@@ -15,4 +15,4 @@ Recommended components:
 - DatasetCapturePanel
 - ModelStatusPanel
 
-In version 1, these components live directly inside `apps/pc-studio/frontend/src/components` for simplicity.
+In the initial skeleton, these components live directly inside `apps/pc-studio/frontend/src/components` for simplicity.

@@ -2,7 +2,7 @@
 
 // ESP32-CAM firmware placeholder for AI Traffic Light project.
 //
-// Version 1 purpose:
+// Initial skeleton purpose:
 // - reserve folder structure
 // - document planned firmware direction
 //

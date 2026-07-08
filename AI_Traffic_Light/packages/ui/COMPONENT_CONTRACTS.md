@@ -43,4 +43,4 @@ Outputs:
 
 - updated zone JSON
 
-Version 1 does not implement the zone editor.
+The initial skeleton does not implement the zone editor.

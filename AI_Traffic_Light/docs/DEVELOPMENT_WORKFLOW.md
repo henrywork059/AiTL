@@ -33,7 +33,7 @@ uvicorn app.main:app --reload
 
 ## Mock-first development
 
-The first version should run without a real camera or AI model.
+The initial skeleton should run without a real camera or AI model.
 
 Use:
 
@@ -46,13 +46,14 @@ Then gradually replace fake parts with real camera and model code.
 
 ## Git workflow suggestion
 
-```bash
-git init
-git add .
-git commit -m "Initial AI traffic light project skeleton"
+For the existing GitHub repo, use these commit messages when applying patches manually through the GitHub website:
+
+```text
+Initial project skeleton v0_0_0
+Fix documentation versioning v0_0_1
 ```
 
-Recommended branch names:
+Recommended branch names later:
 
 ```text
 main

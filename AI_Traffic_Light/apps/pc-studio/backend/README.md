@@ -2,7 +2,7 @@
 
 Python/FastAPI backend placeholder for the PC Studio App.
 
-## Current version
+## Current state
 
 This version serves mock data only.
 

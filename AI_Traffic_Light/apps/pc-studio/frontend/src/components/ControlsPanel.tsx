@@ -24,7 +24,7 @@ export function ControlsPanel({ confidenceThreshold, onConfidenceChange }: Props
         <button>Start mock</button>
         <button>Capture frame</button>
       </div>
-      <p className="small-note">Buttons are placeholders in version 1.</p>
+      <p className="small-note">Buttons are placeholders in the current skeleton.</p>
     </section>
   );
 }

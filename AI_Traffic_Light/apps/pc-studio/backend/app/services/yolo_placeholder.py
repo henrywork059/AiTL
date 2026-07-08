@@ -7,7 +7,7 @@ class YoloDetectionService:
     - filter target classes
     - return DetectionFrame schema
 
-    This is intentionally not implemented in version 1.
+    This is intentionally not implemented at this skeleton stage.
     """
 
     def __init__(self, model_path: str | None = None):

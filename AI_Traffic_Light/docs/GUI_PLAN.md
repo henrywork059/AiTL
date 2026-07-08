@@ -29,7 +29,7 @@ Purpose:
 - Define vehicle queue zone.
 - Define ignore zone.
 
-Version 1 uses hard-coded zones. Later versions should add a visual zone editor.
+The initial skeleton uses hard-coded zones. A later version should add a visual zone editor.
 
 ### 4. Dataset Capture
 
@@ -56,7 +56,7 @@ Purpose:
 - View training logs.
 - Export model package for runtime.
 
-This is a placeholder in version 1.
+This is a placeholder in the initial skeleton.
 
 ## Main live view layout
 

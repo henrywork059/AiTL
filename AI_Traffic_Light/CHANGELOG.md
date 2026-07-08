@@ -1,6 +1,16 @@
 # Changelog
 
-## Version 1 / 0.1.0 skeleton
+## 0_0_1 — Documentation and version cleanup
+
+- Corrected project wording from the earlier “Version 1 / 0.1.0” draft to the chosen **0_0_x** versioning scheme.
+- Updated README layout references from `AI_Traffic_Light_v1/` to `AI_Traffic_Light/`.
+- Added clear baseline/patch distinction:
+  - `0_0_0` = initial skeleton.
+  - `0_0_1` = documentation/version cleanup.
+- Updated documentation roadmap and versioning notes.
+- Updated placeholder UI/backend version labels to avoid old version naming.
+
+## 0_0_0 — Initial starter skeleton
 
 - Added monorepo project structure.
 - Added PC Studio backend placeholder.

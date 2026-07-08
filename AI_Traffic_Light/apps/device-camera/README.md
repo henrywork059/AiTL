@@ -2,7 +2,7 @@
 
 This folder contains camera-node code and instructions.
 
-Version 1 treats the camera device as a **frame sender only**.
+The initial project treats the camera device as a **frame sender only**.
 
 The PC does:
 

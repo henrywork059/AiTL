@@ -37,7 +37,7 @@ A PC app that opens a video/webcam, detects pedestrians and vehicles, counts the
 9. Add ESP-CAM MJPEG input.
 10. Add training/export tools.
 
-## Avoid in version 1
+## Avoid in the initial skeleton stage
 
 - Real traffic-light control.
 - License plate recognition.

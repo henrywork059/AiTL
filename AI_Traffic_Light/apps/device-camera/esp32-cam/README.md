@@ -24,7 +24,7 @@ You can use either:
 - Arduino IDE
 - PlatformIO
 
-This skeleton contains a PlatformIO-style folder, but the firmware is intentionally incomplete in version 1.
+This skeleton contains a PlatformIO-style folder, but the firmware is intentionally incomplete at this stage.
 
 ## Planned controls
 

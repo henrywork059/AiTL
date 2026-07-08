@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.mock import router as mock_router
 from app.routes.traffic import router as traffic_router
 
-app = FastAPI(title="AI Traffic Light PC Studio Backend", version="0.1.0")
+app = FastAPI(title="AI Traffic Light PC Studio Backend", version="0.0.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +23,6 @@ def health() -> dict:
     return {
         "status": "ok",
         "app": "pc-studio-backend",
-        "version": "0.1.0",
+        "version": "0.0.1",
         "mode": "mock",
     }

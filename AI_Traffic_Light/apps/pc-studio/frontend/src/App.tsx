@@ -31,7 +31,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <div className="eyebrow">Version 1 / 0.1.0 skeleton</div>
+          <div className="eyebrow">v0_0_1 documentation patch / skeleton</div>
           <h1>AI Traffic Light PC Studio</h1>
         </div>
         <nav className="tabs" aria-label="Main pages">

@@ -52,7 +52,7 @@ Use shared schemas for detections, zones, traffic state, and camera metadata. Th
 
 ## Development mode
 
-Version 1 starts with mock data:
+The initial skeleton starts with mock data:
 
 ```text
 Fake camera frame
@@ -62,3 +62,10 @@ Fake camera frame
 ```
 
 This allows GUI development with hot reload before AI and camera hardware are connected.
+
+## Current project state
+
+- `0_0_0`: initial skeleton.
+- `0_0_1`: documentation/version cleanup.
+
+The architecture is still draft-level. The next useful step is connecting the frontend placeholder to backend mock data cleanly.

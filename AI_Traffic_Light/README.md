@@ -1,13 +1,16 @@
-# AI Traffic Light — Project Version 1 Skeleton
+# AI Traffic Light — Initial Project Skeleton
 
-This repository is the first draft structure for an **AI vision-based adaptive traffic light project**.
+Current patch: **0_0_1**  
+Baseline skeleton: **0_0_0**
 
-The project is designed around two apps:
+This repository contains the starter structure for an **AI vision-based adaptive traffic light project**.
+
+The project is designed around two main parts:
 
 1. **PC Studio App**
    - Runs on the computer.
    - Receives camera/video frames.
-   - Runs object detection / future segmentation.
+   - Runs object detection and possible future segmentation.
    - Counts pedestrians and vehicles inside traffic zones.
    - Simulates traffic-light decisions.
    - Captures datasets and later trains/exports models.
@@ -17,7 +20,7 @@ The project is designed around two apps:
    - Captures frames and sends them to the PC.
    - Does **not** train AI and does **not** run heavy AI inference.
 
-The current version is a **starter skeleton**, not a finished product. It contains placeholder GUIs, mock APIs, schemas, docs, and folder structure so development can begin cleanly.
+The current project state is a **starter skeleton**, not a finished product. It contains placeholder GUIs, mock APIs, schemas, documentation, and folder structure so development can begin cleanly.
 
 ## Recommended first milestone
 
@@ -34,7 +37,7 @@ Video/webcam input
 ## Repository layout
 
 ```text
-AI_Traffic_Light_v1/
+AI_Traffic_Light/
   apps/
     pc-studio/
       backend/              Python / FastAPI backend placeholder
@@ -60,6 +63,7 @@ AI_Traffic_Light_v1/
 
 ## Version status
 
-This is **Version 1 / 0.1.0 skeleton**.
+- **0_0_0**: initial starter skeleton.
+- **0_0_1**: documentation and version-wording cleanup.
 
-It is safe to upload to GitHub as the first commit.
+No functional app behavior is expected from this patch beyond corrected documentation/version labels.
