@@ -1,0 +1,9 @@
+{
+  "project_name": "AI Vision-Based Adaptive Traffic Light System",
+  "version": "0.1.0",
+  "mode": "mock",
+  "default_source": "mock_camera",
+  "default_confidence_threshold": 0.45,
+  "default_iou_threshold": 0.5,
+  "target_classes": ["person", "car", "bus", "truck", "motorcycle", "bicycle"]
+}

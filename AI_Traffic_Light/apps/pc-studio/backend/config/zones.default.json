@@ -1,0 +1,24 @@
+{
+  "image_width": 1280,
+  "image_height": 720,
+  "zones": [
+    {
+      "id": "ped_waiting_left",
+      "type": "pedestrian_waiting",
+      "label": "Pedestrian Waiting Zone",
+      "polygon": [[70, 380], [360, 380], [360, 690], [70, 690]]
+    },
+    {
+      "id": "crossing_main",
+      "type": "crossing",
+      "label": "Crossing Zone",
+      "polygon": [[360, 360], [680, 360], [680, 690], [360, 690]]
+    },
+    {
+      "id": "vehicle_queue_right",
+      "type": "vehicle_queue",
+      "label": "Vehicle Queue Zone",
+      "polygon": [[680, 300], [1240, 300], [1240, 560], [680, 560]]
+    }
+  ]
+}

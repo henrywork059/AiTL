@@ -1,0 +1,34 @@
+{
+  "classes": [
+    {
+      "id": 0,
+      "name": "person",
+      "category": "pedestrian"
+    },
+    {
+      "id": 1,
+      "name": "car",
+      "category": "vehicle"
+    },
+    {
+      "id": 2,
+      "name": "bus",
+      "category": "vehicle"
+    },
+    {
+      "id": 3,
+      "name": "truck",
+      "category": "vehicle"
+    },
+    {
+      "id": 4,
+      "name": "motorcycle",
+      "category": "vehicle"
+    },
+    {
+      "id": 5,
+      "name": "bicycle",
+      "category": "vehicle"
+    }
+  ]
+}

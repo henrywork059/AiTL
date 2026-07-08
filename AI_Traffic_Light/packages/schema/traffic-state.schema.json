@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TrafficState",
+  "type": "object",
+  "required": [
+    "phase",
+    "pedestrians_waiting",
+    "pedestrians_crossing",
+    "vehicles_waiting",
+    "decision",
+    "decision_reason",
+    "extension_seconds"
+  ],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": [
+        "vehicle_green",
+        "vehicle_yellow",
+        "pedestrian_green",
+        "pedestrian_flashing",
+        "all_red"
+      ]
+    },
+    "pedestrians_waiting": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pedestrians_crossing": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vehicles_waiting": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "decision": {
+      "type": "string"
+    },
+    "decision_reason": {
+      "type": "string"
+    },
+    "extension_seconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
