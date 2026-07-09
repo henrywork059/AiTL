@@ -1,5 +1,11 @@
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
 def get_mock_detection_frame() -> dict:
-    return {
+    """Return stable fake detections for GUI and API testing."""
+    frame = {
         "frame_id": "mock_cam_000001",
         "source_id": "mock_camera",
         "image_width": 1280,
@@ -36,10 +42,13 @@ def get_mock_detection_frame() -> dict:
             },
         ],
     }
+    logger.debug("Generated mock detection frame", extra={"frame_id": frame["frame_id"]})
+    return frame
 
 
 def get_mock_zones() -> list[dict]:
-    return [
+    """Return stable fake traffic zones for GUI and API testing."""
+    zones = [
         {
             "id": "ped_waiting_left",
             "type": "pedestrian_waiting",
@@ -59,3 +68,5 @@ def get_mock_zones() -> list[dict]:
             "polygon": [[680, 300], [1240, 300], [1240, 560], [680, 560]],
         },
     ]
+    logger.debug("Generated mock zones", extra={"zone_count": len(zones)})
+    return zones

@@ -2,13 +2,21 @@
 
 This file gives short mandatory instructions for AI agents, coding assistants, and automation tools working on this repository.
 
-For deeper guidance, read `docs/AI_AGENT_GUIDE.md`.
+For deeper guidance, read:
+
+```text
+docs/AI_AGENT_GUIDE.md
+docs/CODE_STRUCTURE.md
+docs/API_CONTRACTS.md
+docs/ERROR_CODES.md
+docs/DEBUGGING_AND_LOGGING.md
+```
 
 ## Project identity
 
 Project name: **AI Traffic Light**  
 Current patch line: **0_0_x**  
-Current patch: **0_0_2**
+Current patch: **0_0_3**
 
 This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
 
@@ -24,6 +32,76 @@ packages/ui/           Shared UI/component planning
 ```
 
 The PC does heavy AI work. The ESP/device camera captures frames and sends them to the PC. Do not move training or heavy segmentation inference onto the ESP camera.
+
+## Code modularity rule
+
+Break code into small files with single responsibilities.
+
+Required backend layering:
+
+```text
+app/main.py       app factory, middleware, router registration only
+app/routes/       thin HTTP/API handlers only
+app/services/     business logic: detection, counting, traffic decisions, data capture
+app/core/         logging, error codes, exceptions, API response helpers
+app/models.py     Pydantic request/response models only
+```
+
+Required frontend layering:
+
+```text
+src/App.tsx             page composition only
+src/components/         small display/control components
+src/lib/apiClient.ts    API fetch wrapper
+src/lib/logger.ts       frontend logging helper
+src/lib/errorCodes.ts   frontend error-code constants
+src/types.ts            shared frontend types
+```
+
+Do not place camera capture, AI inference, zone counting, traffic decisions, file I/O, and UI rendering in one large file.
+
+## API rule
+
+Use documented API contracts. For new backend endpoints, prefer this envelope shape:
+
+```json
+{
+  "ok": true,
+  "data": {},
+  "meta": {
+    "request_id": "..."
+  }
+}
+```
+
+Errors should use:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "ATL-AREA-NNN",
+    "message": "Human-readable message",
+    "details": {}
+  },
+  "meta": {
+    "request_id": "..."
+  }
+}
+```
+
+## Logging and error-code rule
+
+Most non-trivial code should log useful events and failures.
+
+Use central error codes from:
+
+```text
+apps/pc-studio/backend/app/core/error_codes.py
+docs/ERROR_CODES.md
+```
+
+Do not raise anonymous exceptions for expected project errors. Use `AppError` where possible.
 
 ## Safety rule
 
@@ -54,7 +132,7 @@ Use the underscore version style requested by the project owner:
 0_0_0 = initial skeleton
 0_0_1 = documentation/version cleanup
 0_0_2 = human and AI-agent instruction docs
-0_0_3 = next small patch
+0_0_3 = modular code, API, logging, and error-code standards
 ```
 
 For patch zips, include **only changed files** with the same relative paths. Do not package the whole repository unless explicitly requested.
@@ -78,35 +156,13 @@ relevant docs/*.md
 Do not commit:
 
 ```text
-real API keys
-Wi-Fi passwords
-private IP credentials
+API keys
+passwords
+Wi-Fi credentials
+private camera IPs if sensitive
 large datasets
-trained model binaries
-recorded videos with identifiable people unless explicitly approved
+large trained model files
+personal data from real pedestrians or vehicles
 ```
 
-Use `.gitkeep`, sample JSON, and documentation placeholders instead.
-
-## GUI development rule
-
-Preserve fast preview/development behavior:
-
-```text
-Vite hot reload for frontend
-FastAPI reload for backend
-fake/mock data mode for GUI work
-fixed sample detection JSON for visual testing
-```
-
-Do not require real camera hardware or a real model just to load the GUI.
-
-## Detection data rule
-
-Detection boxes should be stored in original image coordinates, not displayed-screen coordinates. GUI overlays should convert original image coordinates to display coordinates.
-
-Prefer shared schema files in `packages/schema/` over hard-coded ad-hoc formats.
-
-## Human readability rule
-
-Documentation must be clear enough for a student or teacher to follow. Avoid unexplained jargon. When technical terms are needed, define them briefly.
+Use placeholders and `.gitkeep` files for folders that will later contain large/private data.

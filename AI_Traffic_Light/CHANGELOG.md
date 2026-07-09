@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_0_3 — Modular code, API contracts, logging, and error codes
+
+- Added coding standards for small, debuggable modules.
+- Added backend logging/error-code infrastructure.
+- Added API response envelope helpers and exception handling.
+- Added frontend API/debug logging helpers.
+- Refactored placeholder backend routes into smaller route/core/service modules.
+- Added documentation for API contracts, debugging, logging, and error-code ranges.
+- Added patch notes for **0_0_3**.
+
 ## 0_0_2 — Human and AI-agent instruction docs
 
 - Added root-level `AGENTS.md` for AI agents and coding assistants.
