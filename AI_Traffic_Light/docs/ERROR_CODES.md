@@ -1,69 +1,62 @@
 # Error Codes
 
-Patch: **0_0_3**
+The project uses stable error codes so humans and AI agents can debug quickly.
 
-This project uses stable error codes to make debugging easier.
+## Rules
 
-## 1. Format
+- Never raise a generic error when a project-specific code exists.
+- Include the code in backend logs and API error responses.
+- Add new codes here when adding a new failure type.
+- Keep `apps/pc-studio/backend/app/core/error_codes.py` aligned with this file.
 
-Use this format:
+## Code ranges
 
-```text
-ATL-AREA-NNN
-```
+| Range | Area |
+|---|---|
+| `ATL-COMMON-*` | Shared/general errors |
+| `ATL-API-*` | HTTP/API/request/response errors |
+| `ATL-CONFIG-*` | Config/settings errors |
+| `ATL-CAMERA-*` | Camera/video source errors |
+| `ATL-DETECT-*` | AI inference/model detection errors |
+| `ATL-ZONE-*` | Traffic-zone configuration/counting errors |
+| `ATL-TRAFFIC-*` | Traffic-light simulation decision errors |
+| `ATL-DATASET-*` | Dataset capture/review/storage errors |
+| `ATL-TRAIN-*` | Training pipeline errors |
+| `ATL-MODEL-*` | Model registry/export errors |
+| `ATL-LOG-*` | Log reading/reporting errors |
 
-Examples:
+## Current backend codes
 
-```text
-ATL-COMMON-000
-ATL-API-001
-ATL-CAMERA-001
-ATL-DETECT-001
-```
-
-## 2. Area ranges
-
-| Range | Area | Meaning |
-|---|---|---|
-| `ATL-COMMON-000` to `ATL-COMMON-099` | Common | Unknown or generic project errors |
-| `ATL-API-001` to `ATL-API-099` | API | Request/response/server errors |
-| `ATL-CONFIG-001` to `ATL-CONFIG-099` | Config | Missing or invalid configuration |
-| `ATL-CAMERA-001` to `ATL-CAMERA-099` | Camera | Webcam, ESP-CAM, stream, image capture errors |
-| `ATL-DETECT-001` to `ATL-DETECT-099` | AI detection | Model loading, inference, post-processing errors |
-| `ATL-ZONE-001` to `ATL-ZONE-099` | Zones | Invalid zones, geometry, object-zone assignment |
-| `ATL-TRAFFIC-001` to `ATL-TRAFFIC-099` | Traffic logic | Signal state and decision logic errors |
-| `ATL-DATASET-001` to `ATL-DATASET-099` | Dataset | Capture, save, import, export errors |
-| `ATL-FE-001` to `ATL-FE-099` | Frontend | Browser UI, API client, rendering errors |
-
-## 3. Initial backend codes
-
-| Code | Name | Meaning |
-|---|---|---|
-| `ATL-COMMON-000` | `UNKNOWN_ERROR` | Unexpected unhandled error |
-| `ATL-API-001` | `API_REQUEST_FAILED` | API request failed |
-| `ATL-API-002` | `INVALID_REQUEST` | Request body/query/path is invalid |
-| `ATL-CONFIG-001` | `CONFIG_MISSING` | Required config file/value is missing |
-| `ATL-CAMERA-001` | `CAMERA_NOT_CONNECTED` | Camera is not connected |
-| `ATL-CAMERA-002` | `CAMERA_FRAME_READ_FAILED` | Failed to read a camera frame |
-| `ATL-DETECT-001` | `MODEL_NOT_LOADED` | Detection model is not loaded |
-| `ATL-DETECT-002` | `INFERENCE_FAILED` | Detection inference failed |
-| `ATL-ZONE-001` | `ZONE_CONFIG_INVALID` | Zone configuration is invalid |
-| `ATL-TRAFFIC-001` | `TRAFFIC_STATE_INVALID` | Traffic state is invalid |
-| `ATL-DATASET-001` | `DATASET_WRITE_FAILED` | Failed to save dataset item |
-
-## 4. Initial frontend codes
-
-| Code | Name | Meaning |
-|---|---|---|
-| `ATL-FE-001` | `FRONTEND_UNKNOWN` | Unknown frontend error |
-| `ATL-FE-API-001` | `API_FETCH_FAILED` | Frontend failed to fetch API data |
-| `ATL-FE-API-002` | `API_RESPONSE_INVALID` | API response was not in expected shape |
-| `ATL-FE-RENDER-001` | `RENDER_FAILED` | UI component render/update problem |
-
-## 5. Rules for adding new codes
-
-- Do not reuse a code for a different meaning.
-- Do not delete old codes; mark them deprecated if needed.
-- Use specific codes for expected failures.
-- Use `ATL-COMMON-000` only for truly unexpected failures.
-- Update this document and `app/core/error_codes.py` together.
+| Code | Meaning |
+|---|---|
+| `ATL-COMMON-000` | Unexpected backend error. |
+| `ATL-API-001` | API request failed. |
+| `ATL-API-002` | Invalid request. |
+| `ATL-API-003` | Template route is not implemented yet. |
+| `ATL-CONFIG-001` | Required configuration is missing. |
+| `ATL-CONFIG-002` | Failed to read settings. |
+| `ATL-CONFIG-003` | Failed to write settings. |
+| `ATL-CAMERA-001` | Camera is not connected. |
+| `ATL-CAMERA-002` | Failed to read a camera frame. |
+| `ATL-CAMERA-003` | Camera source is invalid. |
+| `ATL-CAMERA-004` | Camera stream has not been started. |
+| `ATL-DETECT-001` | Detection model is not loaded. |
+| `ATL-DETECT-002` | Detection inference failed. |
+| `ATL-DETECT-003` | Inference source is missing. |
+| `ATL-DETECT-004` | Inference result is invalid. |
+| `ATL-ZONE-001` | Zone configuration is invalid. |
+| `ATL-ZONE-002` | Zone was not found. |
+| `ATL-ZONE-003` | Failed to save zone configuration. |
+| `ATL-TRAFFIC-001` | Traffic state is invalid. |
+| `ATL-TRAFFIC-002` | Traffic rule is invalid. |
+| `ATL-TRAFFIC-003` | Traffic decision failed. |
+| `ATL-DATASET-001` | Failed to write dataset item. |
+| `ATL-DATASET-002` | Failed to read dataset item. |
+| `ATL-DATASET-003` | Dataset item was not found. |
+| `ATL-TRAIN-001` | Training is not ready. |
+| `ATL-TRAIN-002` | Training configuration is invalid. |
+| `ATL-TRAIN-003` | Training run failed. |
+| `ATL-MODEL-001` | Failed to read model registry. |
+| `ATL-MODEL-002` | Failed to export model package. |
+| `ATL-MODEL-003` | Model version was not found. |
+| `ATL-LOG-001` | Failed to read logs. |

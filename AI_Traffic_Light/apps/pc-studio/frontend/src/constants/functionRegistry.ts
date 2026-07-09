@@ -1,0 +1,88 @@
+import type { FunctionItem } from "../types/app";
+
+export const FUNCTION_REGISTRY: FunctionItem[] = [
+  {
+    id: "camera.add_source",
+    area: "Camera",
+    label: "Add camera source",
+    description: "Register webcam, ESP-CAM MJPEG URL, IP camera URL, or video file.",
+    status: "placeholder",
+  },
+  {
+    id: "camera.preview_stream",
+    area: "Camera",
+    label: "Preview stream",
+    description: "Show camera feed before enabling AI inference.",
+    status: "placeholder",
+  },
+  {
+    id: "inference.load_model",
+    area: "AI inference",
+    label: "Load detection model",
+    description: "Load a pretrained or exported model for object detection.",
+    status: "placeholder",
+  },
+  {
+    id: "inference.run_frame",
+    area: "AI inference",
+    label: "Run detection on frame",
+    description: "Return detection boxes, classes, confidence, and timing metadata.",
+    status: "placeholder",
+  },
+  {
+    id: "zones.edit",
+    area: "Zones",
+    label: "Edit traffic zones",
+    description: "Draw and edit polygons for waiting, crossing, vehicle queue, and ignore zones.",
+    status: "placeholder",
+  },
+  {
+    id: "zones.count",
+    area: "Zones",
+    label: "Count objects in zones",
+    description: "Map detections to traffic zones using object center or box overlap.",
+    status: "placeholder",
+  },
+  {
+    id: "traffic.decide",
+    area: "Traffic logic",
+    label: "Make signal decision",
+    description: "Use counts, wait time, and crossing safety rules to simulate light phases.",
+    status: "placeholder",
+  },
+  {
+    id: "dataset.capture",
+    area: "Dataset",
+    label: "Capture frame and metadata",
+    description: "Save raw image, detection JSON, zones, and user notes.",
+    status: "placeholder",
+  },
+  {
+    id: "dataset.review",
+    area: "Dataset",
+    label: "Review captured data",
+    description: "Inspect useful/bad frames, label issues, and class distribution.",
+    status: "placeholder",
+  },
+  {
+    id: "training.run",
+    area: "Training",
+    label: "Start training run",
+    description: "Later: configure training, launch it, and stream progress logs.",
+    status: "later",
+  },
+  {
+    id: "model.export",
+    area: "Model",
+    label: "Export runtime package",
+    description: "Later: export model, class list, thresholds, and preprocessing config.",
+    status: "later",
+  },
+  {
+    id: "logs.inspect",
+    area: "Debug",
+    label: "Inspect logs and error codes",
+    description: "View recent errors, request IDs, and related module scope.",
+    status: "placeholder",
+  },
+];

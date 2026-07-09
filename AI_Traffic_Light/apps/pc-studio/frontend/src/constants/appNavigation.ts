@@ -1,0 +1,106 @@
+import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
+
+export const APP_VERSION_LABEL = "0_0_4 PC Studio template";
+
+export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
+  dashboard: {
+    id: "dashboard",
+    label: "Dashboard",
+    shortLabel: "Dashboard",
+    description: "Project overview, app state, and next development tasks.",
+    status: "template",
+  },
+  live_ai: {
+    id: "live_ai",
+    label: "Live AI View",
+    shortLabel: "Live AI",
+    description: "Main camera/detection viewer with traffic-light simulation.",
+    status: "mock",
+  },
+  camera_sources: {
+    id: "camera_sources",
+    label: "Camera Sources",
+    shortLabel: "Cameras",
+    description: "Manage webcam, ESP-CAM, IP camera, and video-file sources.",
+    status: "template",
+  },
+  zone_editor: {
+    id: "zone_editor",
+    label: "Zone Editor",
+    shortLabel: "Zones",
+    description: "Create pedestrian waiting, crossing, vehicle queue, and ignore zones.",
+    status: "template",
+  },
+  traffic_logic: {
+    id: "traffic_logic",
+    label: "Traffic Logic",
+    shortLabel: "Logic",
+    description: "Configure rule-based signal decisions and safety checks.",
+    status: "template",
+  },
+  dataset_capture: {
+    id: "dataset_capture",
+    label: "Dataset Capture",
+    shortLabel: "Capture",
+    description: "Save raw frames, predictions, notes, and frame quality tags.",
+    status: "template",
+  },
+  dataset_review: {
+    id: "dataset_review",
+    label: "Dataset Review",
+    shortLabel: "Review",
+    description: "Inspect saved frames, labels, prediction errors, and dataset balance.",
+    status: "template",
+  },
+  train_export: {
+    id: "train_export",
+    label: "Train / Export",
+    shortLabel: "Train",
+    description: "Configure training runs and export runtime packages for later deployment.",
+    status: "template",
+  },
+  model_registry: {
+    id: "model_registry",
+    label: "Model Registry",
+    shortLabel: "Models",
+    description: "Compare model versions, metrics, classes, and export status.",
+    status: "template",
+  },
+  settings: {
+    id: "settings",
+    label: "Settings",
+    shortLabel: "Settings",
+    description: "Project paths, API base URL, debug mode, and app preferences.",
+    status: "template",
+  },
+  logs: {
+    id: "logs",
+    label: "Logs & Errors",
+    shortLabel: "Logs",
+    description: "Debug logs, error codes, request IDs, and recent app events.",
+    status: "template",
+  },
+};
+
+export const APP_SECTIONS: AppSection[] = [
+  {
+    id: "operate",
+    label: "Operate",
+    pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources],
+  },
+  {
+    id: "traffic",
+    label: "Traffic setup",
+    pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic],
+  },
+  {
+    id: "data",
+    label: "Data & model",
+    pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry],
+  },
+  {
+    id: "system",
+    label: "System",
+    pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs],
+  },
+];

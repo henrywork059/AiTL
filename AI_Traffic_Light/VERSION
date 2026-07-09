@@ -1,5 +1,4 @@
-Project: AI Traffic Light
-Baseline version: 0_0_0
-Current patch version: 0_0_3
-Internal semver: 0.0.3
-Purpose: add modular coding, API, logging, and error-code standards
+version: 0_0_4
+status: pc studio app template patch
+previous_version: 0_0_3
+notes: Adds the first PC Studio application template for confirming functions and GUI layouts. No real AI inference, camera capture, training, or traffic control is implemented yet.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_0_4 — PC Studio app template and function map
+
+- Added the first structured PC Studio frontend template.
+- Added sidebar navigation and placeholder pages for all planned main functions.
+- Added reusable layout, placeholder, metric, checklist, and status components.
+- Added central frontend page and function registries.
+- Added backend placeholder route modules for camera, inference, zones, dataset, training, model registry, settings, logs, and template metadata.
+- Updated backend app wiring to expose the placeholder API structure.
+- Expanded error-code ranges for future camera, inference, zone, dataset, training, model, settings, and logging work.
+- Added human/AI documentation for confirming the PC Studio function list and GUI layout before real implementation.
+
 ## 0_0_3 — Modular code, API contracts, logging, and error codes
 
 - Added coding standards for small, debuggable modules.

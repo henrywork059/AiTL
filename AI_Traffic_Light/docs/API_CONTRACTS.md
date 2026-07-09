@@ -1,139 +1,68 @@
 # API Contracts
 
-Patch: **0_0_3**
+The PC Studio backend should expose small, focused route groups. Each group should call service functions instead of storing logic inside route handlers.
 
-This document defines how the PC Studio backend API should be written.
+## Response envelope
 
-## 1. API style
-
-The backend should use small, predictable endpoints.
-
-Route files should be thin wrappers over service functions.
-
-```text
-HTTP request
-→ route function
-→ service function
-→ response helper
-```
-
-## 2. Success response envelope
-
-New endpoints should return this shape:
+All new APIs should return this format:
 
 ```json
 {
   "ok": true,
   "data": {},
   "meta": {
-    "request_id": "req_..."
+    "request_id": "..."
   }
 }
 ```
 
-## 3. Error response envelope
-
-Expected errors should return this shape:
+Errors should return:
 
 ```json
 {
   "ok": false,
   "error": {
-    "code": "ATL-AREA-NNN",
-    "message": "Human-readable error message",
+    "code": "ATL-AREA-001",
+    "message": "Human readable message",
     "details": {}
   },
   "meta": {
-    "request_id": "req_..."
+    "request_id": "..."
   }
 }
 ```
 
-The frontend API client should support both:
+## Placeholder route groups in 0_0_4
+
+| Route prefix | Purpose |
+|---|---|
+| `/api/camera` | camera/video/ESP-CAM source management |
+| `/api/inference` | model loading and detection results |
+| `/api/zones` | traffic-zone setup and zone counting |
+| `/api/traffic` | signal simulation and decision state |
+| `/api/dataset` | data capture and review |
+| `/api/training` | training progress and config |
+| `/api/models` | model registry and export status |
+| `/api/settings` | project settings |
+| `/api/logs` | recent logs and error reports |
+| `/api/template` | template metadata for GUI confirmation |
+
+## Implementation rule
+
+Do not put real logic directly in route files. Use this structure:
 
 ```text
-new envelope responses
-old raw placeholder responses
+routes/camera.py
+→ services/camera_sources.py
+→ core/error_codes.py
+→ schema files / models
 ```
 
-This keeps early placeholder code from breaking while the API standard is introduced.
-
-## 4. Endpoint groups
-
-Recommended endpoint groups:
+A route file should mainly:
 
 ```text
-GET  /health
-GET  /api/mock/frame
-GET  /api/mock/zones
-GET  /api/traffic/state
-
-Future:
-GET  /api/cameras
-POST /api/cameras/connect
-POST /api/cameras/disconnect
-POST /api/detect/image
-POST /api/detect/frame
-POST /api/datasets/capture
-GET  /api/datasets
-POST /api/train/start
-GET  /api/train/status
-POST /api/models/export
-```
-
-## 5. Naming rules
-
-Use clear nouns and actions:
-
-```text
-/api/cameras
-/api/datasets
-/api/models
-/api/traffic/state
-```
-
-Avoid vague endpoints:
-
-```text
-/api/do
-/api/run
-/api/process
-/api/data
-```
-
-## 6. Route implementation rule
-
-Routes should look like this:
-
-```python
-@router.get('/state')
-def traffic_state(request: Request) -> dict:
-    state = get_mock_traffic_state()
-    return ok(state, request_id=request.state.request_id)
-```
-
-Do not put large business logic in route functions.
-
-## 7. Request ID rule
-
-Every request should have a request ID.
-
-Use it in:
-
-```text
-backend logs
-API meta responses
-frontend error logs
-bug reports
-```
-
-## 8. Backward compatibility rule
-
-When changing an endpoint shape, update:
-
-```text
-frontend API client
-docs/API_CONTRACTS.md
-docs/PATCH_<version>.md
-CHANGELOG.md
+- parse request
+- call service
+- log request/result
+- return API envelope
 ```

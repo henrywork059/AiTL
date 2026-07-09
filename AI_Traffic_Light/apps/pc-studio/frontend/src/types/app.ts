@@ -1,0 +1,36 @@
+export type AppPageId =
+  | "dashboard"
+  | "live_ai"
+  | "camera_sources"
+  | "zone_editor"
+  | "traffic_logic"
+  | "dataset_capture"
+  | "dataset_review"
+  | "train_export"
+  | "model_registry"
+  | "settings"
+  | "logs";
+
+export type AppSection = {
+  id: string;
+  label: string;
+  pages: AppPageSummary[];
+};
+
+export type AppPageSummary = {
+  id: AppPageId;
+  label: string;
+  shortLabel: string;
+  description: string;
+  status: "template" | "mock" | "planned";
+};
+
+export type FunctionStatus = "placeholder" | "planned" | "later";
+
+export type FunctionItem = {
+  id: string;
+  area: string;
+  label: string;
+  description: string;
+  status: FunctionStatus;
+};

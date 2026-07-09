@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchMockFrame, fetchMockZones, fetchTrafficState } from "./api";
-import { ControlsPanel } from "./components/ControlsPanel";
-import { DatasetPanel } from "./components/DatasetPanel";
-import { DetectionTable } from "./components/DetectionTable";
-import { LiveView } from "./components/LiveView";
-import { StatusPanel } from "./components/StatusPanel";
-import { TrafficLight } from "./components/TrafficLight";
-import { ZonePanel } from "./components/ZonePanel";
+import { AppStatusBar } from "./components/AppStatusBar";
+import { AppShell } from "./layout/AppShell";
+import { CameraSourcesPage } from "./pages/CameraSourcesPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { DatasetCapturePage } from "./pages/DatasetCapturePage";
+import { DatasetReviewPage } from "./pages/DatasetReviewPage";
+import { LiveAiPage } from "./pages/LiveAiPage";
+import { LogsPage } from "./pages/LogsPage";
+import { ModelRegistryPage } from "./pages/ModelRegistryPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { TrafficLogicPage } from "./pages/TrafficLogicPage";
+import { TrainExportPage } from "./pages/TrainExportPage";
+import { ZoneEditorPage } from "./pages/ZoneEditorPage";
+import type { AppPageId } from "./types/app";
 import type { DetectionFrame, TrafficState, Zone } from "./types";
 
 export default function App() {
@@ -14,7 +21,7 @@ export default function App() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [traffic, setTraffic] = useState<TrafficState | null>(null);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.45);
-  const [activePage, setActivePage] = useState("live");
+  const [activePage, setActivePage] = useState<AppPageId>("dashboard");
 
   useEffect(() => {
     void fetchMockFrame().then(setFrame);
@@ -24,85 +31,51 @@ export default function App() {
 
   const filteredDetections = useMemo(() => {
     if (!frame) return [];
-    return frame.detections.filter((d) => d.confidence >= confidenceThreshold);
+    return frame.detections.filter((detection) => detection.confidence >= confidenceThreshold);
   }, [frame, confidenceThreshold]);
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <div className="eyebrow">v0_0_1 documentation patch / skeleton</div>
-          <h1>AI Traffic Light PC Studio</h1>
-        </div>
-        <nav className="tabs" aria-label="Main pages">
-          {[
-            ["live", "Live AI"],
-            ["capture", "Dataset Capture"],
-            ["train", "Train / Export"],
-            ["settings", "Settings"],
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              className={activePage === id ? "tab active" : "tab"}
-              onClick={() => setActivePage(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="main-grid">
-        <section className="panel live-panel">
-          <div className="panel-header">
-            <h2>{activePage === "live" ? "Live detection view" : "Placeholder page"}</h2>
-            <span className="status-pill">Mock mode</span>
-          </div>
-          {activePage === "live" && frame ? (
-            <LiveView
-              frame={frame}
-              detections={filteredDetections}
-              zones={zones}
-            />
-          ) : activePage === "capture" ? (
-            <DatasetPanel />
-          ) : activePage === "train" ? (
-            <div className="empty-state">
-              <h3>Training/export placeholder</h3>
-              <p>
-                Later this page will configure model training, review model versions,
-                and export runtime packages.
-              </p>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <h3>Settings placeholder</h3>
-              <p>
-                Later this page will manage camera sources, ESP-CAM IP addresses,
-                model settings, and zone files.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <aside className="side-column">
-          {traffic && <TrafficLight traffic={traffic} />}
-          {traffic && <StatusPanel traffic={traffic} />}
-          <ControlsPanel
+  function renderPage() {
+    switch (activePage) {
+      case "dashboard":
+        return <DashboardPage />;
+      case "live_ai":
+        return (
+          <LiveAiPage
+            frame={frame}
+            zones={zones}
+            traffic={traffic}
+            detections={filteredDetections}
             confidenceThreshold={confidenceThreshold}
             onConfidenceChange={setConfidenceThreshold}
           />
-          <ZonePanel zones={zones} />
-        </aside>
-      </main>
+        );
+      case "camera_sources":
+        return <CameraSourcesPage />;
+      case "zone_editor":
+        return <ZoneEditorPage />;
+      case "traffic_logic":
+        return <TrafficLogicPage />;
+      case "dataset_capture":
+        return <DatasetCapturePage />;
+      case "dataset_review":
+        return <DatasetReviewPage />;
+      case "train_export":
+        return <TrainExportPage />;
+      case "model_registry":
+        return <ModelRegistryPage />;
+      case "settings":
+        return <SettingsPage />;
+      case "logs":
+        return <LogsPage />;
+      default:
+        return <DashboardPage />;
+    }
+  }
 
-      <section className="panel bottom-panel">
-        <div className="panel-header">
-          <h2>Detections</h2>
-          <span>{filteredDetections.length} visible</span>
-        </div>
-        <DetectionTable detections={filteredDetections} />
-      </section>
-    </div>
+  return (
+    <>
+      <AppShell activePage={activePage} onPageChange={setActivePage}>{renderPage()}</AppShell>
+      <AppStatusBar />
+    </>
   );
 }
