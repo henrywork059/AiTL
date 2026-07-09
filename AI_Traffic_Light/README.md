@@ -1,6 +1,6 @@
 # AI Traffic Light — Initial Project Skeleton
 
-Current patch: **0_0_1**  
+Current patch: **0_0_2**  
 Baseline skeleton: **0_0_0**
 
 This repository contains the starter structure for an **AI vision-based adaptive traffic light project**.
@@ -51,6 +51,21 @@ AI_Traffic_Light/
   docs/                     Instructions and design notes
   samples/                  Sample images/videos/predictions placeholders
   scripts/                  Helper scripts
+  AGENTS.md                 Working rules for AI agents
+```
+
+## Important documentation
+
+Start with these files:
+
+```text
+docs/START_HERE.md              First orientation for the project
+docs/HUMAN_GUIDE.md             Human workflow, usage, upload, and safety guide
+docs/AI_AGENT_GUIDE.md          Detailed instructions for AI coding/documentation agents
+AGENTS.md                       Short root-level rules for AI agents
+docs/DEVELOPMENT_WORKFLOW.md    Development flow and milestone order
+docs/VERSIONING.md              Version and patch rules
+docs/ROADMAP.md                 Project roadmap
 ```
 
 ## Development direction
@@ -60,10 +75,12 @@ AI_Traffic_Light/
 - Add YOLO detection after the GUI flow works.
 - Add ESP-CAM stream only after the PC prototype is stable.
 - Add training after the detection + zone logic is proven.
+- Keep documentation, schemas, and app behavior aligned in every patch.
 
 ## Version status
 
 - **0_0_0**: initial starter skeleton.
 - **0_0_1**: documentation and version-wording cleanup.
+- **0_0_2**: added human and AI-agent working instructions.
 
-No functional app behavior is expected from this patch beyond corrected documentation/version labels.
+No functional app behavior is expected from this patch beyond documentation additions and version references.

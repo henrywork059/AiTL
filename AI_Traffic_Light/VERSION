@@ -1,5 +1,5 @@
 Project: AI Traffic Light
 Baseline version: 0_0_0
-Current patch version: 0_0_1
-Internal semver: 0.0.1
-Purpose: documentation and version wording cleanup
+Current patch version: 0_0_2
+Internal semver: 0.0.2
+Purpose: add human and AI-agent project instructions

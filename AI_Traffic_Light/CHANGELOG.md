@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_0_2 — Human and AI-agent instruction docs
+
+- Added root-level `AGENTS.md` for AI agents and coding assistants.
+- Added `docs/AI_AGENT_GUIDE.md` with detailed project rules for AI agents.
+- Added `docs/HUMAN_GUIDE.md` with human-facing usage, upload, patch, and safety instructions.
+- Updated README documentation links.
+- Updated version metadata to **0_0_2**.
+
 ## 0_0_1 — Documentation and version cleanup
 
 - Corrected project wording from the earlier “Version 1 / 0.1.0” draft to the chosen **0_0_x** versioning scheme.
