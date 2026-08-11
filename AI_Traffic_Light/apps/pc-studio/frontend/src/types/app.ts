@@ -22,7 +22,7 @@ export type AppPageSummary = {
   label: string;
   shortLabel: string;
   description: string;
-  status: "template" | "mock" | "planned";
+  status: "template" | "mock" | "planned" | "test-ready";
 };
 
 export type FunctionStatus = "placeholder" | "planned" | "later";

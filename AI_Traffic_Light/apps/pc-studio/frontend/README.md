@@ -1,6 +1,30 @@
 # PC Studio Frontend
 
-React/Vite placeholder GUI for the AI Traffic Light PC Studio App.
+React/Vite GUI for the AI Traffic Light PC Studio App.
+
+## Current state — 0_1_0
+
+This frontend is **test-ready with mock data**.
+
+It can:
+
+```text
+- start locally with Vite
+- connect to the FastAPI backend mock endpoints
+- fall back to local mock data if the backend is offline
+- display the mock Live AI view
+- show mock detections, zones, logs, and traffic state
+```
+
+It cannot yet:
+
+```text
+- open a real webcam
+- read ESP-CAM stream
+- run YOLO inference
+- save dataset captures
+- train/export models
+```
 
 ## Run
 
@@ -15,15 +39,9 @@ Open:
 http://localhost:5173
 ```
 
-## Current state
+## Optional build check
 
-This frontend uses mock data and placeholder SVG-style layout. It is intended for fast GUI development with hot reload.
-
-## Later additions
-
-- Connect to backend API.
-- Show live frame stream.
-- Draw real detection boxes.
-- Add zone editor.
-- Add dataset capture page.
-- Add training/export page.
+```bash
+npm run typecheck
+npm run build
+```

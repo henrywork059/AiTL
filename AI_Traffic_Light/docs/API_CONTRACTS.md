@@ -66,3 +66,39 @@ A route file should mainly:
 - log request/result
 - return API envelope
 ```
+
+## Added in 0_1_0
+
+### `GET /api/smoke/status`
+
+Purpose: verify that the backend is locally test-ready without connecting to real camera, AI inference, training, or physical traffic-light control.
+
+Response data includes:
+
+```text
+version
+mode
+ready_for
+not_ready_for
+checks
+endpoints
+summary
+```
+
+Use this endpoint first when checking whether the frontend and backend can communicate.
+
+### `GET /api/smoke/error-demo`
+
+Purpose: intentionally returns a controlled error envelope for testing error-code display and request handling.
+
+Expected status:
+
+```text
+501
+```
+
+Expected error code:
+
+```text
+ATL-API-003
+```

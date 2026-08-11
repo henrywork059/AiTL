@@ -20,10 +20,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
         try:
             response = await call_next(request)
-        finally:
+        except Exception:
             duration_ms = round((perf_counter() - start) * 1000, 2)
-            logger.info(
-                "HTTP request completed",
+            logger.exception(
+                "HTTP request failed",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
@@ -31,6 +31,18 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "duration_ms": duration_ms,
                 },
             )
+            raise
 
+        duration_ms = round((perf_counter() - start) * 1000, 2)
+        logger.info(
+            "HTTP request completed",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "duration_ms": duration_ms,
+                "status_code": response.status_code,
+            },
+        )
         response.headers["x-request-id"] = request_id
         return response

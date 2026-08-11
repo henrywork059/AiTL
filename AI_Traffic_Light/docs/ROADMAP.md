@@ -76,3 +76,27 @@ Planned next small patch:
 - Multi-camera support.
 - Object tracking.
 - Slow-crossing safety extension.
+
+## 0_1_0 — Test-ready mock PC Studio
+
+Status: added.
+
+Scope:
+
+```text
+- frontend/backend local startup
+- mock API connection
+- smoke-test endpoint
+- mock Live AI view
+- mock logs/status display
+```
+
+Still excluded:
+
+```text
+- real camera capture
+- ESP-CAM stream
+- YOLO inference
+- training
+- physical traffic-light control
+```

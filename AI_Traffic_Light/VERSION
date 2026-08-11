@@ -1,4 +1,4 @@
-version: 0_0_4
-status: pc studio app template patch
-previous_version: 0_0_3
-notes: Adds the first PC Studio application template for confirming functions and GUI layouts. No real AI inference, camera capture, training, or traffic control is implemented yet.
+version: 0_1_0
+status: pc studio test-ready mock version
+previous_version: 0_0_4
+notes: First local smoke-test version. Frontend and backend can be run together with mock data, API health checks, visible error/log status, and a test checklist. No real AI inference, camera capture, training, or physical traffic control is implemented yet.

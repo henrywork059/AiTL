@@ -36,3 +36,50 @@ export type TrafficState = {
   decision_reason: string;
   extension_seconds: number;
 };
+
+export type BackendHealth = {
+  status: string;
+  app: string;
+  version: string;
+  mode: string;
+  safe_mode: boolean;
+  message: string;
+};
+
+export type SmokeCheckStatus = "pass" | "warn" | "fail";
+
+export type SmokeCheck = {
+  id: string;
+  label: string;
+  status: SmokeCheckStatus;
+  detail: string;
+};
+
+export type SmokeStatus = {
+  version: string;
+  mode: string;
+  ready_for: string[];
+  not_ready_for: string[];
+  checks: SmokeCheck[];
+  endpoints: string[];
+  summary: {
+    mock_frame_id: string;
+    mock_detection_count: number;
+    mock_zone_count: number;
+    mock_traffic_phase: string;
+  };
+};
+
+export type RecentLog = {
+  timestamp?: string;
+  level: "debug" | "info" | "warning" | "error" | string;
+  code: string;
+  scope?: string;
+  message: string;
+};
+
+export type ApiConnectionState = {
+  status: "checking" | "connected" | "fallback" | "failed";
+  message: string;
+  checkedAt?: string;
+};

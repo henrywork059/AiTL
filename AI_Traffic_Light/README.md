@@ -1,8 +1,8 @@
-# AI Traffic Light — 0_0_x Prototype Project
+# AI Traffic Light — 0_1_0 Test-Ready Mock Project
 
-This repository contains the early skeleton for an **AI vision-based adaptive traffic light project**.
+This repository contains an early **AI vision-based adaptive traffic light project**.
 
-The project is currently in the **0_0_x planning/template stage**. The current patch is **0_0_4**, which adds the first structured **PC Studio App template** for confirming the function list and GUI layout before real AI/camera/training implementation.
+The current version is **0_1_0**, the first **test-ready mock version** of the PC Studio app. It is intended to verify local startup, GUI layout, frontend-backend connection, mock detection display, logs, and smoke-test endpoints.
 
 ## Project concept
 
@@ -16,11 +16,40 @@ Camera/video input
 
 This is a **prototype and simulation project**. It must not be connected to real public traffic-light infrastructure.
 
+## What 0_1_0 can test
+
+```text
+- PC Studio frontend startup
+- FastAPI backend startup
+- frontend ↔ backend mock API connection
+- mock traffic-scene rendering
+- mock pedestrian/vehicle detections
+- confidence threshold filtering
+- mock traffic-light state display
+- logs/error-code page layout
+- smoke-test endpoint checklist
+```
+
+## What 0_1_0 does not implement yet
+
+```text
+- real webcam capture
+- ESP-CAM stream input
+- YOLO/object-detection inference
+- segmentation
+- dataset writing
+- training
+- model export
+- physical traffic-light control
+```
+
 ## Main apps
 
 ### 1. PC Studio App
 
-Runs on the computer. Planned responsibilities:
+Runs on the computer. Current 0_1_0 status: **mock test-ready**.
+
+Planned responsibilities:
 
 - camera/video source management
 - live AI detection view
@@ -34,7 +63,9 @@ Runs on the computer. Planned responsibilities:
 
 ### 2. Device Camera App
 
-Runs on an ESP32-CAM or similar camera node. Planned responsibilities:
+Runs on an ESP32-CAM or similar camera node. Current status: **placeholder only**.
+
+Planned responsibilities:
 
 - capture frames
 - send frames to the PC
@@ -42,7 +73,45 @@ Runs on an ESP32-CAM or similar camera node. Planned responsibilities:
 
 The device app should not train AI and should not run heavy segmentation/detection models in the first design.
 
-## Current version
+## Quick local test
+
+Start the backend:
+
+```bat
+scripts\start_pc_studio_backend_windows.bat
+```
+
+Start the frontend in another terminal:
+
+```bat
+scripts\start_pc_studio_frontend_windows.bat
+```
+
+Then open:
+
+```text
+http://localhost:5173
+```
+
+Backend docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Smoke-test endpoint:
+
+```text
+http://127.0.0.1:8000/api/smoke/status
+```
+
+Optional backend smoke test:
+
+```bat
+scripts\test_backend_smoke_windows.bat
+```
+
+## Current version history
 
 ```text
 0_0_0 = initial skeleton
@@ -50,6 +119,7 @@ The device app should not train AI and should not run heavy segmentation/detecti
 0_0_2 = human and AI-agent docs
 0_0_3 = modular code, API, logging, and error-code standards
 0_0_4 = PC Studio app template and function map
+0_1_0 = first test-ready mock PC Studio version
 ```
 
 ## Important docs
@@ -59,6 +129,8 @@ Start here:
 ```text
 docs/START_HERE.md
 docs/HUMAN_GUIDE.md
+docs/LOCAL_TESTING.md
+docs/TEST_READY_CHECKLIST.md
 docs/PC_STUDIO_TEMPLATE.md
 docs/PC_STUDIO_FUNCTION_LIST.md
 docs/PC_STUDIO_GUI_LAYOUT.md
@@ -75,8 +147,8 @@ docs/DEBUGGING_AND_LOGGING.md
 AI_Traffic_Light/
   apps/
     pc-studio/
-      backend/              Python / FastAPI backend placeholder
-      frontend/             React / Vite GUI placeholder
+      backend/              Python / FastAPI backend
+      frontend/             React / Vite GUI
     device-camera/
       esp32-cam/            ESP32-CAM firmware placeholder
   packages/
@@ -88,16 +160,16 @@ AI_Traffic_Light/
   scripts/                  Helper scripts
 ```
 
-## First milestone
+## Next milestone after 0_1_0
 
-The first real milestone is still:
+The next functional milestone should be:
 
 ```text
-Video/webcam input
-→ pretrained object detection
+webcam/video input
+→ pretrained YOLO detection
 → zone-based counting
 → rule-based traffic-light simulation
 → GUI visualization
 ```
 
-But before implementing that, **0_0_4 asks humans and AI agents to confirm the PC Studio page list, function list, and GUI layout**.
+Before that, test 0_1_0 and confirm the page list, layout, and function boundaries.

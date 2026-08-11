@@ -13,6 +13,8 @@ type Props = {
   detections: Detection[];
   confidenceThreshold: number;
   onConfidenceChange: (value: number) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 };
 
 export function LiveAiPage({
@@ -22,12 +24,17 @@ export function LiveAiPage({
   detections,
   confidenceThreshold,
   onConfidenceChange,
+  onRefresh,
+  refreshing,
 }: Props) {
   return (
     <div className="live-layout">
       <section className="panel live-panel">
         <div className="panel-header">
-          <h2>Live detection canvas</h2>
+          <div>
+            <h2>Live detection canvas</h2>
+            <p className="placeholder-copy">Mock road scene rendered from API/fallback JSON. This is not a real camera stream yet.</p>
+          </div>
           <span className="status-pill">mock frame</span>
         </div>
         {frame ? <LiveView frame={frame} detections={detections} zones={zones} /> : <p>Loading mock frame...</p>}
@@ -36,7 +43,12 @@ export function LiveAiPage({
       <aside className="side-column">
         {traffic && <TrafficLight traffic={traffic} />}
         {traffic && <StatusPanel traffic={traffic} />}
-        <ControlsPanel confidenceThreshold={confidenceThreshold} onConfidenceChange={onConfidenceChange} />
+        <ControlsPanel
+          confidenceThreshold={confidenceThreshold}
+          onConfidenceChange={onConfidenceChange}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
+        />
         <ZonePanel zones={zones} />
       </aside>
 

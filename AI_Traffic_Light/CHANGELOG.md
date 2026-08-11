@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_1_0 — PC Studio test-ready mock version
+
+- Promoted the PC Studio template from layout-only to a local smoke-testable mock version.
+- Added backend smoke-test endpoints and backend self-check script.
+- Added frontend/backend status display, refresh flow, and mock API integration checks.
+- Updated visible version labels from 0_0_4 to 0_1_0.
+- Added human testing instructions and a test-ready checklist.
+- Still intentionally excludes real YOLO inference, real camera capture, training, model export, and physical traffic-light control.
+
 ## 0_0_4 — PC Studio app template and function map
 
 - Added the first structured PC Studio frontend template.

@@ -1,20 +1,20 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_0_4 PC Studio template";
+export const APP_VERSION_LABEL = "0_1_0 test-ready mock";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
     id: "dashboard",
     label: "Dashboard",
     shortLabel: "Dashboard",
-    description: "Project overview, app state, and next development tasks.",
-    status: "template",
+    description: "Project overview, smoke-test state, and next development tasks.",
+    status: "mock",
   },
   live_ai: {
     id: "live_ai",
     label: "Live AI View",
     shortLabel: "Live AI",
-    description: "Main camera/detection viewer with traffic-light simulation.",
+    description: "Main mock camera/detection viewer with traffic-light simulation.",
     status: "mock",
   },
   camera_sources: {
@@ -35,8 +35,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "traffic_logic",
     label: "Traffic Logic",
     shortLabel: "Logic",
-    description: "Configure rule-based signal decisions and safety checks.",
-    status: "template",
+    description: "Review rule-based signal decisions and safety checks.",
+    status: "mock",
   },
   dataset_capture: {
     id: "dataset_capture",
@@ -78,7 +78,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     label: "Logs & Errors",
     shortLabel: "Logs",
     description: "Debug logs, error codes, request IDs, and recent app events.",
-    status: "template",
+    status: "mock",
   },
 };
 

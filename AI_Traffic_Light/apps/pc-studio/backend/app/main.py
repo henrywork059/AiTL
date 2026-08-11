@@ -12,11 +12,13 @@ from app.routes.logs import router as logs_router
 from app.routes.mock import router as mock_router
 from app.routes.models import router as models_router
 from app.routes.settings import router as settings_router
+from app.routes.smoke import router as smoke_router
 from app.routes.template import router as template_router
 from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
 
+APP_VERSION = "0_1_0"
 logger = get_logger(__name__)
 
 
@@ -28,12 +30,17 @@ def create_app() -> FastAPI:
     """
     configure_logging()
 
-    app = FastAPI(title="AI Traffic Light PC Studio Backend", version="0_0_4")
+    app = FastAPI(title="AI Traffic Light PC Studio Backend", version=APP_VERSION)
 
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -43,6 +50,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
     app.include_router(health_router, tags=["health"])
+    app.include_router(smoke_router, prefix="/api/smoke", tags=["smoke"])
     app.include_router(mock_router, prefix="/api/mock", tags=["mock"])
     app.include_router(camera_router, prefix="/api/camera", tags=["camera"])
     app.include_router(inference_router, prefix="/api/inference", tags=["inference"])
@@ -55,7 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(logs_router, prefix="/api/logs", tags=["logs"])
     app.include_router(template_router, prefix="/api/template", tags=["template"])
 
-    logger.info("PC Studio backend app created", extra={"version": "0_0_4"})
+    logger.info("PC Studio backend app created", extra={"version": APP_VERSION})
     return app
 
 

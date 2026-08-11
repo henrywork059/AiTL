@@ -12,8 +12,27 @@ def recent_logs(request: Request) -> dict:
     """Return placeholder recent logs for the GUI log page."""
     data = {
         "logs": [
-            {"level": "info", "code": "ATL-TEMPLATE-000", "message": "PC Studio template loaded."},
-            {"level": "info", "code": "ATL-TEMPLATE-001", "message": "No real camera or AI model is connected in 0_0_4."},
+            {
+                "timestamp": "mock",
+                "level": "info",
+                "code": "ATL-SMOKE-001",
+                "scope": "startup",
+                "message": "PC Studio 0_1_0 mock test-ready version loaded.",
+            },
+            {
+                "timestamp": "mock",
+                "level": "info",
+                "code": "ATL-SMOKE-002",
+                "scope": "safety",
+                "message": "Real camera, AI inference, training, and physical traffic control are disabled.",
+            },
+            {
+                "timestamp": "mock",
+                "level": "info",
+                "code": "ATL-SMOKE-003",
+                "scope": "api",
+                "message": "Use /api/smoke/status for frontend-backend smoke testing.",
+            },
         ]
     }
     logger.info("Log template returned", extra={"request_id": request.state.request_id})

@@ -1,9 +1,11 @@
 type Props = {
   confidenceThreshold: number;
   onConfidenceChange: (value: number) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 };
 
-export function ControlsPanel({ confidenceThreshold, onConfidenceChange }: Props) {
+export function ControlsPanel({ confidenceThreshold, onConfidenceChange, onRefresh, refreshing }: Props) {
   return (
     <section className="panel compact-panel">
       <div className="panel-header">
@@ -21,10 +23,10 @@ export function ControlsPanel({ confidenceThreshold, onConfidenceChange }: Props
         />
       </label>
       <div className="button-row">
-        <button>Start mock</button>
-        <button>Capture frame</button>
+        <button onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Reload mock data"}</button>
+        <button disabled>Capture frame</button>
       </div>
-      <p className="small-note">Buttons are placeholders in the current skeleton.</p>
+      <p className="small-note">Reload is active. Capture is a placeholder until dataset saving is implemented.</p>
     </section>
   );
 }
