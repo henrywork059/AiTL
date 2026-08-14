@@ -69,3 +69,7 @@ class TrainingStartRequest(BaseModel):
     image_size: int = Field(default=640, ge=64, le=2048)
     batch: int = Field(default=8, ge=1, le=128)
     device: str = Field(default="cpu", min_length=1, max_length=32)
+
+
+class InferenceLoadRequest(BaseModel):
+    model_id: str | None = Field(default=None, min_length=1, max_length=120)

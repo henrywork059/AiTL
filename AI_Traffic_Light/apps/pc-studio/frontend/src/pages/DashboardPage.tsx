@@ -25,7 +25,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: "0_1_4", note: "trained-model live inference candidate" },
+          { label: "Project stage", value: "0_1_5", note: "model management candidate" },
           { label: "Backend", value: apiState.status, note: health?.version ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
           { label: "Real AI", value: "live detection", note: "latest trained best.pt" },
@@ -56,7 +56,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <PlaceholderPanel
-          title="What 0_1_4 can test"
+          title="What 0_1_5 can test"
           description="This version loads the newest locally trained YOLO best.pt and overlays its detections on receiver or simulation frames."
           status="test ready"
           bullets={smokeStatus?.ready_for ?? [
@@ -68,7 +68,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
         />
         <PlaceholderPanel
           title="What is still disabled"
-          description="The project remains prototype-only. These functions should not be expected to work in 0_1_4."
+          description="The project remains prototype-only. These functions should not be expected to work in 0_1_5."
           status="not implemented"
           bullets={smokeStatus?.not_ready_for ?? [
             "automatic labeling",

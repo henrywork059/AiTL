@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_4 live inference";
+export const APP_VERSION_LABEL = "0_1_5 model management";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -14,7 +14,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "live_ai",
     label: "Live AI View",
     shortLabel: "Live AI",
-    description: "Preview receiver or simulation frames with detections from the latest trained YOLO model.",
+    description: "Preview receiver or simulation frames with detections from a selected trained YOLO model.",
     status: "test-ready",
   },
   camera_sources: {
@@ -63,8 +63,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "model_registry",
     label: "Model Registry",
     shortLabel: "Models",
-    description: "Compare model versions, metrics, classes, and export status.",
-    status: "template",
+    description: "Review local trained models, set a default model, load a chosen model, and delete outdated runs.",
+    status: "test-ready",
   },
   settings: {
     id: "settings",

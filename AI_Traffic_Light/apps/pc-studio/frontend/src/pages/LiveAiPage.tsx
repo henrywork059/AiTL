@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  deleteModel,
   fetchInferenceStatus,
   fetchLiveDetections,
+  loadInferenceModel,
   loadLatestInferenceModel,
+  setDefaultModel,
   unloadInferenceModel,
 } from "../api";
 import { CameraDetectionView } from "../components/CameraDetectionView";
@@ -55,11 +58,17 @@ export function LiveAiPage({
   const [liveFrame, setLiveFrame] = useState<DetectionFrame | null>(null);
   const [inferenceError, setInferenceError] = useState<string | null>(null);
   const [loadingModel, setLoadingModel] = useState(false);
+  const [deletingModel, setDeletingModel] = useState(false);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [showBoxes, setShowBoxes] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [enabledClasses, setEnabledClasses] = useState<string[]>([]);
   const autoLoadAttempted = useRef(false);
 
   const refreshInferenceStatus = useCallback(async () => {
     const nextStatus = await fetchInferenceStatus();
     setInferenceStatus(nextStatus);
+    setSelectedModelId((current) => current ?? nextStatus.active_model_id ?? nextStatus.default_model_id ?? nextStatus.models[0]?.model_id ?? null);
     return nextStatus;
   }, []);
 
@@ -69,6 +78,7 @@ export function LiveAiPage({
     try {
       const nextStatus = await loadLatestInferenceModel();
       setInferenceStatus(nextStatus);
+      setSelectedModelId(nextStatus.active_model_id ?? nextStatus.default_model_id ?? nextStatus.models[0]?.model_id ?? null);
       setLiveFrame(null);
     } catch (error) {
       setInferenceError(errorMessage(error));
@@ -77,6 +87,54 @@ export function LiveAiPage({
       setLoadingModel(false);
     }
   }, [refreshInferenceStatus]);
+
+  const loadSelected = useCallback(async () => {
+    setLoadingModel(true);
+    setInferenceError(null);
+    try {
+      const nextStatus = await loadInferenceModel(selectedModelId);
+      setInferenceStatus(nextStatus);
+      setSelectedModelId(nextStatus.active_model_id ?? selectedModelId);
+      setLiveFrame(null);
+    } catch (error) {
+      setInferenceError(errorMessage(error));
+      await refreshInferenceStatus();
+    } finally {
+      setLoadingModel(false);
+    }
+  }, [refreshInferenceStatus, selectedModelId]);
+
+  const setDefault = useCallback(async () => {
+    if (!selectedModelId) return;
+    setInferenceError(null);
+    try {
+      await setDefaultModel(selectedModelId);
+      await refreshInferenceStatus();
+    } catch (error) {
+      setInferenceError(errorMessage(error));
+    }
+  }, [refreshInferenceStatus, selectedModelId]);
+
+  const deleteSelected = useCallback(async () => {
+    if (!selectedModelId) return;
+    if (!window.confirm(`Delete trained model ${selectedModelId}? This removes the whole run folder under outputs/training.`)) {
+      return;
+    }
+    setDeletingModel(true);
+    setInferenceError(null);
+    try {
+      const registry = await deleteModel(selectedModelId);
+      const nextSelection = registry.default_model_id ?? registry.active_model_id ?? registry.models[0]?.model_id ?? null;
+      setSelectedModelId(nextSelection);
+      const nextStatus = await fetchInferenceStatus();
+      setInferenceStatus(nextStatus);
+      setLiveFrame(null);
+    } catch (error) {
+      setInferenceError(errorMessage(error));
+    } finally {
+      setDeletingModel(false);
+    }
+  }, [selectedModelId]);
 
   const unload = useCallback(async () => {
     setLoadingModel(true);
@@ -98,6 +156,7 @@ export function LiveAiPage({
       const status = await fetchInferenceStatus();
       if (cancelled) return;
       setInferenceStatus(status);
+      setSelectedModelId(status.active_model_id ?? status.default_model_id ?? status.models[0]?.model_id ?? null);
       if (
         !autoLoadAttempted.current
         && !status.model_loaded
@@ -107,8 +166,11 @@ export function LiveAiPage({
         autoLoadAttempted.current = true;
         setLoadingModel(true);
         try {
-          const loaded = await loadLatestInferenceModel();
-          if (!cancelled) setInferenceStatus(loaded);
+          const loaded = await loadInferenceModel(status.default_model_id ?? status.models[0]?.model_id ?? null);
+          if (!cancelled) {
+            setInferenceStatus(loaded);
+            setSelectedModelId(loaded.active_model_id ?? status.default_model_id ?? status.models[0]?.model_id ?? null);
+          }
         } catch (error) {
           if (!cancelled) setInferenceError(errorMessage(error));
         } finally {
@@ -139,7 +201,7 @@ export function LiveAiPage({
 
     async function pollDetections() {
       try {
-        const nextFrame = await fetchLiveDetections();
+        const nextFrame = await fetchLiveDetections(confidenceThreshold);
         if (!cancelled) {
           setLiveFrame(nextFrame);
           setInferenceError(null);
@@ -156,12 +218,25 @@ export function LiveAiPage({
       cancelled = true;
       if (timerId !== undefined) window.clearTimeout(timerId);
     };
-  }, [inferenceStatus?.model_loaded, inferenceStatus?.active_model_id, cameraStatus?.frame_available]);
+  }, [inferenceStatus?.model_loaded, inferenceStatus?.active_model_id, cameraStatus?.frame_available, confidenceThreshold]);
 
-  const effectiveConfidenceThreshold = Math.max(confidenceThreshold, inferenceStatus?.confidence_floor ?? 0.1);
+  const rawLiveDetections = liveFrame?.detections ?? [];
+  const liveClassOptions = useMemo(
+    () => Array.from(new Set(rawLiveDetections.map((detection) => detection.class_name))).sort(),
+    [rawLiveDetections],
+  );
+
+  useEffect(() => {
+    setEnabledClasses((current) => {
+      const next = liveClassOptions.filter((className) => current.includes(className));
+      return next.length > 0 || liveClassOptions.length === 0 ? next : liveClassOptions;
+    });
+  }, [liveClassOptions]);
+
+  const effectiveClasses = enabledClasses.length > 0 ? enabledClasses : liveClassOptions;
   const liveDetections = useMemo(
-    () => liveFrame?.detections.filter((detection) => detection.confidence >= effectiveConfidenceThreshold) ?? [],
-    [liveFrame, effectiveConfidenceThreshold],
+    () => rawLiveDetections.filter((detection) => effectiveClasses.includes(detection.class_name)),
+    [rawLiveDetections, effectiveClasses],
   );
   const hasCameraFrame = Boolean(cameraStatus?.frame_available);
   const displayedDetections = hasCameraFrame ? liveDetections : mockDetections;
@@ -173,6 +248,12 @@ export function LiveAiPage({
   const modeLabel = hasCameraFrame
     ? inferenceStatus?.model_loaded ? "trained model live" : "camera / model idle"
     : "mock fallback";
+
+  function toggleClass(className: string) {
+    setEnabledClasses((current) => current.includes(className)
+      ? current.filter((item) => item !== className)
+      : [...current, className]);
+  }
 
   return (
     <div className="live-layout">
@@ -195,34 +276,75 @@ export function LiveAiPage({
         </div>
 
         {hasCameraFrame ? (
-          <CameraDetectionView cameraStatus={cameraStatus} frame={liveFrame} detections={liveDetections} />
+          <CameraDetectionView
+            cameraStatus={cameraStatus}
+            frame={liveFrame}
+            detections={liveDetections}
+            showBoxes={showBoxes}
+            showLabels={showLabels}
+          />
         ) : mockFrame ? (
           <LiveView frame={mockFrame} detections={mockDetections} zones={zones} />
         ) : (
           <p>Loading view...</p>
         )}
 
-        <div className="live-inference-meta">
+        <div className="live-inference-meta wrap-row">
           <span>Camera: <strong>{cameraStatus?.active_source_id ?? "none"}</strong></span>
           <span>Frame: <strong>{inferenceStatus?.last_frame_number ?? cameraStatus?.frame_number ?? 0}</strong></span>
+          <span>Raw detections: <strong>{rawLiveDetections.length}</strong></span>
           <span>Visible detections: <strong>{displayedDetections.length}</strong></span>
           <span>Model: <strong>{inferenceStatus?.active_model_id ?? "not loaded"}</strong></span>
         </div>
+
+        {hasCameraFrame && (
+          <div className="live-visibility-tools">
+            <div className="button-row wrap-row">
+              <label className="inline-toggle"><input type="checkbox" checked={showBoxes} onChange={(event) => setShowBoxes(event.target.checked)} /> Show boxes</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Show labels</label>
+            </div>
+            <div className="class-filter-group">
+              <strong>Visible classes</strong>
+              {liveClassOptions.length === 0 ? (
+                <span className="small-note">No returned classes for the current frame.</span>
+              ) : (
+                <div className="button-row wrap-row">
+                  {liveClassOptions.map((className) => (
+                    <label key={className} className="inline-toggle class-chip">
+                      <input
+                        type="checkbox"
+                        checked={effectiveClasses.includes(className)}
+                        onChange={() => toggleClass(className)}
+                      />
+                      {className}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       <aside className="side-column">
         <InferencePanel
           status={inferenceStatus}
+          selectedModelId={selectedModelId}
+          onSelectedModelChange={setSelectedModelId}
           confidenceThreshold={confidenceThreshold}
           onConfidenceChange={onConfidenceChange}
+          onLoadSelected={() => void loadSelected()}
           onLoadLatest={() => void loadLatest()}
+          onSetDefault={() => void setDefault()}
+          onDeleteSelected={() => void deleteSelected()}
           onUnload={() => void unload()}
           loadingModel={loadingModel}
+          deletingModel={deletingModel}
           error={inferenceError}
         />
         {traffic && <TrafficLight traffic={traffic} />}
         {traffic && <StatusPanel traffic={traffic} />}
-        <p className="small-note">Traffic-light decision cards remain mock simulation state in 0_1_4; live detections do not control physical signals.</p>
+        <p className="small-note">Traffic-light decision cards remain mock simulation state in 0_1_5; live detections do not control physical signals.</p>
         <ZonePanel zones={zones} />
       </aside>
 

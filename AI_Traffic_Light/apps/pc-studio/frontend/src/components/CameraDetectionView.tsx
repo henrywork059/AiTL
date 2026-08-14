@@ -5,9 +5,11 @@ type Props = {
   cameraStatus: CameraStatus | null;
   frame: DetectionFrame | null;
   detections: Detection[];
+  showBoxes: boolean;
+  showLabels: boolean;
 };
 
-export function CameraDetectionView({ cameraStatus, frame, detections }: Props) {
+export function CameraDetectionView({ cameraStatus, frame, detections, showBoxes, showLabels }: Props) {
   if (!cameraStatus?.frame_available) {
     return (
       <div className="live-camera-empty">
@@ -30,7 +32,7 @@ export function CameraDetectionView({ cameraStatus, frame, detections }: Props) 
         src={imageUrl}
         alt="Current camera frame"
       />
-      {frame && (
+      {frame && showBoxes && (
         <svg
           className="live-detection-overlay"
           viewBox={`0 0 ${frame.image_width} ${frame.image_height}`}
@@ -50,17 +52,21 @@ export function CameraDetectionView({ cameraStatus, frame, detections }: Props) 
                   width={x2 - x1}
                   height={y2 - y1}
                 />
-                <rect
-                  className="live-detection-label-bg"
-                  x={x1}
-                  y={Math.max(0, labelY - 24)}
-                  width={labelWidth}
-                  height={26}
-                  rx={5}
-                />
-                <text className="live-detection-label" x={x1 + 7} y={labelY - 5}>
-                  {detection.class_name} {(detection.confidence * 100).toFixed(0)}%
-                </text>
+                {showLabels && (
+                  <>
+                    <rect
+                      className="live-detection-label-bg"
+                      x={x1}
+                      y={Math.max(0, labelY - 24)}
+                      width={labelWidth}
+                      height={26}
+                      rx={5}
+                    />
+                    <text className="live-detection-label" x={x1 + 7} y={labelY - 5}>
+                      {detection.class_name} {(detection.confidence * 100).toFixed(0)}%
+                    </text>
+                  </>
+                )}
               </g>
             );
           })}

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_1_5 — Model selection, deletion, and live-visibility controls
+
+- Reviewed the trained-model loading path and replaced the latest-only UX with explicit model selection from discovered local `outputs/training/*/weights/best.pt` runs.
+- Added backend model-registry functions to list local trained models, persist a default model selection, and delete an outdated model run directory.
+- Added a default-model metadata file under `outputs/training/` so Live AI can auto-load the chosen default model after restart.
+- Added inference API support for loading a selected/default model instead of only the newest model.
+- Extended live detections so the frontend confidence slider is sent to the backend and can go down to 1% for diagnosis.
+- Added live visibility controls to show/hide boxes, show/hide labels, and filter visible classes without changing the underlying source frame.
+- Implemented a working Model Registry page in the frontend with refresh, load, set-default, and delete actions.
+- Updated documentation, error codes, smoke coverage, and local acceptance checks for V015.
+- Live detections still do not control zones or traffic signals; automatic labeling, model export, and physical public-road control remain disabled.
+
 ## 0_1_4 — Trained-model live inference overlay
 
 - Replaced the inference placeholder with a real Ultralytics-backed service that discovers local `outputs/training/*/weights/best.pt` files and loads the newest run.

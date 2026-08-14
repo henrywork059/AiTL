@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query, Request, Response
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
+from app.models import InferenceLoadRequest
 from app.services.camera_frames import camera_frame_service
 from app.services.inference import inference_service
 
@@ -17,9 +18,23 @@ def inference_status(request: Request) -> dict:
     return ok(data, request_id=request.state.request_id)
 
 
+@router.post("/load")
+def load_selected_or_default_model(payload: InferenceLoadRequest, request: Request) -> dict:
+    """Load a chosen model, or the default/latest when model_id is omitted."""
+    if payload.model_id:
+        data = inference_service.load_selected(payload.model_id)
+    else:
+        data = inference_service.load_default_or_latest()
+    logger.info(
+        "Inference model loaded through API",
+        extra={"request_id": request.state.request_id, "model_id": data.get("active_model_id")},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
 @router.post("/load-latest")
 def load_latest_model(request: Request) -> dict:
-    """Load the newest local outputs/training/*/weights/best.pt model."""
+    """Backward-compatible load of the newest local outputs/training/*/weights/best.pt model."""
     data = inference_service.load_latest()
     logger.info(
         "Latest inference model loaded through API",
@@ -37,16 +52,20 @@ def unload_model(request: Request) -> dict:
 
 
 @router.get("/detections")
-def live_detections(request: Request) -> dict:
+def live_detections(
+    request: Request,
+    confidence: float = Query(default=0.10, ge=0.01, le=1.0),
+) -> dict:
     """Run or return cached detection results for the newest camera frame."""
     frame = camera_frame_service.latest_frame()
-    data = inference_service.detect_frame(frame)
+    data = inference_service.detect_frame(frame, confidence_threshold=confidence)
     logger.info(
         "Live detections returned",
         extra={
             "request_id": request.state.request_id,
             "frame_id": data.get("frame_id"),
             "detection_count": len(data.get("detections", [])),
+            "confidence": confidence,
         },
     )
     return ok(data, request_id=request.state.request_id)
@@ -78,10 +97,11 @@ def inference_functions(request: Request) -> dict:
     data = {
         "functions": [
             "discover_trained_best_models",
+            "load_selected_or_default_model",
             "load_latest_trained_model",
             "unload_model",
             "run_detection_on_latest_camera_frame",
-            "cache_detection_per_camera_frame",
+            "cache_detection_per_camera_frame_and_confidence",
             "return_original_coordinate_boxes",
             "return_exact_inferred_source_frame",
         ]

@@ -42,7 +42,7 @@ export default function App() {
   const [smokeStatus, setSmokeStatus] = useState<SmokeStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.45);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.1);
   const [liveDetectionCount, setLiveDetectionCount] = useState(0);
   const [activePage, setActivePage] = useState<AppPageId>("dashboard");
   const [apiState, setApiState] = useState<ApiConnectionState>({

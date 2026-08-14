@@ -216,6 +216,17 @@ export type InferenceModelSummary = {
   model_path: string;
   modified_at_ms: number;
   size_bytes: number;
+  run_path: string;
+  is_latest: boolean;
+  is_default: boolean;
+  is_active: boolean;
+};
+
+export type ModelRegistryStatus = {
+  default_model_id: string | null;
+  active_model_id: string | null;
+  total: number;
+  models: InferenceModelSummary[];
 };
 
 export type InferenceStatus = {
@@ -230,7 +241,10 @@ export type InferenceStatus = {
   backend_available: boolean;
   available_model_count: number;
   latest_model_path: string | null;
+  default_model_id: string | null;
+  default_model_path: string | null;
   active_is_latest: boolean;
   confidence_floor: number;
+  default_confidence: number;
   models: InferenceModelSummary[];
 };

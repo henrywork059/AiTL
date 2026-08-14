@@ -6,8 +6,8 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_4"
-APP_MODE = "trained_model_inference_test_ready"
+APP_VERSION = "0_1_5"
+APP_MODE = "model_management_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -52,7 +52,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "inference.trained_model",
             "label": "Trained-model live inference",
             "status": "pass",
-            "detail": "The inference API can discover outputs/training/*/weights/best.pt, load the latest model, and detect on receiver or simulation frames.",
+            "detail": "The inference API can discover trained models, choose or auto-load a default model, delete model runs, and detect on receiver or simulation frames with lower diagnostic confidence thresholds.",
         },
         {
             "id": "backend.health",
@@ -88,7 +88,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_4 is a supervised prototype and cannot control real public traffic lights.",
+            "detail": "0_1_5 is a supervised prototype and cannot control real public traffic lights.",
         },
     ]
 
@@ -107,6 +107,7 @@ def get_smoke_status() -> dict[str, Any]:
             "managed_yolo_dataset_build_test",
             "optional_labeled_yolo_training_test",
             "trained_model_live_inference_test",
+            "trained_model_selection_and_delete_test",
             "GUI function-list review",
         ],
         "not_ready_for": [
@@ -139,9 +140,13 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/training/start",
             "/api/inference/status",
             "/api/inference/load-latest",
+            "/api/inference/load",
             "/api/inference/unload",
             "/api/inference/detections",
             "/api/inference/frame",
+            "/api/models",
+            "/api/models/default",
+            "/api/models/{model_id}",
         ],
         "summary": {
             "mock_frame_id": frame.get("frame_id"),

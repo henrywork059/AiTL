@@ -9,6 +9,7 @@ import type {
   DatasetStatus,
   DetectionFrame,
   InferenceStatus,
+  ModelRegistryStatus,
   RecentLog,
   SmokeStatus,
   TrafficState,
@@ -36,14 +37,14 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_4",
+  version: "0_1_5",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_4",
+  version: "0_1_5",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
   not_ready_for: ["automatic_labeling", "model export", "physical_traffic_light_control"],
@@ -127,8 +128,18 @@ const fallbackInferenceStatus: InferenceStatus = {
   backend_available: false,
   available_model_count: 0,
   latest_model_path: null,
+  default_model_id: null,
+  default_model_path: null,
   active_is_latest: false,
-  confidence_floor: 0.1,
+  confidence_floor: 0.01,
+  default_confidence: 0.1,
+  models: [],
+};
+
+const fallbackModelRegistryStatus: ModelRegistryStatus = {
+  default_model_id: null,
+  active_model_id: null,
+  total: 0,
   models: [],
 };
 
@@ -279,12 +290,39 @@ export async function loadLatestInferenceModel(): Promise<InferenceStatus> {
   return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load-latest`, { method: "POST" });
 }
 
+export async function loadInferenceModel(modelId: string | null): Promise<InferenceStatus> {
+  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_id: modelId }),
+  });
+}
+
 export async function unloadInferenceModel(): Promise<InferenceStatus> {
   return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/unload`, { method: "POST" });
 }
 
-export async function fetchLiveDetections(): Promise<DetectionFrame> {
-  return requestJsonStrict<DetectionFrame>(`${API_BASE}/api/inference/detections`);
+export async function fetchModelRegistry(): Promise<ModelRegistryStatus> {
+  return requestJson<ModelRegistryStatus>(`${API_BASE}/api/models`, fallbackModelRegistryStatus);
+}
+
+export async function setDefaultModel(modelId: string): Promise<ModelRegistryStatus> {
+  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/default`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_id: modelId }),
+  });
+}
+
+export async function deleteModel(modelId: string): Promise<ModelRegistryStatus> {
+  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/${encodeURIComponent(modelId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchLiveDetections(confidenceThreshold = 0.1): Promise<DetectionFrame> {
+  const params = new URLSearchParams({ confidence: String(confidenceThreshold) });
+  return requestJsonStrict<DetectionFrame>(`${API_BASE}/api/inference/detections?${params.toString()}`);
 }
 
 export function inferredFrameUrl(sourceId: string, frameNumber: number, timestampMs: number): string {

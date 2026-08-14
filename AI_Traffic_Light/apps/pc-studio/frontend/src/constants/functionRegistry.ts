@@ -26,7 +26,21 @@ export const FUNCTION_REGISTRY: FunctionItem[] = [
     id: "inference.load_model",
     area: "AI inference",
     label: "Load detection model",
-    description: "Discover and load the newest local trained outputs/training/*/weights/best.pt model.",
+    description: "Discover local trained models and load either a selected model or the newest/default model.",
+    status: "implemented",
+  },
+  {
+    id: "inference.manage_models",
+    area: "AI inference",
+    label: "Choose, default, and delete trained models",
+    description: "Review local outputs/training runs, choose which model to run, set the default auto-load model, and delete outdated model folders.",
+    status: "implemented",
+  },
+  {
+    id: "inference.visibility",
+    area: "AI inference",
+    label: "Visibility controls",
+    description: "Adjust backend confidence down to 1%, toggle overlay boxes/labels, and filter visible classes on the live canvas.",
     status: "implemented",
   },
   {

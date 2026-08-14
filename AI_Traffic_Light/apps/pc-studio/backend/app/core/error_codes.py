@@ -52,6 +52,7 @@ class ErrorCode(str, Enum):
     MODEL_REGISTRY_READ_FAILED = "ATL-MODEL-001"
     MODEL_EXPORT_FAILED = "ATL-MODEL-002"
     MODEL_VERSION_NOT_FOUND = "ATL-MODEL-003"
+    MODEL_DELETE_FAILED = "ATL-MODEL-004"
 
     LOG_READ_FAILED = "ATL-LOG-001"
 
@@ -93,6 +94,7 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.MODEL_REGISTRY_READ_FAILED: "Failed to read model registry.",
     ErrorCode.MODEL_EXPORT_FAILED: "Failed to export model package.",
     ErrorCode.MODEL_VERSION_NOT_FOUND: "Model version was not found.",
+    ErrorCode.MODEL_DELETE_FAILED: "Failed to delete the selected model.",
     ErrorCode.LOG_READ_FAILED: "Failed to read logs.",
 }
 
