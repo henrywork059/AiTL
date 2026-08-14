@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_1_2 — Persistent capture and optional labeled-dataset training
+
+- Replaced the Dataset Capture placeholder with a working receiver/simulation capture page.
+- Added atomic image and paired JSON metadata writes under `datasets/captures/<session>/`.
+- Changed synthetic simulation frames to PNG so they can be saved by the same capture path as device images.
+- Added persistent capture counts, session IDs, quality tags, notes, stable envelopes, and request IDs.
+- Added a real optional Ultralytics YOLO background runner with dataset-path/config validation and status polling.
+- Added frontend capture/training controls, strict mutation error handling, tests, and generated-data ignores.
+- Raw captures remain unlabeled; real detection training requires a prepared YOLO dataset and the optional training dependency.
+- Real inference, automatic labeling, model export, and physical traffic-light control remain disabled.
+
 ## 0_1_1 — Camera frame receiver and simulation
 
 - Added an in-memory PC-side endpoint for ESP32/Raspberry Pi JPEG or PNG frame uploads.

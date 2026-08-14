@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_1 camera receiver";
+export const APP_VERSION_LABEL = "0_1_2 dataset capture";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -42,8 +42,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "dataset_capture",
     label: "Dataset Capture",
     shortLabel: "Capture",
-    description: "Save raw frames, predictions, notes, and frame quality tags.",
-    status: "template",
+    description: "Persist receiver or simulation images with paired metadata and quality tags.",
+    status: "test-ready",
   },
   dataset_review: {
     id: "dataset_review",
@@ -56,8 +56,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "train_export",
     label: "Train / Export",
     shortLabel: "Train",
-    description: "Configure training runs and export runtime packages for later deployment.",
-    status: "template",
+    description: "Run optional local YOLO training from a labeled dataset; export remains planned.",
+    status: "test-ready",
   },
   model_registry: {
     id: "model_registry",

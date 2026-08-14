@@ -16,7 +16,7 @@ docs/DEBUGGING_AND_LOGGING.md
 
 Project name: **AI Traffic Light**  
 Current patch line: **0_1_x**
-Current patch: **0_1_1**
+Current patch: **0_1_2**
 
 This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
 

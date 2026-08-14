@@ -16,7 +16,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -519,6 +521,86 @@ button:disabled {
   align-items: start;
 }
 
+.capture-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 18px;
+  align-items: start;
+}
+
+.capture-form,
+.training-form,
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.capture-form label,
+.training-form label {
+  display: grid;
+  gap: 6px;
+  color: #c9d1d9;
+  font-size: 13px;
+}
+
+.capture-form input,
+.capture-form select,
+.capture-form textarea,
+.training-form input {
+  width: 100%;
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 9px 10px;
+}
+
+.capture-form textarea {
+  resize: vertical;
+}
+
+.success-message,
+.error-message {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.success-message {
+  color: #7ee787;
+}
+
+.error-message {
+  color: #ff7b72;
+}
+
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.progress-track {
+  height: 12px;
+  margin: 6px 0 14px;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 999px;
+  background: #0d1117;
+}
+
+.progress-track div {
+  height: 100%;
+  background: #2ea043;
+  transition: width 180ms ease;
+}
+
+.training-status-list {
+  margin: 12px 0;
+}
+
+.training-status-list strong {
+  max-width: 230px;
+  overflow-wrap: anywhere;
+}
+
 .camera-frame-wrapper {
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -683,7 +765,8 @@ button:disabled {
 
   .log-row,
   .settings-list div,
-  .camera-layout {
+  .camera-layout,
+  .capture-layout {
     grid-template-columns: 1fr;
   }
 }

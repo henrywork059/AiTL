@@ -101,3 +101,61 @@ export type CameraStatus = {
   frame_url: string | null;
   upload_endpoint: string;
 };
+
+export type CaptureQualityTag = "unreviewed" | "useful" | "bad";
+
+export type CaptureRecord = {
+  capture_id: string;
+  session_id: string;
+  source_id: string;
+  origin: "upload" | "simulation";
+  content_type: string;
+  width: number;
+  height: number;
+  source_frame_number: number;
+  source_received_at_ms: number;
+  captured_at_ms: number;
+  size_bytes: number;
+  quality_tag: CaptureQualityTag;
+  note: string;
+  image_path: string;
+  metadata_path: string;
+};
+
+export type DatasetStatus = {
+  active_dataset_id: string;
+  session_count: number;
+  frame_count: number;
+  metadata_count: number;
+  capture_enabled: boolean;
+  status: "ready" | string;
+  dataset_path: string;
+  last_capture: CaptureRecord | null;
+};
+
+export type TrainingConfig = {
+  dataset_yaml: string;
+  base_model: string;
+  epochs: number;
+  image_size: number;
+  batch: number;
+  device: string;
+};
+
+export type TrainingStatus = {
+  training_available: boolean;
+  backend: string;
+  active_run_id: string | null;
+  progress: number;
+  status: "idle" | "running" | "completed" | "failed" | string;
+  message: string;
+  started_at_ms: number | null;
+  finished_at_ms: number | null;
+  config: TrainingConfig | null;
+  output_path: string | null;
+  best_model_path: string | null;
+  error: string | null;
+  dataset_root: string;
+  requires_labeled_dataset: boolean;
+  install_command: string;
+};

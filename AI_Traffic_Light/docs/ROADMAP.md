@@ -77,6 +77,15 @@ Planned next small patch:
 - Object tracking.
 - Slow-crossing safety extension.
 
+## 0_1_2 — Persistent capture candidate
+
+Status: implemented, awaiting owner acceptance.
+
+- Save the latest device or simulation image with paired JSON metadata.
+- Keep capture counts across backend restarts.
+- Add an optional real YOLO runner for separately labeled datasets.
+- Keep automatic labeling, live inference, model export, and physical traffic control out of scope.
+
 ## 0_1_0 — Test-ready mock PC Studio
 
 Status: added.

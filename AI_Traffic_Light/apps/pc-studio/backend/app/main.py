@@ -1,7 +1,13 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.exceptions import AppError, app_error_handler, unhandled_exception_handler
+from app.core.exceptions import (
+    AppError,
+    app_error_handler,
+    request_validation_error_handler,
+    unhandled_exception_handler,
+)
 from app.core.logging_config import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.routes.camera import router as camera_router
@@ -18,7 +24,7 @@ from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
 
-APP_VERSION = "0_1_1"
+APP_VERSION = "0_1_2"
 logger = get_logger(__name__)
 
 
@@ -47,6 +53,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
     app.include_router(health_router, tags=["health"])

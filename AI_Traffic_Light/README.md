@@ -1,8 +1,8 @@
-# AI Traffic Light — 0_1_1 Camera Receiver Project
+# AI Traffic Light — 0_1_2 Dataset Capture Project
 
 This repository contains an early **AI vision-based adaptive traffic light project**.
 
-The current version is **0_1_1**, a test-ready PC camera-frame receiver. It accepts JPEG/PNG images from future ESP32 or Raspberry Pi camera nodes, automatically displays the newest frame, and provides a hardware-free simulation mode.
+The current candidate is **0_1_2**. It receives or simulates camera frames, previews the newest image, and persistently saves selected frames with paired JSON metadata. It also includes an optional real Ultralytics YOLO training runner for separately labeled YOLO datasets.
 
 ## Project concept
 
@@ -16,7 +16,7 @@ Camera/video input
 
 This is a **prototype and simulation project**. It must not be connected to real public traffic-light infrastructure.
 
-## What 0_1_1 can test
+## What 0_1_2 can test
 
 ```text
 - PC Studio frontend startup
@@ -31,17 +31,22 @@ This is a **prototype and simulation project**. It must not be connected to real
 - raw JPEG/PNG frame upload to the PC
 - automatic latest-frame display and stale-frame status
 - moving camera simulation without hardware
+- manual capture from receiver or simulation mode
+- persistent PNG/JPEG image and JSON metadata pairs
+- capture sessions, notes, quality tags, and saved-file counts
+- optional background YOLO training from a prepared labeled dataset
 ```
 
-## What 0_1_1 does not implement yet
+## What 0_1_2 does not implement yet
 
 ```text
 - ESP32/Raspberry Pi camera firmware
 - real webcam capture
 - YOLO/object-detection inference
 - segmentation
-- dataset writing
-- training
+- automatic object labeling or a bounding-box label editor
+- training directly from raw unlabeled captures
+- bundled training dependency in the normal lightweight backend install
 - model export
 - physical traffic-light control
 ```
@@ -50,7 +55,7 @@ This is a **prototype and simulation project**. It must not be connected to real
 
 ### 1. PC Studio App
 
-Runs on the computer. Current 0_1_1 status: **camera receiver and simulation test-ready**.
+Runs on the computer. Current 0_1_2 status: **dataset capture candidate awaiting owner acceptance**.
 
 Planned responsibilities:
 
@@ -61,7 +66,7 @@ Planned responsibilities:
 - rule-based traffic-light simulation
 - dataset capture
 - dataset review
-- model training/export placeholders
+- optional labeled-dataset training and future model export
 - logs and debugging
 
 ### 2. Device Camera App
@@ -114,6 +119,14 @@ Optional backend smoke test:
 scripts\test_backend_smoke_windows.bat
 ```
 
+Generated captures are written to `datasets/captures/<session_id>/images/` with matching records in `metadata/`. The `datasets/` and `outputs/` folders are ignored by Git and should not be uploaded with patches.
+
+For optional real YOLO training, first prepare a labeled dataset YAML under `datasets/`, then install the extra dependency from the backend folder:
+
+```powershell
+pip install -r requirements-training.txt
+```
+
 ## Current version history
 
 ```text
@@ -124,6 +137,7 @@ scripts\test_backend_smoke_windows.bat
 0_0_4 = PC Studio app template and function map
 0_1_0 = first test-ready mock PC Studio version
 0_1_1 = camera frame receiver, live preview, and simulation mode
+0_1_2 = persistent receiver/simulation capture and optional labeled-dataset training
 ```
 
 ## Important docs
@@ -164,7 +178,7 @@ AI_Traffic_Light/
   scripts/                  Helper scripts
 ```
 
-## Next milestone after 0_1_1
+## Next milestone after 0_1_2
 
 The next functional milestone should be:
 
@@ -176,4 +190,4 @@ webcam/video input
 → GUI visualization
 ```
 
-Before that, connect an ESP32 or Raspberry Pi sender to the documented frame-upload endpoint.
+Before that, test both receiver and simulation capture and confirm that image/metadata pairs remain after restarting the backend. Do not treat 0_1_2 as passed until the owner confirms every acceptance check.

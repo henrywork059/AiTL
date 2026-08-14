@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from html import escape
 import re
 from threading import Lock
 import time
+
+import cv2
+import numpy as np
 
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
@@ -223,24 +225,52 @@ class CameraFrameService:
         car_x = (tick * 31) % 1120
         bus_x = 1100 - ((tick * 19) % 1040)
         pedestrian_x = 500 + ((tick * 7) % 180)
-        timestamp = escape(time.strftime("%Y-%m-%d %H:%M:%S"))
-        svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-<rect width="1280" height="720" fill="#111827"/>
-<rect y="205" width="1280" height="515" fill="#24292f"/>
-<path d="M0 360H1280M0 560H1280" stroke="#d29922" stroke-width="6" stroke-dasharray="36 28" opacity=".8"/>
-<g fill="#e6edf3" opacity=".75">{''.join(f'<rect x="{430 + i * 42}" y="205" width="22" height="515"/>' for i in range(9))}</g>
-<rect x="{car_x}" y="405" width="160" height="70" rx="16" fill="#f0883e"/>
-<circle cx="{car_x + 38}" cy="478" r="18" fill="#05070a"/><circle cx="{car_x + 125}" cy="478" r="18" fill="#05070a"/>
-<rect x="{bus_x}" y="590" width="235" height="82" rx="12" fill="#58a6ff"/>
-<circle cx="{bus_x + 48}" cy="675" r="17" fill="#05070a"/><circle cx="{bus_x + 190}" cy="675" r="17" fill="#05070a"/>
-<circle cx="{pedestrian_x}" cy="260" r="22" fill="#a371f7"/><path d="M{pedestrian_x} 282v82m0-45-35 42m35-42 34 42m-34 3-28 55m28-55 30 55" stroke="#a371f7" stroke-width="15" stroke-linecap="round"/>
-<rect x="28" y="24" width="430" height="92" rx="14" fill="#05070a" opacity=".82"/>
-<text x="52" y="62" fill="#7ee787" font-family="sans-serif" font-size="25" font-weight="700">PC CAMERA SIMULATION</text>
-<text x="52" y="95" fill="#c9d1d9" font-family="monospace" font-size="20">{timestamp} · frame {self._frame_counter}</text>
-</svg>"""
+        canvas = np.full((720, 1280, 3), (39, 32, 17), dtype=np.uint8)
+        cv2.rectangle(canvas, (0, 205), (1279, 719), (47, 41, 36), thickness=-1)
+        for y in (360, 560):
+            for x in range(0, 1280, 64):
+                cv2.line(canvas, (x, y), (min(x + 36, 1279), y), (34, 153, 210), thickness=6)
+        for index in range(9):
+            x = 430 + index * 42
+            cv2.rectangle(canvas, (x, 205), (x + 22, 719), (243, 237, 230), thickness=-1)
+
+        cv2.rectangle(canvas, (car_x, 405), (car_x + 160, 475), (62, 136, 240), thickness=-1)
+        cv2.circle(canvas, (car_x + 38, 478), 18, (10, 7, 5), thickness=-1)
+        cv2.circle(canvas, (car_x + 125, 478), 18, (10, 7, 5), thickness=-1)
+        cv2.rectangle(canvas, (bus_x, 590), (bus_x + 235, 672), (255, 166, 88), thickness=-1)
+        cv2.circle(canvas, (bus_x + 48, 675), 17, (10, 7, 5), thickness=-1)
+        cv2.circle(canvas, (bus_x + 190, 675), 17, (10, 7, 5), thickness=-1)
+
+        cv2.circle(canvas, (pedestrian_x, 260), 22, (247, 113, 163), thickness=-1)
+        cv2.line(canvas, (pedestrian_x, 282), (pedestrian_x, 364), (247, 113, 163), thickness=15)
+        cv2.line(canvas, (pedestrian_x, 319), (pedestrian_x - 35, 361), (247, 113, 163), thickness=15)
+        cv2.line(canvas, (pedestrian_x, 319), (pedestrian_x + 34, 361), (247, 113, 163), thickness=15)
+        cv2.line(canvas, (pedestrian_x, 364), (pedestrian_x - 28, 419), (247, 113, 163), thickness=15)
+        cv2.line(canvas, (pedestrian_x, 364), (pedestrian_x + 30, 419), (247, 113, 163), thickness=15)
+
+        cv2.rectangle(canvas, (28, 24), (520, 116), (10, 7, 5), thickness=-1)
+        cv2.putText(canvas, "PC CAMERA SIMULATION", (52, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (135, 231, 126), 2)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(
+            canvas,
+            f"{timestamp} - frame {self._frame_counter}",
+            (52, 99),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.58,
+            (217, 209, 201),
+            1,
+        )
+
+        encoded_ok, encoded = cv2.imencode(".png", canvas)
+        if not encoded_ok:
+            raise AppError(
+                ErrorCode.CAMERA_FRAME_READ_FAILED,
+                "Failed to encode the synthetic camera frame.",
+                status_code=500,
+            )
         self._simulation_frame = CameraFrame(
-            content=svg.encode("utf-8"),
-            content_type="image/svg+xml",
+            content=encoded.tobytes(),
+            content_type="image/png",
             source_id="simulation_camera",
             width=1280,
             height=720,

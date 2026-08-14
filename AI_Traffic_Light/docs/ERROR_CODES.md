@@ -31,7 +31,7 @@ The project uses stable error codes so humans and AI agents can debug quickly.
 |---|---|
 | `ATL-COMMON-000` | Unexpected backend error. |
 | `ATL-API-001` | API request failed. |
-| `ATL-API-002` | Invalid request. |
+| `ATL-API-002` | Invalid request, including capture/training field validation. |
 | `ATL-API-003` | Template route is not implemented yet. |
 | `ATL-CONFIG-001` | Required configuration is missing. |
 | `ATL-CONFIG-002` | Failed to read settings. |
@@ -53,11 +53,11 @@ The project uses stable error codes so humans and AI agents can debug quickly.
 | `ATL-TRAFFIC-001` | Traffic state is invalid. |
 | `ATL-TRAFFIC-002` | Traffic rule is invalid. |
 | `ATL-TRAFFIC-003` | Traffic decision failed. |
-| `ATL-DATASET-001` | Failed to write dataset item. |
+| `ATL-DATASET-001` | Failed to atomically write a captured image or its metadata. |
 | `ATL-DATASET-002` | Failed to read dataset item. |
 | `ATL-DATASET-003` | Dataset item was not found. |
-| `ATL-TRAIN-001` | Training is not ready. |
-| `ATL-TRAIN-002` | Training configuration is invalid. |
+| `ATL-TRAIN-001` | Training prerequisites are unavailable or another run is active. |
+| `ATL-TRAIN-002` | Training config, dataset path, or dataset YAML is invalid. |
 | `ATL-TRAIN-003` | Training run failed. |
 | `ATL-MODEL-001` | Failed to read model registry. |
 | `ATL-MODEL-002` | Failed to export model package. |

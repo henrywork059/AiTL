@@ -61,8 +61,8 @@ export const FUNCTION_REGISTRY: FunctionItem[] = [
     id: "dataset.capture",
     area: "Dataset",
     label: "Capture frame and metadata",
-    description: "Save raw image, detection JSON, zones, and user notes.",
-    status: "placeholder",
+    description: "Save the latest receiver or simulation image with source metadata, quality tag, and notes.",
+    status: "implemented",
   },
   {
     id: "dataset.review",
@@ -75,8 +75,8 @@ export const FUNCTION_REGISTRY: FunctionItem[] = [
     id: "training.run",
     area: "Training",
     label: "Start training run",
-    description: "Later: configure training, launch it, and stream progress logs.",
-    status: "later",
+    description: "Validate a labeled YOLO dataset and launch an optional Ultralytics training run.",
+    status: "implemented",
   },
   {
     id: "model.export",

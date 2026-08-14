@@ -2,9 +2,9 @@
 
 React/Vite GUI for the AI Traffic Light PC Studio App.
 
-## Current state — 0_1_0
+## Current state — 0_1_2
 
-This frontend is **test-ready with mock data**.
+This frontend is **test-ready for persistent frame capture with an optional labeled-dataset training panel**.
 
 It can:
 
@@ -14,6 +14,9 @@ It can:
 - fall back to local mock data if the backend is offline
 - display the mock Live AI view
 - show mock detections, zones, logs, and traffic state
+- preview and save the current receiver or simulation frame
+- show persistent image/metadata counts and saved paths
+- configure and monitor an optional background YOLO training run
 ```
 
 It cannot yet:
@@ -22,14 +25,15 @@ It cannot yet:
 - open a real webcam
 - read ESP-CAM stream
 - run YOLO inference
-- save dataset captures
-- train/export models
+- label bounding boxes
+- train directly from unlabeled captures
+- export models
 ```
 
 ## Run
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 

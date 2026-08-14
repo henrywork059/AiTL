@@ -1,4 +1,4 @@
-"""Hardware-free checks for the 0_1_1 PC camera frame service."""
+"""Hardware-free checks for the 0_1_2 PC camera frame service."""
 from __future__ import annotations
 
 import base64
@@ -25,7 +25,10 @@ def main() -> int:
     simulation = service.set_simulation(True)
     assert simulation["mode"] == "simulation"
     assert simulation["frame_available"] is True
-    assert service.latest_frame().content_type == "image/svg+xml"  # type: ignore[union-attr]
+    simulated_frame = service.latest_frame()
+    assert simulated_frame is not None
+    assert simulated_frame.content_type == "image/png"
+    assert simulated_frame.content.startswith(b"\x89PNG\r\n\x1a\n")
 
     service.set_simulation(False)
     assert service.status()["frame_available"] is False
@@ -46,7 +49,7 @@ def main() -> int:
         raise AssertionError("Unsupported camera content type was accepted")
 
     print("[PASS] camera receiver accepts PNG frames")
-    print("[PASS] simulation produces displayable frames")
+    print("[PASS] simulation produces capturable PNG frames")
     print("[PASS] invalid upload types return stable camera errors")
     return 0
 

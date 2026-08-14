@@ -81,7 +81,7 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.DATASET_WRITE_FAILED: "Failed to write dataset item.",
     ErrorCode.DATASET_READ_FAILED: "Failed to read dataset item.",
     ErrorCode.DATASET_ITEM_NOT_FOUND: "Dataset item was not found.",
-    ErrorCode.TRAINING_NOT_READY: "Training is not ready in the current build.",
+    ErrorCode.TRAINING_NOT_READY: "Training prerequisites are not ready.",
     ErrorCode.TRAINING_CONFIG_INVALID: "Training configuration is invalid.",
     ErrorCode.TRAINING_RUN_FAILED: "Training run failed.",
     ErrorCode.MODEL_REGISTRY_READ_FAILED: "Failed to read model registry.",

@@ -2,9 +2,9 @@
 
 Python/FastAPI backend for the AI Traffic Light PC Studio App.
 
-## Current state — 0_1_1
+## Current state — 0_1_2
 
-This backend is **test-ready with a camera-frame receiver, simulation, and mock AI APIs**.
+This backend is a **persistent capture candidate with a camera receiver, PNG simulation, mock AI APIs, and an optional YOLO training runner**.
 
 It can:
 
@@ -20,6 +20,9 @@ It can:
 - accept raw JPEG/PNG camera frames
 - return the latest frame and receiver metadata
 - generate synthetic moving frames for hardware-free testing
+- save receiver or simulation images with paired JSON metadata
+- count captures across backend restarts
+- validate and launch optional labeled-dataset YOLO training
 ```
 
 It cannot yet:
@@ -28,7 +31,8 @@ It cannot yet:
 - open a real camera
 - run ESP32/Raspberry Pi camera firmware
 - run YOLO inference
-- train/export models
+- train from raw unlabeled captures
+- export models
 - control physical traffic lights
 ```
 
@@ -48,7 +52,11 @@ http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/health
 http://127.0.0.1:8000/api/smoke/status
 http://127.0.0.1:8000/api/camera/status
+http://127.0.0.1:8000/api/dataset/status
+http://127.0.0.1:8000/api/training/status
 ```
+
+Captured files are saved under the project `datasets/captures/` folder. To enable real YOLO training after preparing labels and `datasets/<name>/data.yaml`, run `pip install -r requirements-training.txt` from this backend folder. Training outputs go to `outputs/training/`.
 
 ## Smoke test
 

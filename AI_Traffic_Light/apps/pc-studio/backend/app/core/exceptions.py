@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.core.api_response import fail
@@ -67,5 +68,37 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             code=ErrorCode.UNKNOWN_ERROR,
             message=default_message(ErrorCode.UNKNOWN_ERROR),
             request_id=request_id,
+        ),
+    )
+
+
+async def request_validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Return FastAPI/Pydantic request validation failures in the project envelope."""
+    request_id = getattr(request.state, "request_id", None)
+    details = {
+        "fields": [
+            {
+                "location": [str(part) for part in error.get("loc", ())],
+                "message": error.get("msg", "Invalid value"),
+                "type": error.get("type", "validation_error"),
+            }
+            for error in exc.errors()
+        ]
+    }
+    logger.warning(
+        "Request validation failed",
+        extra={
+            "request_id": request_id,
+            "error_code": ErrorCode.INVALID_REQUEST.value,
+            "path": request.url.path,
+        },
+    )
+    return JSONResponse(
+        status_code=422,
+        content=fail(
+            code=ErrorCode.INVALID_REQUEST,
+            message=default_message(ErrorCode.INVALID_REQUEST),
+            request_id=request_id,
+            details=details,
         ),
     )

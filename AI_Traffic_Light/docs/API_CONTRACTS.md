@@ -120,3 +120,48 @@ Returns the current mode, source ID, frame number, resolution, age, stale state,
 ### `POST /api/camera/simulation/start` and `/stop`
 
 Enables or disables a synthetic moving traffic scene. Simulation uses the same status and image endpoints as future hardware uploads.
+
+## Added in 0_1_2
+
+### `GET /api/dataset/status`
+
+Returns persistent capture counts, session count, the relative dataset path, and the latest capture made during the current backend process.
+
+### `POST /api/dataset/captures`
+
+Saves the latest receiver or simulation frame with paired JSON metadata. The JSON request body is:
+
+```json
+{
+  "session_id": "default",
+  "quality_tag": "unreviewed",
+  "note": "optional note"
+}
+```
+
+`session_id` accepts 1–64 letters, numbers, dots, dashes, or underscores. `quality_tag` is `unreviewed`, `useful`, or `bad`. Images are written under `datasets/captures/<session_id>/images/`; paired records use `metadata/`. Generated dataset paths are relative and are never included in patch ZIPs.
+
+### `GET /api/training/status`
+
+Returns optional Ultralytics availability, current background-run state, progress, validated config, relative output paths, and any bounded failure message.
+
+### `POST /api/training/start`
+
+Validates and starts one real Ultralytics YOLO training job. The dataset YAML must be a relative path inside `datasets/` and define `train`, `val`, and `names` or `nc`.
+
+```json
+{
+  "dataset_yaml": "yolo/data.yaml",
+  "base_model": "yolo26n.pt",
+  "epochs": 10,
+  "image_size": 640,
+  "batch": 8,
+  "device": "cpu"
+}
+```
+
+Training requires the optional `requirements-training.txt` install and labeled YOLO images. Raw captures alone are not a trainable object-detection dataset. Only one run can be active; 0_1_2 does not implement cancel, model export, or automatic labeling.
+
+### Validation envelopes
+
+FastAPI/Pydantic request validation errors now use the normal failure envelope with `ATL-API-002` and the middleware request ID.

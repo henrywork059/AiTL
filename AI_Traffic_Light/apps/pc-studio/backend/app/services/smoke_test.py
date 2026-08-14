@@ -6,8 +6,8 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_1"
-APP_MODE = "camera_receiver_test_ready"
+APP_VERSION = "0_1_2"
+APP_MODE = "dataset_capture_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -28,6 +28,18 @@ def get_smoke_status() -> dict[str, Any]:
             "label": "Camera frame receiver",
             "status": "pass",
             "detail": "JPEG/PNG upload, latest-frame preview, and simulation endpoints are available.",
+        },
+        {
+            "id": "dataset.capture",
+            "label": "Persistent dataset capture",
+            "status": "pass",
+            "detail": "The latest receiver or simulation PNG can be saved with paired JSON metadata.",
+        },
+        {
+            "id": "training.runner",
+            "label": "Optional labeled-dataset training runner",
+            "status": "pass",
+            "detail": "A validated background YOLO runner is available after installing the optional dependency.",
         },
         {
             "id": "backend.health",
@@ -63,7 +75,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_1 is a supervised prototype and cannot control real traffic lights.",
+            "detail": "0_1_2 is a supervised prototype and cannot control real traffic lights.",
         },
     ]
 
@@ -77,12 +89,13 @@ def get_smoke_status() -> dict[str, Any]:
             "frontend_backend_connection_test",
             "camera_frame_upload_test",
             "camera_simulation_test",
+            "persistent_frame_capture_test",
+            "optional_labeled_yolo_training_test",
             "GUI function-list review",
         ],
         "not_ready_for": [
             "device_camera_firmware",
             "YOLO inference",
-            "training",
             "model_export",
             "physical_traffic_light_control",
         ],
@@ -99,6 +112,10 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/camera/frame",
             "/api/camera/simulation/start",
             "/api/camera/simulation/stop",
+            "/api/dataset/status",
+            "/api/dataset/captures",
+            "/api/training/status",
+            "/api/training/start",
         ],
         "summary": {
             "mock_frame_id": frame.get("frame_id"),

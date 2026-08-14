@@ -98,7 +98,7 @@ export default function App() {
   }, [refreshAll]);
 
   useEffect(() => {
-    if (activePage !== "camera_sources") return undefined;
+    if (activePage !== "camera_sources" && activePage !== "dataset_capture") return undefined;
 
     const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
     void refreshCamera();
@@ -158,7 +158,7 @@ export default function App() {
       case "traffic_logic":
         return <TrafficLogicPage traffic={traffic} smokeStatus={smokeStatus} />;
       case "dataset_capture":
-        return <DatasetCapturePage />;
+        return <DatasetCapturePage cameraStatus={cameraStatus} />;
       case "dataset_review":
         return <DatasetReviewPage />;
       case "train_export":

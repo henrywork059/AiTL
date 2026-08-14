@@ -1,4 +1,4 @@
-version: 0_1_1
-status: pc camera frame receiver and simulation test version
-previous_version: 0_1_0
-notes: PC Studio accepts the latest JPEG/PNG uploaded by a future ESP32 or Raspberry Pi camera node, displays it with automatic status polling, and includes a hardware-free moving-frame simulation mode. AI inference, training, and physical traffic control are not implemented.
+version: 0_1_2
+status: persistent dataset capture and optional YOLO training candidate
+previous_version: 0_1_1
+notes: PC Studio saves the latest receiver or simulation frame as an image with paired JSON metadata. An optional background Ultralytics YOLO runner can train from a separately labeled YOLO dataset. This candidate is not passed until the owner completes the acceptance checklist. AI inference, automatic labeling, and physical traffic control are not implemented.

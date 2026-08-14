@@ -1,6 +1,19 @@
-import type { BackendHealth, CameraStatus, DetectionFrame, RecentLog, SmokeStatus, TrafficState, Zone } from "./types";
+import type {
+  BackendHealth,
+  CameraStatus,
+  CaptureQualityTag,
+  CaptureRecord,
+  DatasetStatus,
+  DetectionFrame,
+  RecentLog,
+  SmokeStatus,
+  TrafficState,
+  TrainingConfig,
+  TrainingStatus,
+  Zone,
+} from "./types";
 import { mockFrame, mockTrafficState, mockZones } from "./mockData";
-import { requestJson } from "./lib/apiClient";
+import { requestJson, requestJsonStrict } from "./lib/apiClient";
 
 const configuredApiBase = import.meta.env.VITE_API_BASE_URL;
 export const API_BASE = typeof configuredApiBase === "string" && configuredApiBase.length > 0
@@ -18,17 +31,17 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_1",
+  version: "0_1_2",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_1",
+  version: "0_1_2",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
-  not_ready_for: ["real_camera_capture", "YOLO inference", "training", "physical_traffic_light_control"],
+  not_ready_for: ["real_camera_capture", "YOLO inference", "unlabeled_dataset_training", "physical_traffic_light_control"],
   checks: [
     {
       id: "frontend.fallback",
@@ -62,6 +75,35 @@ const fallbackCameraStatus: CameraStatus = {
   stale: false,
   frame_url: null,
   upload_endpoint: "/api/camera/frame?source_id=<camera_id>",
+};
+
+const fallbackDatasetStatus: DatasetStatus = {
+  active_dataset_id: "captures",
+  session_count: 0,
+  frame_count: 0,
+  metadata_count: 0,
+  capture_enabled: false,
+  status: "backend_offline",
+  dataset_path: "datasets/captures",
+  last_capture: null,
+};
+
+const fallbackTrainingStatus: TrainingStatus = {
+  training_available: false,
+  backend: "ultralytics_yolo_optional",
+  active_run_id: null,
+  progress: 0,
+  status: "backend_offline",
+  message: "Backend is offline, so training availability cannot be checked.",
+  started_at_ms: null,
+  finished_at_ms: null,
+  config: null,
+  output_path: null,
+  best_model_path: null,
+  error: null,
+  dataset_root: "datasets",
+  requires_labeled_dataset: true,
+  install_command: "pip install -r requirements-training.txt",
 };
 
 export async function fetchHealth(): Promise<BackendHealth> {
@@ -113,4 +155,32 @@ export async function setCameraSimulation(enabled: boolean): Promise<CameraStatu
     fallbackCameraStatus,
     { method: "POST" },
   );
+}
+
+export async function fetchDatasetStatus(): Promise<DatasetStatus> {
+  return requestJson<DatasetStatus>(`${API_BASE}/api/dataset/status`, fallbackDatasetStatus);
+}
+
+export async function captureLatestFrame(input: {
+  session_id: string;
+  quality_tag: CaptureQualityTag;
+  note: string;
+}): Promise<CaptureRecord> {
+  return requestJsonStrict<CaptureRecord>(`${API_BASE}/api/dataset/captures`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchTrainingStatus(): Promise<TrainingStatus> {
+  return requestJson<TrainingStatus>(`${API_BASE}/api/training/status`, fallbackTrainingStatus);
+}
+
+export async function startTraining(config: TrainingConfig): Promise<TrainingStatus> {
+  return requestJsonStrict<TrainingStatus>(`${API_BASE}/api/training/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
 }

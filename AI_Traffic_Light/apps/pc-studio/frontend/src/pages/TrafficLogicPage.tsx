@@ -29,7 +29,7 @@ export function TrafficLogicPage({ traffic, smokeStatus }: Props) {
 
         <PlaceholderPanel
           title="Rule engine plan"
-          description="This page will later expose the rule-based decision engine. In 0_1_1 it only confirms the intended layout and mock state display."
+          description="This page will later expose the rule-based decision engine. In 0_1_2 it only confirms the intended layout and mock state display."
           status="mock"
           bullets={[
             "extend pedestrian green when enough people are waiting",
