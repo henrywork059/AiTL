@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 import re
 from threading import Lock
 import time
@@ -14,6 +15,7 @@ from app.core.exceptions import AppError
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 SUPPORTED_UPLOAD_TYPES = {"image/jpeg", "image/png"}
+SIMULATION_DENSITIES = {"light", "normal", "busy"}
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,47 @@ def _image_dimensions(content: bytes, content_type: str) -> tuple[int, int] | No
     return None
 
 
+def _draw_pedestrian(canvas: np.ndarray, x: int, y: int, color: tuple[int, int, int], stride: int) -> None:
+    """Draw a simple top-to-bottom walking pedestrian centred on ``x, y``."""
+    cv2.circle(canvas, (x, y - 28), 14, color, thickness=-1)
+    cv2.line(canvas, (x, y - 12), (x, y + 24), color, thickness=10)
+    cv2.line(canvas, (x, y), (x - 18, y + 18), color, thickness=8)
+    cv2.line(canvas, (x, y), (x + 18, y + 18), color, thickness=8)
+    cv2.line(canvas, (x, y + 22), (x - 12 - stride, y + 48), color, thickness=8)
+    cv2.line(canvas, (x, y + 22), (x + 12 + stride, y + 48), color, thickness=8)
+
+
+def _draw_vehicle(
+    canvas: np.ndarray,
+    *,
+    x: int,
+    y: int,
+    width: int,
+    color: tuple[int, int, int],
+    vehicle_type: str,
+) -> None:
+    """Draw a compact side-view vehicle for the synthetic horizontal lanes."""
+    height = 58 if vehicle_type == "car" else 72
+    body_top = y - height // 2
+    body_bottom = y + height // 2
+    cv2.rectangle(canvas, (x, body_top), (x + width, body_bottom), color, thickness=-1)
+
+    if vehicle_type == "car":
+        roof_left = x + width // 4
+        roof_right = x + (width * 3) // 4
+        cv2.rectangle(canvas, (roof_left, body_top - 22), (roof_right, body_top + 4), color, thickness=-1)
+        cv2.rectangle(canvas, (roof_left + 7, body_top - 17), (roof_right - 7, body_top - 2), (77, 93, 110), thickness=-1)
+    else:
+        for window_x in range(x + 18, x + width - 20, 44):
+            cv2.rectangle(canvas, (window_x, body_top + 10), (min(window_x + 28, x + width - 12), body_top + 31), (77, 93, 110), thickness=-1)
+
+    wheel_y = body_bottom + 4
+    cv2.circle(canvas, (x + 34, wheel_y), 14, (18, 20, 23), thickness=-1)
+    cv2.circle(canvas, (x + width - 34, wheel_y), 14, (18, 20, 23), thickness=-1)
+    cv2.circle(canvas, (x + 34, wheel_y), 6, (125, 133, 144), thickness=-1)
+    cv2.circle(canvas, (x + width - 34, wheel_y), 6, (125, 133, 144), thickness=-1)
+
+
 class CameraFrameService:
     """Store the latest uploaded frame and provide a hardware-free simulator."""
 
@@ -114,6 +157,9 @@ class CameraFrameService:
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
         self._simulation_enabled = False
+        self._simulation_paused = False
+        self._simulation_density = "normal"
+        self._simulation_seed = int(time.time() * 1000) & 0x7FFFFFFF
         self._frame_counter = 0
         self._last_simulation_tick = -1
 
@@ -174,15 +220,48 @@ class CameraFrameService:
     def set_simulation(self, enabled: bool) -> dict:
         with self._lock:
             self._simulation_enabled = enabled
-            if not enabled:
-                self._simulation_frame = None
-                self._last_simulation_tick = -1
+            self._simulation_paused = False
+            self._simulation_frame = None
+            self._last_simulation_tick = -1
+        return self.status()
+
+    def configure_simulation(self, *, density: str | None = None, paused: bool | None = None) -> dict:
+        """Update synthetic-scene density or pause state without changing camera mode."""
+        with self._lock:
+            if density is not None:
+                normalized_density = density.strip().lower()
+                if normalized_density not in SIMULATION_DENSITIES:
+                    raise AppError(
+                        ErrorCode.INVALID_REQUEST,
+                        "Simulation density must be light, normal, or busy.",
+                        status_code=422,
+                        details={"density": density, "allowed": sorted(SIMULATION_DENSITIES)},
+                    )
+                if normalized_density != self._simulation_density:
+                    self._simulation_density = normalized_density
+                    self._simulation_frame = None
+                    self._last_simulation_tick = -1
+
+            if paused is not None:
+                if not self._simulation_enabled:
+                    raise AppError(
+                        ErrorCode.CAMERA_STREAM_NOT_STARTED,
+                        "Start simulation mode before pausing or resuming the synthetic scene.",
+                        status_code=409,
+                    )
+                if paused != self._simulation_paused:
+                    self._simulation_paused = paused
+                    if not paused:
+                        self._simulation_frame = None
+                        self._last_simulation_tick = -1
+
         return self.status()
 
     def latest_frame(self) -> CameraFrame | None:
         with self._lock:
             if self._simulation_enabled:
-                self._refresh_simulation_locked()
+                if self._simulation_frame is None or not self._simulation_paused:
+                    self._refresh_simulation_locked()
                 return self._simulation_frame
             return self._uploaded_frame
 
@@ -190,12 +269,20 @@ class CameraFrameService:
         frame = self.latest_frame()
         now_ms = int(time.time() * 1000)
         age_ms = now_ms - frame.received_at_ms if frame else None
-        simulation_enabled = self.simulation_enabled
+        with self._lock:
+            simulation_enabled = self._simulation_enabled
+            simulation_paused = self._simulation_paused
+            simulation_density = self._simulation_density
         return {
             "mode": "simulation" if simulation_enabled else "receiver",
             "simulation_enabled": simulation_enabled,
+            "simulation_paused": simulation_paused,
+            "simulation_density": simulation_density,
             "frame_available": frame is not None,
-            "streaming": frame is not None and (simulation_enabled or (age_ms is not None and age_ms <= 5000)),
+            "streaming": frame is not None and (
+                (simulation_enabled and not simulation_paused)
+                or (not simulation_enabled and age_ms is not None and age_ms <= 5000)
+            ),
             "active_source_id": frame.source_id if frame else None,
             "resolution": {"width": frame.width, "height": frame.height} if frame else None,
             "content_type": frame.content_type if frame else None,
@@ -222,42 +309,115 @@ class CameraFrameService:
         self._last_simulation_tick = tick
         self._frame_counter += 1
         now_ms = int(time.time() * 1000)
-        car_x = (tick * 31) % 1120
-        bus_x = 1100 - ((tick * 19) % 1040)
-        pedestrian_x = 500 + ((tick * 7) % 180)
-        canvas = np.full((720, 1280, 3), (39, 32, 17), dtype=np.uint8)
-        cv2.rectangle(canvas, (0, 205), (1279, 719), (47, 41, 36), thickness=-1)
-        for y in (360, 560):
-            for x in range(0, 1280, 64):
-                cv2.line(canvas, (x, y), (min(x + 36, 1279), y), (34, 153, 210), thickness=6)
-        for index in range(9):
-            x = 430 + index * 42
-            cv2.rectangle(canvas, (x, 205), (x + 22, 719), (243, 237, 230), thickness=-1)
+        density = self._simulation_density
+        paused = self._simulation_paused
 
-        cv2.rectangle(canvas, (car_x, 405), (car_x + 160, 475), (62, 136, 240), thickness=-1)
-        cv2.circle(canvas, (car_x + 38, 478), 18, (10, 7, 5), thickness=-1)
-        cv2.circle(canvas, (car_x + 125, 478), 18, (10, 7, 5), thickness=-1)
-        cv2.rectangle(canvas, (bus_x, 590), (bus_x + 235, 672), (255, 166, 88), thickness=-1)
-        cv2.circle(canvas, (bus_x + 48, 675), 17, (10, 7, 5), thickness=-1)
-        cv2.circle(canvas, (bus_x + 190, 675), 17, (10, 7, 5), thickness=-1)
+        canvas = np.full((720, 1280, 3), (29, 33, 37), dtype=np.uint8)
 
-        cv2.circle(canvas, (pedestrian_x, 260), 22, (247, 113, 163), thickness=-1)
-        cv2.line(canvas, (pedestrian_x, 282), (pedestrian_x, 364), (247, 113, 163), thickness=15)
-        cv2.line(canvas, (pedestrian_x, 319), (pedestrian_x - 35, 361), (247, 113, 163), thickness=15)
-        cv2.line(canvas, (pedestrian_x, 319), (pedestrian_x + 34, 361), (247, 113, 163), thickness=15)
-        cv2.line(canvas, (pedestrian_x, 364), (pedestrian_x - 28, 419), (247, 113, 163), thickness=15)
-        cv2.line(canvas, (pedestrian_x, 364), (pedestrian_x + 30, 419), (247, 113, 163), thickness=15)
+        # Sidewalks and horizontal road keep vehicle motion visually left/right.
+        cv2.rectangle(canvas, (0, 0), (1279, 178), (72, 79, 84), thickness=-1)
+        cv2.rectangle(canvas, (0, 179), (1279, 624), (48, 52, 57), thickness=-1)
+        cv2.rectangle(canvas, (0, 625), (1279, 719), (72, 79, 84), thickness=-1)
+        cv2.line(canvas, (0, 179), (1279, 179), (128, 136, 144), thickness=5)
+        cv2.line(canvas, (0, 625), (1279, 625), (128, 136, 144), thickness=5)
 
-        cv2.rectangle(canvas, (28, 24), (520, 116), (10, 7, 5), thickness=-1)
-        cv2.putText(canvas, "PC CAMERA SIMULATION", (52, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (135, 231, 126), 2)
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        for lane_y in (310, 500):
+            for x in range(0, 1280, 86):
+                cv2.line(canvas, (x, lane_y), (min(x + 50, 1279), lane_y), (46, 176, 224), thickness=5)
+
+        # A vertical pedestrian crossing: people travel from the top sidewalk to the bottom.
+        crossing_left, crossing_right = 520, 760
+        cv2.rectangle(canvas, (crossing_left, 179), (crossing_right, 625), (55, 59, 63), thickness=-1)
+        for stripe_y in range(205, 610, 46):
+            cv2.rectangle(
+                canvas,
+                (crossing_left + 18, stripe_y),
+                (crossing_right - 18, stripe_y + 22),
+                (225, 228, 230),
+                thickness=-1,
+            )
+        cv2.line(canvas, (485, 179), (485, 625), (218, 218, 218), thickness=5)
+        cv2.line(canvas, (795, 179), (795, 625), (218, 218, 218), thickness=5)
+
+        profile = {
+            "light": {"pedestrians": (2, 3), "vehicles": 2},
+            "normal": {"pedestrians": (4, 6), "vehicles": 4},
+            "busy": {"pedestrians": (7, 10), "vehicles": 6},
+        }[density]
+        scene_bucket = tick // 8
+        rng = random.Random(self._simulation_seed + scene_bucket * 1009 + len(density) * 97)
+
+        vehicle_palette = [
+            (66, 135, 245),
+            (94, 176, 110),
+            (230, 144, 81),
+            (181, 105, 200),
+            (94, 188, 214),
+            (122, 128, 137),
+        ]
+        for index in range(profile["vehicles"]):
+            vehicle_type = "bus" if index % 5 == 4 else "car"
+            width = 220 if vehicle_type == "bus" else rng.randint(125, 170)
+            lane_y = 265 if index % 2 == 0 else 455
+            direction = 1 if index % 2 == 0 else -1
+            speed = rng.randint(13, 25)
+            offset = rng.randint(0, 1500)
+            span = 1280 + width + 220
+            progress = (offset + tick * speed) % span
+            x = -width + progress if direction > 0 else 1280 - progress
+            _draw_vehicle(
+                canvas,
+                x=int(x),
+                y=lane_y,
+                width=width,
+                color=vehicle_palette[index % len(vehicle_palette)],
+                vehicle_type=vehicle_type,
+            )
+
+        pedestrian_count = rng.randint(*profile["pedestrians"])
+        pedestrian_palette = [
+            (196, 111, 255),
+            (119, 187, 255),
+            (119, 220, 157),
+            (255, 158, 132),
+            (164, 142, 245),
+            (114, 212, 229),
+        ]
+        travel_top, travel_bottom = 120, 690
+        travel_span = travel_bottom - travel_top
+        for index in range(pedestrian_count):
+            x = rng.randint(crossing_left + 45, crossing_right - 45)
+            speed = rng.randint(6, 13)
+            base = rng.randint(0, travel_span - 1)
+            y = travel_top + ((base + tick * speed) % travel_span)
+            stride = 5 if (tick + index) % 2 == 0 else -5
+            _draw_pedestrian(
+                canvas,
+                x=x,
+                y=int(y),
+                color=pedestrian_palette[index % len(pedestrian_palette)],
+                stride=stride,
+            )
+
+        cv2.rectangle(canvas, (24, 20), (490, 122), (14, 17, 20), thickness=-1)
+        cv2.putText(canvas, "PC CAMERA SIMULATION", (46, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.74, (126, 231, 135), 2)
         cv2.putText(
             canvas,
-            f"{timestamp} - frame {self._frame_counter}",
-            (52, 99),
+            f"density: {density}   pedestrians: {pedestrian_count}   vehicles: {profile['vehicles']}",
+            (46, 82),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
-            (217, 209, 201),
+            0.52,
+            (217, 221, 224),
+            1,
+        )
+        state_label = "PAUSED - inspection frame" if paused else f"frame {self._frame_counter}"
+        cv2.putText(
+            canvas,
+            state_label,
+            (46, 107),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            (217, 221, 224),
             1,
         )
 

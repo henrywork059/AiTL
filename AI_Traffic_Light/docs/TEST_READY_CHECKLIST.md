@@ -1,13 +1,20 @@
-# V015 acceptance checklist
+# V016 acceptance checklist
 
-1. Health and Dashboard show `0_1_5`.
-2. At least two local trained models are present under `outputs/training/*/weights/best.pt`.
-3. Live AI shows a model selector with discovered runs.
-4. Loading a selected model changes the active model ID.
-5. Setting a default model persists after a backend restart.
-6. Deleting a selected model removes its run directory and updates the list.
-7. Live detections still work after selecting a model.
-8. Lowering confidence to 1–10% affects returned/visible detections.
-9. Boxes and labels can be toggled independently.
-10. Class visibility filters update the overlay and result table.
-11. The Models page supports refresh, load, set-default, and delete.
+V016 remains a candidate until the project owner explicitly confirms every required item.
+
+1. Health/Dashboard report `0_1_6`.
+2. Live AI long Active run / Default run identifiers remain inside the Trained model card.
+3. Selected model Path and Run folder wrap inside the card without horizontal spillover.
+4. Camera simulation starts and displays a vertical pedestrian crossing with horizontal white zebra bars.
+5. Simulated pedestrians visibly travel top-to-bottom through the crossing.
+6. Multiple simulated vehicles move horizontally across the road lanes.
+7. The synthetic scene shows multiple pedestrians and visible variation over time.
+8. Light / Normal / Busy density controls update the scene and reported status.
+9. Pause scene freezes the current synthetic frame; Resume scene restarts frame progression.
+10. A paused or moving simulation frame can still be captured by the existing Dataset Capture workflow.
+11. Existing manual labeling and managed YOLO dataset generation still work on captured images.
+12. Existing training page/status still loads without regression.
+13. Existing trained-model discovery, selection, default, deletion, and live inference still work.
+14. Confidence down to 1%, box/label toggles, and class filtering still work on Live AI.
+15. Camera binary image responses preserve a request ID header.
+16. Live AI remains prototype/simulation input only and does not control real public traffic infrastructure.

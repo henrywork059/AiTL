@@ -1,10 +1,12 @@
 import { API_BASE } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
+import { SimulationControls } from "../components/SimulationControls";
 import type { CameraStatus } from "../types";
 
 type Props = {
   status: CameraStatus | null;
   onSimulationChange: (enabled: boolean) => void;
+  onStatusChange: (status: CameraStatus) => void;
   changingMode: boolean;
 };
 
@@ -14,14 +16,16 @@ function formatAge(ageMs: number | null): string {
   return `${(ageMs / 1000).toFixed(1)} s ago`;
 }
 
-export function CameraSourcesPage({ status, onSimulationChange, changingMode }: Props) {
+export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, changingMode }: Props) {
   const imageUrl = status?.frame_available
     ? `${API_BASE}/api/camera/frame?v=${status.frame_number}`
     : null;
   const statusLabel = !status
     ? "checking"
     : status.simulation_enabled
-      ? "simulation active"
+      ? status.simulation_paused
+        ? "simulation paused"
+        : "simulation active"
       : status.frame_available
         ? status.stale
           ? "frame stale"
@@ -67,6 +71,8 @@ export function CameraSourcesPage({ status, onSimulationChange, changingMode }: 
                   : "Start simulation"}
             </button>
           </div>
+
+          <SimulationControls status={status} onStatusChange={onStatusChange} />
         </section>
 
         <aside className="side-column">
@@ -78,6 +84,8 @@ export function CameraSourcesPage({ status, onSimulationChange, changingMode }: 
               <div><span>Resolution</span><strong>{status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : "unknown"}</strong></div>
               <div><span>Last update</span><strong>{formatAge(status?.age_ms ?? null)}</strong></div>
               <div><span>Frame</span><strong>#{status?.frame_number ?? 0}</strong></div>
+              <div><span>Sim density</span><strong>{status?.simulation_density ?? "normal"}</strong></div>
+              <div><span>Sim scene</span><strong>{status?.simulation_paused ? "paused" : "moving"}</strong></div>
             </div>
           </section>
 

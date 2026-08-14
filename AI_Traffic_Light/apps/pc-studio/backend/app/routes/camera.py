@@ -5,6 +5,7 @@ from app.core.api_response import ok
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
+from app.models import CameraSimulationSettingsRequest
 from app.services.camera_frames import camera_frame_service
 
 router = APIRouter()
@@ -89,6 +90,7 @@ def latest_camera_frame(request: Request) -> Response:
         media_type=frame.content_type,
         headers={
             "Cache-Control": "no-store, max-age=0",
+            "X-Request-ID": request.state.request_id,
             "X-Camera-Source": frame.source_id,
             "X-Frame-Number": str(frame.frame_number),
         },
@@ -108,4 +110,25 @@ def stop_camera_simulation(request: Request) -> dict:
     """Return to device receiver mode without discarding the last device upload."""
     data = camera_frame_service.set_simulation(False)
     logger.info("Camera simulation stopped", extra={"request_id": request.state.request_id})
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.post("/simulation/settings")
+def update_camera_simulation_settings(
+    payload: CameraSimulationSettingsRequest,
+    request: Request,
+) -> dict:
+    """Adjust synthetic-scene density or pause/resume the active simulation."""
+    data = camera_frame_service.configure_simulation(
+        density=payload.density,
+        paused=payload.paused,
+    )
+    logger.info(
+        "Camera simulation settings updated",
+        extra={
+            "request_id": request.state.request_id,
+            "simulation_density": data["simulation_density"],
+            "simulation_paused": data["simulation_paused"],
+        },
+    )
     return ok(data, request_id=request.state.request_id)

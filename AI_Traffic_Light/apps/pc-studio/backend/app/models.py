@@ -43,6 +43,11 @@ class TrafficState(BaseModel):
     extension_seconds: int = 0
 
 
+class CameraSimulationSettingsRequest(BaseModel):
+    density: Literal["light", "normal", "busy"] | None = None
+    paused: bool | None = None
+
+
 class CaptureFrameRequest(BaseModel):
     session_id: str = Field(default="default", min_length=1, max_length=64)
     quality_tag: Literal["unreviewed", "useful", "bad"] = "unreviewed"

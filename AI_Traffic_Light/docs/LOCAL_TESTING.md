@@ -1,12 +1,33 @@
-# Local Testing Notes (V015)
+# Local Testing Notes (V016)
 
 ## Key manual tests
 
-1. Train at least one model so `outputs/training/<run_id>/weights/best.pt` exists.
-2. Open **Live AI** and confirm the model list appears.
-3. Choose a model and click **Load selected model**.
-4. Set a default model and refresh the page; Live AI should auto-load the default when possible.
-5. Delete a non-default model and confirm its run directory is removed from disk.
-6. Lower confidence to 1–10% and confirm the backend still responds.
-7. Toggle boxes, labels, and class filters on the live overlay.
-8. Open **Models** and repeat load/default/delete actions there.
+1. Confirm `GET /health` and the Dashboard show `0_1_6`.
+2. Open **Live AI** with a trained model whose run ID/path is long. Confirm Active run, Default run, Path, and Run folder wrap inside the Trained model panel instead of extending beyond its border.
+3. Open **Camera Sources** and start simulation mode.
+4. Confirm the zebra crossing is a vertical travel corridor: white zebra bars run horizontally across it while pedestrians move from the top of the image toward the bottom.
+5. Confirm cars/buses move left-to-right or right-to-left on horizontal road lanes.
+6. Leave the scene running for several seconds and confirm pedestrian positions/counts and vehicle layout vary rather than showing one fixed person/car arrangement.
+7. Change **Scene density** through Light, Normal, and Busy. Confirm the visible synthetic population changes and status reports the selected density.
+8. Click **Pause scene**. Confirm the frame number/image stops advancing and the status reports paused; click **Resume scene** and confirm movement returns.
+9. While paused, use the existing Dataset Capture page to save the frame and confirm persistent capture still works.
+10. Return to **Live AI** and confirm V015 model selection, default model, confidence, box/label toggles, and class filters still work.
+11. Confirm no live detection is connected to physical traffic-light control.
+
+## Automated local commands
+
+From `AI_Traffic_Light`:
+
+```powershell
+python .\scripts\test_camera_frame_service.py
+python .\scripts\test_camera_simulation_api.py
+python .\scripts\test_backend_smoke.py
+python .\scripts\check_structure.py
+```
+
+From `apps\pc-studio\frontend`:
+
+```powershell
+npm run typecheck
+npm run build
+```

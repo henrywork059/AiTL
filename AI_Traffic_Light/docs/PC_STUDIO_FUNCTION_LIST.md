@@ -4,6 +4,10 @@
 - receive JPEG/PNG frame
 - simulation mode
 - latest-frame preview
+- vertical pedestrian-crossing synthetic scene with top-to-bottom pedestrian motion
+- horizontal synthetic vehicle motion with varied scene population
+- light / normal / busy simulation density presets
+- pause / resume synthetic scene for inspection and capture
 
 ## Dataset
 - capture latest frame with metadata
@@ -22,3 +26,4 @@
 - adjust backend confidence down to 1%
 - toggle overlay boxes and labels
 - filter visible classes
+- contain long model IDs/paths inside the Live AI model panel

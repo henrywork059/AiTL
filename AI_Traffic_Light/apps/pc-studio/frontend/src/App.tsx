@@ -153,6 +153,7 @@ export default function App() {
           <CameraSourcesPage
             status={cameraStatus}
             onSimulationChange={changeCameraSimulation}
+            onStatusChange={setCameraStatus}
             changingMode={changingCameraMode}
           />
         );

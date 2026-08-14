@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_5 model management";
+export const APP_VERSION_LABEL = "0_1_6 simulation controls";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -21,7 +21,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "camera_sources",
     label: "Camera Sources",
     shortLabel: "Cameras",
-    description: "Receive and preview frames uploaded by ESP32 or Raspberry Pi camera nodes.",
+    description: "Receive device frames or run the controllable PC traffic simulation with density and pause controls.",
     status: "test-ready",
   },
   zone_editor: {

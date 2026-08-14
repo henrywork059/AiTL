@@ -1,5 +1,19 @@
 # Changelog
 
+## 0_1_6 — Live layout and controllable simulation scene
+
+- Fixed Live AI model/run/path text containment so long trained-model identifiers wrap inside the right-hand model panel instead of overflowing its border.
+- Reworked the synthetic camera image around a horizontal road and a vertical pedestrian crossing with horizontal zebra bars.
+- Changed synthetic pedestrians to move from the top of the frame toward the bottom while cars/buses move horizontally across lanes.
+- Added a larger, varied synthetic population with deterministic scene randomization for positions, speeds, sizes, and counts.
+- Added Light / Normal / Busy simulation density presets.
+- Added Pause / Resume scene controls so one synthetic frame can be frozen for inspection or persistent dataset capture.
+- Added `POST /api/camera/simulation/settings` and extended camera status with simulation density/pause state using existing envelopes, request IDs, logging, Pydantic validation, and stable errors.
+- Added `X-Request-ID` to the binary camera-frame response.
+- Added focused camera simulation service/API tests and updated V016 documentation, function status, and acceptance checks.
+- Preserved V015 model management, confidence/visibility controls, capture, labeling, managed YOLO training, and trained-model live inference.
+- Live detections remain prototype/simulation input and do not directly control physical public-road traffic infrastructure.
+
 ## 0_1_5 — Model selection, deletion, and live-visibility controls
 
 - Reviewed the trained-model loading path and replaced the latest-only UX with explicit model selection from discovered local `outputs/training/*/weights/best.pt` runs.
@@ -111,7 +125,6 @@
 
 - Added monorepo project structure.
 - Added PC Studio backend placeholder.
-- Added PC Studio frontend placeholder GUI.
 - Added ESP32-CAM firmware placeholder.
 - Added shared schemas.
 - Added documentation and roadmap.

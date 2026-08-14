@@ -3,8 +3,30 @@
 All API responses continue to use the standard envelope:
 
 ```json
-{ "ok": true, "request_id": "...", "data": { ... } }
+{
+  "ok": true,
+  "data": {},
+  "meta": { "request_id": "..." }
+}
 ```
+
+Binary image responses include `X-Request-ID`.
+
+## Camera
+
+- `GET /api/camera/status`
+  - returns receiver/simulation state and latest-frame metadata.
+  - V016 also returns `simulation_density` (`light`, `normal`, or `busy`) and `simulation_paused`.
+- `GET /api/camera/frame`
+  - returns the latest device or synthetic PNG/JPEG frame.
+  - includes `X-Request-ID`, `X-Camera-Source`, and `X-Frame-Number` headers.
+- `POST /api/camera/simulation/start`
+- `POST /api/camera/simulation/stop`
+- `POST /api/camera/simulation/settings`
+  - body fields are optional: `{ "density": "busy", "paused": true }`.
+  - density may be changed before or during simulation.
+  - pause/resume requires simulation mode to be active.
+  - invalid request values use the existing stable API/camera error codes.
 
 ## Inference
 

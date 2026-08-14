@@ -85,9 +85,13 @@ export type ApiConnectionState = {
   checkedAt?: string;
 };
 
+export type SimulationDensity = "light" | "normal" | "busy";
+
 export type CameraStatus = {
   mode: "receiver" | "simulation";
   simulation_enabled: boolean;
+  simulation_paused: boolean;
+  simulation_density: SimulationDensity;
   frame_available: boolean;
   streaming: boolean;
   active_source_id: string | null;

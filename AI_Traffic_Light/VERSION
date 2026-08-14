@@ -1,5 +1,5 @@
-version: 0_1_5
-status: model selection, deletion, and live-visibility candidate
-previous_version: 0_1_4
-passed_baseline: 0_1_1
-notes: PC Studio can now discover local trained YOLO models, choose which model to load, set a default auto-load model, delete outdated model runs, and adjust live-visibility diagnostics with lower backend confidence plus overlay/class visibility controls. Capture, manual labeling, managed YOLO dataset generation, optional training, and trained-model live inference remain available. Live detections still do not drive zone counts or traffic decisions. Automatic labeling, model export, and physical traffic control are not implemented. This candidate is not passed until the owner completes the acceptance checklist.
+version: 0_1_6
+status: live layout and controllable simulation candidate
+previous_version: 0_1_5
+passed_baseline: 0_1_5
+notes: V016 fixes long trained-model text overflowing the Live AI side panel, improves the synthetic camera scene with a vertical pedestrian crossing, top-to-bottom pedestrian motion, horizontal vehicle motion, and a more varied population, and adds simulation density plus pause/resume controls. All V015 capture, labeling, managed YOLO training, model management, and live inference functions remain in scope. Live detections still do not directly control physical traffic infrastructure. This candidate is not passed until the owner completes the V016 acceptance checklist.

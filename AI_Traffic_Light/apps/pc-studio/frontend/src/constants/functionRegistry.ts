@@ -19,7 +19,21 @@ export const FUNCTION_REGISTRY: FunctionItem[] = [
     id: "camera.simulation",
     area: "Camera",
     label: "Simulate camera frames",
-    description: "Generate moving test frames without requiring camera hardware.",
+    description: "Generate varied traffic test frames with top-to-bottom pedestrians, horizontal vehicles, and a vertical crossing.",
+    status: "implemented",
+  },
+  {
+    id: "camera.simulation_density",
+    area: "Camera",
+    label: "Adjust simulation density",
+    description: "Switch the synthetic scene between light, normal, and busy pedestrian/vehicle populations.",
+    status: "implemented",
+  },
+  {
+    id: "camera.simulation_pause",
+    area: "Camera",
+    label: "Pause simulation scene",
+    description: "Freeze and resume one synthetic frame for inspection or persistent dataset capture.",
     status: "implemented",
   },
   {

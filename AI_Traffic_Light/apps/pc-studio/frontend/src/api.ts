@@ -11,6 +11,7 @@ import type {
   InferenceStatus,
   ModelRegistryStatus,
   RecentLog,
+  SimulationDensity,
   SmokeStatus,
   TrafficState,
   TrainingConfig,
@@ -37,14 +38,14 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_5",
+  version: "0_1_6",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_5",
+  version: "0_1_6",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
   not_ready_for: ["automatic_labeling", "model export", "physical_traffic_light_control"],
@@ -68,6 +69,8 @@ const fallbackSmokeStatus: SmokeStatus = {
 const fallbackCameraStatus: CameraStatus = {
   mode: "receiver",
   simulation_enabled: false,
+  simulation_paused: false,
+  simulation_density: "normal",
   frame_available: false,
   streaming: false,
   active_source_id: null,
@@ -114,7 +117,6 @@ const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
   classes: [],
   message: "Backend is offline, so the managed training dataset cannot be checked.",
 };
-
 
 const fallbackInferenceStatus: InferenceStatus = {
   model_loaded: false,
@@ -210,6 +212,17 @@ export async function setCameraSimulation(enabled: boolean): Promise<CameraStatu
     fallbackCameraStatus,
     { method: "POST" },
   );
+}
+
+export async function setCameraSimulationSettings(input: {
+  density?: SimulationDensity;
+  paused?: boolean;
+}): Promise<CameraStatus> {
+  return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export async function fetchDatasetStatus(): Promise<DatasetStatus> {

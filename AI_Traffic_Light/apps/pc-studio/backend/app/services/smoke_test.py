@@ -6,8 +6,8 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_5"
-APP_MODE = "model_management_test_ready"
+APP_VERSION = "0_1_6"
+APP_MODE = "simulation_scene_controls_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -23,6 +23,12 @@ def get_smoke_status() -> dict[str, Any]:
             "label": "Camera frame receiver",
             "status": "pass",
             "detail": "JPEG/PNG upload, latest-frame preview, and simulation endpoints are available.",
+        },
+        {
+            "id": "camera.simulation_scene",
+            "label": "Controllable synthetic traffic scene",
+            "status": "pass",
+            "detail": "Simulation supports a vertical pedestrian crossing, horizontal vehicle motion, density presets, and pause/resume inspection.",
         },
         {
             "id": "dataset.capture",
@@ -88,7 +94,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_5 is a supervised prototype and cannot control real public traffic lights.",
+            "detail": "0_1_6 is a supervised prototype and cannot control real public traffic lights.",
         },
     ]
 
@@ -102,6 +108,8 @@ def get_smoke_status() -> dict[str, Any]:
             "frontend_backend_connection_test",
             "camera_frame_upload_test",
             "camera_simulation_test",
+            "camera_simulation_density_test",
+            "camera_simulation_pause_resume_test",
             "persistent_frame_capture_test",
             "manual_bounding_box_labeling_test",
             "managed_yolo_dataset_build_test",
@@ -130,6 +138,7 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/camera/frame",
             "/api/camera/simulation/start",
             "/api/camera/simulation/stop",
+            "/api/camera/simulation/settings",
             "/api/dataset/status",
             "/api/dataset/captures",
             "/api/dataset/captures/{capture_id}/image",
