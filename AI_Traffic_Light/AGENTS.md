@@ -16,9 +16,9 @@ docs/DEBUGGING_AND_LOGGING.md
 
 Project name: **AI Traffic Light**
 Current patch line: **0_1_x**
-Current patch: **0_1_3**
+Current patch: **0_1_4**
 
-This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, supervised labeling, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
+This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, supervised labeling, local trained-model inference, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
 
 ## Architecture rule
 
@@ -160,6 +160,13 @@ relevant docs/*.md
 - Manual labels are human annotations; do not describe them as automatic AI labels.
 - A reviewed frame with zero boxes is a valid negative example; an unreviewed frame is not equivalent to a negative label.
 - Frames tagged `bad` should not be included in managed training builds.
+
+## Trained-model inference rule
+
+- Trained `best.pt` files remain runtime output under `outputs/training/`; never package model weights into code patches.
+- Prefer loading trained models on the PC only. Device-camera firmware remains frame capture/sender logic.
+- Live inference results must preserve original camera coordinates so overlays and later zone counting are auditable.
+- Do not silently connect live detections to physical traffic-light control. Current live inference is visualization/test input for later simulation logic only.
 
 ## Data and secrets rule
 

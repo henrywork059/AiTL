@@ -1,8 +1,8 @@
-# AI Traffic Light — 0_1_3 Manual Labeling Project
+# AI Traffic Light — 0_1_4 Trained-Model Live Inference Project
 
 This repository contains an early **AI vision-based adaptive traffic-light prototype**.
 
-The current candidate is **0_1_3**. It receives or simulates camera frames, persistently captures selected images, lets a human draw and save bounding-box labels in PC Studio, and can convert reviewed captures into a managed YOLO train/validation dataset for the existing optional Ultralytics training runner.
+The current candidate is **0_1_4**. It keeps the V013 capture → label → managed YOLO training workflow and adds local trained-model inference: PC Studio discovers the newest `outputs/training/<run_id>/weights/best.pt`, loads it with Ultralytics, runs it on receiver or simulation frames, and overlays the returned boxes on the exact inferred source image.
 
 ## Project concept
 
@@ -17,7 +17,7 @@ Camera/video input
 
 This is a **prototype and simulation project**. It must not be connected to real public traffic-light infrastructure.
 
-## What 0_1_3 can test
+## What 0_1_4 can test
 
 ```text
 - PC Studio frontend and FastAPI backend startup
@@ -35,6 +35,11 @@ This is a **prototype and simulation project**. It must not be connected to real
 - generated datasets/yolo/data.yaml and manifest
 - stale managed-dataset detection after label edits
 - optional background Ultralytics YOLO training from the managed or another labeled dataset
+- discovery of local `outputs/training/*/weights/best.pt` runs after backend restart
+- automatic latest-model load when Live AI opens, plus explicit reload/unload controls
+- trained YOLO inference on receiver or simulation frames
+- original-image-coordinate bounding-box overlays and confidence filtering
+- exact inferred source-frame display to keep boxes aligned with the frame that produced them
 ```
 
 The shared labeling classes are:
@@ -48,13 +53,13 @@ The shared labeling classes are:
 5 bicycle
 ```
 
-## What 0_1_3 does not implement yet
+## What 0_1_4 does not implement yet
 
 ```text
 - ESP32/Raspberry Pi camera firmware
 - real webcam capture
 - automatic object labeling
-- YOLO/object-detection inference in the live view
+- automatic use of live detections for traffic-zone counting or traffic decisions
 - segmentation
 - model export
 - physical traffic-light control
@@ -64,7 +69,7 @@ The shared labeling classes are:
 
 ### 1. PC Studio App
 
-Runs on the computer. Current 0_1_3 status: **manual-labeling candidate awaiting owner acceptance**.
+Runs on the computer. Current 0_1_4 status: **trained-model live-inference candidate awaiting owner acceptance**.
 
 Current testable data workflow:
 
@@ -74,6 +79,7 @@ Camera Sources
 → Dataset Review / manual labels
 → Build training dataset
 → Train / Export (optional Ultralytics dependency)
+→ Live AI (load latest trained best.pt and overlay detections)
 ```
 
 ### 2. Device Camera App
@@ -141,7 +147,7 @@ For optional real YOLO training, install the extra dependency from the backend f
 pip install -r requirements-training.txt
 ```
 
-Then use the default `yolo/data.yaml` on **Train / Export**, or another labeled YOLO YAML path inside `datasets/`.
+Then use the default `yolo/data.yaml` on **Train / Export**, or another labeled YOLO YAML path inside `datasets/`. Successful runs normally produce `outputs/training/<run_id>/weights/best.pt`. Open **Live AI** to discover and load the newest `best.pt`. Trained weights stay in runtime storage and are never bundled into patch ZIPs.
 
 ## Current version history
 
@@ -155,6 +161,7 @@ Then use the default `yolo/data.yaml` on **Train / Export**, or another labeled 
 0_1_1 = camera frame receiver, live preview, and simulation mode
 0_1_2 = persistent receiver/simulation capture and optional labeled-dataset training
 0_1_3 = manual bounding-box labeling and managed YOLO dataset generation
+0_1_4 = latest trained-model discovery and live camera/simulation detection overlay
 ```
 
 ## Important docs
@@ -197,6 +204,6 @@ AI_Traffic_Light/
 
 ## Next functional milestone
 
-After 0_1_3 is accepted, the next useful milestone can connect a pretrained detector to captured/live frames, then feed detections into zone-based counting and the existing traffic-light simulation. That later inference work must remain separate from real public-road control.
+After 0_1_4 is accepted, the next useful milestone is to map live detections into configured pedestrian/vehicle zones and feed those counts into the existing traffic-light **simulation** logic. This remains separate from physical public-road control.
 
-Do not treat 0_1_3 as passed until the project owner confirms every required acceptance check.
+Do not treat 0_1_4 as passed until the project owner confirms every required acceptance check.

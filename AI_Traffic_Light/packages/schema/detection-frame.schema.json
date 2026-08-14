@@ -29,6 +29,11 @@
       "type": "integer",
       "minimum": 0
     },
+    "source_frame_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Optional camera frame number used to address the exact recent source image for live inference overlays."
+    },
     "detections": {
       "type": "array",
       "items": {

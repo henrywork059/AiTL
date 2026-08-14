@@ -6,8 +6,8 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_3"
-APP_MODE = "manual_labeling_test_ready"
+APP_VERSION = "0_1_4"
+APP_MODE = "trained_model_inference_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -49,6 +49,12 @@ def get_smoke_status() -> dict[str, Any]:
             "detail": "The existing background runner can use yolo/data.yaml after the managed dataset is built and Ultralytics is installed.",
         },
         {
+            "id": "inference.trained_model",
+            "label": "Trained-model live inference",
+            "status": "pass",
+            "detail": "The inference API can discover outputs/training/*/weights/best.pt, load the latest model, and detect on receiver or simulation frames.",
+        },
+        {
             "id": "backend.health",
             "label": "Backend health endpoint",
             "status": "pass",
@@ -82,7 +88,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_3 is a supervised prototype and cannot control real public traffic lights.",
+            "detail": "0_1_4 is a supervised prototype and cannot control real public traffic lights.",
         },
     ]
 
@@ -100,12 +106,13 @@ def get_smoke_status() -> dict[str, Any]:
             "manual_bounding_box_labeling_test",
             "managed_yolo_dataset_build_test",
             "optional_labeled_yolo_training_test",
+            "trained_model_live_inference_test",
             "GUI function-list review",
         ],
         "not_ready_for": [
             "device_camera_firmware",
             "automatic_labeling",
-            "YOLO inference",
+            "live_zone_counting",
             "model_export",
             "physical_traffic_light_control",
         ],
@@ -130,6 +137,11 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/dataset/training-dataset",
             "/api/training/status",
             "/api/training/start",
+            "/api/inference/status",
+            "/api/inference/load-latest",
+            "/api/inference/unload",
+            "/api/inference/detections",
+            "/api/inference/frame",
         ],
         "summary": {
             "mock_frame_id": frame.get("frame_id"),

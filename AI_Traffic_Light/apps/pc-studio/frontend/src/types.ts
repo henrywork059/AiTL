@@ -12,6 +12,7 @@ export type DetectionFrame = {
   image_width: number;
   image_height: number;
   timestamp_ms: number;
+  source_frame_number?: number;
   detections: Detection[];
 };
 
@@ -208,4 +209,28 @@ export type TrainingStatus = {
   dataset_root: string;
   requires_labeled_dataset: boolean;
   install_command: string;
+};
+
+export type InferenceModelSummary = {
+  model_id: string;
+  model_path: string;
+  modified_at_ms: number;
+  size_bytes: number;
+};
+
+export type InferenceStatus = {
+  model_loaded: boolean;
+  active_model_id: string | null;
+  active_model_path: string | null;
+  loaded_at_ms: number | null;
+  last_latency_ms: number | null;
+  last_frame_number: number | null;
+  error: string | null;
+  backend: string;
+  backend_available: boolean;
+  available_model_count: number;
+  latest_model_path: string | null;
+  active_is_latest: boolean;
+  confidence_floor: number;
+  models: InferenceModelSummary[];
 };

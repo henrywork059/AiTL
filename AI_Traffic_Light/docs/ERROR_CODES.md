@@ -43,10 +43,10 @@ The project uses stable error codes so humans and AI agents can debug quickly.
 | `ATL-CAMERA-005` | Camera frame exceeds the 8 MiB limit. |
 | `ATL-CAMERA-006` | Camera frame content type is unsupported. |
 | `ATL-CAMERA-007` | Camera frame bytes are invalid. |
-| `ATL-DETECT-001` | Detection model is not loaded. |
-| `ATL-DETECT-002` | Detection inference failed. |
-| `ATL-DETECT-003` | Inference source is missing. |
-| `ATL-DETECT-004` | Inference result is invalid. |
+| `ATL-DETECT-001` | No inference model is loaded, or Ultralytics is unavailable when loading a trained model. |
+| `ATL-DETECT-002` | Trained-model load or live-frame inference failed. |
+| `ATL-DETECT-003` | No camera frame/exact inferred source frame is available, or the current frame cannot be decoded. |
+| `ATL-DETECT-004` | The inference backend returned an unsupported or invalid result structure. |
 | `ATL-ZONE-001` | Zone configuration is invalid. |
 | `ATL-ZONE-002` | Zone was not found. |
 | `ATL-ZONE-003` | Failed to save zone configuration. |
@@ -64,5 +64,5 @@ The project uses stable error codes so humans and AI agents can debug quickly.
 | `ATL-TRAIN-003` | Training run failed. |
 | `ATL-MODEL-001` | Failed to read model registry. |
 | `ATL-MODEL-002` | Failed to export model package. |
-| `ATL-MODEL-003` | Model version was not found. |
+| `ATL-MODEL-003` | Requested/discovered model version was not found; V014 also uses this when no trained `best.pt` exists. |
 | `ATL-LOG-001` | Failed to read logs. |

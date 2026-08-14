@@ -25,10 +25,10 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: "0_1_3", note: "manual labeling candidate" },
+          { label: "Project stage", value: "0_1_4", note: "trained-model live inference candidate" },
           { label: "Backend", value: apiState.status, note: health?.version ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Real AI", value: "training optional", note: "live inference still off" },
+          { label: "Real AI", value: "live detection", note: "latest trained best.pt" },
         ]}
       />
 
@@ -56,23 +56,23 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <PlaceholderPanel
-          title="What 0_1_3 can test"
-          description="This version adds manual capture labeling and a managed YOLO train/validation build on top of persistent V012 capture and training."
+          title="What 0_1_4 can test"
+          description="This version loads the newest locally trained YOLO best.pt and overlays its detections on receiver or simulation frames."
           status="test ready"
           bullets={smokeStatus?.ready_for ?? [
-            "persistent capture",
-            "manual bounding-box labels",
+            "persistent capture and manual labels",
             "managed YOLO dataset build",
             "optional local training",
+            "trained-model live camera inference",
           ]}
         />
         <PlaceholderPanel
           title="What is still disabled"
-          description="The project remains prototype-only. These functions should not be expected to work in 0_1_3."
+          description="The project remains prototype-only. These functions should not be expected to work in 0_1_4."
           status="not implemented"
           bullets={smokeStatus?.not_ready_for ?? [
             "automatic labeling",
-            "YOLO live inference",
+            "zone counts from live detections",
             "model export",
             "physical traffic-light control",
           ]}

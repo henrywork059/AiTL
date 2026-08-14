@@ -238,6 +238,75 @@ The split is deterministic by capture ID. At least one image is placed in train 
 
 If manual labels change after the build, status becomes stale and the managed dataset should be rebuilt before training with `yolo/data.yaml`.
 
+## Added in 0_1_4
+
+### `GET /api/inference/status`
+
+Returns trained-model discovery and live inference state without loading weights. The service scans the configured training output root for:
+
+```text
+outputs/training/<run_id>/weights/best.pt
+```
+
+Response data includes:
+
+```text
+model_loaded
+active_model_id
+active_model_path
+backend
+backend_available
+available_model_count
+latest_model_path
+active_is_latest
+confidence_floor
+last_latency_ms
+last_frame_number
+models
+```
+
+Only relative display paths are returned; model weight bytes remain local runtime data.
+
+### `POST /api/inference/load-latest`
+
+Loads the newest discovered `best.pt` by file modification time. Ultralytics must be installed through `requirements-training.txt`. If no trained run exists, the endpoint returns `ATL-MODEL-003`. If Ultralytics is unavailable it returns `ATL-DETECT-001`; model-load failures use `ATL-DETECT-002`.
+
+### `POST /api/inference/unload`
+
+Releases the active model reference and clears cached live detections/source-frame state.
+
+### `GET /api/inference/detections`
+
+Runs the loaded model against the newest receiver or simulation frame, or returns the cached result if that same source/frame number has already been inferred. The minimum backend confidence floor is `0.10`; the frontend can apply a higher display threshold without rerunning inference.
+
+The response uses the existing `DetectionFrame` shape:
+
+```json
+{
+  "frame_id": "camera-simulation-42",
+  "source_id": "simulation",
+  "image_width": 1280,
+  "image_height": 720,
+  "timestamp_ms": 1780000000000,
+  "source_frame_number": 42,
+  "detections": [
+    {
+      "id": "live-42-0",
+      "class_id": 1,
+      "class_name": "car",
+      "confidence": 0.87,
+      "box_xyxy": [120, 300, 410, 520]
+    }
+  ]
+}
+```
+
+`box_xyxy` coordinates refer to the original camera image dimensions. No zone or traffic decision is made by this endpoint.
+
+### `GET /api/inference/frame?source_id=<id>&frame_number=<n>`
+
+Returns the exact recent image bytes used by the matching successful inference result. The service keeps a small in-memory cache of recent inferred frames. Supplying only one of `source_id` or `frame_number` is invalid; omitting both returns the newest inferred frame for diagnostics. This binary endpoint includes `X-Request-ID`, `X-Frame-Number`, `X-Source-ID`, and `Cache-Control: no-store`. The frontend requests the specific source/frame number returned in `DetectionFrame`, preventing a moving simulation from advancing one frame ahead of its boxes.
+
 ## Validation envelopes
 
 FastAPI/Pydantic request validation failures use the normal error envelope with `ATL-API-002` and the middleware request ID. Project-specific labeling/build validation uses the stable `ATL-DATASET-*` codes documented in `ERROR_CODES.md`.

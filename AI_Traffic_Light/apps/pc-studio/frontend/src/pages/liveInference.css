@@ -1,0 +1,111 @@
+.live-camera-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: #05070a;
+}
+
+.live-camera-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.live-detection-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.live-detection-box {
+  fill: transparent;
+  stroke: #58a6ff;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.live-detection-person {
+  stroke: #a371f7;
+}
+
+.live-detection-car,
+.live-detection-bus,
+.live-detection-truck,
+.live-detection-motorcycle,
+.live-detection-bicycle {
+  stroke: #f0883e;
+}
+
+.live-detection-label-bg {
+  fill: rgba(0, 0, 0, 0.78);
+}
+
+.live-detection-label {
+  fill: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 2px;
+}
+
+.live-camera-empty {
+  min-height: 420px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: #05070a;
+}
+
+.live-camera-empty strong {
+  color: #e6edf3;
+  font-size: 18px;
+}
+
+.inference-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.inference-status-list strong {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.inference-button-row {
+  margin-top: 0;
+}
+
+.inference-button-row button:first-child {
+  flex: 1;
+}
+
+.inference-threshold {
+  margin-top: 4px;
+}
+
+.live-inference-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.live-inference-meta strong {
+  color: #e6edf3;
+}
+
+.live-panel .panel-header > .button-row {
+  margin-top: 0;
+  align-items: center;
+}

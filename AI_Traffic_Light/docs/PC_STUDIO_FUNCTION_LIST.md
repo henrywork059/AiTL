@@ -1,4 +1,4 @@
-# PC Studio Function List — 0_1_3 status
+# PC Studio Function List — 0_1_4 status
 
 This document tracks the main PC Studio functions. Status meanings:
 
@@ -16,16 +16,18 @@ later       = outside the current patch scope
 | Receive uploaded JPEG/PNG frame | implemented | PC-side receiver for future ESP32/Raspberry Pi senders. |
 | Preview latest frame | implemented | Automatically refreshes receiver/simulation image. |
 | Start/stop simulation | implemented | Moving PNG source for hardware-free testing. |
-| Real webcam source | later | Not part of 0_1_3. |
-| Measure FPS/latency | later | Useful after real inference. |
+| Real webcam source | later | Not part of 0_1_4; receiver uploads and simulation are supported. |
+| Live inference latency | implemented | Backend reports measured per-frame inference latency. |
 
 ## Inference functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Load model | placeholder | Future pretrained/exported detector. |
-| Run detection on frame | placeholder | Live YOLO inference is not implemented in 0_1_3. |
-| Filter by confidence/class | mock | Existing mock Live AI view only. |
+| Discover trained models | implemented | Scans `outputs/training/*/weights/best.pt` and orders newest first. |
+| Load latest trained model | implemented | Loads newest local `best.pt` with optional Ultralytics backend. |
+| Run detection on frame | implemented | Receiver/simulation frame inference with original-coordinate `xyxy` boxes. |
+| Filter by confidence | implemented | Backend keeps a 0.10 floor; Live AI applies a higher display threshold without rerunning the same frame. |
+| Exact source-frame overlay | implemented | Live AI displays the cached source image used by the returned detections. |
 | Instance segmentation | later | After detection + zones. |
 
 ## Zone functions
@@ -56,7 +58,7 @@ later       = outside the current patch scope
 | Draw manual bounding boxes | implemented | Uses shared class IDs 0–5. |
 | Save/remove manual labels | implemented | Persists separate label JSON files. |
 | Save reviewed zero-box negative | implemented | Distinct from an unreviewed frame. |
-| Automatic/pseudo labeling | later | Not implemented in 0_1_3. |
+| Automatic/pseudo labeling | later | Not implemented in 0_1_4. |
 | Build YOLO train/val dataset | implemented | Deterministic split under `datasets/yolo/`. |
 | Detect stale managed dataset | implemented | Label changes require rebuild before default managed training. |
 
@@ -68,8 +70,8 @@ later       = outside the current patch scope
 | Select base model/config | implemented | Prototype limits validated by backend. |
 | Start local Ultralytics training | implemented | Optional dependency; one background job at a time. |
 | Use in-app managed labels | implemented | Default `yolo/data.yaml` is generated from Dataset Review. |
-| Compare model versions | later | After multiple trained models exist. |
-| Export runtime package | later | Not implemented in 0_1_3. |
+| Discover trained best.pt runs | implemented | Inference status lists recent trained runs; model-comparison metrics remain later. |
+| Export runtime package | later | Not implemented in 0_1_4. |
 
 ## Debugging functions
 

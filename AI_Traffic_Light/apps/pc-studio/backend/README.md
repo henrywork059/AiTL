@@ -2,9 +2,9 @@
 
 Python/FastAPI backend for the AI Traffic Light PC Studio App.
 
-## Current state — 0_1_3
+## Current state — 0_1_4
 
-This backend is a **manual-labeling candidate** built on the existing camera receiver, simulation, persistent capture, mock APIs, and optional YOLO training runner.
+This backend is a **trained-model live-inference candidate** built on the V013 receiver, simulation, persistent capture, manual labeling, managed dataset, and optional YOLO training runner.
 
 It can:
 
@@ -22,6 +22,10 @@ It can:
 - build a deterministic YOLO train/validation dataset at datasets/yolo/
 - detect when saved labels make the managed YOLO dataset stale
 - validate and launch optional labeled-dataset Ultralytics YOLO training
+- discover the newest outputs/training/*/weights/best.pt after backend restart
+- load/unload the latest trained YOLO model
+- run detections on the newest receiver or simulation frame
+- cache results per camera frame and expose the exact inferred source image
 ```
 
 It cannot yet:
@@ -30,7 +34,7 @@ It cannot yet:
 - open a real webcam directly
 - run ESP32/Raspberry Pi camera firmware
 - automatically label captured objects
-- run YOLO inference in the live view
+- automatically feed live detections into zone counts or traffic decisions
 - export models
 - control physical public traffic lights
 ```
@@ -54,6 +58,8 @@ http://127.0.0.1:8000/api/dataset/status
 http://127.0.0.1:8000/api/dataset/captures
 http://127.0.0.1:8000/api/dataset/training-dataset/status
 http://127.0.0.1:8000/api/training/status
+http://127.0.0.1:8000/api/inference/status
+http://127.0.0.1:8000/api/inference/detections
 ```
 
 Capture images/metadata/labels are stored under `datasets/captures/`. The managed dataset builder writes `datasets/yolo/data.yaml`, train/validation images, YOLO `.txt` labels, and a manifest. All generated dataset/output folders stay out of patch ZIPs.
@@ -64,7 +70,7 @@ To enable the real optional YOLO training runner:
 pip install -r requirements-training.txt
 ```
 
-Training outputs go to `outputs/training/`.
+Training outputs go to `outputs/training/`. Live inference discovers `outputs/training/<run_id>/weights/best.pt`; model weights remain generated runtime data and are not part of code patches.
 
 ## Tests
 
@@ -75,6 +81,7 @@ python .\scripts\test_camera_frame_service.py
 python .\scripts\test_dataset_capture_service.py
 python .\scripts\test_dataset_labeling_service.py
 python .\scripts\test_training_service.py
+python .\scripts\test_inference_service.py
 python .\scripts\check_structure.py
 ```
 

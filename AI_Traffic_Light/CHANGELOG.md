@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_1_4 — Trained-model live inference overlay
+
+- Replaced the inference placeholder with a real Ultralytics-backed service that discovers local `outputs/training/*/weights/best.pt` files and loads the newest run.
+- Added model status, load-latest, unload, live-detection, and exact inferred-source-frame endpoints using the existing API envelope/request-ID conventions.
+- Runs the loaded trained model on the newest receiver or simulation frame and returns class, confidence, and original-image `xyxy` coordinates.
+- Caches inference per camera frame so repeated frontend polls do not rerun the same frame.
+- Keeps the exact source image used for each detection result so frontend overlays stay aligned even while simulation frames continue moving.
+- Upgraded Live AI to automatically load the newest trained model when available, show the real camera/simulation image, overlay boxes, filter displayed confidence, and show inference latency/model state.
+- Preserved the original mock Live AI scene as a fallback when no camera frame exists.
+- Added trained-model inference service tests, smoke coverage, API documentation, and V014 acceptance checks.
+- Live detections do not yet feed zone counts or traffic-light decisions; automatic labeling, model export, and physical public-road control remain disabled.
+
 ## 0_1_3 — Manual labeling and managed YOLO dataset
 
 - Replaced the Dataset Review placeholder with a working captured-frame browser and manual bounding-box label editor.

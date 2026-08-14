@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_3 manual labeling";
+export const APP_VERSION_LABEL = "0_1_4 live inference";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -14,8 +14,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "live_ai",
     label: "Live AI View",
     shortLabel: "Live AI",
-    description: "Main mock camera/detection viewer with traffic-light simulation.",
-    status: "mock",
+    description: "Preview receiver or simulation frames with detections from the latest trained YOLO model.",
+    status: "test-ready",
   },
   camera_sources: {
     id: "camera_sources",

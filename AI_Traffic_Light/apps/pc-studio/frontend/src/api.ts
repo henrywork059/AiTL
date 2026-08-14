@@ -8,6 +8,7 @@ import type {
   DatasetLabelBox,
   DatasetStatus,
   DetectionFrame,
+  InferenceStatus,
   RecentLog,
   SmokeStatus,
   TrafficState,
@@ -35,17 +36,17 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_3",
+  version: "0_1_4",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_3",
+  version: "0_1_4",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
-  not_ready_for: ["automatic_labeling", "YOLO inference", "physical_traffic_light_control"],
+  not_ready_for: ["automatic_labeling", "model export", "physical_traffic_light_control"],
   checks: [
     {
       id: "frontend.fallback",
@@ -111,6 +112,24 @@ const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
   generated_at_ms: null,
   classes: [],
   message: "Backend is offline, so the managed training dataset cannot be checked.",
+};
+
+
+const fallbackInferenceStatus: InferenceStatus = {
+  model_loaded: false,
+  active_model_id: null,
+  active_model_path: null,
+  loaded_at_ms: null,
+  last_latency_ms: null,
+  last_frame_number: null,
+  error: null,
+  backend: "ultralytics_yolo",
+  backend_available: false,
+  available_model_count: 0,
+  latest_model_path: null,
+  active_is_latest: false,
+  confidence_floor: 0.1,
+  models: [],
 };
 
 const fallbackTrainingStatus: TrainingStatus = {
@@ -250,4 +269,29 @@ export async function startTraining(config: TrainingConfig): Promise<TrainingSta
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
+}
+
+export async function fetchInferenceStatus(): Promise<InferenceStatus> {
+  return requestJson<InferenceStatus>(`${API_BASE}/api/inference/status`, fallbackInferenceStatus);
+}
+
+export async function loadLatestInferenceModel(): Promise<InferenceStatus> {
+  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load-latest`, { method: "POST" });
+}
+
+export async function unloadInferenceModel(): Promise<InferenceStatus> {
+  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/unload`, { method: "POST" });
+}
+
+export async function fetchLiveDetections(): Promise<DetectionFrame> {
+  return requestJsonStrict<DetectionFrame>(`${API_BASE}/api/inference/detections`);
+}
+
+export function inferredFrameUrl(sourceId: string, frameNumber: number, timestampMs: number): string {
+  const params = new URLSearchParams({
+    source_id: sourceId,
+    frame_number: String(frameNumber),
+    t: String(timestampMs),
+  });
+  return `${API_BASE}/api/inference/frame?${params.toString()}`;
 }

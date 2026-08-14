@@ -43,6 +43,7 @@ export default function App() {
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.45);
+  const [liveDetectionCount, setLiveDetectionCount] = useState(0);
   const [activePage, setActivePage] = useState<AppPageId>("dashboard");
   const [apiState, setApiState] = useState<ApiConnectionState>({
     status: "checking",
@@ -53,7 +54,7 @@ export default function App() {
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
-    setApiState({ status: "checking", message: "Refreshing mock API data..." });
+    setApiState({ status: "checking", message: "Refreshing API data..." });
 
     try {
       const [nextHealth, nextSmoke, nextFrame, nextZones, nextTraffic, nextLogs, nextCameraStatus] = await Promise.all([
@@ -79,7 +80,7 @@ export default function App() {
         status: fallbackMode ? "fallback" : "connected",
         message: fallbackMode
           ? "Backend not connected. Frontend fallback mock data is active."
-          : "Backend connected. Mock API data loaded successfully.",
+          : "Backend connected. API data loaded successfully.",
         checkedAt: new Date().toLocaleTimeString(),
       });
     } catch (error) {
@@ -98,11 +99,11 @@ export default function App() {
   }, [refreshAll]);
 
   useEffect(() => {
-    if (activePage !== "camera_sources" && activePage !== "dataset_capture") return undefined;
+    if (!["camera_sources", "dataset_capture", "live_ai"].includes(activePage)) return undefined;
 
     const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
     void refreshCamera();
-    const timerId = window.setInterval(() => void refreshCamera(), 1000);
+    const timerId = window.setInterval(() => void refreshCamera(), activePage === "live_ai" ? 500 : 1000);
     return () => window.clearInterval(timerId);
   }, [activePage]);
 
@@ -135,14 +136,16 @@ export default function App() {
       case "live_ai":
         return (
           <LiveAiPage
-            frame={frame}
+            mockFrame={frame}
             zones={zones}
             traffic={traffic}
-            detections={filteredDetections}
+            mockDetections={filteredDetections}
+            cameraStatus={cameraStatus}
             confidenceThreshold={confidenceThreshold}
             onConfidenceChange={setConfidenceThreshold}
             onRefresh={refreshAll}
             refreshing={refreshing}
+            onDetectionCountChange={setLiveDetectionCount}
           />
         );
       case "camera_sources":
@@ -174,10 +177,12 @@ export default function App() {
     }
   }
 
+  const statusBarDetectionCount = activePage === "live_ai" ? liveDetectionCount : filteredDetections.length;
+
   return (
     <>
       <AppShell activePage={activePage} onPageChange={setActivePage}>{renderPage()}</AppShell>
-      <AppStatusBar apiState={apiState} detectionCount={filteredDetections.length} />
+      <AppStatusBar apiState={apiState} detectionCount={statusBarDetectionCount} />
     </>
   );
 }

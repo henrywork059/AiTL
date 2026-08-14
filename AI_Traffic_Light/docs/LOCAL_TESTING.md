@@ -1,6 +1,6 @@
-# Local Testing Guide — 0_1_3 candidate
+# Local Testing Guide — 0_1_4 candidate
 
-This guide verifies persistent capture, manual bounding-box labeling, managed YOLO dataset generation, and the existing optional local training runner. The project remains a simulation/classroom prototype and is not for real public-road traffic control.
+This guide verifies trained-model discovery and live detection overlay on top of the V013 capture/label/train workflow. The project remains a classroom/prototype traffic-light **simulation** and is not for real public-road signal control.
 
 ## Requirements
 
@@ -8,122 +8,88 @@ This guide verifies persistent capture, manual bounding-box labeling, managed YO
 - Python 3.11 or newer recommended
 - Node.js 20 or newer recommended
 - npm
-- optional: a JPEG/PNG test image for receiver testing
-- optional: requirements-training.txt for a real Ultralytics run
+- V013 dataset/capture files if you want regression testing
+- at least one completed YOLO training run with outputs/training/<run_id>/weights/best.pt
+- requirements-training.txt installed for real Ultralytics inference
 ```
 
-## Start the backend
-
-In PowerShell:
+## Start backend
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\backend"
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install -r requirements-training.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Open:
+Open `http://127.0.0.1:8000/health`. It must report `0_1_4` and a request ID.
 
-```text
-http://127.0.0.1:8000/docs
-http://127.0.0.1:8000/health
-http://127.0.0.1:8000/api/smoke/status
-```
-
-Health and smoke status must report `0_1_3`.
-
-## Start the frontend
+## Start frontend
 
 In a second PowerShell terminal:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
 npm ci
+npm run typecheck
+npm run build
 npm run dev
 ```
 
 Open `http://localhost:5173`.
 
-## Required capture setup
+## Confirm a trained model exists
 
-Create at least two saved frames. Simulation is the simplest path:
+From the project root:
 
-1. Open **Camera Sources** and select **Start simulation**.
-2. Confirm the image moves.
-3. Open **Dataset Capture**.
-4. Save one frame under session `label_acceptance` with quality `Useful`.
-5. Wait for the simulation scene to move, then save a second frame under the same session.
-6. Optionally save a third frame marked `Bad` to verify exclusion behavior.
-
-Confirm the capture files still appear under:
-
-```text
-AI_Traffic_Light\datasets\captures\label_acceptance\images
-AI_Traffic_Light\datasets\captures\label_acceptance\metadata
+```powershell
+Get-ChildItem .\AI_Traffic_Light\outputs\training\*\weights\best.pt | Sort-Object LastWriteTime -Descending | Select-Object LastWriteTime, FullName
 ```
 
-## Required manual labeling test
+The newest `best.pt` is what **Load latest trained model** uses. Model weights remain runtime files and are not included in patch ZIPs.
 
-1. Open **Dataset Review**.
-2. Confirm the captured frames appear in the left browser.
-3. Select the first non-bad frame.
-4. Choose a class such as `person`.
-5. Drag across the image to draw a bounding box.
-6. Add a second box with another class if useful.
-7. Select **Save labels**.
-8. Confirm the page reports saved labels and the selected frame changes to `reviewed`.
-9. Select the second non-bad frame.
-10. Either draw a box and save, or deliberately save zero boxes to test a reviewed negative example.
+## Required inference API check
 
-On disk, confirm JSON label documents appear under:
+With the backend running:
 
-```text
-AI_Traffic_Light\datasets\captures\label_acceptance\labels
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/inference/status
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/inference/load-latest
 ```
 
-Each label JSON must use class IDs/names from the shared schema and record pixel `box_xyxy` coordinates. A saved zero-box document must show `reviewed: true` with an empty `labels` array.
-
-## Required managed YOLO build test
-
-With at least two reviewed non-bad frames:
-
-1. On **Dataset Review**, check the Managed YOLO section reports at least `2` eligible frames.
-2. Select **Build training dataset**.
-3. Confirm the UI reports at least one train frame and one validation frame.
-4. Inspect:
+Expected status after load:
 
 ```text
-AI_Traffic_Light\datasets\yolo\images\train
-AI_Traffic_Light\datasets\yolo\images\val
-AI_Traffic_Light\datasets\yolo\labels\train
-AI_Traffic_Light\datasets\yolo\labels\val
-AI_Traffic_Light\datasets\yolo\data.yaml
-AI_Traffic_Light\datasets\yolo\manifest.json
+model_loaded = true
+active_model_id = newest training run ID
+available_model_count >= 1
+active_is_latest = true
+backend_available = true
 ```
 
-Expected:
+If no `best.pt` exists, load-latest should return `ATL-MODEL-003`. If Ultralytics is missing, it should return `ATL-DETECT-001`.
 
-```text
-- train and val each contain at least one image
-- every included image has a same-name .txt label file
-- reviewed negative frames have an empty .txt label file
-- captures marked bad are absent from both splits
-- data.yaml lists the six shared classes
-- manifest.json records train/val counts and the source signature
-```
+## Required simulation live-overlay test
 
-## Required stale-dataset test
+1. Open **Cameras** and start simulation.
+2. Open **Live AI**.
+3. V014 should automatically load the newest trained model if no model is already active.
+4. Confirm the canvas shows the current simulation image rather than only the old mock SVG scene.
+5. Confirm **Trained model** shows `loaded`, the active run ID, and a changing inference latency/frame number.
+6. The backend runs at a 10% confidence floor. Move the display confidence slider lower/higher and confirm boxes are hidden/shown without reloading the model.
+7. If the model detects an object, confirm its class/confidence box stays aligned with the image while the simulation moves. The frontend uses `/api/inference/frame?source_id=...&frame_number=...`, which addresses the exact recent source image cached for that detection result.
+8. Confirm the detection table matches the visible filtered boxes.
+9. Select **Unload**. The model state must become `not loaded`, live inference stops, and the app must remain responsive.
+10. Select **Load latest trained model** and confirm inference resumes.
 
-1. Return to a labeled capture in **Dataset Review**.
-2. Add, remove, or resize a box by replacing the labels and select **Save labels**.
-3. Confirm Managed YOLO status changes to `rebuild required` / stale.
-4. Open **Train / Export** with the default `yolo/data.yaml`.
-5. Confirm **Start real training** is blocked for the stale managed dataset.
-6. Return to **Dataset Review** and rebuild.
-7. Confirm status becomes ready/current again.
+A tiny dataset may produce zero useful detections. That is a model-quality limitation, not automatically an API failure. For the overlay acceptance check, use a receiver/simulation frame similar to the labeled training data and lower the display threshold to 10%. At least one returned detection should be visually checked for coordinate alignment.
 
-## Backend scripts
+## Required uploaded-frame alignment test
+
+Stop simulation and upload a static JPEG/PNG using the existing camera endpoint. A static image is useful for checking that class labels and bounding boxes align with the expected object positions without motion between frames.
+
+## Backend regression/unit scripts
 
 From `AI_Traffic_Light` with the backend environment active:
 
@@ -132,6 +98,7 @@ python .\scripts\test_camera_frame_service.py
 python .\scripts\test_dataset_capture_service.py
 python .\scripts\test_dataset_labeling_service.py
 python .\scripts\test_training_service.py
+python .\scripts\test_inference_service.py
 python .\scripts\check_structure.py
 ```
 
@@ -141,45 +108,8 @@ With the backend running:
 python .\scripts\test_backend_smoke.py
 ```
 
-Every script should complete successfully. The smoke payload must include dataset labeling and managed YOLO build endpoints/checks.
+Every test should pass. The smoke script now includes `/api/inference/status` but does not require a trained model to be loaded.
 
-## Optional uploaded-frame capture test
+## Boundaries
 
-Stop simulation, then from a terminal containing a test image:
-
-```powershell
-curl.exe -X POST "http://127.0.0.1:8000/api/camera/frame?source_id=test_camera" -H "Content-Type: image/jpeg" --data-binary "@.\test-frame.jpg"
-```
-
-Capture it in **Dataset Capture**, then label it in **Dataset Review**. This confirms receiver-origin images use the same label workflow as simulation captures.
-
-## Optional real YOLO training test
-
-Install the optional training dependency from the backend folder:
-
-```powershell
-pip install -r requirements-training.txt
-```
-
-Open **Train / Export**. Keep the default:
-
-```text
-yolo/data.yaml
-```
-
-Use a very small epoch count for acceptance. Expected:
-
-```text
-- the start button is enabled only when the managed dataset is current and Ultralytics is available
-- one run starts in the background
-- the API remains responsive while training runs
-- status reaches completed or returns a useful failed state
-- outputs appear under AI_Traffic_Light\outputs\training\<run_id>
-- best_model_path appears if weights\best.pt is produced
-```
-
-A custom labeled YOLO YAML path inside `datasets/` remains supported and is not controlled by the managed-dataset readiness flag.
-
-## Generated-data rule
-
-Do not upload `datasets/`, `outputs/`, `.venv/`, `node_modules/`, or `dist/` to GitHub. They are runtime/generated content and are not part of the changed-files patch.
+0_1_4 does not automatically label images, perform live zone counting, feed real detections into traffic decisions, export models, or control physical traffic lights. Traffic decision cards on Live AI remain mock simulation state.

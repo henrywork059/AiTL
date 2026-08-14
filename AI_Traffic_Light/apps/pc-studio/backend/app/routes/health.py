@@ -15,10 +15,10 @@ def health(request: Request) -> dict:
         {
             "status": "ok",
             "app": "pc-studio-backend",
-            "version": "0_1_3",
-            "mode": "manual_labeling_test_ready",
+            "version": "0_1_4",
+            "mode": "trained_model_inference_test_ready",
             "safe_mode": True,
-            "message": "Backend is ready for capture, manual bounding-box labeling, managed YOLO dataset builds, and optional training tests.",
+            "message": "Backend is ready for capture, manual labeling, managed YOLO training, and live inference with the latest trained best.pt model.",
         },
         request_id=request.state.request_id,
     )

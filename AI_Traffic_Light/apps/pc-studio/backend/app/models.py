@@ -16,6 +16,7 @@ class DetectionFrame(BaseModel):
     image_width: int
     image_height: int
     timestamp_ms: int
+    source_frame_number: int | None = None
     detections: list[Detection]
 
 

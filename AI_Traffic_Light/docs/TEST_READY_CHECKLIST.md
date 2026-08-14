@@ -1,68 +1,50 @@
-# Acceptance Checklist — 0_1_3 candidate
+# Acceptance Checklist — 0_1_4 candidate
 
-Do not mark 0_1_3 as passed until every required checkbox is confirmed by the project owner.
+Do not mark 0_1_4 as passed until the project owner confirms every required check.
 
-## Required backend and version checks
+## Backend and build
 
+- [ ] `AI_Traffic_Light\VERSION` reports `0_1_4` and still identifies the prior passed baseline correctly.
 - [ ] Backend starts with the documented PowerShell command.
-- [ ] `/docs` opens and shows capture, label, managed-dataset, and training endpoints.
-- [ ] `/health` returns `ok: true`, version `0_1_3`, and a request ID.
-- [ ] `/api/smoke/status` returns version `0_1_3` and includes dataset labeling/build checks.
-- [ ] `python .\scripts\test_dataset_labeling_service.py` shows all `PASS` lines.
-- [ ] Existing camera capture and training service tests still pass.
-- [ ] Invalid label coordinates/class IDs return a standard error envelope using `ATL-DATASET-004` or request validation using `ATL-API-002`.
-- [ ] Trying to build with fewer than two eligible reviewed frames returns `ATL-DATASET-005`.
+- [ ] `/health` returns `ok: true`, version `0_1_4`, and a request ID.
+- [ ] `/api/smoke/status` returns version `0_1_4` and includes trained-model inference in the test-ready list.
+- [ ] `python .\scripts\test_inference_service.py` shows every line as `PASS`.
+- [ ] Existing camera, capture, labeling, training, structure, and backend smoke tests still pass.
+- [ ] Frontend `npm ci`, `npm run typecheck`, and `npm run build` succeed.
 
-## Required frontend checks
+## Trained-model discovery/load
 
-- [ ] `npm ci`, `npm run typecheck`, and `npm run build` succeed locally.
-- [ ] Frontend starts and the sidebar/dashboard show `0_1_3`.
-- [ ] Existing Camera Sources, Dataset Capture, mock Live AI, traffic simulation, and logs still open normally.
-- [ ] Dataset Review is shown as test-ready and contains the capture browser, class selector, image canvas, label list, and managed-dataset section.
-- [ ] The app does not describe manual labels as automatic AI labels.
+- [ ] At least one `outputs\training\<run_id>\weights\best.pt` exists locally.
+- [ ] `/api/inference/status` reports at least one available model.
+- [ ] **Live AI** automatically loads the newest model when opened, or **Load latest trained model** loads it manually.
+- [ ] The shown active run ID/path corresponds to the newest `best.pt`.
+- [ ] Restarting the backend does not lose model discovery; reopening Live AI can load the existing trained file again.
 
-## Required manual labeling checks
+## Live receiver/simulation inference
 
-- [ ] At least two non-bad captures appear in Dataset Review.
-- [ ] Selecting a capture loads the correct saved image.
-- [ ] Drawing a box creates a visible box with the selected class name.
-- [ ] Switching classes allows a different class to be added.
-- [ ] **Remove** removes only the selected local label.
-- [ ] **Save labels** persists the boxes and marks the capture reviewed.
-- [ ] Refreshing the page/backend reloads the saved labels from disk.
-- [ ] A corresponding JSON file exists under `datasets\captures\<session>\labels\`.
-- [ ] Saving zero boxes creates a reviewed negative example rather than returning the frame to unreviewed state.
-- [ ] A capture marked `bad` can be reviewed but is reported as excluded from the managed training build.
+- [ ] Start camera simulation and confirm Live AI shows the real simulation image.
+- [ ] Inference frame number and latency update while frames change.
+- [ ] The backend remains responsive while inference polling runs.
+- [ ] Detection table is populated when the trained model returns detections.
+- [ ] Lowering/raising the display confidence threshold filters visible boxes and table rows.
+- [ ] For at least one detection on a training-like frame, the box/class/confidence visually align with the object.
+- [ ] `/api/inference/frame?source_id=...&frame_number=...` displays the exact inferred source frame and does not visibly drift one simulation frame ahead of the boxes.
 
-## Required managed YOLO dataset checks
+## Model controls/errors
 
-- [ ] **Build training dataset** is disabled until at least two non-bad reviewed frames exist.
-- [ ] Building creates `datasets\yolo\data.yaml` and `manifest.json`.
-- [ ] Building creates both `images\train` and `images\val` with at least one image each.
-- [ ] Building creates matching `labels\train` and `labels\val` `.txt` files.
-- [ ] YOLO label rows use normalized values between 0 and 1 and the correct class ID.
-- [ ] A reviewed negative image receives an empty `.txt` label file.
-- [ ] A capture tagged `bad` is not copied into train or val.
-- [ ] `data.yaml` lists person, car, bus, truck, motorcycle, and bicycle using IDs 0–5.
-- [ ] Editing/saving labels after a build marks the managed dataset stale/rebuild-required.
-- [ ] Rebuilding clears stale state and updates train/val status.
+- [ ] **Unload** clears the active model without crashing the backend/frontend.
+- [ ] After unload, direct `/api/inference/detections` returns the standard error envelope with `ATL-DETECT-001` and a request ID.
+- [ ] **Load latest trained model** restores inference after unload.
+- [ ] A missing trained `best.pt` is handled with `ATL-MODEL-003`, not an anonymous exception.
 
-## Required training integration boundaries
+## V013 regression and safety
 
-- [ ] **Train / Export** defaults to `yolo/data.yaml`.
-- [ ] With `yolo/data.yaml`, training is blocked until the managed dataset is current.
-- [ ] With the optional dependency absent, the UI still explains `pip install -r requirements-training.txt` and no training job starts.
-- [ ] A custom labeled YOLO YAML inside `datasets/` remains accepted by the existing training API rules.
-- [ ] The app does not claim that live inference, automatic labeling, model export, or physical public-road traffic-light control works.
-
-## Optional end-to-end Ultralytics check
-
-- [ ] Install `requirements-training.txt`.
-- [ ] Start a short run using the generated `yolo/data.yaml`.
-- [ ] Status reaches completed or returns a useful failed state without stopping the API.
-- [ ] Training output is written under `outputs\training\<run_id>`.
-- [ ] `best_model_path` appears if Ultralytics produces `weights\best.pt`.
+- [ ] Dataset Capture still saves receiver/simulation frames.
+- [ ] Dataset Review still loads/saves manual labels and builds `yolo/data.yaml`.
+- [ ] Train / Export still starts a valid local training run when prerequisites are met.
+- [ ] Live detections do **not** automatically control zone counts or physical traffic signals.
+- [ ] The UI/docs still describe the project as prototype/simulation scope.
 
 ## Pass decision
 
-The required checks define the 0_1_3 patch pass. The optional Ultralytics run depends on the local PyTorch/Ultralytics environment and may be deferred only if that external training environment is unavailable. **0_1_3 remains a candidate until the owner explicitly confirms the required checks.**
+0_1_4 remains a candidate until the owner explicitly confirms the required checks. Detection accuracy is dataset/model dependent, but at least one returned detection must be visually checked for correct overlay coordinates when a suitable frame produces a detection.
