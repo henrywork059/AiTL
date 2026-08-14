@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_0 test-ready mock";
+export const APP_VERSION_LABEL = "0_1_1 camera receiver";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -21,8 +21,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
     id: "camera_sources",
     label: "Camera Sources",
     shortLabel: "Cameras",
-    description: "Manage webcam, ESP-CAM, IP camera, and video-file sources.",
-    status: "template",
+    description: "Receive and preview frames uploaded by ESP32 or Raspberry Pi camera nodes.",
+    status: "test-ready",
   },
   zone_editor: {
     id: "zone_editor",

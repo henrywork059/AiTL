@@ -15,7 +15,7 @@ def training_status(request: Request) -> dict:
         "active_run_id": None,
         "progress": 0,
         "status": "template_only",
-        "note": "Training UI exists only for layout confirmation in 0_1_0. No training process is implemented.",
+        "note": "Training UI exists only for layout confirmation in 0_1_1. No training process is implemented.",
     }
     logger.info("Training status template returned", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)

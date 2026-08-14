@@ -83,3 +83,21 @@ export type ApiConnectionState = {
   message: string;
   checkedAt?: string;
 };
+
+export type CameraStatus = {
+  mode: "receiver" | "simulation";
+  simulation_enabled: boolean;
+  frame_available: boolean;
+  streaming: boolean;
+  active_source_id: string | null;
+  resolution: { width: number; height: number } | null;
+  content_type: string | null;
+  received_at_ms: number | null;
+  age_ms: number | null;
+  frame_number: number;
+  size_bytes: number;
+  origin: "upload" | "simulation" | null;
+  stale: boolean;
+  frame_url: string | null;
+  upload_endpoint: string;
+};

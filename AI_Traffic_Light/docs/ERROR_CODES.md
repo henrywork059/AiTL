@@ -40,6 +40,9 @@ The project uses stable error codes so humans and AI agents can debug quickly.
 | `ATL-CAMERA-002` | Failed to read a camera frame. |
 | `ATL-CAMERA-003` | Camera source is invalid. |
 | `ATL-CAMERA-004` | Camera stream has not been started. |
+| `ATL-CAMERA-005` | Camera frame exceeds the 8 MiB limit. |
+| `ATL-CAMERA-006` | Camera frame content type is unsupported. |
+| `ATL-CAMERA-007` | Camera frame bytes are invalid. |
 | `ATL-DETECT-001` | Detection model is not loaded. |
 | `ATL-DETECT-002` | Detection inference failed. |
 | `ATL-DETECT-003` | Inference source is missing. |

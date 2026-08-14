@@ -17,14 +17,14 @@ def recent_logs(request: Request) -> dict:
                 "level": "info",
                 "code": "ATL-SMOKE-001",
                 "scope": "startup",
-                "message": "PC Studio 0_1_0 mock test-ready version loaded.",
+                "message": "PC Studio 0_1_1 camera receiver version loaded.",
             },
             {
                 "timestamp": "mock",
                 "level": "info",
                 "code": "ATL-SMOKE-002",
                 "scope": "safety",
-                "message": "Real camera, AI inference, training, and physical traffic control are disabled.",
+                "message": "Camera frame receiving and simulation are enabled; AI inference, training, and physical traffic control remain disabled.",
             },
             {
                 "timestamp": "mock",

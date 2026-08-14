@@ -21,6 +21,9 @@ class ErrorCode(str, Enum):
     CAMERA_FRAME_READ_FAILED = "ATL-CAMERA-002"
     CAMERA_SOURCE_INVALID = "ATL-CAMERA-003"
     CAMERA_STREAM_NOT_STARTED = "ATL-CAMERA-004"
+    CAMERA_FRAME_TOO_LARGE = "ATL-CAMERA-005"
+    CAMERA_FRAME_TYPE_UNSUPPORTED = "ATL-CAMERA-006"
+    CAMERA_FRAME_INVALID = "ATL-CAMERA-007"
 
     MODEL_NOT_LOADED = "ATL-DETECT-001"
     INFERENCE_FAILED = "ATL-DETECT-002"
@@ -62,6 +65,9 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.CAMERA_FRAME_READ_FAILED: "Failed to read a camera frame.",
     ErrorCode.CAMERA_SOURCE_INVALID: "Camera source is invalid.",
     ErrorCode.CAMERA_STREAM_NOT_STARTED: "Camera stream has not been started.",
+    ErrorCode.CAMERA_FRAME_TOO_LARGE: "Camera frame is too large.",
+    ErrorCode.CAMERA_FRAME_TYPE_UNSUPPORTED: "Camera frame type is unsupported.",
+    ErrorCode.CAMERA_FRAME_INVALID: "Camera frame is invalid.",
     ErrorCode.MODEL_NOT_LOADED: "Detection model is not loaded.",
     ErrorCode.INFERENCE_FAILED: "Detection inference failed.",
     ErrorCode.INFERENCE_SOURCE_MISSING: "Inference source is missing.",

@@ -1,4 +1,4 @@
-version: 0_1_0
-status: pc studio test-ready mock version
-previous_version: 0_0_4
-notes: First local smoke-test version. Frontend and backend can be run together with mock data, API health checks, visible error/log status, and a test checklist. No real AI inference, camera capture, training, or physical traffic control is implemented yet.
+version: 0_1_1
+status: pc camera frame receiver and simulation test version
+previous_version: 0_1_0
+notes: PC Studio accepts the latest JPEG/PNG uploaded by a future ESP32 or Raspberry Pi camera node, displays it with automatic status polling, and includes a hardware-free moving-frame simulation mode. AI inference, training, and physical traffic control are not implemented.

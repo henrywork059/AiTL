@@ -25,7 +25,7 @@ export type AppPageSummary = {
   status: "template" | "mock" | "planned" | "test-ready";
 };
 
-export type FunctionStatus = "placeholder" | "planned" | "later";
+export type FunctionStatus = "implemented" | "placeholder" | "planned" | "later";
 
 export type FunctionItem = {
   id: string;

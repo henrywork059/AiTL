@@ -1,4 +1,4 @@
-# Test-Ready Checklist — 0_1_0
+# Test-Ready Checklist — 0_1_1
 
 Use this checklist when testing the project after uploading the patch.
 
@@ -7,7 +7,8 @@ Use this checklist when testing the project after uploading the patch.
 - [ ] Backend starts with `scripts\start_pc_studio_backend_windows.bat`.
 - [ ] `http://127.0.0.1:8000/docs` opens.
 - [ ] `http://127.0.0.1:8000/health` returns `ok: true`.
-- [ ] `http://127.0.0.1:8000/api/smoke/status` returns version `0_1_0`.
+- [ ] `http://127.0.0.1:8000/api/smoke/status` returns version `0_1_1`.
+- [ ] Camera Sources can start/stop simulation and display moving frames.
 - [ ] `scripts\test_backend_smoke_windows.bat` shows all `PASS`.
 
 ## Frontend
@@ -31,7 +32,7 @@ Use this checklist when testing the project after uploading the patch.
 
 ## Pass criteria
 
-0_1_0 passes if:
+0_1_1 passes if:
 
 ```text
 frontend starts
@@ -41,4 +42,4 @@ mock GUI renders
 smoke test endpoints pass
 ```
 
-0_1_0 does not need real AI or real camera input.
+0_1_1 does not need real AI or completed ESP32/Raspberry Pi firmware.

@@ -15,10 +15,10 @@ def health(request: Request) -> dict:
         {
             "status": "ok",
             "app": "pc-studio-backend",
-            "version": "0_1_0",
-            "mode": "mock_test_ready",
+            "version": "0_1_1",
+            "mode": "camera_receiver_test_ready",
             "safe_mode": True,
-            "message": "Backend is ready for mock GUI/API testing only.",
+            "message": "Backend is ready for camera-frame receiver and simulation testing.",
         },
         request_id=request.state.request_id,
     )

@@ -2,9 +2,9 @@
 
 Python/FastAPI backend for the AI Traffic Light PC Studio App.
 
-## Current state — 0_1_0
+## Current state — 0_1_1
 
-This backend is **test-ready with mock APIs**.
+This backend is **test-ready with a camera-frame receiver, simulation, and mock AI APIs**.
 
 It can:
 
@@ -17,13 +17,16 @@ It can:
 - return mock traffic-light state
 - return mock logs
 - return standard API envelopes and error codes
+- accept raw JPEG/PNG camera frames
+- return the latest frame and receiver metadata
+- generate synthetic moving frames for hardware-free testing
 ```
 
 It cannot yet:
 
 ```text
 - open a real camera
-- read ESP-CAM stream
+- run ESP32/Raspberry Pi camera firmware
 - run YOLO inference
 - train/export models
 - control physical traffic lights
@@ -44,6 +47,7 @@ Open:
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/health
 http://127.0.0.1:8000/api/smoke/status
+http://127.0.0.1:8000/api/camera/status
 ```
 
 ## Smoke test

@@ -7,6 +7,7 @@ type Props = {
 };
 
 function statusText(item: FunctionItem) {
+  if (item.status === "implemented") return "implemented";
   if (item.status === "later") return "later";
   if (item.status === "planned") return "planned";
   return "placeholder";

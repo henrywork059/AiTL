@@ -2,18 +2,25 @@ import type { FunctionItem } from "../types/app";
 
 export const FUNCTION_REGISTRY: FunctionItem[] = [
   {
-    id: "camera.add_source",
+    id: "camera.receive_frame",
     area: "Camera",
-    label: "Add camera source",
-    description: "Register webcam, ESP-CAM MJPEG URL, IP camera URL, or video file.",
-    status: "placeholder",
+    label: "Receive device frame",
+    description: "Accept the latest JPEG or PNG uploaded by an ESP32 or Raspberry Pi camera node.",
+    status: "implemented",
   },
   {
     id: "camera.preview_stream",
     area: "Camera",
-    label: "Preview stream",
-    description: "Show camera feed before enabling AI inference.",
-    status: "placeholder",
+    label: "Preview latest frame",
+    description: "Automatically display new camera frames and connection metadata.",
+    status: "implemented",
+  },
+  {
+    id: "camera.simulation",
+    area: "Camera",
+    label: "Simulate camera frames",
+    description: "Generate moving test frames without requiring camera hardware.",
+    status: "implemented",
   },
   {
     id: "inference.load_model",

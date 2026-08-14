@@ -18,7 +18,7 @@ from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
 
-APP_VERSION = "0_1_0"
+APP_VERSION = "0_1_1"
 logger = get_logger(__name__)
 
 

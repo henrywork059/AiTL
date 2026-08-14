@@ -25,7 +25,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: "0_1_0", note: "test-ready mock" },
+          { label: "Project stage", value: "0_1_1", note: "camera receiver test-ready" },
           { label: "Backend", value: apiState.status, note: health?.version ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
           { label: "Real AI", value: "off", note: "safe mock mode" },
@@ -56,7 +56,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <PlaceholderPanel
-          title="What 0_1_0 can test"
+          title="What 0_1_1 can test"
           description="This version is intended for local app startup, layout review, frontend-backend connection checks, and mock API testing."
           status="test ready"
           bullets={smokeStatus?.ready_for ?? [
@@ -68,7 +68,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
         />
         <PlaceholderPanel
           title="What is still disabled"
-          description="The project remains safe-mode only. These functions should not be expected to work in 0_1_0."
+          description="The project remains safe-mode only. These functions should not be expected to work in 0_1_1."
           status="not implemented"
           bullets={smokeStatus?.not_ready_for ?? [
             "real camera capture",

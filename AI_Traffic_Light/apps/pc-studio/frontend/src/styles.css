@@ -506,6 +506,88 @@ button:disabled {
   opacity: 0.55;
 }
 
+.status-implemented {
+  border-color: #238636;
+  background: rgba(46, 160, 67, 0.12);
+  color: #7ee787;
+}
+
+.camera-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+}
+
+.camera-frame-wrapper {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: #05070a;
+}
+
+.camera-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.camera-empty-state {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+  padding: 28px;
+  text-align: center;
+  color: #8b949e;
+}
+
+.camera-empty-state strong {
+  color: #e6edf3;
+  font-size: 18px;
+}
+
+.camera-status-list {
+  display: grid;
+  gap: 8px;
+}
+
+.camera-status-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #30363d;
+}
+
+.camera-status-list div:last-child {
+  border-bottom: 0;
+}
+
+.camera-status-list span {
+  color: #8b949e;
+}
+
+.camera-status-list strong {
+  text-align: right;
+}
+
+.endpoint-code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  background: #0d1117;
+  color: #79c0ff;
+  line-height: 1.5;
+}
+
 .status-error {
   border-color: #da3633;
   background: rgba(218, 54, 51, 0.12);
@@ -600,7 +682,8 @@ button:disabled {
   }
 
   .log-row,
-  .settings-list div {
+  .settings-list div,
+  .camera-layout {
     grid-template-columns: 1fr;
   }
 }

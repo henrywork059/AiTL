@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_1_1 — Camera frame receiver and simulation
+
+- Added an in-memory PC-side endpoint for ESP32/Raspberry Pi JPEG or PNG frame uploads.
+- Added latest-frame metadata, stale-frame detection, and an image response endpoint.
+- Replaced the Camera Sources placeholder with an automatically refreshing preview and receiver status.
+- Added a moving synthetic camera mode that tests the same viewer path without camera hardware.
+- Added stable camera validation errors and documented the upload contract.
+- Updated Windows backend launchers to listen on the local network for future camera-node uploads.
+- Real AI inference, training, and physical traffic-light control remain disabled.
+
 ## 0_1_0 — PC Studio test-ready mock version
 
 - Promoted the PC Studio template from layout-only to a local smoke-testable mock version.

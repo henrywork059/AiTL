@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchHealth,
+  fetchCameraStatus,
   fetchMockFrame,
   fetchMockZones,
   fetchRecentLogs,
   fetchSmokeStatus,
   fetchTrafficState,
+  setCameraSimulation,
 } from "./api";
 import { AppStatusBar } from "./components/AppStatusBar";
 import { AppShell } from "./layout/AppShell";
@@ -24,6 +26,7 @@ import type { AppPageId } from "./types/app";
 import type {
   ApiConnectionState,
   BackendHealth,
+  CameraStatus,
   DetectionFrame,
   RecentLog,
   SmokeStatus,
@@ -38,6 +41,7 @@ export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [smokeStatus, setSmokeStatus] = useState<SmokeStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.45);
   const [activePage, setActivePage] = useState<AppPageId>("dashboard");
   const [apiState, setApiState] = useState<ApiConnectionState>({
@@ -45,19 +49,21 @@ export default function App() {
     message: "Checking backend connection...",
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [changingCameraMode, setChangingCameraMode] = useState(false);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
     setApiState({ status: "checking", message: "Refreshing mock API data..." });
 
     try {
-      const [nextHealth, nextSmoke, nextFrame, nextZones, nextTraffic, nextLogs] = await Promise.all([
+      const [nextHealth, nextSmoke, nextFrame, nextZones, nextTraffic, nextLogs, nextCameraStatus] = await Promise.all([
         fetchHealth(),
         fetchSmokeStatus(),
         fetchMockFrame(),
         fetchMockZones(),
         fetchTrafficState(),
         fetchRecentLogs(),
+        fetchCameraStatus(),
       ]);
 
       setHealth(nextHealth);
@@ -66,6 +72,7 @@ export default function App() {
       setZones(nextZones);
       setTraffic(nextTraffic);
       setRecentLogs(nextLogs);
+      setCameraStatus(nextCameraStatus);
 
       const fallbackMode = nextHealth.mode.includes("fallback") || nextSmoke.mode.includes("fallback");
       setApiState({
@@ -89,6 +96,24 @@ export default function App() {
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);
+
+  useEffect(() => {
+    if (activePage !== "camera_sources") return undefined;
+
+    const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
+    void refreshCamera();
+    const timerId = window.setInterval(() => void refreshCamera(), 1000);
+    return () => window.clearInterval(timerId);
+  }, [activePage]);
+
+  const changeCameraSimulation = useCallback(async (enabled: boolean) => {
+    setChangingCameraMode(true);
+    try {
+      setCameraStatus(await setCameraSimulation(enabled));
+    } finally {
+      setChangingCameraMode(false);
+    }
+  }, []);
 
   const filteredDetections = useMemo(() => {
     if (!frame) return [];
@@ -121,7 +146,13 @@ export default function App() {
           />
         );
       case "camera_sources":
-        return <CameraSourcesPage />;
+        return (
+          <CameraSourcesPage
+            status={cameraStatus}
+            onSimulationChange={changeCameraSimulation}
+            changingMode={changingCameraMode}
+          />
+        );
       case "zone_editor":
         return <ZoneEditorPage />;
       case "traffic_logic":

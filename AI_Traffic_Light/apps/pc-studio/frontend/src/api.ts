@@ -1,4 +1,4 @@
-import type { BackendHealth, DetectionFrame, RecentLog, SmokeStatus, TrafficState, Zone } from "./types";
+import type { BackendHealth, CameraStatus, DetectionFrame, RecentLog, SmokeStatus, TrafficState, Zone } from "./types";
 import { mockFrame, mockTrafficState, mockZones } from "./mockData";
 import { requestJson } from "./lib/apiClient";
 
@@ -18,14 +18,14 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_0",
+  version: "0_1_1",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_0",
+  version: "0_1_1",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
   not_ready_for: ["real_camera_capture", "YOLO inference", "training", "physical_traffic_light_control"],
@@ -44,6 +44,24 @@ const fallbackSmokeStatus: SmokeStatus = {
     mock_zone_count: mockZones.length,
     mock_traffic_phase: mockTrafficState.phase,
   },
+};
+
+const fallbackCameraStatus: CameraStatus = {
+  mode: "receiver",
+  simulation_enabled: false,
+  frame_available: false,
+  streaming: false,
+  active_source_id: null,
+  resolution: null,
+  content_type: null,
+  received_at_ms: null,
+  age_ms: null,
+  frame_number: 0,
+  size_bytes: 0,
+  origin: null,
+  stale: false,
+  frame_url: null,
+  upload_endpoint: "/api/camera/frame?source_id=<camera_id>",
 };
 
 export async function fetchHealth(): Promise<BackendHealth> {
@@ -82,4 +100,17 @@ export async function fetchRecentLogs(): Promise<RecentLog[]> {
     ],
   });
   return data.logs;
+}
+
+export async function fetchCameraStatus(): Promise<CameraStatus> {
+  return requestJson<CameraStatus>(`${API_BASE}/api/camera/status`, fallbackCameraStatus);
+}
+
+export async function setCameraSimulation(enabled: boolean): Promise<CameraStatus> {
+  const action = enabled ? "start" : "stop";
+  return requestJson<CameraStatus>(
+    `${API_BASE}/api/camera/simulation/${action}`,
+    fallbackCameraStatus,
+    { method: "POST" },
+  );
 }

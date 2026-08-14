@@ -1,8 +1,8 @@
-# AI Traffic Light — 0_1_0 Test-Ready Mock Project
+# AI Traffic Light — 0_1_1 Camera Receiver Project
 
 This repository contains an early **AI vision-based adaptive traffic light project**.
 
-The current version is **0_1_0**, the first **test-ready mock version** of the PC Studio app. It is intended to verify local startup, GUI layout, frontend-backend connection, mock detection display, logs, and smoke-test endpoints.
+The current version is **0_1_1**, a test-ready PC camera-frame receiver. It accepts JPEG/PNG images from future ESP32 or Raspberry Pi camera nodes, automatically displays the newest frame, and provides a hardware-free simulation mode.
 
 ## Project concept
 
@@ -16,7 +16,7 @@ Camera/video input
 
 This is a **prototype and simulation project**. It must not be connected to real public traffic-light infrastructure.
 
-## What 0_1_0 can test
+## What 0_1_1 can test
 
 ```text
 - PC Studio frontend startup
@@ -28,13 +28,16 @@ This is a **prototype and simulation project**. It must not be connected to real
 - mock traffic-light state display
 - logs/error-code page layout
 - smoke-test endpoint checklist
+- raw JPEG/PNG frame upload to the PC
+- automatic latest-frame display and stale-frame status
+- moving camera simulation without hardware
 ```
 
-## What 0_1_0 does not implement yet
+## What 0_1_1 does not implement yet
 
 ```text
+- ESP32/Raspberry Pi camera firmware
 - real webcam capture
-- ESP-CAM stream input
 - YOLO/object-detection inference
 - segmentation
 - dataset writing
@@ -47,7 +50,7 @@ This is a **prototype and simulation project**. It must not be connected to real
 
 ### 1. PC Studio App
 
-Runs on the computer. Current 0_1_0 status: **mock test-ready**.
+Runs on the computer. Current 0_1_1 status: **camera receiver and simulation test-ready**.
 
 Planned responsibilities:
 
@@ -120,6 +123,7 @@ scripts\test_backend_smoke_windows.bat
 0_0_3 = modular code, API, logging, and error-code standards
 0_0_4 = PC Studio app template and function map
 0_1_0 = first test-ready mock PC Studio version
+0_1_1 = camera frame receiver, live preview, and simulation mode
 ```
 
 ## Important docs
@@ -160,7 +164,7 @@ AI_Traffic_Light/
   scripts/                  Helper scripts
 ```
 
-## Next milestone after 0_1_0
+## Next milestone after 0_1_1
 
 The next functional milestone should be:
 
@@ -172,4 +176,4 @@ webcam/video input
 → GUI visualization
 ```
 
-Before that, test 0_1_0 and confirm the page list, layout, and function boundaries.
+Before that, connect an ESP32 or Raspberry Pi sender to the documented frame-upload endpoint.

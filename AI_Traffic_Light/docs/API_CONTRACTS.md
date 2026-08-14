@@ -102,3 +102,21 @@ Expected error code:
 ```text
 ATL-API-003
 ```
+
+## Added in 0_1_1
+
+### `POST /api/camera/frame?source_id=<camera_id>`
+
+Accepts one raw `image/jpeg` or `image/png` request body (maximum 8 MiB). The latest valid upload is retained in PC memory and replaces the previous device frame.
+
+### `GET /api/camera/frame`
+
+Returns the latest device or simulation image as binary image content. Returns `ATL-CAMERA-001` with HTTP 404 until a frame exists.
+
+### `GET /api/camera/status`
+
+Returns the current mode, source ID, frame number, resolution, age, stale state, and display URL.
+
+### `POST /api/camera/simulation/start` and `/stop`
+
+Enables or disables a synthetic moving traffic scene. Simulation uses the same status and image endpoints as future hardware uploads.

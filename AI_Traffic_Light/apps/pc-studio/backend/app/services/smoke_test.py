@@ -6,8 +6,8 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_0"
-APP_MODE = "mock_test_ready"
+APP_VERSION = "0_1_1"
+APP_MODE = "camera_receiver_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -23,6 +23,12 @@ def get_smoke_status() -> dict[str, Any]:
     template = get_template_summary()
 
     checks = [
+        {
+            "id": "camera.receiver",
+            "label": "Camera frame receiver",
+            "status": "pass",
+            "detail": "JPEG/PNG upload, latest-frame preview, and simulation endpoints are available.",
+        },
         {
             "id": "backend.health",
             "label": "Backend health endpoint",
@@ -57,7 +63,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_0 is simulation/mock only and cannot control real traffic lights.",
+            "detail": "0_1_1 is a supervised prototype and cannot control real traffic lights.",
         },
     ]
 
@@ -69,11 +75,12 @@ def get_smoke_status() -> dict[str, Any]:
             "backend_startup_test",
             "mock_api_test",
             "frontend_backend_connection_test",
+            "camera_frame_upload_test",
+            "camera_simulation_test",
             "GUI function-list review",
         ],
         "not_ready_for": [
-            "real_camera_capture",
-            "ESP-CAM stream",
+            "device_camera_firmware",
             "YOLO inference",
             "training",
             "model_export",
@@ -88,6 +95,10 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/traffic/state",
             "/api/logs/recent",
             "/api/template/pc-studio",
+            "/api/camera/status",
+            "/api/camera/frame",
+            "/api/camera/simulation/start",
+            "/api/camera/simulation/stop",
         ],
         "summary": {
             "mock_frame_id": frame.get("frame_id"),

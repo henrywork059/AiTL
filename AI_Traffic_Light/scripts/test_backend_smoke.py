@@ -18,6 +18,7 @@ ENDPOINTS = [
     "/api/mock/zones",
     "/api/traffic/state",
     "/api/logs/recent",
+    "/api/camera/status",
 ]
 
 
