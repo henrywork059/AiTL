@@ -1,5 +1,19 @@
 # Changelog
 
+## 0_1_3 — Manual labeling and managed YOLO dataset
+
+- Replaced the Dataset Review placeholder with a working captured-frame browser and manual bounding-box label editor.
+- Reused the shared six-class schema: person, car, bus, truck, motorcycle, and bicycle.
+- Added persistent label JSON files under each capture session without altering the original image or capture metadata.
+- Treats a saved zero-box review as a valid negative example and keeps unreviewed captures distinct.
+- Excludes captures tagged `bad` from managed training builds.
+- Added a deterministic managed YOLO train/validation builder at `datasets/yolo/` with image copies, normalized `.txt` labels, `data.yaml`, and a manifest.
+- Requires at least two reviewed non-bad frames so train and validation sets are distinct.
+- Detects label changes after a dataset build and marks the managed dataset stale until rebuilt.
+- Connected the existing Train / Export page to the managed `yolo/data.yaml` status while preserving support for other labeled YOLO YAML files inside `datasets/`.
+- Added labeling/build API contracts, stable dataset error codes, service tests, and acceptance documentation.
+- Automatic labeling, live YOLO inference, model export, and physical public-road traffic-light control remain disabled.
+
 ## 0_1_2 — Persistent capture and optional labeled-dataset training
 
 - Replaced the Dataset Capture placeholder with a working receiver/simulation capture page.

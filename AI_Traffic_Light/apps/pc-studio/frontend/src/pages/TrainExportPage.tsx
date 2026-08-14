@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchTrainingStatus, startTraining } from "../api";
+import type { ChangeEvent } from "react";
+import { fetchTrainingDatasetStatus, fetchTrainingStatus, startTraining } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
-import type { TrainingConfig, TrainingStatus } from "../types";
+import type { TrainingConfig, TrainingDatasetStatus, TrainingStatus } from "../types";
 
 const DEFAULT_CONFIG: TrainingConfig = {
   dataset_yaml: "yolo/data.yaml",
@@ -14,12 +15,18 @@ const DEFAULT_CONFIG: TrainingConfig = {
 
 export function TrainExportPage() {
   const [status, setStatus] = useState<TrainingStatus | null>(null);
+  const [managedDataset, setManagedDataset] = useState<TrainingDatasetStatus | null>(null);
   const [config, setConfig] = useState<TrainingConfig>(DEFAULT_CONFIG);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function refreshStatus() {
-    setStatus(await fetchTrainingStatus());
+    const [nextStatus, nextDataset] = await Promise.all([
+      fetchTrainingStatus(),
+      fetchTrainingDatasetStatus(),
+    ]);
+    setStatus(nextStatus);
+    setManagedDataset(nextDataset);
   }
 
   useEffect(() => {
@@ -41,6 +48,8 @@ export function TrainExportPage() {
   }
 
   const running = status?.status === "running";
+  const usesManagedDataset = config.dataset_yaml.trim() === "yolo/data.yaml";
+  const managedDatasetBlocked = usesManagedDataset && !managedDataset?.ready;
 
   return (
     <div className="page-stack">
@@ -49,7 +58,7 @@ export function TrainExportPage() {
           <div className="panel-header">
             <div>
               <h2>YOLO training configuration</h2>
-              <p className="placeholder-copy">Runs a real local Ultralytics job only with a labeled YOLO dataset.</p>
+              <p className="placeholder-copy">Runs a real local Ultralytics job only with a current labeled YOLO dataset.</p>
             </div>
             <span className={`status-pill ${status?.training_available ? "" : "status-planned"}`}>
               {status?.training_available ? "runner available" : "optional dependency missing"}
@@ -57,29 +66,42 @@ export function TrainExportPage() {
           </div>
           <div className="form-grid">
             <label className="full-span">Dataset YAML inside datasets/
-              <input value={config.dataset_yaml} onChange={(event) => setConfig({ ...config, dataset_yaml: event.target.value })} />
+              <input value={config.dataset_yaml} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, dataset_yaml: event.target.value })} />
             </label>
             <label>Base model
-              <input value={config.base_model} onChange={(event) => setConfig({ ...config, base_model: event.target.value })} />
+              <input value={config.base_model} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, base_model: event.target.value })} />
             </label>
             <label>Device
-              <input value={config.device} onChange={(event) => setConfig({ ...config, device: event.target.value })} />
+              <input value={config.device} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, device: event.target.value })} />
             </label>
             <label>Epochs
-              <input type="number" min={1} max={300} value={config.epochs} onChange={(event) => setConfig({ ...config, epochs: Number(event.target.value) })} />
+              <input type="number" min={1} max={300} value={config.epochs} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, epochs: Number(event.target.value) })} />
             </label>
             <label>Image size
-              <input type="number" min={64} max={2048} value={config.image_size} onChange={(event) => setConfig({ ...config, image_size: Number(event.target.value) })} />
+              <input type="number" min={64} max={2048} value={config.image_size} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, image_size: Number(event.target.value) })} />
             </label>
             <label>Batch
-              <input type="number" min={1} max={128} value={config.batch} onChange={(event) => setConfig({ ...config, batch: Number(event.target.value) })} />
+              <input type="number" min={1} max={128} value={config.batch} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, batch: Number(event.target.value) })} />
             </label>
           </div>
-          <button onClick={() => void launchTraining()} disabled={starting || running || !status?.training_available}>
+          {usesManagedDataset && (
+            <div className="camera-status-list training-status-list">
+              <div><span>Managed labels</span><strong>{managedDataset?.eligible_frame_count ?? 0} eligible frames</strong></div>
+              <div><span>Managed split</span><strong>{managedDataset?.train_count ?? 0} train / {managedDataset?.val_count ?? 0} val</strong></div>
+              <div><span>Dataset state</span><strong>{managedDataset?.ready ? "current" : managedDataset?.stale ? "rebuild required" : "not built"}</strong></div>
+            </div>
+          )}
+          <button
+            onClick={() => void launchTraining()}
+            disabled={starting || running || !status?.training_available || managedDatasetBlocked}
+          >
             {running ? "Training running..." : starting ? "Starting..." : "Start real training"}
           </button>
           {!status?.training_available && (
             <code className="endpoint-code">cd apps\pc-studio\backend<br />pip install -r requirements-training.txt</code>
+          )}
+          {managedDatasetBlocked && (
+            <p className="small-note">{managedDataset?.message ?? "Build the managed dataset in Dataset Review before using yolo/data.yaml."}</p>
           )}
           {error && <p className="error-message">{error}</p>}
         </section>
@@ -94,7 +116,7 @@ export function TrainExportPage() {
             <div><span>Output</span><strong>{status?.output_path ?? "none"}</strong></div>
             <div><span>Best model</span><strong>{status?.best_model_path ?? "not produced"}</strong></div>
           </div>
-          <p className="small-note">Raw captured images are not labels. Add YOLO bounding-box labels and a dataset YAML before training.</p>
+          <p className="small-note">Manual labels saved in Dataset Review can be built into the default <code>yolo/data.yaml</code>. Custom labeled YOLO YAML paths inside <code>datasets/</code> remain supported.</p>
           {status?.error && <p className="error-message">{status.error}</p>}
         </aside>
       </div>

@@ -1,52 +1,68 @@
-# Acceptance Checklist — 0_1_2 candidate
+# Acceptance Checklist — 0_1_3 candidate
 
-Do not mark 0_1_2 as passed until every required checkbox is confirmed by the project owner.
+Do not mark 0_1_3 as passed until every required checkbox is confirmed by the project owner.
 
-## Required backend and API
+## Required backend and version checks
 
 - [ ] Backend starts with the documented PowerShell command.
-- [ ] `/docs` opens and shows dataset capture plus training endpoints.
-- [ ] `/health` returns `ok: true`, version `0_1_2`, and a request ID.
-- [ ] `/api/smoke/status` returns version `0_1_2`.
-- [ ] `scripts\test_backend_smoke_windows.bat` shows all `PASS`, including dataset/training status.
-- [ ] Invalid capture/training input returns the standard error envelope and request ID.
+- [ ] `/docs` opens and shows capture, label, managed-dataset, and training endpoints.
+- [ ] `/health` returns `ok: true`, version `0_1_3`, and a request ID.
+- [ ] `/api/smoke/status` returns version `0_1_3` and includes dataset labeling/build checks.
+- [ ] `python .\scripts\test_dataset_labeling_service.py` shows all `PASS` lines.
+- [ ] Existing camera capture and training service tests still pass.
+- [ ] Invalid label coordinates/class IDs return a standard error envelope using `ATL-DATASET-004` or request validation using `ATL-API-002`.
+- [ ] Trying to build with fewer than two eligible reviewed frames returns `ATL-DATASET-005`.
 
-## Required frontend
+## Required frontend checks
 
 - [ ] `npm ci`, `npm run typecheck`, and `npm run build` succeed locally.
-- [ ] Frontend starts and Dashboard shows `0_1_2`.
-- [ ] Sidebar navigation, existing mock Live AI page, logs, and traffic simulation still work.
-- [ ] Dataset Capture and Train / Export are shown as test-ready, not as finished production features.
+- [ ] Frontend starts and the sidebar/dashboard show `0_1_3`.
+- [ ] Existing Camera Sources, Dataset Capture, mock Live AI, traffic simulation, and logs still open normally.
+- [ ] Dataset Review is shown as test-ready and contains the capture browser, class selector, image canvas, label list, and managed-dataset section.
+- [ ] The app does not describe manual labels as automatic AI labels.
 
-## Required simulation capture
+## Required manual labeling checks
 
-- [ ] Camera simulation starts and shows moving PNG frames.
-- [ ] Dataset Capture previews the current simulation frame.
-- [ ] **Capture current frame** reports a saved relative path.
-- [ ] Images and Metadata each increase by one.
-- [ ] A readable PNG exists under `datasets\captures\<session>\images`.
-- [ ] A matching JSON exists under `metadata` with `origin: simulation`, tag, note, source, resolution, and relative paths.
-- [ ] Counts remain after restarting the backend.
+- [ ] At least two non-bad captures appear in Dataset Review.
+- [ ] Selecting a capture loads the correct saved image.
+- [ ] Drawing a box creates a visible box with the selected class name.
+- [ ] Switching classes allows a different class to be added.
+- [ ] **Remove** removes only the selected local label.
+- [ ] **Save labels** persists the boxes and marks the capture reviewed.
+- [ ] Refreshing the page/backend reloads the saved labels from disk.
+- [ ] A corresponding JSON file exists under `datasets\captures\<session>\labels\`.
+- [ ] Saving zero boxes creates a reviewed negative example rather than returning the frame to unreviewed state.
+- [ ] A capture marked `bad` can be reviewed but is reported as excluded from the managed training build.
 
-## Required uploaded-frame capture
+## Required managed YOLO dataset checks
 
-- [ ] Simulation is stopped and a real JPEG or PNG is uploaded to `/api/camera/frame`.
-- [ ] The uploaded image appears in the Camera Sources preview.
-- [ ] Capturing it saves the original format and matching metadata with `origin: upload`.
+- [ ] **Build training dataset** is disabled until at least two non-bad reviewed frames exist.
+- [ ] Building creates `datasets\yolo\data.yaml` and `manifest.json`.
+- [ ] Building creates both `images\train` and `images\val` with at least one image each.
+- [ ] Building creates matching `labels\train` and `labels\val` `.txt` files.
+- [ ] YOLO label rows use normalized values between 0 and 1 and the correct class ID.
+- [ ] A reviewed negative image receives an empty `.txt` label file.
+- [ ] A capture tagged `bad` is not copied into train or val.
+- [ ] `data.yaml` lists person, car, bus, truck, motorcycle, and bicycle using IDs 0–5.
+- [ ] Editing/saving labels after a build marks the managed dataset stale/rebuild-required.
+- [ ] Rebuilding clears stale state and updates train/val status.
 
-## Required training boundaries
+## Required training integration boundaries
 
-- [ ] Without the optional dependency, the UI explains the install command and `/api/training/start` returns `ATL-TRAIN-001`.
-- [ ] Invalid or out-of-project dataset YAML paths are rejected with `ATL-TRAIN-002`.
-- [ ] The UI clearly states that raw captures are unlabeled and cannot directly train object detection.
-- [ ] The app does not claim that model export, live inference, or physical traffic-light control works.
+- [ ] **Train / Export** defaults to `yolo/data.yaml`.
+- [ ] With `yolo/data.yaml`, training is blocked until the managed dataset is current.
+- [ ] With the optional dependency absent, the UI still explains `pip install -r requirements-training.txt` and no training job starts.
+- [ ] A custom labeled YOLO YAML inside `datasets/` remains accepted by the existing training API rules.
+- [ ] The app does not claim that live inference, automatic labeling, model export, or physical public-road traffic-light control works.
 
-## Optional end-to-end training check
+## Optional end-to-end Ultralytics check
 
-- [ ] After installing `requirements-training.txt` and supplying a labeled YOLO dataset, one short run starts in the background.
+- [ ] Install `requirements-training.txt`.
+- [ ] Start a short run using the generated `yolo/data.yaml`.
 - [ ] Status reaches completed or returns a useful failed state without stopping the API.
 - [ ] Training output is written under `outputs\training\<run_id>`.
+- [ ] `best_model_path` appears if Ultralytics produces `weights\best.pt`.
 
 ## Pass decision
 
-Required checks define the 0_1_2 patch pass. The optional end-to-end run confirms the external Ultralytics/PyTorch/data environment and may be deferred if no labeled dataset is available. 0_1_2 remains a candidate until the owner explicitly confirms the required checks.
+The required checks define the 0_1_3 patch pass. The optional Ultralytics run depends on the local PyTorch/Ultralytics environment and may be deferred only if that external training environment is unavailable. **0_1_3 remains a candidate until the owner explicitly confirms the required checks.**

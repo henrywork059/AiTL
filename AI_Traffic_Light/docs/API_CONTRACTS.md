@@ -1,10 +1,10 @@
 # API Contracts
 
-The PC Studio backend should expose small, focused route groups. Each group should call service functions instead of storing logic inside route handlers.
+The PC Studio backend exposes small, focused route groups. Route handlers parse requests, call services, log results, and return the project response envelope; business logic stays in services.
 
 ## Response envelope
 
-All new APIs should return this format:
+All JSON APIs should return:
 
 ```json
 {
@@ -32,7 +32,9 @@ Errors should return:
 }
 ```
 
-## Placeholder route groups in 0_0_4
+Binary image endpoints return image bytes rather than the JSON envelope and include `X-Request-ID`.
+
+## Route groups
 
 | Route prefix | Purpose |
 |---|---|
@@ -40,96 +42,50 @@ Errors should return:
 | `/api/inference` | model loading and detection results |
 | `/api/zones` | traffic-zone setup and zone counting |
 | `/api/traffic` | signal simulation and decision state |
-| `/api/dataset` | data capture and review |
+| `/api/dataset` | capture, manual review/labeling, and managed dataset generation |
 | `/api/training` | training progress and config |
 | `/api/models` | model registry and export status |
 | `/api/settings` | project settings |
 | `/api/logs` | recent logs and error reports |
 | `/api/template` | template metadata for GUI confirmation |
 
-## Implementation rule
-
-Do not put real logic directly in route files. Use this structure:
-
-```text
-routes/camera.py
-→ services/camera_sources.py
-→ core/error_codes.py
-→ schema files / models
-```
-
-A route file should mainly:
-
-```text
-- parse request
-- call service
-- log request/result
-- return API envelope
-```
-
-## Added in 0_1_0
+## 0_1_0 smoke API
 
 ### `GET /api/smoke/status`
 
-Purpose: verify that the backend is locally test-ready without connecting to real camera, AI inference, training, or physical traffic-light control.
-
-Response data includes:
-
-```text
-version
-mode
-ready_for
-not_ready_for
-checks
-endpoints
-summary
-```
-
-Use this endpoint first when checking whether the frontend and backend can communicate.
+Returns version, mode, ready/not-ready lists, checks, endpoints, and summary values.
 
 ### `GET /api/smoke/error-demo`
 
-Purpose: intentionally returns a controlled error envelope for testing error-code display and request handling.
+Returns the controlled `ATL-API-003` error for envelope testing.
 
-Expected status:
-
-```text
-501
-```
-
-Expected error code:
-
-```text
-ATL-API-003
-```
-
-## Added in 0_1_1
+## 0_1_1 camera APIs
 
 ### `POST /api/camera/frame?source_id=<camera_id>`
 
-Accepts one raw `image/jpeg` or `image/png` request body (maximum 8 MiB). The latest valid upload is retained in PC memory and replaces the previous device frame.
+Accepts one raw `image/jpeg` or `image/png` request body, maximum 8 MiB.
 
 ### `GET /api/camera/frame`
 
-Returns the latest device or simulation image as binary image content. Returns `ATL-CAMERA-001` with HTTP 404 until a frame exists.
+Returns the latest device or simulation image.
 
 ### `GET /api/camera/status`
 
-Returns the current mode, source ID, frame number, resolution, age, stale state, and display URL.
+Returns current source/mode/frame metadata.
 
 ### `POST /api/camera/simulation/start` and `/stop`
 
-Enables or disables a synthetic moving traffic scene. Simulation uses the same status and image endpoints as future hardware uploads.
+Enables/disables the synthetic traffic-scene frame source.
 
-## Added in 0_1_2
+## 0_1_2 capture and training APIs
 
 ### `GET /api/dataset/status`
 
-Returns persistent capture counts, session count, the relative dataset path, and the latest capture made during the current backend process.
+Returns persistent capture/session counts and the latest capture made in the current backend process.
 
 ### `POST /api/dataset/captures`
 
-Saves the latest receiver or simulation frame with paired JSON metadata. The JSON request body is:
+Saves the latest receiver or simulation frame and paired metadata:
 
 ```json
 {
@@ -139,15 +95,15 @@ Saves the latest receiver or simulation frame with paired JSON metadata. The JSO
 }
 ```
 
-`session_id` accepts 1–64 letters, numbers, dots, dashes, or underscores. `quality_tag` is `unreviewed`, `useful`, or `bad`. Images are written under `datasets/captures/<session_id>/images/`; paired records use `metadata/`. Generated dataset paths are relative and are never included in patch ZIPs.
+`quality_tag` is `unreviewed`, `useful`, or `bad`.
 
 ### `GET /api/training/status`
 
-Returns optional Ultralytics availability, current background-run state, progress, validated config, relative output paths, and any bounded failure message.
+Returns optional Ultralytics availability and current background-run state.
 
 ### `POST /api/training/start`
 
-Validates and starts one real Ultralytics YOLO training job. The dataset YAML must be a relative path inside `datasets/` and define `train`, `val`, and `names` or `nc`.
+Starts one validated Ultralytics YOLO training job. `dataset_yaml` must remain inside `datasets/` and define train/val plus names or nc.
 
 ```json
 {
@@ -160,8 +116,128 @@ Validates and starts one real Ultralytics YOLO training job. The dataset YAML mu
 }
 ```
 
-Training requires the optional `requirements-training.txt` install and labeled YOLO images. Raw captures alone are not a trainable object-detection dataset. Only one run can be active; 0_1_2 does not implement cancel, model export, or automatic labeling.
+## Added in 0_1_3
 
-### Validation envelopes
+### `GET /api/dataset/captures?limit=500&session_id=<optional>`
 
-FastAPI/Pydantic request validation errors now use the normal failure envelope with `ATL-API-002` and the middleware request ID.
+Returns saved capture records for review plus:
+
+```text
+labeled
+label_count
+image_url
+```
+
+The response also includes the shared class list. Class IDs come from `packages/schema/classes.default.json` and currently map 0–5 to person, car, bus, truck, motorcycle, and bicycle.
+
+### `GET /api/dataset/captures/{capture_id}/image`
+
+Returns one persisted capture image for the local review UI. The response includes `X-Request-ID` and `Cache-Control: no-store`.
+
+### `GET /api/dataset/captures/{capture_id}/labels`
+
+Returns the saved manual label document. If the capture has never been reviewed, the endpoint returns `reviewed: false` with an empty label list.
+
+Example:
+
+```json
+{
+  "capture_id": "...",
+  "session_id": "default",
+  "image_path": "captures/default/images/...png",
+  "width": 1280,
+  "height": 720,
+  "reviewed": true,
+  "updated_at_ms": 1780000000000,
+  "labels": [
+    {
+      "class_id": 0,
+      "class_name": "person",
+      "box_xyxy": [100.0, 120.0, 240.0, 560.0]
+    }
+  ]
+}
+```
+
+A reviewed document may intentionally contain zero boxes. This represents a human-reviewed negative example and is different from an unreviewed capture.
+
+### `PUT /api/dataset/captures/{capture_id}/labels`
+
+Replaces the current manual boxes for one capture:
+
+```json
+{
+  "labels": [
+    {
+      "class_id": 1,
+      "box_xyxy": [200, 300, 600, 620]
+    }
+  ]
+}
+```
+
+The backend derives `class_name` from the shared schema. Boxes must have positive area and remain within the recorded image dimensions. Maximum 500 boxes per frame.
+
+Labels are written to:
+
+```text
+datasets/captures/<session_id>/labels/<capture_id>.json
+```
+
+### `GET /api/dataset/training-dataset/status`
+
+Returns the managed dataset state:
+
+```text
+ready
+stale
+dataset_yaml
+labeled_frame_count
+eligible_frame_count
+excluded_bad_count
+label_box_count
+train_count
+val_count
+generated_at_ms
+classes
+message
+```
+
+`ready` is false if fewer than two non-bad reviewed frames exist, if the managed dataset has never been built, or if saved labels/quality state changed after the last build.
+
+### `POST /api/dataset/training-dataset`
+
+Builds the managed YOLO dataset used by the default training configuration:
+
+```json
+{
+  "validation_fraction": 0.2
+}
+```
+
+Requirements:
+
+```text
+- at least two reviewed captures not tagged bad
+- each reviewed capture may have zero or more manual boxes
+- validation_fraction > 0 and < 0.5
+```
+
+Generated runtime files:
+
+```text
+datasets/yolo/images/train/
+datasets/yolo/images/val/
+datasets/yolo/labels/train/
+datasets/yolo/labels/val/
+datasets/yolo/data.yaml
+datasets/yolo/manifest.json
+```
+
+The split is deterministic by capture ID. At least one image is placed in train and one in validation. YOLO labels use normalized `class x_center y_center width height` values. Captures tagged `bad` are excluded even if label files exist.
+
+If manual labels change after the build, status becomes stale and the managed dataset should be rebuilt before training with `yolo/data.yaml`.
+
+## Validation envelopes
+
+FastAPI/Pydantic request validation failures use the normal error envelope with `ATL-API-002` and the middleware request ID. Project-specific labeling/build validation uses the stable `ATL-DATASET-*` codes documented in `ERROR_CODES.md`.

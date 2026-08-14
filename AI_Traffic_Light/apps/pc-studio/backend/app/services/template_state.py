@@ -10,7 +10,7 @@ PC_STUDIO_PAGES: list[dict[str, Any]] = [
     {"id": "zone_editor", "label": "Zone Editor", "status": "template"},
     {"id": "traffic_logic", "label": "Traffic Logic", "status": "mock"},
     {"id": "dataset_capture", "label": "Dataset Capture", "status": "test-ready"},
-    {"id": "dataset_review", "label": "Dataset Review", "status": "template"},
+    {"id": "dataset_review", "label": "Dataset Review", "status": "test-ready"},
     {"id": "train_export", "label": "Train / Export", "status": "test-ready"},
     {"id": "model_registry", "label": "Model Registry", "status": "template"},
     {"id": "settings", "label": "Settings", "status": "template"},
@@ -19,10 +19,10 @@ PC_STUDIO_PAGES: list[dict[str, Any]] = [
 
 
 def get_template_summary() -> dict[str, Any]:
-    """Return planned PC Studio pages and placeholder implementation status."""
+    """Return PC Studio pages and current implementation status."""
     return {
-        "version": "0_1_2",
-        "mode": "dataset_capture_test_ready",
+        "version": "0_1_3",
+        "mode": "manual_labeling_test_ready",
         "pages": PC_STUDIO_PAGES,
-        "implementation_note": "The app can receive and save frames. Optional YOLO training requires a separately labeled dataset; inference and physical traffic control remain disabled.",
+        "implementation_note": "The app can capture, manually label, and build a managed YOLO dataset. Optional YOLO training uses labeled data; automatic labeling, live inference, and physical traffic control remain disabled.",
     }

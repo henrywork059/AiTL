@@ -67,9 +67,16 @@ export const FUNCTION_REGISTRY: FunctionItem[] = [
   {
     id: "dataset.review",
     area: "Dataset",
-    label: "Review captured data",
-    description: "Inspect useful/bad frames, label issues, and class distribution.",
-    status: "placeholder",
+    label: "Review and label captured data",
+    description: "Browse saved frames, draw manual bounding boxes, save reviewed negatives, and exclude bad captures from training builds.",
+    status: "implemented",
+  },
+  {
+    id: "dataset.yolo_build",
+    area: "Dataset",
+    label: "Build managed YOLO dataset",
+    description: "Convert reviewed captures into distinct YOLO train/validation images, labels, and yolo/data.yaml.",
+    status: "implemented",
   },
   {
     id: "training.run",

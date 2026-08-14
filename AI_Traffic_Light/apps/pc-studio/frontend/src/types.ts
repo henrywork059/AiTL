@@ -133,6 +133,56 @@ export type DatasetStatus = {
   last_capture: CaptureRecord | null;
 };
 
+export type LabelClass = {
+  id: number;
+  name: string;
+  category: string;
+};
+
+export type DatasetLabelBox = {
+  class_id: number;
+  class_name: string;
+  box_xyxy: [number, number, number, number];
+};
+
+export type CaptureSummary = CaptureRecord & {
+  labeled: boolean;
+  label_count: number;
+  image_url: string;
+};
+
+export type DatasetCaptureList = {
+  captures: CaptureSummary[];
+  total: number;
+  classes: LabelClass[];
+};
+
+export type CaptureLabelDocument = {
+  capture_id: string;
+  session_id: string;
+  image_path: string;
+  width: number;
+  height: number;
+  reviewed: boolean;
+  updated_at_ms: number | null;
+  labels: DatasetLabelBox[];
+};
+
+export type TrainingDatasetStatus = {
+  ready: boolean;
+  stale: boolean;
+  dataset_yaml: string;
+  labeled_frame_count: number;
+  eligible_frame_count: number;
+  excluded_bad_count: number;
+  label_box_count: number;
+  train_count: number;
+  val_count: number;
+  generated_at_ms: number | null;
+  classes: LabelClass[];
+  message: string;
+};
+
 export type TrainingConfig = {
   dataset_yaml: string;
   base_model: string;

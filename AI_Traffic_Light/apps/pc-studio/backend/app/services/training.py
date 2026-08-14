@@ -12,6 +12,7 @@ from uuid import uuid4
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
+from app.services.dataset_labeling import DatasetLabelingService
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "outputs" / "training"
 MODEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,80}\.(?:pt|yaml|yml)$")
 DEVICE_PATTERN = re.compile(r"^(?:cpu|mps|[0-9](?:,[0-9])*)$")
 YoloFactory = Callable[[str], Any]
+MANAGED_DATASET_YAML = "yolo/data.yaml"
 
 
 class TrainingService:
@@ -78,7 +80,22 @@ class TrainingService:
         batch: int,
         device: str,
     ) -> dict:
+        normalized_dataset_yaml = dataset_yaml.replace("\\", "/")
         dataset_path = self._resolve_dataset_path(dataset_yaml)
+        managed_manifest = self._dataset_root / "yolo" / "manifest.json"
+        if normalized_dataset_yaml == MANAGED_DATASET_YAML and managed_manifest.is_file():
+            managed_status = DatasetLabelingService(dataset_root=self._dataset_root).training_dataset_status()
+            if not managed_status["ready"]:
+                raise AppError(
+                    ErrorCode.DATASET_TRAINING_NOT_READY,
+                    managed_status["message"],
+                    status_code=409,
+                    details={
+                        "dataset_yaml": MANAGED_DATASET_YAML,
+                        "stale": managed_status["stale"],
+                        "eligible_frame_count": managed_status["eligible_frame_count"],
+                    },
+                )
         if not self._training_available():
             raise AppError(
                 ErrorCode.TRAINING_NOT_READY,

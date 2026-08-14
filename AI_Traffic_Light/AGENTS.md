@@ -14,11 +14,11 @@ docs/DEBUGGING_AND_LOGGING.md
 
 ## Project identity
 
-Project name: **AI Traffic Light**  
+Project name: **AI Traffic Light**
 Current patch line: **0_1_x**
-Current patch: **0_1_2**
+Current patch: **0_1_3**
 
-This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
+This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, supervised labeling, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
 
 ## Architecture rule
 
@@ -90,6 +90,8 @@ Errors should use:
 }
 ```
 
+Binary image endpoints should still return an `X-Request-ID` header.
+
 ## Logging and error-code rule
 
 Most non-trivial code should log useful events and failures.
@@ -150,6 +152,14 @@ VERSION
 docs/PATCH_<version>.md
 relevant docs/*.md
 ```
+
+## Dataset and labeling rule
+
+- Captured images, manual labels, generated YOLO splits, and trained weights are runtime data and must stay out of patch ZIPs.
+- Keep class IDs aligned with `packages/schema/classes.default.json` unless an explicit schema migration is approved.
+- Manual labels are human annotations; do not describe them as automatic AI labels.
+- A reviewed frame with zero boxes is a valid negative example; an unreviewed frame is not equivalent to a negative label.
+- Frames tagged `bad` should not be included in managed training builds.
 
 ## Data and secrets rule
 

@@ -20,6 +20,8 @@ ENDPOINTS = [
     "/api/logs/recent",
     "/api/camera/status",
     "/api/dataset/status",
+    "/api/dataset/captures?limit=5",
+    "/api/dataset/training-dataset/status",
     "/api/training/status",
 ]
 
@@ -58,7 +60,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("Smoke test passed. Backend capture and training-status APIs are ready for frontend testing.")
+    print("Smoke test passed. Capture, labeling, managed-dataset status, and training-status APIs are ready for frontend testing.")
     return 0
 
 

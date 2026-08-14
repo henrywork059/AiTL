@@ -25,10 +25,10 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: "0_1_2", note: "dataset capture test-ready" },
+          { label: "Project stage", value: "0_1_3", note: "manual labeling candidate" },
           { label: "Backend", value: apiState.status, note: health?.version ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Real AI", value: "off", note: "safe mock mode" },
+          { label: "Real AI", value: "training optional", note: "live inference still off" },
         ]}
       />
 
@@ -56,24 +56,24 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <PlaceholderPanel
-          title="What 0_1_2 can test"
-          description="This version adds persistent receiver/simulation capture and an optional labeled-dataset YOLO runner."
+          title="What 0_1_3 can test"
+          description="This version adds manual capture labeling and a managed YOLO train/validation build on top of persistent V012 capture and training."
           status="test ready"
           bullets={smokeStatus?.ready_for ?? [
-            "frontend layout test",
-            "backend startup test",
-            "mock API test",
-            "frontend-backend connection test",
+            "persistent capture",
+            "manual bounding-box labels",
+            "managed YOLO dataset build",
+            "optional local training",
           ]}
         />
         <PlaceholderPanel
           title="What is still disabled"
-          description="The project remains prototype-only. These functions should not be expected to work in 0_1_2."
+          description="The project remains prototype-only. These functions should not be expected to work in 0_1_3."
           status="not implemented"
           bullets={smokeStatus?.not_ready_for ?? [
-            "real camera capture",
-            "YOLO inference",
-            "training from raw unlabeled captures",
+            "automatic labeling",
+            "YOLO live inference",
+            "model export",
             "physical traffic-light control",
           ]}
         />

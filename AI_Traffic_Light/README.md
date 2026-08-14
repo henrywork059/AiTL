@@ -1,52 +1,61 @@
-# AI Traffic Light — 0_1_2 Dataset Capture Project
+# AI Traffic Light — 0_1_3 Manual Labeling Project
 
-This repository contains an early **AI vision-based adaptive traffic light project**.
+This repository contains an early **AI vision-based adaptive traffic-light prototype**.
 
-The current candidate is **0_1_2**. It receives or simulates camera frames, previews the newest image, and persistently saves selected frames with paired JSON metadata. It also includes an optional real Ultralytics YOLO training runner for separately labeled YOLO datasets.
+The current candidate is **0_1_3**. It receives or simulates camera frames, persistently captures selected images, lets a human draw and save bounding-box labels in PC Studio, and can convert reviewed captures into a managed YOLO train/validation dataset for the existing optional Ultralytics training runner.
 
 ## Project concept
 
 ```text
 Camera/video input
+→ human-supervised dataset capture and labeling
 → object detection for pedestrians and vehicles
 → zone-based counting
 → traffic-light decision simulation
-→ GUI visualization and dataset capture
+→ GUI visualization
 ```
 
 This is a **prototype and simulation project**. It must not be connected to real public traffic-light infrastructure.
 
-## What 0_1_2 can test
+## What 0_1_3 can test
 
 ```text
-- PC Studio frontend startup
-- FastAPI backend startup
+- PC Studio frontend and FastAPI backend startup
 - frontend ↔ backend mock API connection
-- mock traffic-scene rendering
-- mock pedestrian/vehicle detections
-- confidence threshold filtering
-- mock traffic-light state display
-- logs/error-code page layout
-- smoke-test endpoint checklist
 - raw JPEG/PNG frame upload to the PC
-- automatic latest-frame display and stale-frame status
-- moving camera simulation without hardware
-- manual capture from receiver or simulation mode
-- persistent PNG/JPEG image and JSON metadata pairs
-- capture sessions, notes, quality tags, and saved-file counts
-- optional background YOLO training from a prepared labeled dataset
+- moving PNG camera simulation without hardware
+- persistent receiver/simulation image capture with JSON metadata
+- capture sessions, notes, and quality tags
+- browsing saved captures in Dataset Review
+- manual bounding-box labeling for the shared six classes
+- reviewed zero-box negative examples
+- persistent label JSON files
+- exclusion of bad-quality captures from managed training data
+- deterministic YOLO train/validation dataset generation
+- generated datasets/yolo/data.yaml and manifest
+- stale managed-dataset detection after label edits
+- optional background Ultralytics YOLO training from the managed or another labeled dataset
 ```
 
-## What 0_1_2 does not implement yet
+The shared labeling classes are:
+
+```text
+0 person
+1 car
+2 bus
+3 truck
+4 motorcycle
+5 bicycle
+```
+
+## What 0_1_3 does not implement yet
 
 ```text
 - ESP32/Raspberry Pi camera firmware
 - real webcam capture
-- YOLO/object-detection inference
+- automatic object labeling
+- YOLO/object-detection inference in the live view
 - segmentation
-- automatic object labeling or a bounding-box label editor
-- training directly from raw unlabeled captures
-- bundled training dependency in the normal lightweight backend install
 - model export
 - physical traffic-light control
 ```
@@ -55,31 +64,23 @@ This is a **prototype and simulation project**. It must not be connected to real
 
 ### 1. PC Studio App
 
-Runs on the computer. Current 0_1_2 status: **dataset capture candidate awaiting owner acceptance**.
+Runs on the computer. Current 0_1_3 status: **manual-labeling candidate awaiting owner acceptance**.
 
-Planned responsibilities:
+Current testable data workflow:
 
-- camera/video source management
-- live AI detection view
-- traffic-zone setup
-- pedestrian/vehicle counting
-- rule-based traffic-light simulation
-- dataset capture
-- dataset review
-- optional labeled-dataset training and future model export
-- logs and debugging
+```text
+Camera Sources
+→ Dataset Capture
+→ Dataset Review / manual labels
+→ Build training dataset
+→ Train / Export (optional Ultralytics dependency)
+```
 
 ### 2. Device Camera App
 
 Runs on an ESP32-CAM or similar camera node. Current status: **placeholder only**.
 
-Planned responsibilities:
-
-- capture frames
-- send frames to the PC
-- expose simple camera status/settings
-
-The device app should not train AI and should not run heavy segmentation/detection models in the first design.
+The device app should capture/send frames only. Training and dataset labeling stay on the PC.
 
 ## Quick local test
 
@@ -113,19 +114,34 @@ Smoke-test endpoint:
 http://127.0.0.1:8000/api/smoke/status
 ```
 
-Optional backend smoke test:
+Generated captures remain under:
 
-```bat
-scripts\test_backend_smoke_windows.bat
+```text
+datasets/captures/<session_id>/images/
+datasets/captures/<session_id>/metadata/
+datasets/captures/<session_id>/labels/
 ```
 
-Generated captures are written to `datasets/captures/<session_id>/images/` with matching records in `metadata/`. The `datasets/` and `outputs/` folders are ignored by Git and should not be uploaded with patches.
+After at least two non-bad captures have been reviewed and their labels saved, **Dataset Review → Build training dataset** creates:
 
-For optional real YOLO training, first prepare a labeled dataset YAML under `datasets/`, then install the extra dependency from the backend folder:
+```text
+datasets/yolo/images/train/
+datasets/yolo/images/val/
+datasets/yolo/labels/train/
+datasets/yolo/labels/val/
+datasets/yolo/data.yaml
+datasets/yolo/manifest.json
+```
+
+`datasets/` and `outputs/` are generated runtime content and must not be included in patch ZIPs.
+
+For optional real YOLO training, install the extra dependency from the backend folder:
 
 ```powershell
 pip install -r requirements-training.txt
 ```
+
+Then use the default `yolo/data.yaml` on **Train / Export**, or another labeled YOLO YAML path inside `datasets/`.
 
 ## Current version history
 
@@ -138,6 +154,7 @@ pip install -r requirements-training.txt
 0_1_0 = first test-ready mock PC Studio version
 0_1_1 = camera frame receiver, live preview, and simulation mode
 0_1_2 = persistent receiver/simulation capture and optional labeled-dataset training
+0_1_3 = manual bounding-box labeling and managed YOLO dataset generation
 ```
 
 ## Important docs
@@ -178,16 +195,8 @@ AI_Traffic_Light/
   scripts/                  Helper scripts
 ```
 
-## Next milestone after 0_1_2
+## Next functional milestone
 
-The next functional milestone should be:
+After 0_1_3 is accepted, the next useful milestone can connect a pretrained detector to captured/live frames, then feed detections into zone-based counting and the existing traffic-light simulation. That later inference work must remain separate from real public-road control.
 
-```text
-webcam/video input
-→ pretrained YOLO detection
-→ zone-based counting
-→ rule-based traffic-light simulation
-→ GUI visualization
-```
-
-Before that, test both receiver and simulation capture and confirm that image/metadata pairs remain after restarting the backend. Do not treat 0_1_2 as passed until the owner confirms every acceptance check.
+Do not treat 0_1_3 as passed until the project owner confirms every required acceptance check.

@@ -1,4 +1,5 @@
-version: 0_1_2
-status: persistent dataset capture and optional YOLO training candidate
-previous_version: 0_1_1
-notes: PC Studio saves the latest receiver or simulation frame as an image with paired JSON metadata. An optional background Ultralytics YOLO runner can train from a separately labeled YOLO dataset. This candidate is not passed until the owner completes the acceptance checklist. AI inference, automatic labeling, and physical traffic control are not implemented.
+version: 0_1_3
+status: manual labeling and managed YOLO dataset candidate
+previous_version: 0_1_2
+passed_baseline: 0_1_1
+notes: PC Studio can browse persistent captures, save manual bounding-box labels using the shared six-class schema, and build a managed datasets/yolo/data.yaml train/validation dataset for the existing optional Ultralytics runner. Bad-quality captures are excluded and label changes make the managed dataset stale until rebuilt. This candidate is not passed until the owner completes the acceptance checklist. Automatic labeling, live AI inference, model export, and physical traffic control are not implemented.

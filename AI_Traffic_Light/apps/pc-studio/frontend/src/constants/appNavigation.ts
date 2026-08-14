@@ -1,6 +1,6 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
 
-export const APP_VERSION_LABEL = "0_1_2 dataset capture";
+export const APP_VERSION_LABEL = "0_1_3 manual labeling";
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: {
@@ -48,15 +48,15 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dataset_review: {
     id: "dataset_review",
     label: "Dataset Review",
-    shortLabel: "Review",
-    description: "Inspect saved frames, labels, prediction errors, and dataset balance.",
-    status: "template",
+    shortLabel: "Review / Label",
+    description: "Browse saved frames, draw manual bounding boxes, and build the managed YOLO training dataset.",
+    status: "test-ready",
   },
   train_export: {
     id: "train_export",
     label: "Train / Export",
     shortLabel: "Train",
-    description: "Run optional local YOLO training from a labeled dataset; export remains planned.",
+    description: "Run optional local YOLO training from the managed or another labeled dataset; export remains planned.",
     status: "test-ready",
   },
   model_registry: {

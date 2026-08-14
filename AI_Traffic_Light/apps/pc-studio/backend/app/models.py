@@ -48,6 +48,19 @@ class CaptureFrameRequest(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
+class DatasetLabelBoxRequest(BaseModel):
+    class_id: int = Field(ge=0, le=1000)
+    box_xyxy: tuple[float, float, float, float]
+
+
+class SaveCaptureLabelsRequest(BaseModel):
+    labels: list[DatasetLabelBoxRequest] = Field(default_factory=list, max_length=500)
+
+
+class BuildTrainingDatasetRequest(BaseModel):
+    validation_fraction: float = Field(default=0.2, gt=0, lt=0.5)
+
+
 class TrainingStartRequest(BaseModel):
     dataset_yaml: str = Field(default="yolo/data.yaml", min_length=5, max_length=240)
     base_model: str = Field(default="yolo26n.pt", min_length=4, max_length=80)

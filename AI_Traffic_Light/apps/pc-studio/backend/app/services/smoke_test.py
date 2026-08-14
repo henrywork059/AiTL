@@ -6,17 +6,12 @@ from app.services.mock_data import get_mock_detection_frame, get_mock_zones
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import get_mock_traffic_state
 
-APP_VERSION = "0_1_2"
-APP_MODE = "dataset_capture_test_ready"
+APP_VERSION = "0_1_3"
+APP_MODE = "manual_labeling_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
-    """Return a compact self-check payload for local testing.
-
-    This intentionally avoids touching cameras, AI models, training jobs, or
-    physical traffic-control devices. It only verifies that the mock backend
-    shape is usable by the PC Studio frontend.
-    """
+    """Return a compact self-check payload for local testing."""
     frame = get_mock_detection_frame()
     zones = get_mock_zones()
     traffic = get_mock_traffic_state()
@@ -33,13 +28,25 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "dataset.capture",
             "label": "Persistent dataset capture",
             "status": "pass",
-            "detail": "The latest receiver or simulation PNG can be saved with paired JSON metadata.",
+            "detail": "The latest receiver or simulation frame can be saved with paired JSON metadata.",
+        },
+        {
+            "id": "dataset.labeling",
+            "label": "Manual dataset labeling",
+            "status": "pass",
+            "detail": "Captured frames can be reviewed and saved with manual bounding boxes using the shared six-class schema.",
+        },
+        {
+            "id": "dataset.yolo_build",
+            "label": "Managed YOLO dataset builder",
+            "status": "pass",
+            "detail": "Reviewed non-bad captures can be converted into distinct train/validation images and YOLO label files.",
         },
         {
             "id": "training.runner",
-            "label": "Optional labeled-dataset training runner",
+            "label": "Optional YOLO training runner",
             "status": "pass",
-            "detail": "A validated background YOLO runner is available after installing the optional dependency.",
+            "detail": "The existing background runner can use yolo/data.yaml after the managed dataset is built and Ultralytics is installed.",
         },
         {
             "id": "backend.health",
@@ -75,7 +82,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_2 is a supervised prototype and cannot control real traffic lights.",
+            "detail": "0_1_3 is a supervised prototype and cannot control real public traffic lights.",
         },
     ]
 
@@ -90,11 +97,14 @@ def get_smoke_status() -> dict[str, Any]:
             "camera_frame_upload_test",
             "camera_simulation_test",
             "persistent_frame_capture_test",
+            "manual_bounding_box_labeling_test",
+            "managed_yolo_dataset_build_test",
             "optional_labeled_yolo_training_test",
             "GUI function-list review",
         ],
         "not_ready_for": [
             "device_camera_firmware",
+            "automatic_labeling",
             "YOLO inference",
             "model_export",
             "physical_traffic_light_control",
@@ -114,6 +124,10 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/camera/simulation/stop",
             "/api/dataset/status",
             "/api/dataset/captures",
+            "/api/dataset/captures/{capture_id}/image",
+            "/api/dataset/captures/{capture_id}/labels",
+            "/api/dataset/training-dataset/status",
+            "/api/dataset/training-dataset",
             "/api/training/status",
             "/api/training/start",
         ],

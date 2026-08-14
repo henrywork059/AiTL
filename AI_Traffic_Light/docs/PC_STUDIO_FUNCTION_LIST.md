@@ -1,78 +1,81 @@
-# PC Studio Function List — Draft 0_0_4
+# PC Studio Function List — 0_1_3 status
 
-This document defines the first planned function list for the PC Studio App.
-
-Status meanings:
+This document tracks the main PC Studio functions. Status meanings:
 
 ```text
-placeholder = shown in GUI/API but not implemented
-planned     = should be implemented after layout confirmation
-later       = useful later, not needed for the first working prototype
+implemented = working candidate behavior that still requires owner acceptance
+mock        = simulated/test data behavior only
+placeholder = shown in GUI/API but not functionally implemented
+later       = outside the current patch scope
 ```
 
 ## Camera functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Add camera source | placeholder | Webcam, ESP-CAM MJPEG, IP camera, video file. |
-| Preview stream | placeholder | Show source before AI runs. |
-| Start/stop stream | planned | Needed before real detection. |
-| Measure FPS/latency | planned | Needed for debugging. |
-| Save source settings | later | Useful after app flow is stable. |
+| Receive uploaded JPEG/PNG frame | implemented | PC-side receiver for future ESP32/Raspberry Pi senders. |
+| Preview latest frame | implemented | Automatically refreshes receiver/simulation image. |
+| Start/stop simulation | implemented | Moving PNG source for hardware-free testing. |
+| Real webcam source | later | Not part of 0_1_3. |
+| Measure FPS/latency | later | Useful after real inference. |
 
 ## Inference functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Load model | placeholder | First real model should be pretrained YOLO-style detection. |
-| Run detection on frame | placeholder | Return DetectionFrame JSON. |
-| Filter by confidence/class | placeholder | Should be frontend and backend compatible. |
-| Coordinate conversion | planned | Critical for correct boxes after resizing. |
-| Instance segmentation | later | Add after detection + zones work. |
+| Load model | placeholder | Future pretrained/exported detector. |
+| Run detection on frame | placeholder | Live YOLO inference is not implemented in 0_1_3. |
+| Filter by confidence/class | mock | Existing mock Live AI view only. |
+| Instance segmentation | later | After detection + zones. |
 
 ## Zone functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Draw polygon zone | placeholder | Waiting, crossing, vehicle queue, ignore. |
-| Edit polygon points | planned | Needed for real scenes. |
-| Save/load zone file | planned | Should use shared schema. |
-| Count detections inside zones | placeholder | Core traffic logic input. |
+| Draw/edit polygon zone | placeholder | Waiting, crossing, vehicle queue, ignore. |
+| Save/load zone file | placeholder | Should use shared schema. |
+| Count detections inside zones | placeholder | Requires real inference first. |
 
 ## Traffic logic functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Compute pedestrian count | placeholder | Waiting and crossing separately. |
-| Compute vehicle queue count | placeholder | Cars, buses, trucks, motorcycles, bicycles. |
-| Decide signal phase | placeholder | Rule-based first. |
-| Explain decision | planned | Required for demo and debugging. |
-| Safety override | later | Simulation only; no real public traffic control. |
+| Show pedestrian/vehicle counts | mock | Uses mock detection data. |
+| Decide signal phase | mock | Rule-based simulation only. |
+| Explain decision | mock | Existing traffic simulation explanation. |
+| Physical traffic signal control | later | Explicitly not implemented; public-road control is outside project scope. |
 
 ## Dataset functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Capture raw frame | placeholder | Saves image. |
-| Save detection JSON | placeholder | Saves model output with frame. |
-| Mark useful/bad | planned | Helps dataset cleanup. |
-| Review captured frames | placeholder | Page exists; functionality later. |
-| Export dataset | later | Needed before training. |
+| Capture raw frame | implemented | Saves receiver or simulation image. |
+| Save capture metadata | implemented | Paired JSON with source, resolution, quality, note, paths. |
+| Mark useful/bad at capture time | implemented | Bad captures are excluded from managed training builds. |
+| Browse captured frames | implemented | Dataset Review lists persisted capture metadata. |
+| Draw manual bounding boxes | implemented | Uses shared class IDs 0–5. |
+| Save/remove manual labels | implemented | Persists separate label JSON files. |
+| Save reviewed zero-box negative | implemented | Distinct from an unreviewed frame. |
+| Automatic/pseudo labeling | later | Not implemented in 0_1_3. |
+| Build YOLO train/val dataset | implemented | Deterministic split under `datasets/yolo/`. |
+| Detect stale managed dataset | implemented | Label changes require rebuild before default managed training. |
 
 ## Training/export functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Select dataset | placeholder | Layout only. |
-| Select base model | placeholder | Layout only. |
-| Start training | later | Not part of first demo. |
-| Compare model versions | later | After at least two models exist. |
-| Export runtime package | later | For later device/PC deployment package. |
+| Select dataset YAML | implemented | Must remain inside `datasets/`. |
+| Select base model/config | implemented | Prototype limits validated by backend. |
+| Start local Ultralytics training | implemented | Optional dependency; one background job at a time. |
+| Use in-app managed labels | implemented | Default `yolo/data.yaml` is generated from Dataset Review. |
+| Compare model versions | later | After multiple trained models exist. |
+| Export runtime package | later | Not implemented in 0_1_3. |
 
 ## Debugging functions
 
 | Function | Status | Notes |
 |---|---|---|
-| Show recent logs | placeholder | Frontend page and backend endpoint exist. |
-| Show error codes | planned | Use docs/ERROR_CODES.md as source. |
-| Copy debug report | later | Helpful when asking AI agents for help. |
+| Show recent logs | mock | Existing debug API/UI. |
+| Stable backend error codes | implemented | See `docs/ERROR_CODES.md`. |
+| Request IDs in JSON APIs | implemented | Standard success/error envelopes. |
+| Copy debug report | later | Useful future convenience. |

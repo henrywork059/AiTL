@@ -1,14 +1,18 @@
 import type {
   BackendHealth,
   CameraStatus,
+  CaptureLabelDocument,
   CaptureQualityTag,
   CaptureRecord,
+  DatasetCaptureList,
+  DatasetLabelBox,
   DatasetStatus,
   DetectionFrame,
   RecentLog,
   SmokeStatus,
   TrafficState,
   TrainingConfig,
+  TrainingDatasetStatus,
   TrainingStatus,
   Zone,
 } from "./types";
@@ -31,17 +35,17 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_2",
+  version: "0_1_3",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback mock data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_2",
+  version: "0_1_3",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test", "mock_gui_review"],
-  not_ready_for: ["real_camera_capture", "YOLO inference", "unlabeled_dataset_training", "physical_traffic_light_control"],
+  not_ready_for: ["automatic_labeling", "YOLO inference", "physical_traffic_light_control"],
   checks: [
     {
       id: "frontend.fallback",
@@ -86,6 +90,27 @@ const fallbackDatasetStatus: DatasetStatus = {
   status: "backend_offline",
   dataset_path: "datasets/captures",
   last_capture: null,
+};
+
+const fallbackCaptureList: DatasetCaptureList = {
+  captures: [],
+  total: 0,
+  classes: [],
+};
+
+const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
+  ready: false,
+  stale: false,
+  dataset_yaml: "yolo/data.yaml",
+  labeled_frame_count: 0,
+  eligible_frame_count: 0,
+  excluded_bad_count: 0,
+  label_box_count: 0,
+  train_count: 0,
+  val_count: 0,
+  generated_at_ms: null,
+  classes: [],
+  message: "Backend is offline, so the managed training dataset cannot be checked.",
 };
 
 const fallbackTrainingStatus: TrainingStatus = {
@@ -170,6 +195,48 @@ export async function captureLatestFrame(input: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  });
+}
+
+export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> {
+  return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList);
+}
+
+export function captureImageUrl(captureId: string): string {
+  return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`;
+}
+
+export async function fetchCaptureLabels(captureId: string): Promise<CaptureLabelDocument> {
+  return requestJsonStrict<CaptureLabelDocument>(
+    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`,
+  );
+}
+
+export async function saveCaptureLabels(captureId: string, labels: DatasetLabelBox[]): Promise<CaptureLabelDocument> {
+  return requestJsonStrict<CaptureLabelDocument>(
+    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        labels: labels.map((label) => ({ class_id: label.class_id, box_xyxy: label.box_xyxy })),
+      }),
+    },
+  );
+}
+
+export async function fetchTrainingDatasetStatus(): Promise<TrainingDatasetStatus> {
+  return requestJson<TrainingDatasetStatus>(
+    `${API_BASE}/api/dataset/training-dataset/status`,
+    fallbackTrainingDatasetStatus,
+  );
+}
+
+export async function buildTrainingDataset(validationFraction = 0.2): Promise<TrainingDatasetStatus> {
+  return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ validation_fraction: validationFraction }),
   });
 }
 
