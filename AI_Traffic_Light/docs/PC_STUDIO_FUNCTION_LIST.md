@@ -4,10 +4,8 @@
 - receive JPEG/PNG frame
 - simulation mode
 - latest-frame preview
-- vertical pedestrian-crossing synthetic scene with top-to-bottom pedestrian motion
-- horizontal synthetic vehicle motion with varied scene population
-- light / normal / busy simulation density presets
-- pause / resume synthetic scene for inspection and capture
+- Light / Normal / Busy synthetic density
+- pause/resume synthetic scene
 
 ## Dataset
 - capture latest frame with metadata
@@ -15,7 +13,10 @@
 - managed YOLO dataset build
 
 ## Training
-- optional local Ultralytics training
+- local Ultralytics training
+- per-epoch validation fitness / mAP convergence history
+- live training convergence plot
+- configurable patience-based automatic early stopping
 
 ## Inference / Models
 - discover local trained models
@@ -26,4 +27,18 @@
 - adjust backend confidence down to 1%
 - toggle overlay boxes and labels
 - filter visible classes
-- contain long model IDs/paths inside the Live AI model panel
+
+## Zones / Traffic simulation
+- edit and persist polygon zones
+- reset simulation-aligned reference zones
+- count live detection centres inside zones
+- generate simulation-only phase recommendations with reasons and frame/zone audit data
+
+## System
+- persist runtime confidence, camera-status polling, training patience, and log level
+- inspect real recent backend logs with request IDs/error codes when available
+
+## Still later
+- automatic labeling
+- model export/runtime package
+- physical public-road traffic control

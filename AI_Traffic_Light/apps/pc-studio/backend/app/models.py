@@ -22,9 +22,13 @@ class DetectionFrame(BaseModel):
 
 class Zone(BaseModel):
     id: str
-    type: str
+    type: Literal["pedestrian_waiting", "crossing", "vehicle_queue", "ignore"]
     label: str
     polygon: list[list[int]]
+
+
+class SaveZonesRequest(BaseModel):
+    zones: list[Zone] = Field(default_factory=list, max_length=32)
 
 
 class TrafficState(BaseModel):
@@ -41,6 +45,10 @@ class TrafficState(BaseModel):
     decision: str
     decision_reason: str
     extension_seconds: int = 0
+    data_source: str | None = None
+    evaluated_frame_number: int | None = None
+    zone_counts: dict[str, int] = Field(default_factory=dict)
+    prototype_only: bool = True
 
 
 class CameraSimulationSettingsRequest(BaseModel):
@@ -74,6 +82,14 @@ class TrainingStartRequest(BaseModel):
     image_size: int = Field(default=640, ge=64, le=2048)
     batch: int = Field(default=8, ge=1, le=128)
     device: str = Field(default="cpu", min_length=1, max_length=32)
+    patience: int = Field(default=5, ge=1, le=100)
+
+
+class RuntimeSettingsRequest(BaseModel):
+    default_confidence: float = Field(default=0.10, ge=0.01, le=1.0)
+    live_poll_interval_ms: int = Field(default=500, ge=250, le=5000)
+    training_patience: int = Field(default=5, ge=1, le=100)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
 class InferenceLoadRequest(BaseModel):

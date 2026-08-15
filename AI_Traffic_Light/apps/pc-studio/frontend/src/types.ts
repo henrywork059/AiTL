@@ -16,11 +16,22 @@ export type DetectionFrame = {
   detections: Detection[];
 };
 
+export type ZoneType = "pedestrian_waiting" | "crossing" | "vehicle_queue" | "ignore";
+
 export type Zone = {
   id: string;
-  type: "pedestrian_waiting" | "crossing" | "vehicle_queue" | "ignore" | string;
+  type: ZoneType;
   label: string;
   polygon: [number, number][];
+};
+
+export type ZoneStatus = {
+  zones: Zone[];
+  editable: boolean;
+  status: string;
+  source: "defaults" | "persisted" | string;
+  reference_resolution: { width: number; height: number };
+  config_path: string;
 };
 
 export type TrafficState = {
@@ -36,6 +47,10 @@ export type TrafficState = {
   decision: string;
   decision_reason: string;
   extension_seconds: number;
+  data_source?: string;
+  evaluated_frame_number?: number | null;
+  zone_counts?: Record<string, number>;
+  prototype_only?: boolean;
 };
 
 export type BackendHealth = {
@@ -77,6 +92,7 @@ export type RecentLog = {
   code: string;
   scope?: string;
   message: string;
+  request_id?: string | null;
 };
 
 export type ApiConnectionState = {
@@ -195,6 +211,27 @@ export type TrainingConfig = {
   image_size: number;
   batch: number;
   device: string;
+  patience: number;
+};
+
+export type TrainingMetricPoint = {
+  epoch: number;
+  fitness: number | null;
+  best_fitness: number | null;
+  map50_95: number | null;
+  map50: number | null;
+  train_loss: number | null;
+  val_loss: number | null;
+};
+
+export type EarlyStoppingState = {
+  enabled: boolean;
+  patience: number;
+  epochs_without_improvement: number;
+  best_epoch: number | null;
+  best_fitness: number | null;
+  converged: boolean;
+  stopped_early: boolean;
 };
 
 export type TrainingStatus = {
@@ -202,7 +239,7 @@ export type TrainingStatus = {
   backend: string;
   active_run_id: string | null;
   progress: number;
-  status: "idle" | "running" | "completed" | "failed" | string;
+  status: "idle" | "running" | "completed" | "early_stopped" | "failed" | string;
   message: string;
   started_at_ms: number | null;
   finished_at_ms: number | null;
@@ -213,6 +250,16 @@ export type TrainingStatus = {
   dataset_root: string;
   requires_labeled_dataset: boolean;
   install_command: string;
+  history: TrainingMetricPoint[];
+  completed_epochs: number;
+  early_stopping: EarlyStoppingState;
+};
+
+export type RuntimeSettings = {
+  default_confidence: number;
+  live_poll_interval_ms: number;
+  training_patience: number;
+  log_level: "DEBUG" | "INFO" | "WARNING" | "ERROR";
 };
 
 export type InferenceModelSummary = {

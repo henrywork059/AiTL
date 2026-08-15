@@ -1,5 +1,21 @@
 # Changelog
 
+## 0_1_7 — Training convergence, early stopping, and real prototype tools
+
+- Added per-epoch YOLO training metric history for validation fitness, mAP50-95, mAP50, and available train/validation loss totals.
+- Added a live Training Convergence SVG plot and best-epoch/plateau counters to the Train / Export page.
+- Added configurable `patience` to training requests and forwards it to Ultralytics so training automatically stops when validation fitness stops improving for the patience window.
+- Marks convergence-stopped runs as `early_stopped` while retaining the best checkpoint path.
+- Replaced the Zone Editor template with a working polygon editor backed by validated persistent `config/zones.json` storage and reset-to-reference controls; runtime zone/settings JSON is locally ignored from Git.
+- Replaced mock Traffic Logic with live detection-centre zone counting and an auditable simulation-only phase recommendation.
+- Replaced the Settings template with persistent runtime settings for default confidence, Live AI camera-status polling, training patience, and backend log level.
+- Replaced mock logs with a bounded real backend log buffer that exposes timestamp, level, module scope, request ID, and stable error code when present.
+- Updated Dashboard and navigation/version labels so Project stage is derived from the current backend/smoke version instead of stale hard-coded `0_1_5` text.
+- Marked all main PC Studio pages as test-ready prototype surfaces in the page/function registries.
+- Added focused training, zone/traffic, settings/logging, and API contract tests plus V017 documentation and acceptance checks.
+- Reuses existing `ATL-ZONE-*`, `ATL-SETTINGS-*`, training, inference, and request-validation error codes; no new stable error-code range was required.
+- Automatic labeling, model export, device firmware completion, and physical public-road traffic control remain disabled.
+
 ## 0_1_6 — Live layout and controllable simulation scene
 
 - Fixed Live AI model/run/path text containment so long trained-model identifiers wrap inside the right-hand model panel instead of overflowing its border.

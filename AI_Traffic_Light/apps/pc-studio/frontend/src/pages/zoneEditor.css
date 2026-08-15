@@ -1,0 +1,93 @@
+.zone-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+}
+
+.zone-editor-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  background: #05070a;
+  cursor: crosshair;
+}
+
+.zone-sidewalk { fill: #444c56; }
+.zone-road { fill: #24292f; }
+.zone-crossing-bed { fill: #30363d; }
+.zone-zebra { fill: rgba(255, 255, 255, 0.82); }
+
+.zone-editor-polygon {
+  fill: rgba(88, 166, 255, 0.08);
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.zone-editor-pedestrian_waiting { stroke: #a371f7; }
+.zone-editor-crossing { stroke: #58a6ff; }
+.zone-editor-vehicle_queue { stroke: #f0883e; }
+.zone-editor-ignore { stroke: #8b949e; }
+.zone-editor-selected { fill: rgba(126, 231, 135, 0.14); stroke-width: 6; }
+
+.zone-draft-line {
+  fill: none;
+  stroke: #7ee787;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.zone-draft-point {
+  fill: #7ee787;
+  stroke: #05070a;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.zone-editor-form {
+  display: grid;
+  gap: 10px;
+}
+
+.zone-editor-form label {
+  display: grid;
+  gap: 6px;
+  color: #c9d1d9;
+}
+
+.zone-editor-form input,
+.zone-editor-form select {
+  width: 100%;
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 9px 10px;
+}
+
+.zone-selector-list {
+  display: grid;
+  gap: 8px;
+}
+
+.zone-selector-list button {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.zone-selector-list button span {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.zone-selector-list button.active {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.12);
+}
+
+@media (max-width: 1300px) {
+  .zone-editor-layout { grid-template-columns: 1fr; }
+}

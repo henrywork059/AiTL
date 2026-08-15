@@ -1,11 +1,19 @@
-# PC Studio backend (V015)
+# PC Studio Backend — V017 candidate
 
-The backend provides:
+FastAPI backend for the local AI Traffic Light prototype.
 
-- camera frame receiver and simulation mode;
-- persistent dataset capture;
-- manual labeling and managed YOLO dataset generation;
-- optional Ultralytics training;
-- trained-model discovery, selection, default selection, deletion, and live inference.
+## Working prototype functions
 
-Local trained models remain runtime files under `outputs/training/` and are not committed into the repository.
+- receive device JPEG/PNG frames and run the controllable synthetic camera;
+- persist captures, manual labels, and managed YOLO datasets;
+- run optional local Ultralytics training with per-epoch convergence history and automatic early stopping;
+- discover, load, default, and delete trained `best.pt` models;
+- run trained-model inference on receiver/simulation frames;
+- persist editable traffic zones and count live detection centres inside them;
+- return simulation-only traffic recommendations from current zone counts;
+- persist runtime confidence/polling/patience/log-level settings;
+- expose recent real backend log records with request IDs where available.
+
+Local datasets, runtime settings/zones, and trained models remain runtime data. Trained models stay under `outputs/training/` and are not part of code patches.
+
+This backend is for prototype, simulation, classroom, and supervised testing only. It is not a public-road traffic controller.

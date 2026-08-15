@@ -2,19 +2,23 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.mock_data import get_mock_detection_frame, get_mock_zones
+from app.services.mock_data import get_mock_detection_frame
+from app.services.runtime_settings import runtime_settings_service
 from app.services.template_state import get_template_summary
-from app.services.traffic_logic import get_mock_traffic_state
+from app.services.traffic_logic import evaluate_traffic_state
+from app.services.zones import zone_service
 
-APP_VERSION = "0_1_6"
-APP_MODE = "simulation_scene_controls_test_ready"
+APP_VERSION = "0_1_7"
+APP_MODE = "convergence_and_prototype_tools_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
     """Return a compact self-check payload for local testing."""
-    frame = get_mock_detection_frame()
-    zones = get_mock_zones()
-    traffic = get_mock_traffic_state()
+    fixture_frame = get_mock_detection_frame()
+    zone_status = zone_service.status()
+    zones = zone_status["zones"]
+    traffic = evaluate_traffic_state(fixture_frame, zones, source="smoke_fixture")
+    settings = runtime_settings_service.get()
     template = get_template_summary()
 
     checks = [
@@ -28,7 +32,19 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "camera.simulation_scene",
             "label": "Controllable synthetic traffic scene",
             "status": "pass",
-            "detail": "Simulation supports a vertical pedestrian crossing, horizontal vehicle motion, density presets, and pause/resume inspection.",
+            "detail": "Simulation supports vertical pedestrian motion, horizontal vehicle motion, density presets, and pause/resume inspection.",
+        },
+        {
+            "id": "zones.persistent",
+            "label": "Persistent zone editor",
+            "status": "pass" if zones else "warn",
+            "detail": f"{len(zones)} editable zones are available from {zone_status['source']} configuration.",
+        },
+        {
+            "id": "traffic.live_logic",
+            "label": "Zone-aware traffic simulation logic",
+            "status": "pass" if traffic.get("phase") else "warn",
+            "detail": "The decision engine maps detection centres into persisted zones and returns a simulation-only phase recommendation.",
         },
         {
             "id": "dataset.capture",
@@ -40,7 +56,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "dataset.labeling",
             "label": "Manual dataset labeling",
             "status": "pass",
-            "detail": "Captured frames can be reviewed and saved with manual bounding boxes using the shared six-class schema.",
+            "detail": "Captured frames can be reviewed and saved with manual bounding boxes using the shared class schema.",
         },
         {
             "id": "dataset.yolo_build",
@@ -49,52 +65,46 @@ def get_smoke_status() -> dict[str, Any]:
             "detail": "Reviewed non-bad captures can be converted into distinct train/validation images and YOLO label files.",
         },
         {
-            "id": "training.runner",
-            "label": "Optional YOLO training runner",
+            "id": "training.convergence",
+            "label": "Training convergence and early stopping",
             "status": "pass",
-            "detail": "The existing background runner can use yolo/data.yaml after the managed dataset is built and Ultralytics is installed.",
+            "detail": "Training status exposes per-epoch fitness history and uses Ultralytics patience-based automatic early stopping.",
         },
         {
             "id": "inference.trained_model",
             "label": "Trained-model live inference",
             "status": "pass",
-            "detail": "The inference API can discover trained models, choose or auto-load a default model, delete model runs, and detect on receiver or simulation frames with lower diagnostic confidence thresholds.",
+            "detail": "The inference API supports selected/default models, live receiver/simulation detections, and visibility controls.",
+        },
+        {
+            "id": "settings.runtime",
+            "label": "Persistent runtime settings",
+            "status": "pass",
+            "detail": f"Viewer polling, confidence, training patience, and log level are active; current log level is {settings['log_level']}.",
+        },
+        {
+            "id": "logs.recent",
+            "label": "Real recent backend logs",
+            "status": "pass",
+            "detail": "The log page reads a bounded in-memory buffer populated by actual backend logging records.",
         },
         {
             "id": "backend.health",
             "label": "Backend health endpoint",
             "status": "pass",
-            "detail": "FastAPI app is running and can return JSON responses.",
+            "detail": "FastAPI app is running and returns standard API envelopes and request IDs.",
         },
         {
-            "id": "mock.frame",
-            "label": "Mock detection frame",
-            "status": "pass" if frame.get("detections") else "warn",
-            "detail": f"{len(frame.get('detections', []))} mock detections available.",
-        },
-        {
-            "id": "mock.zones",
-            "label": "Mock traffic zones",
-            "status": "pass" if zones else "warn",
-            "detail": f"{len(zones)} mock zones available.",
-        },
-        {
-            "id": "traffic.state",
-            "label": "Mock traffic state",
-            "status": "pass" if traffic.get("phase") else "warn",
-            "detail": f"Current mock phase: {traffic.get('phase')}.",
-        },
-        {
-            "id": "template.pages",
+            "id": "pages.registry",
             "label": "PC Studio page registry",
-            "status": "pass" if template.get("pages") else "warn",
-            "detail": f"{len(template.get('pages', []))} pages registered.",
+            "status": "pass" if all(page.get("status") == "test-ready" for page in template.get("pages", [])) else "warn",
+            "detail": f"{len(template.get('pages', []))} PC Studio pages are registered as test-ready prototype surfaces.",
         },
         {
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_6 is a supervised prototype and cannot control real public traffic lights.",
+            "detail": "0_1_7 remains a supervised prototype and cannot control real public traffic infrastructure.",
         },
     ]
 
@@ -104,24 +114,24 @@ def get_smoke_status() -> dict[str, Any]:
         "ready_for": [
             "frontend_layout_test",
             "backend_startup_test",
-            "mock_api_test",
-            "frontend_backend_connection_test",
             "camera_frame_upload_test",
             "camera_simulation_test",
-            "camera_simulation_density_test",
-            "camera_simulation_pause_resume_test",
+            "persistent_zone_editing_test",
+            "live_zone_counting_test",
+            "simulation_decision_test",
             "persistent_frame_capture_test",
             "manual_bounding_box_labeling_test",
             "managed_yolo_dataset_build_test",
-            "optional_labeled_yolo_training_test",
+            "training_convergence_plot_test",
+            "automatic_early_stopping_test",
             "trained_model_live_inference_test",
             "trained_model_selection_and_delete_test",
-            "GUI function-list review",
+            "runtime_settings_test",
+            "recent_backend_logs_test",
         ],
         "not_ready_for": [
-            "device_camera_firmware",
+            "device_camera_firmware_completion",
             "automatic_labeling",
-            "live_zone_counting",
             "model_export",
             "physical_traffic_light_control",
         ],
@@ -129,9 +139,10 @@ def get_smoke_status() -> dict[str, Any]:
         "endpoints": [
             "/health",
             "/api/smoke/status",
-            "/api/mock/frame",
-            "/api/mock/zones",
             "/api/traffic/state",
+            "/api/zones/active",
+            "/api/zones/reset",
+            "/api/settings/runtime",
             "/api/logs/recent",
             "/api/template/pc-studio",
             "/api/camera/status",
@@ -158,8 +169,8 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/models/{model_id}",
         ],
         "summary": {
-            "mock_frame_id": frame.get("frame_id"),
-            "mock_detection_count": len(frame.get("detections", [])),
+            "mock_frame_id": fixture_frame.get("frame_id"),
+            "mock_detection_count": len(fixture_frame.get("detections", [])),
             "mock_zone_count": len(zones),
             "mock_traffic_phase": traffic.get("phase"),
         },

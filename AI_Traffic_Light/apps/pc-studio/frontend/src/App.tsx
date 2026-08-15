@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  fallbackRuntimeSettings,
+  fetchActiveZones,
   fetchHealth,
   fetchCameraStatus,
   fetchMockFrame,
-  fetchMockZones,
   fetchRecentLogs,
+  fetchRuntimeSettings,
   fetchSmokeStatus,
   fetchTrafficState,
   setCameraSimulation,
@@ -29,6 +31,7 @@ import type {
   CameraStatus,
   DetectionFrame,
   RecentLog,
+  RuntimeSettings,
   SmokeStatus,
   TrafficState,
   Zone,
@@ -42,7 +45,8 @@ export default function App() {
   const [smokeStatus, setSmokeStatus] = useState<SmokeStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.1);
+  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(fallbackRuntimeSettings);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(fallbackRuntimeSettings.default_confidence);
   const [liveDetectionCount, setLiveDetectionCount] = useState(0);
   const [activePage, setActivePage] = useState<AppPageId>("dashboard");
   const [apiState, setApiState] = useState<ApiConnectionState>({
@@ -51,36 +55,43 @@ export default function App() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [changingCameraMode, setChangingCameraMode] = useState(false);
+  const runtimeInitialized = useRef(false);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
     setApiState({ status: "checking", message: "Refreshing API data..." });
 
     try {
-      const [nextHealth, nextSmoke, nextFrame, nextZones, nextTraffic, nextLogs, nextCameraStatus] = await Promise.all([
+      const [nextHealth, nextSmoke, nextFrame, nextZoneStatus, nextTraffic, nextLogs, nextCameraStatus, nextSettings] = await Promise.all([
         fetchHealth(),
         fetchSmokeStatus(),
         fetchMockFrame(),
-        fetchMockZones(),
+        fetchActiveZones(),
         fetchTrafficState(),
         fetchRecentLogs(),
         fetchCameraStatus(),
+        fetchRuntimeSettings(),
       ]);
 
       setHealth(nextHealth);
       setSmokeStatus(nextSmoke);
       setFrame(nextFrame);
-      setZones(nextZones);
+      setZones(nextZoneStatus.zones);
       setTraffic(nextTraffic);
       setRecentLogs(nextLogs);
       setCameraStatus(nextCameraStatus);
+      setRuntimeSettings(nextSettings);
+      if (!runtimeInitialized.current) {
+        runtimeInitialized.current = true;
+        setConfidenceThreshold(nextSettings.default_confidence);
+      }
 
       const fallbackMode = nextHealth.mode.includes("fallback") || nextSmoke.mode.includes("fallback");
       setApiState({
         status: fallbackMode ? "fallback" : "connected",
         message: fallbackMode
-          ? "Backend not connected. Frontend fallback mock data is active."
-          : "Backend connected. API data loaded successfully.",
+          ? "Backend not connected. Frontend fallback data is active."
+          : "Backend connected. Live prototype APIs loaded successfully.",
         checkedAt: new Date().toLocaleTimeString(),
       });
     } catch (error) {
@@ -103,7 +114,22 @@ export default function App() {
 
     const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
     void refreshCamera();
-    const timerId = window.setInterval(() => void refreshCamera(), activePage === "live_ai" ? 500 : 1000);
+    const timerId = window.setInterval(
+      () => void refreshCamera(),
+      activePage === "live_ai" ? runtimeSettings.live_poll_interval_ms : 1000,
+    );
+    return () => window.clearInterval(timerId);
+  }, [activePage, runtimeSettings.live_poll_interval_ms]);
+
+  useEffect(() => {
+    if (activePage !== "live_ai") return undefined;
+    const refreshLiveContext = async () => {
+      const [nextTraffic, nextZones] = await Promise.all([fetchTrafficState(), fetchActiveZones()]);
+      setTraffic(nextTraffic);
+      setZones(nextZones.zones);
+    };
+    void refreshLiveContext();
+    const timerId = window.setInterval(() => void refreshLiveContext(), 1000);
     return () => window.clearInterval(timerId);
   }, [activePage]);
 
@@ -114,6 +140,11 @@ export default function App() {
     } finally {
       setChangingCameraMode(false);
     }
+  }, []);
+
+  const applyRuntimeSettings = useCallback((settings: RuntimeSettings) => {
+    setRuntimeSettings(settings);
+    setConfidenceThreshold(settings.default_confidence);
   }, []);
 
   const filteredDetections = useMemo(() => {
@@ -160,7 +191,7 @@ export default function App() {
       case "zone_editor":
         return <ZoneEditorPage />;
       case "traffic_logic":
-        return <TrafficLogicPage traffic={traffic} smokeStatus={smokeStatus} />;
+        return <TrafficLogicPage />;
       case "dataset_capture":
         return <DatasetCapturePage cameraStatus={cameraStatus} />;
       case "dataset_review":
@@ -170,9 +201,9 @@ export default function App() {
       case "model_registry":
         return <ModelRegistryPage />;
       case "settings":
-        return <SettingsPage apiState={apiState} health={health} />;
+        return <SettingsPage apiState={apiState} health={health} settings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
       case "logs":
-        return <LogsPage logs={recentLogs} apiState={apiState} onRefresh={refreshAll} refreshing={refreshing} />;
+        return <LogsPage logs={recentLogs} apiState={apiState} onLogsChange={setRecentLogs} />;
       default:
         return <DashboardPage health={health} smokeStatus={smokeStatus} apiState={apiState} onRefresh={refreshAll} refreshing={refreshing} />;
     }

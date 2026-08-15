@@ -1,0 +1,95 @@
+.convergence-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.convergence-chart-wrap {
+  min-width: 0;
+}
+
+.convergence-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  background: #0d1117;
+}
+
+.convergence-grid-line {
+  stroke: rgba(139, 148, 158, 0.18);
+  stroke-width: 1;
+}
+
+.convergence-axis {
+  stroke: #8b949e;
+  stroke-width: 1.5;
+}
+
+.convergence-axis-label {
+  fill: #8b949e;
+  font-size: 11px;
+}
+
+.convergence-line {
+  fill: none;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.convergence-fitness,
+.legend-fitness {
+  stroke: #58a6ff;
+  background: #58a6ff;
+}
+
+.convergence-map,
+.legend-map {
+  stroke: #a371f7;
+  background: #a371f7;
+}
+
+.convergence-dot {
+  stroke-width: 1;
+}
+
+.convergence-fitness-dot {
+  fill: #58a6ff;
+  stroke: #0d1117;
+}
+
+.convergence-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.convergence-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend-line {
+  width: 24px;
+  height: 3px;
+  border-radius: 99px;
+}
+
+.convergence-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #30363d;
+  border-radius: 12px;
+  color: #8b949e;
+  text-align: center;
+  padding: 20px;
+}
+
+.convergence-metrics strong {
+  font-size: 20px;
+}

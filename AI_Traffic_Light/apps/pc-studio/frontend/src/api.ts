@@ -11,6 +11,7 @@ import type {
   InferenceStatus,
   ModelRegistryStatus,
   RecentLog,
+  RuntimeSettings,
   SimulationDensity,
   SmokeStatus,
   TrafficState,
@@ -18,6 +19,7 @@ import type {
   TrainingDatasetStatus,
   TrainingStatus,
   Zone,
+  ZoneStatus,
 } from "./types";
 import { mockFrame, mockTrafficState, mockZones } from "./mockData";
 import { requestJson, requestJsonStrict } from "./lib/apiClient";
@@ -38,26 +40,26 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_6",
+  version: "0_1_7",
   mode: "frontend_fallback",
   safe_mode: true,
-  message: "Backend is not connected. Frontend is using local fallback mock data.",
+  message: "Backend is not connected. Frontend is using local fallback data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_6",
+  version: "0_1_7",
   mode: "frontend_fallback",
-  ready_for: ["frontend_layout_test", "mock_gui_review"],
-  not_ready_for: ["automatic_labeling", "model export", "physical_traffic_light_control"],
+  ready_for: ["frontend_layout_test"],
+  not_ready_for: ["backend_features", "physical_traffic_light_control"],
   checks: [
     {
       id: "frontend.fallback",
       label: "Frontend fallback data",
       status: "warn",
-      detail: "The backend did not respond, but the GUI can still render mock data.",
+      detail: "The backend did not respond, so only local fallback data is available.",
     },
   ],
-  endpoints: ["/health", "/api/smoke/status", "/api/mock/frame", "/api/mock/zones", "/api/traffic/state"],
+  endpoints: ["/health", "/api/smoke/status", "/api/zones/active", "/api/traffic/state"],
   summary: {
     mock_frame_id: mockFrame.frame_id,
     mock_detection_count: mockFrame.detections.length,
@@ -118,6 +120,35 @@ const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
   message: "Backend is offline, so the managed training dataset cannot be checked.",
 };
 
+const fallbackTrainingStatus: TrainingStatus = {
+  training_available: false,
+  backend: "ultralytics_yolo_optional",
+  active_run_id: null,
+  progress: 0,
+  status: "backend_offline",
+  message: "Backend is offline, so training availability cannot be checked.",
+  started_at_ms: null,
+  finished_at_ms: null,
+  config: null,
+  output_path: null,
+  best_model_path: null,
+  error: null,
+  dataset_root: "datasets",
+  requires_labeled_dataset: true,
+  install_command: "pip install -r requirements-training.txt",
+  history: [],
+  completed_epochs: 0,
+  early_stopping: {
+    enabled: true,
+    patience: 5,
+    epochs_without_improvement: 0,
+    best_epoch: null,
+    best_fitness: null,
+    converged: false,
+    stopped_early: false,
+  },
+};
+
 const fallbackInferenceStatus: InferenceStatus = {
   model_loaded: false,
   active_model_id: null,
@@ -145,22 +176,20 @@ const fallbackModelRegistryStatus: ModelRegistryStatus = {
   models: [],
 };
 
-const fallbackTrainingStatus: TrainingStatus = {
-  training_available: false,
-  backend: "ultralytics_yolo_optional",
-  active_run_id: null,
-  progress: 0,
+export const fallbackRuntimeSettings: RuntimeSettings = {
+  default_confidence: 0.10,
+  live_poll_interval_ms: 500,
+  training_patience: 5,
+  log_level: "INFO",
+};
+
+const fallbackZoneStatus: ZoneStatus = {
+  zones: mockZones,
+  editable: false,
   status: "backend_offline",
-  message: "Backend is offline, so training availability cannot be checked.",
-  started_at_ms: null,
-  finished_at_ms: null,
-  config: null,
-  output_path: null,
-  best_model_path: null,
-  error: null,
-  dataset_root: "datasets",
-  requires_labeled_dataset: true,
-  install_command: "pip install -r requirements-training.txt",
+  source: "fallback",
+  reference_resolution: { width: 1280, height: 720 },
+  config_path: "config/zones.json",
 };
 
 export async function fetchHealth(): Promise<BackendHealth> {
@@ -176,18 +205,32 @@ export async function fetchMockFrame(): Promise<DetectionFrame> {
 }
 
 export async function fetchMockZones(): Promise<Zone[]> {
-  const data = await requestJson<ZonesResponse>(`${API_BASE}/api/mock/zones`, {
-    zones: mockZones,
-  });
+  const data = await requestJson<ZonesResponse>(`${API_BASE}/api/mock/zones`, { zones: mockZones });
   return data.zones;
+}
+
+export async function fetchActiveZones(): Promise<ZoneStatus> {
+  return requestJson<ZoneStatus>(`${API_BASE}/api/zones/active`, fallbackZoneStatus);
+}
+
+export async function saveActiveZones(zones: Zone[]): Promise<ZoneStatus> {
+  return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/active`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ zones }),
+  });
+}
+
+export async function resetActiveZones(): Promise<ZoneStatus> {
+  return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/reset`, { method: "POST" });
 }
 
 export async function fetchTrafficState(): Promise<TrafficState> {
   return requestJson<TrafficState>(`${API_BASE}/api/traffic/state`, mockTrafficState);
 }
 
-export async function fetchRecentLogs(): Promise<RecentLog[]> {
-  const data = await requestJson<LogsResponse>(`${API_BASE}/api/logs/recent`, {
+export async function fetchRecentLogs(limit = 100): Promise<RecentLog[]> {
+  const data = await requestJson<LogsResponse>(`${API_BASE}/api/logs/recent?limit=${limit}`, {
     logs: [
       {
         timestamp: "frontend",
@@ -199,6 +242,18 @@ export async function fetchRecentLogs(): Promise<RecentLog[]> {
     ],
   });
   return data.logs;
+}
+
+export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
+  return requestJson<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, fallbackRuntimeSettings);
+}
+
+export async function saveRuntimeSettings(settings: RuntimeSettings): Promise<RuntimeSettings> {
+  return requestJsonStrict<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
 }
 
 export async function fetchCameraStatus(): Promise<CameraStatus> {

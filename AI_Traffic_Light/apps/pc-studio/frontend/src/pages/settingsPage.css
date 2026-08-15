@@ -1,0 +1,8 @@
+.training-form select {
+  width: 100%;
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 9px 10px;
+}

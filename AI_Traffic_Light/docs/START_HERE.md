@@ -1,51 +1,25 @@
-# Start Here
+# Start Here — Current V017 candidate
 
-## What to build first
+The project has moved beyond the original mock/template skeleton. The current passed baseline remains `0_1_5`; V016 and this V017 patch remain candidates until owner acceptance.
 
-Do **not** start with ESP-CAM, segmentation, or custom model training.
+## Current working path
 
-Start with the PC Studio App in mock mode:
+1. Start the FastAPI PC Studio backend.
+2. Start the React/Vite frontend.
+3. Use receiver or synthetic-camera frames.
+4. Capture and manually label useful frames.
+5. Build the managed YOLO dataset.
+6. Train locally and monitor validation convergence; patience-based early stopping can end a converged run before the maximum epoch count.
+7. Load a trained model in Live AI.
+8. Edit persistent zones and inspect live detection-centre counts in Traffic Logic.
+9. Adjust runtime settings and inspect recent backend logs when troubleshooting.
 
-```text
-1. Open the placeholder GUI.
-2. Check the live-view layout.
-3. Check the traffic light simulator panel.
-4. Check the fake detection counts.
-5. Replace fake data with webcam/video frames.
-6. Add object detection.
-7. Add zone counting.
-```
+## Still outside the current prototype
 
-## First technical milestone
+- automatic labeling;
+- model export/runtime packaging;
+- complete device-camera firmware workflow;
+- production-grade tracking or multi-camera synchronization;
+- direct control of real public-road traffic infrastructure.
 
-The first real working milestone is:
-
-```text
-A PC app that opens a video/webcam, detects pedestrians and vehicles, counts them inside predefined zones, and shows a simulated traffic-light decision.
-```
-
-## Suggested development order
-
-1. Run frontend placeholder.
-2. Run backend mock API.
-3. Connect frontend to backend.
-4. Add video/webcam frame reading.
-5. Add YOLO detection.
-6. Add zone counting.
-7. Add traffic-light decision logic.
-8. Add dataset capture.
-9. Add ESP-CAM MJPEG input.
-10. Add training/export tools.
-
-## Avoid in the initial skeleton stage
-
-- Real traffic-light control.
-- License plate recognition.
-- Disabled-person classification.
-- Emergency vehicle priority.
-- Multi-camera synchronization.
-- Segmentation.
-- Database.
-- Cloud deployment.
-
-These can be later extensions after the core demo works.
+The traffic recommendation pages are for simulation, demonstration, classroom testing, and human-supervised analysis only.

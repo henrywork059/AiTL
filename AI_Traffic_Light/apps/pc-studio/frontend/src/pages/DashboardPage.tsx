@@ -1,6 +1,5 @@
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { MetricStrip } from "../components/MetricStrip";
-import { PlaceholderPanel } from "../components/PlaceholderPanel";
 import type { ApiConnectionState, BackendHealth, SmokeStatus } from "../types";
 
 type Props = {
@@ -20,25 +19,26 @@ function statusClass(status: string) {
 export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refreshing }: Props) {
   const passCount = smokeStatus?.checks.filter((check) => check.status === "pass").length ?? 0;
   const warnCount = smokeStatus?.checks.filter((check) => check.status === "warn").length ?? 0;
+  const version = health?.version ?? smokeStatus?.version ?? "0_1_7";
 
   return (
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: "0_1_5", note: "model management candidate" },
-          { label: "Backend", value: apiState.status, note: health?.version ?? "checking" },
+          { label: "Project stage", value: version, note: "convergence + prototype tools candidate" },
+          { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Real AI", value: "live detection", note: "latest trained best.pt" },
+          { label: "Training", value: "early stop", note: "live convergence history" },
         ]}
       />
 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Local smoke-test status</h2>
+            <h2>Local prototype status</h2>
             <p className="placeholder-copy">{apiState.message}</p>
           </div>
-          <button onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh mock APIs"}</button>
+          <button onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh live APIs"}</button>
         </div>
         <div className="smoke-grid">
           {(smokeStatus?.checks ?? []).map((check) => (
@@ -55,30 +55,21 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
       </section>
 
       <div className="two-column-grid">
-        <PlaceholderPanel
-          title="What 0_1_5 can test"
-          description="This version loads the newest locally trained YOLO best.pt and overlays its detections on receiver or simulation frames."
-          status="test ready"
-          bullets={smokeStatus?.ready_for ?? [
-            "persistent capture and manual labels",
-            "managed YOLO dataset build",
-            "optional local training",
-            "trained-model live camera inference",
-          ]}
-        />
-        <PlaceholderPanel
-          title="What is still disabled"
-          description="The project remains prototype-only. These functions should not be expected to work in 0_1_5."
-          status="not implemented"
-          bullets={smokeStatus?.not_ready_for ?? [
-            "automatic labeling",
-            "zone counts from live detections",
-            "model export",
-            "physical traffic-light control",
-          ]}
-        />
+        <section className="panel">
+          <div className="panel-header"><h2>Working prototype functions</h2><span className="status-pill">test-ready</span></div>
+          <ul className="check-list">
+            {(smokeStatus?.ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
+          </ul>
+        </section>
+        <section className="panel">
+          <div className="panel-header"><h2>Explicit boundaries</h2><span className="status-pill status-planned">not enabled</span></div>
+          <ul className="check-list">
+            {(smokeStatus?.not_ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
+          </ul>
+          <p className="small-note">Zone-aware traffic decisions are simulation-only and remain disconnected from physical traffic infrastructure.</p>
+        </section>
       </div>
-      <FunctionChecklist limit={8} />
+      <FunctionChecklist limit={10} />
     </div>
   );
 }

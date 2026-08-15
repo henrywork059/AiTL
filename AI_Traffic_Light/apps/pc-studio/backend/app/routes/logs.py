@@ -1,39 +1,15 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.core.api_response import ok
-from app.core.logging_config import get_logger
+from app.core.logging_config import get_logger, recent_log_entries
 
 router = APIRouter()
 logger = get_logger(__name__)
 
 
 @router.get("/recent")
-def recent_logs(request: Request) -> dict:
-    """Return placeholder recent logs for the GUI log page."""
-    data = {
-        "logs": [
-            {
-                "timestamp": "mock",
-                "level": "info",
-                "code": "ATL-SMOKE-001",
-                "scope": "startup",
-                "message": "PC Studio 0_1_2 persistent dataset capture version loaded.",
-            },
-            {
-                "timestamp": "mock",
-                "level": "info",
-                "code": "ATL-SMOKE-002",
-                "scope": "safety",
-                "message": "Frame capture is enabled; optional training requires labeled data, while inference and physical traffic control remain disabled.",
-            },
-            {
-                "timestamp": "mock",
-                "level": "info",
-                "code": "ATL-SMOKE-003",
-                "scope": "api",
-                "message": "Use /api/smoke/status for frontend-backend smoke testing.",
-            },
-        ]
-    }
-    logger.info("Log template returned", extra={"request_id": request.state.request_id})
+def recent_logs(request: Request, limit: int = Query(default=100, ge=1, le=200)) -> dict:
+    """Return recent real backend log records from the bounded in-memory buffer."""
+    data = {"logs": recent_log_entries(limit), "limit": limit, "status": "ready"}
+    logger.info("Recent backend logs returned", extra={"request_id": request.state.request_id, "limit": limit})
     return ok(data, request_id=request.state.request_id)

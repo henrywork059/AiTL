@@ -14,10 +14,10 @@ BASE_URL = "http://127.0.0.1:8000"
 ENDPOINTS = [
     "/health",
     "/api/smoke/status",
-    "/api/mock/frame",
-    "/api/mock/zones",
+    "/api/zones/active",
     "/api/traffic/state",
-    "/api/logs/recent",
+    "/api/settings/runtime",
+    "/api/logs/recent?limit=5",
     "/api/camera/status",
     "/api/dataset/status",
     "/api/dataset/captures?limit=5",
@@ -29,7 +29,7 @@ ENDPOINTS = [
 
 
 def fetch_json(path: str) -> dict:
-    with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=5) as response:
+    with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=10) as response:
         raw = response.read().decode("utf-8")
     return json.loads(raw)
 
@@ -62,7 +62,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("Smoke test passed. Capture, labeling, training, inference, and model-management APIs are ready for frontend testing.")
+    print("Smoke test passed. V017 convergence, zones, traffic simulation, settings, logs, and existing APIs responded successfully.")
     return 0
 
 

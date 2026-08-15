@@ -1,85 +1,86 @@
 import type { DetectionFrame, TrafficState, Zone } from "./types";
 
+// Offline/smoke fallback only. Working pages use live backend APIs when connected.
 export const mockFrame: DetectionFrame = {
-  frame_id: "mock_cam_000001",
-  source_id: "mock_camera",
+  frame_id: "fallback_cam_000001",
+  source_id: "fallback_camera",
   image_width: 1280,
   image_height: 720,
   timestamp_ms: 0,
   detections: [
     {
-      id: "det_person_001",
+      id: "fallback_person_waiting",
       class_id: 0,
       class_name: "person",
       confidence: 0.93,
-      box_xyxy: [130, 390, 215, 650],
+      box_xyxy: [585, 70, 645, 165],
     },
     {
-      id: "det_person_002",
+      id: "fallback_person_crossing",
       class_id: 0,
       class_name: "person",
       confidence: 0.88,
-      box_xyxy: [245, 410, 315, 660],
+      box_xyxy: [625, 300, 690, 430],
     },
     {
-      id: "det_car_001",
+      id: "fallback_car_left",
       class_id: 1,
       class_name: "car",
       confidence: 0.91,
-      box_xyxy: [700, 360, 900, 500],
+      box_xyxy: [250, 350, 430, 455],
     },
     {
-      id: "det_bus_001",
+      id: "fallback_bus_right",
       class_id: 2,
       class_name: "bus",
       confidence: 0.84,
-      box_xyxy: [920, 310, 1210, 520],
+      box_xyxy: [860, 430, 1160, 565],
     },
   ],
 };
 
 export const mockZones: Zone[] = [
   {
-    id: "ped_waiting_left",
+    id: "ped_waiting_top",
     type: "pedestrian_waiting",
     label: "Pedestrian Waiting Zone",
-    polygon: [
-      [70, 380],
-      [360, 380],
-      [360, 690],
-      [70, 690],
-    ],
+    polygon: [[500, 0], [780, 0], [780, 178], [500, 178]],
   },
   {
     id: "crossing_main",
     type: "crossing",
     label: "Crossing Zone",
-    polygon: [
-      [360, 360],
-      [680, 360],
-      [680, 690],
-      [360, 690],
-    ],
+    polygon: [[500, 179], [780, 179], [780, 625], [500, 625]],
+  },
+  {
+    id: "vehicle_queue_left",
+    type: "vehicle_queue",
+    label: "Left Vehicle Queue",
+    polygon: [[0, 190], [500, 190], [500, 615], [0, 615]],
   },
   {
     id: "vehicle_queue_right",
     type: "vehicle_queue",
-    label: "Vehicle Queue Zone",
-    polygon: [
-      [680, 300],
-      [1240, 300],
-      [1240, 560],
-      [680, 560],
-    ],
+    label: "Right Vehicle Queue",
+    polygon: [[780, 190], [1279, 190], [1279, 615], [780, 615]],
   },
 ];
 
 export const mockTrafficState: TrafficState = {
-  phase: "vehicle_green",
-  pedestrians_waiting: 2,
-  pedestrians_crossing: 0,
+  phase: "vehicle_yellow",
+  pedestrians_waiting: 1,
+  pedestrians_crossing: 1,
   vehicles_waiting: 2,
-  decision: "prepare_pedestrian_green",
-  decision_reason: "Pedestrians are waiting and vehicle queue is moderate.",
-  extension_seconds: 5,
+  decision: "fallback_only",
+  decision_reason: "Backend is unavailable; this state is only a frontend fallback fixture.",
+  extension_seconds: 0,
+  data_source: "frontend_fallback",
+  evaluated_frame_number: null,
+  zone_counts: {
+    ped_waiting_top: 1,
+    crossing_main: 1,
+    vehicle_queue_left: 1,
+    vehicle_queue_right: 1,
+  },
+  prototype_only: true,
 };

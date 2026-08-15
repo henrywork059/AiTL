@@ -1,72 +1,85 @@
+"""Offline/smoke fallback fixtures.
+
+Working V017 pages use receiver/simulation, persistent zones, trained-model
+inference, and live prototype services. These fixtures remain only for the
+backward-compatible /api/mock endpoints and frontend-offline rendering.
+"""
+
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
 def get_mock_detection_frame() -> dict:
-    """Return stable fake detections for GUI and API testing."""
+    """Return a stable fallback frame aligned to the V016/V017 reference scene."""
     frame = {
-        "frame_id": "mock_cam_000001",
-        "source_id": "mock_camera",
+        "frame_id": "fallback_cam_000001",
+        "source_id": "fallback_camera",
         "image_width": 1280,
         "image_height": 720,
         "timestamp_ms": 0,
         "detections": [
             {
-                "id": "det_person_001",
+                "id": "fallback_person_waiting",
                 "class_id": 0,
                 "class_name": "person",
                 "confidence": 0.93,
-                "box_xyxy": [130, 390, 215, 650],
+                "box_xyxy": [585, 70, 645, 165],
             },
             {
-                "id": "det_person_002",
+                "id": "fallback_person_crossing",
                 "class_id": 0,
                 "class_name": "person",
                 "confidence": 0.88,
-                "box_xyxy": [245, 410, 315, 660],
+                "box_xyxy": [625, 300, 690, 430],
             },
             {
-                "id": "det_car_001",
+                "id": "fallback_car_left",
                 "class_id": 1,
                 "class_name": "car",
                 "confidence": 0.91,
-                "box_xyxy": [700, 360, 900, 500],
+                "box_xyxy": [250, 350, 430, 455],
             },
             {
-                "id": "det_bus_001",
+                "id": "fallback_bus_right",
                 "class_id": 2,
                 "class_name": "bus",
                 "confidence": 0.84,
-                "box_xyxy": [920, 310, 1210, 520],
+                "box_xyxy": [860, 430, 1160, 565],
             },
         ],
     }
-    logger.debug("Generated mock detection frame", extra={"frame_id": frame["frame_id"]})
+    logger.debug("Generated fallback detection frame", extra={"frame_id": frame["frame_id"]})
     return frame
 
 
 def get_mock_zones() -> list[dict]:
-    """Return stable fake traffic zones for GUI and API testing."""
+    """Return fallback zones aligned with the persistent V017 defaults."""
     zones = [
         {
-            "id": "ped_waiting_left",
+            "id": "ped_waiting_top",
             "type": "pedestrian_waiting",
             "label": "Pedestrian Waiting Zone",
-            "polygon": [[70, 380], [360, 380], [360, 690], [70, 690]],
+            "polygon": [[500, 0], [780, 0], [780, 178], [500, 178]],
         },
         {
             "id": "crossing_main",
             "type": "crossing",
             "label": "Crossing Zone",
-            "polygon": [[360, 360], [680, 360], [680, 690], [360, 690]],
+            "polygon": [[500, 179], [780, 179], [780, 625], [500, 625]],
+        },
+        {
+            "id": "vehicle_queue_left",
+            "type": "vehicle_queue",
+            "label": "Left Vehicle Queue",
+            "polygon": [[0, 190], [500, 190], [500, 615], [0, 615]],
         },
         {
             "id": "vehicle_queue_right",
             "type": "vehicle_queue",
-            "label": "Vehicle Queue Zone",
-            "polygon": [[680, 300], [1240, 300], [1240, 560], [680, 560]],
+            "label": "Right Vehicle Queue",
+            "polygon": [[780, 190], [1279, 190], [1279, 615], [780, 615]],
         },
     ]
-    logger.debug("Generated mock zones", extra={"zone_count": len(zones)})
+    logger.debug("Generated fallback zones", extra={"zone_count": len(zones)})
     return zones

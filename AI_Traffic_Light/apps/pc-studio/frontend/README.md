@@ -1,51 +1,31 @@
-# PC Studio Frontend
+# PC Studio Frontend — V017 candidate
 
-React/Vite GUI for the AI Traffic Light PC Studio App.
+React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
-## Current state — 0_1_2
+## Current working surfaces
 
-This frontend is **test-ready for persistent frame capture with an optional labeled-dataset training panel**.
+- Dashboard with current project/version and live smoke-test state;
+- Live AI receiver/simulation preview with trained-model overlays and visibility controls;
+- Camera receiver plus density/pause-controlled simulation;
+- persistent polygon Zone Editor;
+- live zone-count and simulation-only Traffic Logic view;
+- dataset capture, manual review/labeling, and managed YOLO dataset build;
+- local training controls with a live convergence plot and early-stop patience;
+- Model Registry for load/default/delete actions;
+- persistent runtime Settings;
+- recent real backend Logs & Errors.
 
-It can:
-
-```text
-- start locally with Vite
-- connect to the FastAPI backend mock endpoints
-- fall back to local mock data if the backend is offline
-- display the mock Live AI view
-- show mock detections, zones, logs, and traffic state
-- preview and save the current receiver or simulation frame
-- show persistent image/metadata counts and saved paths
-- configure and monitor an optional background YOLO training run
-```
-
-It cannot yet:
-
-```text
-- open a real webcam
-- read ESP-CAM stream
-- run YOLO inference
-- label bounding boxes
-- train directly from unlabeled captures
-- export models
-```
+When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
 
 ## Run
 
-```bash
+```powershell
 npm ci
+npm run typecheck
+npm run build
 npm run dev
 ```
 
-Open:
+Open `http://localhost:5173/`.
 
-```text
-http://localhost:5173
-```
-
-## Optional build check
-
-```bash
-npm run typecheck
-npm run build
-```
+The frontend is a supervised prototype UI and is not connected to physical public-road traffic infrastructure.

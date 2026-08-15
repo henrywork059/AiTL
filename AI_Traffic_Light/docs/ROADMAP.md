@@ -1,111 +1,12 @@
-# Roadmap
 
-## 0_0_0 — Initial skeleton
+## 0_1_7 — Convergence monitoring and working prototype tools
 
-- Project folder structure.
-- Placeholder PC frontend.
-- Placeholder PC backend.
-- Shared schemas.
-- ESP-CAM firmware placeholder.
-- Documentation.
+Status: candidate, awaiting owner acceptance.
 
-## 0_0_1 — Documentation/version cleanup
-
-- Correct old “Version 1 / 0.1.0” wording.
-- Confirm versioning scheme as `0_0_x`.
-- Clarify that the current project is a starter skeleton.
-- Keep functional code unchanged except version labels/placeholders.
-
-## 0_0_2 — PC mock GUI cleanup
-
-Planned next small patch:
-
-- Make mock API/frontend wording cleaner.
-- Add stronger placeholder states.
-- Add clearer frontend/backend start instructions.
-- Prepare GUI components for future detection data.
-
-## 0_1_0 — PC mock GUI connected to mock API
-
-- Frontend fetches real mock API data.
-- Live View page shows mock detections and zones from backend.
-- Traffic-light simulator panel updates from backend.
-- Confidence slider affects frontend filtering.
-
-## 0_2_0 — Video/webcam input
-
-- Open webcam/video file on PC.
-- Show frames in GUI.
-- Save frames to dataset folder.
-
-## 0_3_0 — Pretrained object detection
-
-- Add YOLO detection backend.
-- Detect person/car/bus/truck/motorcycle/bicycle.
-- Return detection JSON.
-- Draw boxes in GUI.
-
-## 0_4_0 — Zone counting and signal logic
-
-- Add zone configuration.
-- Count pedestrians and vehicles by zone.
-- Add simple traffic-light state machine.
-
-## 0_5_0 — ESP-CAM input
-
-- Receive MJPEG stream from ESP-CAM.
-- Add camera source manager.
-- Compare ESP-CAM quality/FPS with webcam.
-
-## 0_6_0 — Dataset capture and review
-
-- Save frame + metadata + detection JSON.
-- Review captured data.
-- Mark sample as useful/bad.
-
-## 0_7_0 — Training placeholder
-
-- Add training configuration UI.
-- Prepare dataset export format.
-- Add model version registry.
-
-## Future extensions
-
-- Instance segmentation.
-- Physical traffic light LED model.
-- Multi-camera support.
-- Object tracking.
-- Slow-crossing safety extension.
-
-## 0_1_2 — Persistent capture candidate
-
-Status: implemented, awaiting owner acceptance.
-
-- Save the latest device or simulation image with paired JSON metadata.
-- Keep capture counts across backend restarts.
-- Add an optional real YOLO runner for separately labeled datasets.
-- Keep automatic labeling, live inference, model export, and physical traffic control out of scope.
-
-## 0_1_0 — Test-ready mock PC Studio
-
-Status: added.
-
-Scope:
-
-```text
-- frontend/backend local startup
-- mock API connection
-- smoke-test endpoint
-- mock Live AI view
-- mock logs/status display
-```
-
-Still excluded:
-
-```text
-- real camera capture
-- ESP-CAM stream
-- YOLO inference
-- training
-- physical traffic-light control
-```
+- Add live per-epoch training convergence history and a frontend convergence plot.
+- Use Ultralytics patience-based automatic early stopping and report stopped-early runs explicitly.
+- Replace the main Zone Editor placeholder with persistent polygon editing.
+- Replace mock Traffic Logic with live trained-detection zone counting and simulation-only recommendations.
+- Replace template Settings with persistent runtime settings and mock Logs with recent real backend records.
+- Keep legacy `/api/mock` data only as backward-compatible smoke/offline fixtures, not as the connected-page implementation.
+- Keep automatic labeling, model export, finished device firmware, and physical public-road control outside this patch.

@@ -1,5 +1,5 @@
-version: 0_1_6
-status: live layout and controllable simulation candidate
-previous_version: 0_1_5
+version: 0_1_7
+status: training convergence, early stopping, and real prototype tools candidate
+previous_version: 0_1_6
 passed_baseline: 0_1_5
-notes: V016 fixes long trained-model text overflowing the Live AI side panel, improves the synthetic camera scene with a vertical pedestrian crossing, top-to-bottom pedestrian motion, horizontal vehicle motion, and a more varied population, and adds simulation density plus pause/resume controls. All V015 capture, labeling, managed YOLO training, model management, and live inference functions remain in scope. Live detections still do not directly control physical traffic infrastructure. This candidate is not passed until the owner completes the V016 acceptance checklist.
+notes: V017 adds per-epoch training convergence history and a live frontend plot, forwards configurable patience to Ultralytics for automatic early stopping, replaces the Zone Editor/Traffic Logic/Settings/Logs mock-template surfaces with working prototype implementations, and removes stale hard-coded project-stage text from the Dashboard. Persistent zones drive live detection-centre counting and simulation-only traffic recommendations; runtime settings persist confidence, camera-status polling, training patience, and log level; logs show real backend records. Model export, automatic labeling, device firmware completion, and physical public-road traffic control remain outside this candidate. V017 is not passed until the owner completes the V017 acceptance checklist.

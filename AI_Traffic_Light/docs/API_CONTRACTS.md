@@ -1,6 +1,6 @@
 # API Contracts (current highlights)
 
-All API responses continue to use the standard envelope:
+All JSON API responses continue to use the standard envelope:
 
 ```json
 {
@@ -15,28 +15,49 @@ Binary image responses include `X-Request-ID`.
 ## Camera
 
 - `GET /api/camera/status`
-  - returns receiver/simulation state and latest-frame metadata.
-  - V016 also returns `simulation_density` (`light`, `normal`, or `busy`) and `simulation_paused`.
+  - returns receiver/simulation state, latest-frame metadata, simulation density, and pause state.
 - `GET /api/camera/frame`
   - returns the latest device or synthetic PNG/JPEG frame.
   - includes `X-Request-ID`, `X-Camera-Source`, and `X-Frame-Number` headers.
 - `POST /api/camera/simulation/start`
 - `POST /api/camera/simulation/stop`
 - `POST /api/camera/simulation/settings`
-  - body fields are optional: `{ "density": "busy", "paused": true }`.
-  - density may be changed before or during simulation.
-  - pause/resume requires simulation mode to be active.
-  - invalid request values use the existing stable API/camera error codes.
+  - optional body fields: `{ "density": "busy", "paused": true }`.
+
+## Zones
+
+- `GET /api/zones/active`
+  - returns the validated active zone set, reference resolution, persistence source, and config path.
+- `PUT /api/zones/active`
+  - body: `{ "zones": [{ "id": "...", "type": "crossing", "label": "...", "polygon": [[x,y], ...] }] }`.
+  - replaces the complete active zone set after validation and persists it to `config/zones.json`.
+  - uses existing `ATL-ZONE-001` / `ATL-ZONE-003` errors for invalid or unsavable configurations.
+- `POST /api/zones/reset`
+  - restores and persists the simulation-aligned reference zones.
+
+## Traffic simulation logic
+
+- `GET /api/traffic/state`
+  - obtains the current receiver/simulation frame and loaded model when available.
+  - runs/reuses trained-model inference, scales detection-box centres into the zone reference frame, and returns zone counts.
+  - returns a simulation-only phase recommendation, reason, source, evaluated frame number, and `prototype_only: true`.
+  - this endpoint is not connected to physical traffic infrastructure.
+
+## Training
+
+- `GET /api/training/status`
+  - returns run progress plus `history`, `completed_epochs`, and `early_stopping`.
+  - each history point can include `epoch`, `fitness`, `best_fitness`, `map50_95`, `map50`, `train_loss`, and `val_loss`.
+- `POST /api/training/start`
+  - body fields: `dataset_yaml`, `base_model`, `epochs`, `image_size`, `batch`, `device`, and `patience`.
+  - `patience` is 1-100 and is passed to Ultralytics automatic early stopping.
+  - a run that finishes before the requested maximum epochs is reported as `early_stopped` and retains its best checkpoint metadata.
 
 ## Inference
 
 - `GET /api/inference/status`
-  - returns backend availability, active/default/latest model info, confidence limits, and discovered models.
 - `POST /api/inference/load`
-  - body: `{ "model_id": "train_..." }`
-  - if `model_id` is omitted or null, the backend loads the default model or newest model.
 - `POST /api/inference/load-latest`
-  - backward-compatible latest-model load.
 - `POST /api/inference/unload`
 - `GET /api/inference/detections?confidence=0.01..1.0`
 - `GET /api/inference/frame?source_id=...&frame_number=...`
@@ -44,8 +65,19 @@ Binary image responses include `X-Request-ID`.
 ## Models
 
 - `GET /api/models`
-  - returns discovered local trained models and default/active model IDs.
 - `POST /api/models/default`
-  - body: `{ "model_id": "train_..." }`
 - `DELETE /api/models/{model_id}`
-  - deletes the whole local training run directory.
+
+## Runtime settings
+
+- `GET /api/settings/runtime`
+- `PUT /api/settings/runtime`
+  - body: `{ "default_confidence": 0.1, "live_poll_interval_ms": 500, "training_patience": 5, "log_level": "INFO" }`.
+  - settings are persisted to `config/runtime_settings.json`.
+  - the backend log level is applied immediately; frontend confidence and camera-status polling are applied by PC Studio when settings are loaded/saved.
+
+## Logs
+
+- `GET /api/logs/recent?limit=1..200`
+  - returns actual recent backend log records from a bounded in-memory handler.
+  - entries include timestamp, level, code, scope, message, and request ID when present.

@@ -247,7 +247,7 @@ export function LiveAiPage({
 
   const modeLabel = hasCameraFrame
     ? inferenceStatus?.model_loaded ? "trained model live" : "camera / model idle"
-    : "mock fallback";
+    : "fallback scene";
 
   function toggleClass(className: string) {
     setEnabledClasses((current) => current.includes(className)
@@ -264,7 +264,7 @@ export function LiveAiPage({
             <p className="placeholder-copy">
               {hasCameraFrame
                 ? "Current receiver/simulation frame with trained YOLO detections overlaid in original image coordinates."
-                : "No camera frame is available, so the original mock scene remains visible as a fallback."}
+                : "No camera frame is available, so the local fallback scene remains visible."}
             </p>
           </div>
           <div className="button-row">
@@ -344,13 +344,13 @@ export function LiveAiPage({
         />
         {traffic && <TrafficLight traffic={traffic} />}
         {traffic && <StatusPanel traffic={traffic} />}
-        <p className="small-note">Traffic-light decision cards remain mock simulation state in 0_1_5; live detections do not control physical signals.</p>
+        <p className="small-note">Traffic decision cards now use zone-aware simulation state in 0_1_7; they remain disconnected from physical traffic signals.</p>
         <ZonePanel zones={zones} />
       </aside>
 
       <section className="panel bottom-panel full-span">
         <div className="panel-header">
-          <h2>{hasCameraFrame ? "Live trained-model detections" : "Mock detection result table"}</h2>
+          <h2>{hasCameraFrame ? "Live trained-model detections" : "Fallback detection result table"}</h2>
           <span>{displayedDetections.length} visible</span>
         </div>
         <DetectionTable detections={displayedDetections} />

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { fetchTrainingDatasetStatus, fetchTrainingStatus, startTraining } from "../api";
+import { fetchRuntimeSettings, fetchTrainingDatasetStatus, fetchTrainingStatus, startTraining } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
+import { TrainingConvergenceChart } from "../components/TrainingConvergenceChart";
 import type { TrainingConfig, TrainingDatasetStatus, TrainingStatus } from "../types";
 
 const DEFAULT_CONFIG: TrainingConfig = {
@@ -11,6 +12,7 @@ const DEFAULT_CONFIG: TrainingConfig = {
   image_size: 640,
   batch: 8,
   device: "cpu",
+  patience: 5,
 };
 
 export function TrainExportPage() {
@@ -30,9 +32,16 @@ export function TrainExportPage() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    void fetchRuntimeSettings().then((settings) => {
+      if (!cancelled) setConfig((current) => ({ ...current, patience: settings.training_patience }));
+    });
     void refreshStatus();
-    const timerId = window.setInterval(() => void refreshStatus(), 1500);
-    return () => window.clearInterval(timerId);
+    const timerId = window.setInterval(() => void refreshStatus(), 1200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timerId);
+    };
   }, []);
 
   async function launchTraining() {
@@ -50,6 +59,7 @@ export function TrainExportPage() {
   const running = status?.status === "running";
   const usesManagedDataset = config.dataset_yaml.trim() === "yolo/data.yaml";
   const managedDatasetBlocked = usesManagedDataset && !managedDataset?.ready;
+  const early = status?.early_stopping ?? null;
 
   return (
     <div className="page-stack">
@@ -58,7 +68,7 @@ export function TrainExportPage() {
           <div className="panel-header">
             <div>
               <h2>YOLO training configuration</h2>
-              <p className="placeholder-copy">Runs a real local Ultralytics job only with a current labeled YOLO dataset.</p>
+              <p className="placeholder-copy">Runs local Ultralytics training with validation convergence monitoring and automatic early stopping.</p>
             </div>
             <span className={`status-pill ${status?.training_available ? "" : "status-planned"}`}>
               {status?.training_available ? "runner available" : "optional dependency missing"}
@@ -74,8 +84,11 @@ export function TrainExportPage() {
             <label>Device
               <input value={config.device} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, device: event.target.value })} />
             </label>
-            <label>Epochs
+            <label>Maximum epochs
               <input type="number" min={1} max={300} value={config.epochs} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, epochs: Number(event.target.value) })} />
+            </label>
+            <label>Early-stop patience
+              <input type="number" min={1} max={100} value={config.patience} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, patience: Number(event.target.value) })} />
             </label>
             <label>Image size
               <input type="number" min={64} max={2048} value={config.image_size} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, image_size: Number(event.target.value) })} />
@@ -84,6 +97,7 @@ export function TrainExportPage() {
               <input type="number" min={1} max={128} value={config.batch} onChange={(event: ChangeEvent<HTMLInputElement>) => setConfig({ ...config, batch: Number(event.target.value) })} />
             </label>
           </div>
+          <p className="small-note">Patience is the number of validation epochs allowed without a better fitness score before Ultralytics automatically stops the run.</p>
           {usesManagedDataset && (
             <div className="camera-status-list training-status-list">
               <div><span>Managed labels</span><strong>{managedDataset?.eligible_frame_count ?? 0} eligible frames</strong></div>
@@ -95,7 +109,7 @@ export function TrainExportPage() {
             onClick={() => void launchTraining()}
             disabled={starting || running || !status?.training_available || managedDatasetBlocked}
           >
-            {running ? "Training running..." : starting ? "Starting..." : "Start real training"}
+            {running ? "Training running..." : starting ? "Starting..." : "Start training with early stopping"}
           </button>
           {!status?.training_available && (
             <code className="endpoint-code">cd apps\pc-studio\backend<br />pip install -r requirements-training.txt</code>
@@ -112,14 +126,23 @@ export function TrainExportPage() {
           <p className="placeholder-copy">{status?.message ?? "Checking backend training availability..."}</p>
           <div className="camera-status-list training-status-list">
             <div><span>Progress</span><strong>{status?.progress ?? 0}%</strong></div>
+            <div><span>Epochs finished</span><strong>{status?.completed_epochs ?? 0} / {status?.config?.epochs ?? config.epochs}</strong></div>
             <div><span>Run ID</span><strong>{status?.active_run_id ?? "none"}</strong></div>
+            <div><span>Best epoch</span><strong>{early?.best_epoch ?? "n/a"}</strong></div>
+            <div><span>Plateau counter</span><strong>{early ? `${early.epochs_without_improvement} / ${early.patience}` : "n/a"}</strong></div>
             <div><span>Output</span><strong>{status?.output_path ?? "none"}</strong></div>
             <div><span>Best model</span><strong>{status?.best_model_path ?? "not produced"}</strong></div>
           </div>
-          <p className="small-note">Manual labels saved in Dataset Review can be built into the default <code>yolo/data.yaml</code>. Custom labeled YOLO YAML paths inside <code>datasets/</code> remain supported.</p>
+          <p className="small-note">A stopped-early run still keeps the best checkpoint produced by Ultralytics. Model export remains a later feature.</p>
           {status?.error && <p className="error-message">{status.error}</p>}
         </aside>
       </div>
+
+      <TrainingConvergenceChart
+        history={status?.history ?? []}
+        earlyStopping={early}
+        requestedEpochs={status?.config?.epochs ?? config.epochs}
+      />
       <FunctionChecklist area="Training" />
     </div>
   );

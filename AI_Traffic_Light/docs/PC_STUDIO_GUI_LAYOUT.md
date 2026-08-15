@@ -1,80 +1,38 @@
-# PC Studio GUI Layout — Draft 0_0_4
+# PC Studio GUI Layout — V017 candidate
 
-This document describes the planned layout of the PC Studio App.
+The PC Studio keeps the established sidebar + page-content layout. V017 converts the remaining main mock/template pages into working prototype surfaces without restructuring the application.
 
 ## Global layout
 
 ```text
-┌─────────────────────┬────────────────────────────────────────────┐
-│ Sidebar navigation  │ Page header                                 │
-│                     ├────────────────────────────────────────────┤
-│ Operate             │ Main page content                           │
-│ - Dashboard         │                                            │
-│ - Live AI           │                                            │
-│ - Cameras           │                                            │
-│                     │                                            │
-│ Traffic setup       │                                            │
-│ - Zones             │                                            │
-│ - Logic             │                                            │
-│                     │                                            │
-│ Data & model        │                                            │
-│ - Capture           │                                            │
-│ - Review            │                                            │
-│ - Train             │                                            │
-│ - Models            │                                            │
-│                     │                                            │
-│ System              │                                            │
-│ - Settings          │                                            │
-│ - Logs              │                                            │
-└─────────────────────┴────────────────────────────────────────────┘
+Operate
+- Dashboard          current version and smoke status
+- Live AI            camera/simulation frame + trained-model detections
+- Cameras            receiver + controllable synthetic scene
+
+Traffic setup
+- Zones              persistent polygon editor on a 1280 x 720 reference
+- Logic              live detection-centre counts + simulation recommendation
+
+Data & model
+- Capture            persistent frame capture
+- Review / Label     manual bounding boxes + managed YOLO build
+- Train              local training + convergence plot + early stopping
+- Models             model registry/load/default/delete
+
+System
+- Settings           persistent runtime settings
+- Logs               recent real backend log buffer
 ```
 
-## Live AI page layout
+## Train page
 
-```text
-┌──────────────────────────────────────┬──────────────────────────┐
-│ Camera / detection canvas            │ Signal simulator          │
-│ - frame preview                      │ Traffic state metrics     │
-│ - boxes                              │ Controls                  │
-│ - zones                              │ Zone list                 │
-├──────────────────────────────────────┴──────────────────────────┤
-│ Detection result table                                           │
-└──────────────────────────────────────────────────────────────────┘
-```
+The training form and current-run summary remain at the top. A full-width **Training convergence** panel below them plots per-epoch validation fitness and mAP50-95 and shows best epoch plus the no-improvement/patience counter.
 
-## Dataset pages
+## Zone / traffic pages
 
-Dataset Capture and Dataset Review are separate on purpose:
+The Zone Editor saves polygons to local runtime configuration. Traffic Logic scales current trained-model detection centres into the same reference coordinate system and generates simulation-only recommendations from pedestrian waiting/crossing and vehicle queue counts.
 
-```text
-Dataset Capture = collect data quickly while viewing camera/model output.
-Dataset Review  = inspect, filter, and prepare saved data for training.
-```
+## Safety boundary
 
-They can be merged later if they feel too small.
-
-## Train / Export page
-
-Training and export are together in 0_0_4 because training is not implemented yet. Later, they may be split into:
-
-```text
-Train
-Evaluate
-Export
-```
-
-## Logs page
-
-The Logs & Errors page should eventually show:
-
-```text
-- timestamp
-- scope/module
-- error code
-- message
-- request ID
-- related page/function
-- suggested fix
-```
-
-This is important because the project will be developed with small modules and frequent patches.
+No GUI surface sends commands to physical traffic lights. Traffic decisions remain supervised prototype/simulation output only.

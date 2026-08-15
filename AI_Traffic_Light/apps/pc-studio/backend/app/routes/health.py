@@ -15,10 +15,13 @@ def health(request: Request) -> dict:
         {
             "status": "ok",
             "app": "pc-studio-backend",
-            "version": "0_1_6",
-            "mode": "simulation_scene_controls_test_ready",
+            "version": "0_1_7",
+            "mode": "convergence_and_prototype_tools_test_ready",
             "safe_mode": True,
-            "message": "Backend is ready for capture, manual labeling, managed YOLO training, trained-model live inference, and controllable synthetic simulation testing.",
+            "message": (
+                "Backend is ready for camera/simulation, persistent zones, live-detection simulation decisions, "
+                "capture/label/train/model workflows, convergence monitoring, early stopping, runtime settings, and logs."
+            ),
         },
         request_id=request.state.request_id,
     )
