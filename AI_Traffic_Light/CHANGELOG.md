@@ -9,6 +9,11 @@
 - Added saved-zone overlays to real Live AI camera frames with reference-to-frame coordinate scaling and a Show zones visibility toggle.
 - Added a compact simulation-only traffic signal overlay at the top-right of the Live AI canvas.
 - Updated version/status surfaces to `0_2_0` and promoted owner-confirmed V017 / `0_1_7` to the passed baseline.
+- Added maintenance hardening while keeping V020 as the unaccepted candidate: backend release surfaces now read validated root `VERSION` metadata instead of duplicating release strings, and frontend Dashboard/navigation/fallback surfaces now reuse one checked project-version constant.
+- Expanded repository checks to validate required release fields, candidate/baseline state, patch/changelog presence, backend version-source use, and current frontend version surfaces.
+- Expanded the live backend smoke script to require request IDs and verify health/smoke/template versions match root `VERSION`.
+- Added a patch-ZIP validator for `AI_Traffic_Light/` path enforcement, forbidden runtime/generated content, path traversal, and ZIP integrity.
+- Reworked AI-agent/developer instructions around the current architecture, candidate acceptance gate, runtime-data preservation, evidence reporting, and changed-files-only packaging; added a concise AI-agent checklist.
 - Preserved V017 convergence monitoring, patience-based early stopping, persistent settings/logs, traffic logic, labeling, training, model management, and prototype-only safety boundaries.
 - Physical public-road traffic control remains disabled.
 

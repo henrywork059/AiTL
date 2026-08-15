@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
+from app.core.project_version import PROJECT_MODE, PROJECT_VERSION
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -15,8 +16,8 @@ def health(request: Request) -> dict:
         {
             "status": "ok",
             "app": "pc-studio-backend",
-            "version": "0_2_0",
-            "mode": "camera_aligned_zones_and_capture_lifecycle_test_ready",
+            "version": PROJECT_VERSION,
+            "mode": PROJECT_MODE,
             "safe_mode": True,
             "message": (
                 "Backend is ready for camera/simulation, camera-aligned persistent zones, Live AI zone/signal overlays, "

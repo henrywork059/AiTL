@@ -10,6 +10,7 @@ from app.core.exceptions import (
 )
 from app.core.logging_config import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
+from app.core.project_version import PROJECT_VERSION
 from app.routes.camera import router as camera_router
 from app.routes.dataset import router as dataset_router
 from app.routes.health import router as health_router
@@ -24,7 +25,6 @@ from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
 
-APP_VERSION = "0_2_0"
 logger = get_logger(__name__)
 
 
@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
     """
     configure_logging()
 
-    app = FastAPI(title="AI Traffic Light PC Studio Backend", version=APP_VERSION)
+    app = FastAPI(title="AI Traffic Light PC Studio Backend", version=PROJECT_VERSION)
 
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(logs_router, prefix="/api/logs", tags=["logs"])
     app.include_router(template_router, prefix="/api/template", tags=["template"])
 
-    logger.info("PC Studio backend app created", extra={"version": APP_VERSION})
+    logger.info("PC Studio backend app created", extra={"version": PROJECT_VERSION})
     return app
 
 

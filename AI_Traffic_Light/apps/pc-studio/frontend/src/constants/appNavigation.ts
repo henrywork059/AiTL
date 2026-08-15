@@ -1,6 +1,7 @@
 import type { AppPageId, AppPageSummary, AppSection } from "../types/app";
+import { PROJECT_VERSION_LABEL } from "./projectVersion";
 
-export const APP_VERSION_LABEL = "0_2_0 camera-aligned zones + capture lifecycle";
+export const APP_VERSION_LABEL = PROJECT_VERSION_LABEL;
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: { id: "dashboard", label: "Dashboard", shortLabel: "Dashboard", description: "Current project version, smoke checks, implemented functions, and explicit prototype boundaries.", status: "test-ready" },

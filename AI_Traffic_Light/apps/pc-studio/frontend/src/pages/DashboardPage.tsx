@@ -1,5 +1,6 @@
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { MetricStrip } from "../components/MetricStrip";
+import { PROJECT_VERSION } from "../constants/projectVersion";
 import type { ApiConnectionState, BackendHealth, SmokeStatus } from "../types";
 
 type Props = {
@@ -19,7 +20,7 @@ function statusClass(status: string) {
 export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refreshing }: Props) {
   const passCount = smokeStatus?.checks.filter((check) => check.status === "pass").length ?? 0;
   const warnCount = smokeStatus?.checks.filter((check) => check.status === "warn").length ?? 0;
-  const version = health?.version ?? smokeStatus?.version ?? "0_2_0";
+  const version = health?.version ?? smokeStatus?.version ?? PROJECT_VERSION;
 
   return (
     <div className="page-stack">

@@ -1,285 +1,287 @@
 # AI Agent Guide
 
-This guide is for AI coding agents, ChatGPT-style assistants, documentation agents, and automated project helpers working on **AI Traffic Light**.
+This is the detailed operating guide for AI coding agents working on **AI Traffic Light (AiTL)**. `../AGENTS.md` is mandatory and takes priority when the two overlap.
 
-The root `AGENTS.md` contains the short mandatory rules. This file explains how to apply them.
+## 1. Mental model
 
-## 1. Project purpose
-
-AI Traffic Light is a student-scale computer vision project. The intended system is:
+AiTL is a local prototype with this flow:
 
 ```text
-Camera/video input
-→ object detection or future segmentation
-→ pedestrian/vehicle counting inside traffic zones
-→ rule-based traffic-light simulation
-→ GUI visualization and dataset capture
+receiver/simulated camera frame
+→ local object detection
+→ persisted zone geometry
+→ detection-centre zone counts
+→ simulation-only traffic recommendation
+→ PC Studio visualization
 ```
 
-The project should demonstrate adaptive signal logic, not control real public traffic infrastructure.
-
-Use these descriptions:
+It also contains a local data/model workflow:
 
 ```text
-prototype
-simulation
+capture image + metadata
+→ manual review/labels
+→ managed YOLO dataset
+→ local Ultralytics training
+→ model registry
+→ local live inference
+```
+
+No path in this project should turn those recommendations into direct public-road signal control.
+
+## 2. Source-of-truth order
+
+For a development task, resolve state in this order:
+
+1. The owner's explicit current request.
+2. Current GitHub `main` content.
+3. Root `VERSION` release state.
+4. `AGENTS.md` and this guide.
+5. API/error/data contracts and current tests.
+6. Historical patch/roadmap documents for context only.
+
+Historical docs are not evidence that a candidate passed. Only explicit owner acceptance can promote `passed_baseline`.
+
+## 3. Version-state decision gate
+
+Before coding, read all five root `VERSION` fields.
+
+### If `version != passed_baseline`
+
+Treat the current version as unaccepted unless the owner explicitly says otherwise. Fix/harden that candidate. Do not increment automatically.
+
+### If the owner explicitly confirms the candidate passed
+
+First record the promotion in the next patch/state update so `passed_baseline` reflects the accepted version. Normal future increments then continue from that accepted version unless the owner chooses a different version.
+
+### Never infer acceptance from
+
+- unit tests;
+- successful build;
+- “looks good” in agent-generated output;
+- presence on GitHub `main`;
+- a patch document calling something test-ready.
+
+## 4. Preflight repository inspection
+
+For every non-trivial patch, inspect:
+
+```text
+VERSION
+AGENTS.md
+relevant source files
+relevant tests
+API_CONTRACTS.md if HTTP behavior is involved
+ERROR_CODES.md and error_codes.py if errors are involved
+DATA_FORMAT.md/schema files if persisted data or coordinates are involved
+LOCAL_TESTING.md
+TEST_READY_CHECKLIST.md
+```
+
+Also inspect nearby modules before adding a new abstraction. Reuse existing services/types/helpers when their responsibility already matches the need.
+
+## 5. Change-size decision rules
+
+Prefer the smallest cohesive change.
+
+Refactor when one of these is true:
+
+- the same project fact/constant is duplicated across multiple runtime surfaces;
+- a file owns multiple unrelated responsibilities;
+- the same validation/error mapping is repeated;
+- a page/service is difficult to test because I/O and business rules are entangled;
+- adding the requested feature would otherwise require copy/paste logic.
+
+Do not refactor merely because a file is long. A large training/inference service can be legitimate if its functions are cohesive. Split only when the ownership boundary is clear and tests can verify it.
+
+## 6. Backend implementation protocol
+
+### Routes
+
+Routes translate HTTP input/output. They should:
+
+- accept Pydantic input where applicable;
+- call a service;
+- return the standard envelope/binary response;
+- attach/preserve request IDs;
+- avoid filesystem/model/training algorithms.
+
+### Services
+
+Services own business logic and side effects such as:
+
+- capture persistence/deletion;
+- labeling and dataset build;
+- camera-frame state;
+- model discovery/loading;
+- inference;
+- training;
+- zone persistence/counting;
+- simulation-only traffic logic.
+
+Prefer explicit service return data over route-layer knowledge of internal files.
+
+### Core
+
+Cross-cutting mechanisms belong in `app/core/`:
+
+- API envelopes;
+- stable errors/exceptions;
+- logging;
+- request middleware;
+- project runtime metadata.
+
+Backend release version surfaces must use `app/core/project_version.py`, which validates root `VERSION`. Do not reintroduce literal release strings in `main.py`, health, smoke, or template state.
+
+## 7. Frontend implementation protocol
+
+`App.tsx` should coordinate top-level state/navigation only. Put page behavior in pages, reusable rendering in components, and HTTP behavior in the existing API client/functions.
+
+Use shared TypeScript types rather than recreating response shapes locally. Use `src/constants/projectVersion.ts` for frontend release fallbacks/navigation; do not repeat literal release strings in `api.ts`, Dashboard, or navigation metadata.
+
+For camera/inference overlays:
+
+- canonical boxes/zones remain in source/reference image coordinates;
+- scale only for the displayed frame/canvas;
+- do not persist browser/canvas pixel coordinates as canonical data;
+- keep visibility toggles presentation-only unless the user explicitly requests inference changes.
+
+For mutation APIs, do not silently hide real backend errors behind offline fallback behavior unless the existing contract intentionally does so.
+
+## 8. Data-integrity protocol
+
+Treat these as user data, not disposable build artifacts:
+
+```text
+datasets/captures/**
+datasets/yolo/**
+outputs/training/**
+manual label JSON
+runtime zone/settings JSON
+trained *.pt files
+```
+
+When changing deletion/build logic:
+
+- define the complete set of paired files;
+- handle partial failures deliberately;
+- update counts/status after successful changes;
+- preserve stale/rebuild markers for derived datasets;
+- test missing-file and failure paths using stable error codes.
+
+Patch archives must never contain those runtime paths/files.
+
+## 9. API/error/logging protocol
+
+Success and errors must keep the established envelopes. Stable domain failures use central error codes and `AppError`; unexpected failures reach the global handler and are logged.
+
+Do not invent one-off error JSON in a route.
+
+Binary image responses are the exception to the JSON body format but still carry `X-Request-ID`.
+
+When adding/changing an endpoint, update the contract docs and tests in the same patch.
+
+## 10. Safety protocol for traffic logic
+
+Allowed language/code intent:
+
+```text
+simulation phase
+recommendation
+visualized signal
 model junction
-traffic-light demo
-AI vision decision-support system
+classroom prototype
+supervised test
 ```
 
-Avoid these descriptions unless the user explicitly changes the project scope and provides safety certification requirements:
+Forbidden project direction without a separate explicitly approved and safety-engineered project scope:
 
 ```text
-production traffic controller
-real road deployment
-certified safety system
-public-road autonomous signal control
+public-road controller
+physical cabinet integration
+production autonomous signal authority
+bypass/failsafe defeat
 ```
 
-## 2. System architecture
+A GUI traffic-light graphic must be described as simulated/display-only.
 
-Keep the two-part app structure:
+## 11. Testing protocol
+
+Use the backend `.venv` for backend scripts when available. A normal local validation pass should include:
+
+```powershell
+python -m compileall .\apps\pc-studio\backend\app .\scripts
+python .\scripts\check_structure.py
+```
+
+Then run the service/API regression scripts relevant to the patch. With the backend running, run `scripts/test_backend_smoke.py`.
+
+Frontend validation:
+
+```powershell
+npm ci
+npm run typecheck
+npm run build
+```
+
+Repository hygiene:
 
 ```text
-PC Studio App
-- receives camera/video frames
-- runs AI detection/segmentation
-- counts traffic objects inside zones
-- simulates signal decisions
-- captures datasets
-- reviews data and predictions
-- later trains and exports models
-
-Device Camera App
-- runs on ESP32-CAM or similar camera node
-- captures frames
-- sends frames to the PC
-- provides basic camera status/configuration
-- does not train AI
-- does not run heavy inference
+git diff --check
+version-surface check
+forbidden runtime/generated-file scan
+patch ZIP validation
 ```
 
-Shared contracts live in:
+Do not claim a command passed unless it actually ran in the current environment.
+
+## 12. Patch assembly protocol
+
+Build the archive from the known changed-file list, not by zipping the project root.
+
+Expected member shape:
 
 ```text
-packages/schema/
-packages/ui/
+AI_Traffic_Light/VERSION
+AI_Traffic_Light/CHANGELOG.md
+AI_Traffic_Light/apps/...
+AI_Traffic_Light/docs/...
 ```
 
-Do not create separate incompatible detection formats for the PC app and device app.
+Never include runtime/generated paths. Run:
 
-## 3. Versioning and patch packaging
-
-The project uses underscore versions:
-
-```text
-0_0_0
-0_0_1
-0_0_2
+```powershell
+python .\scripts\validate_patch_zip.py <patch.zip>
 ```
 
-Patch zip rule:
+Then independently compare the ZIP manifest with the intended change manifest.
 
-```text
-Only include changed files.
-Keep the same relative paths.
-Do not include the whole repo unless requested.
-```
+## 13. Handoff protocol
 
-Correct patch structure example:
+A useful handoff tells the owner exactly:
 
-```text
-AI_Traffic_Light/
-  README.md
-  VERSION
-  CHANGELOG.md
-  docs/
-    PATCH_0_0_3.md
-    SOME_CHANGED_DOC.md
-```
+- why the patch stays on or increments the current version;
+- what files changed;
+- what behavior changed and what did not;
+- what automated/targeted checks ran;
+- what could not be tested;
+- what manual acceptance checks to perform;
+- SHA-256 of the ZIP.
 
-Wrong patch structure example:
+Do not write “passed baseline” until the owner explicitly confirms manual acceptance.
 
-```text
-AI_Traffic_Light_0_0_3_full_project/
-  entire repository...
-```
+## 14. Common failure patterns to avoid
 
-When producing a patch, include:
+- Starting a new version while the current candidate is still unaccepted.
+- Hard-coding release strings in multiple backend surfaces.
+- Putting service logic into FastAPI routes.
+- Growing `App.tsx` with page-specific business logic.
+- Treating datasets/training outputs as disposable Git clutter.
+- Running `git clean -fd` on the user's working copy.
+- Packaging the full repository instead of changed files.
+- Calling synthetic/unit checks a full regression pass.
+- Editing historical changelog versions during a stale-version scan.
+- Describing simulated recommendations as real traffic control.
 
-```text
-VERSION update
-CHANGELOG update
-PATCH_<version>.md note
-changed code/docs only
-```
+## 15. When context is incomplete
 
-## 4. Documentation rules
-
-Documentation should serve two audiences:
-
-1. Humans: students, teachers, project reviewers, future maintainers.
-2. AI agents: tools that need clear repository rules and safe editing boundaries.
-
-For humans, explain:
-
-```text
-what the feature is
-how to run or use it
-what it does not do yet
-what the next step is
-```
-
-For AI agents, specify:
-
-```text
-which files are relevant
-what must not be changed
-what assumptions are safe
-what output/versioning format to use
-```
-
-## 5. Safety boundaries
-
-Traffic control is safety-critical. This project must stay in the prototype/simulation scope unless the user explicitly creates a separate certified deployment plan.
-
-Do not write code or docs that imply:
-
-```text
-direct connection to real traffic-light cabinets
-bypassing traffic-signal safety interlocks
-unsafe autonomous public-road control
-using unverified detections as sole control authority
-```
-
-Acceptable outputs include:
-
-```text
-simulated light state
-LED model traffic light
-GUI recommendation
-human-supervised extension suggestion
-controlled classroom test track
-```
-
-## 6. CV/AI design assumptions
-
-Use a staged development path:
-
-```text
-1. Mock/fake data GUI
-2. Webcam or video-file input
-3. Pretrained object detection
-4. Zone-based counting
-5. Rule-based signal simulation
-6. Dataset capture/review
-7. ESP-CAM input
-8. Fine-tuning/training if needed
-9. Segmentation or tracking if needed
-```
-
-Do not start with segmentation, multi-camera fusion, or custom model training unless the user specifically asks.
-
-## 7. Data schema expectations
-
-Prefer detection data like:
-
-```json
-{
-  "frame_id": "cam01_000001",
-  "source_id": "cam01",
-  "image_width": 1280,
-  "image_height": 720,
-  "timestamp_ms": 123456,
-  "detections": [
-    {
-      "id": "det_001",
-      "class_id": 0,
-      "class_name": "person",
-      "confidence": 0.91,
-      "box_xyxy": [120, 80, 260, 420]
-    }
-  ]
-}
-```
-
-Important rule:
-
-```text
-Store boxes in original image coordinates.
-Convert to displayed coordinates only inside the viewer/overlay layer.
-```
-
-Avoid saving GUI canvas coordinates as the main data record.
-
-## 8. GUI development expectations
-
-The project should support fast visual development:
-
-```text
-Vite frontend hot reload
-FastAPI backend reload
-mock frames
-fake detection JSON
-fake traffic-light states
-```
-
-A GUI page should be able to load without:
-
-```text
-real camera
-real ESP-CAM
-trained model
-GPU
-internet connection
-```
-
-When adding GUI features, provide mock/sample states first.
-
-## 9. File and folder discipline
-
-Use these locations:
-
-```text
-apps/pc-studio/frontend/       React/Vite app
-apps/pc-studio/backend/        FastAPI/Python backend
-apps/device-camera/esp32-cam/  ESP32-CAM firmware
-packages/schema/               shared JSON/data schemas
-packages/ui/                   shared UI/component notes or future components
-docs/                          project documentation
-samples/                       small sample files only
-models/                        placeholders only unless user approves model files
-datasets/                      placeholders only unless user approves data files
-outputs/                       generated files, usually not committed
-```
-
-Do not put random scripts at repo root unless they are project-wide helpers.
-
-## 10. Commit and patch message style
-
-Use short, versioned messages:
-
-```text
-Patch v0_0_2: add human and AI-agent docs
-Patch v0_0_3: add webcam detection prototype
-Patch v0_0_4: add zone-counting service
-```
-
-For GitHub web upload, the user may manually upload changed files. Patch zips should make this easy.
-
-## 11. When uncertain
-
-If a requirement is ambiguous, choose the smallest safe prototype-friendly interpretation. Do not overbuild.
-
-Prefer:
-
-```text
-mock first
-document assumptions
-keep files small
-avoid hardware dependency
-avoid safety-critical claims
-```
-
-Then leave a clear note in `docs/PATCH_<version>.md`.
+Inspect the repository first. If a safe, narrow assumption is possible, make it explicit in `docs/PATCH_<version>.md` and continue. Do not broaden scope just to avoid uncertainty.

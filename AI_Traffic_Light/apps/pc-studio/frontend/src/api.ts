@@ -22,6 +22,7 @@ import type {
   Zone,
   ZoneStatus,
 } from "./types";
+import { PROJECT_VERSION } from "./constants/projectVersion";
 import { mockFrame, mockTrafficState, mockZones } from "./mockData";
 import { requestJson, requestJsonStrict } from "./lib/apiClient";
 
@@ -41,14 +42,14 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_2_0",
+  version: PROJECT_VERSION,
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_2_0",
+  version: PROJECT_VERSION,
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test"],
   not_ready_for: ["backend_features", "physical_traffic_light_control"],

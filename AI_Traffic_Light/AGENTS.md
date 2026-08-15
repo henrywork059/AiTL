@@ -1,189 +1,265 @@
-# AGENTS.md — AI Agent Working Rules
+# AGENTS.md — mandatory rules for AiTL coding agents
 
-This file gives short mandatory instructions for AI agents, coding assistants, and automation tools working on this repository.
+This file is the first repository instruction for AI coding agents, assistants, and automation working inside `AI_Traffic_Light/`.
 
-For deeper guidance, read:
+## 1. Read order before changing anything
 
-```text
-docs/AI_AGENT_GUIDE.md
-docs/CODE_STRUCTURE.md
-docs/API_CONTRACTS.md
-docs/ERROR_CODES.md
-docs/DEBUGGING_AND_LOGGING.md
-```
+Read these in order:
 
-## Project identity
+1. `AGENTS.md` — mandatory repository rules.
+2. `VERSION` — current candidate, status, previous version, and owner-confirmed passed baseline.
+3. `docs/AI_AGENT_GUIDE.md` — detailed execution rules.
+4. `docs/AI_AGENT_CHECKLIST.md` — short preflight/change/test/package checklist.
+5. Task-specific contracts/docs, then the current source and tests you intend to change.
 
-Project name: **AI Traffic Light**
-Current patch line: **0_2_x**
-Current patch: **0_2_0**
+Always inspect the current GitHub `main` branch before producing a patch when the task is based on GitHub state. Do not assume an older local snapshot is current.
 
-This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, supervised labeling, local trained-model inference, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
+## 2. Current release gate
 
-## Architecture rule
+At the time of this file update:
 
-Keep the project split into these parts:
+- current candidate: V020 / `0_2_0`;
+- previous version: `0_1_7`;
+- owner-confirmed passed baseline: V017 / `0_1_7`;
+- V020 is still a candidate until the owner explicitly confirms its acceptance checks.
 
-```text
-apps/pc-studio/        PC app: GUI, detection, training, evaluation, export, dataset capture
-apps/device-camera/    Camera node: ESP32-CAM or similar frame sender only
-packages/schema/       Shared schemas and data contracts
-packages/ui/           Shared UI/component planning
-```
+Rules:
 
-The PC does heavy AI work. The ESP/device camera captures frames and sends them to the PC. Do not move training or heavy segmentation inference onto the ESP camera.
+- Never promote a candidate because automated tests passed.
+- Never silently create the next version while the current candidate is unaccepted.
+- If the owner reports a problem in an unaccepted candidate, repair the same candidate unless the owner explicitly requests a new version.
+- Only change `passed_baseline` after explicit owner acceptance.
+- Version skips are allowed only when explicitly requested by the owner.
 
-## Code modularity rule
-
-Break code into small files with single responsibilities.
-
-Required backend layering:
+`VERSION` is authoritative and must contain:
 
 ```text
-app/main.py       app factory, middleware, router registration only
-app/routes/       thin HTTP/API handlers only
-app/services/     business logic: detection, counting, traffic decisions, data capture
-app/core/         logging, error codes, exceptions, API response helpers
-app/models.py     Pydantic request/response models only
+version
+status
+previous_version
+passed_baseline
+notes
 ```
 
-Required frontend layering:
+## 3. Project scope and safety boundary
+
+AiTL is a local/student-scale computer-vision and traffic-light simulation prototype.
+
+Allowed scope includes:
+
+- receiver or simulated camera frames;
+- local detection/inference;
+- dataset capture/review/manual labeling;
+- local model training;
+- editable traffic zones and zone counts;
+- simulated traffic-phase recommendations and GUI signal visualization;
+- classroom/model-junction experimentation.
+
+Do not implement, document, or imply:
+
+- direct control of public-road traffic signals;
+- connections to public traffic-signal cabinets/controllers;
+- bypassing safety interlocks;
+- autonomous deployment claims based on prototype detections.
+
+Traffic outputs remain simulation/recommendation/display outputs only.
+
+## 4. Architecture rules
+
+### Backend
+
+Keep:
 
 ```text
-src/App.tsx             page composition only
-src/components/         small display/control components
-src/lib/apiClient.ts    API fetch wrapper
-src/lib/logger.ts       frontend logging helper
-src/lib/errorCodes.ts   frontend error-code constants
-src/types.ts            shared frontend types
+app/main.py       app creation, middleware, handlers, router wiring only
+app/routes/       HTTP translation only; routes stay thin
+app/services/     business/state/filesystem/inference/training logic
+app/models.py     Pydantic request/response models
+app/core/         envelopes, errors, logging, middleware, shared app metadata
 ```
 
-Do not place camera capture, AI inference, zone counting, traffic decisions, file I/O, and UI rendering in one large file.
+Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging.
 
-## API rule
+Project release metadata for backend surfaces comes from root `VERSION` through `app/core/project_version.py`. Do not add literal release versions back into backend health/smoke/template/app wiring. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`; keep that shared mirror synchronized with root `VERSION` and do not duplicate literals across pages/API fixtures.
 
-Use documented API contracts. For new backend endpoints, prefer this envelope shape:
+### Frontend
+
+Keep:
+
+```text
+src/App.tsx          composition, top-level coordination, page switching
+src/pages/           page-level UI/state
+src/components/      small reusable UI components
+src/api.ts           typed API functions and controlled fallbacks
+src/lib/apiClient.ts shared envelope/error handling
+src/types.ts         shared domain/API types
+src/types/           app-specific type modules
+src/constants/       navigation/function metadata
+```
+
+Do not turn `App.tsx` into a business-logic container. Prefer extracting cohesive logic/components instead of growing unrelated responsibilities in one file.
+
+## 5. API contract is stable unless the task changes it
+
+JSON success:
 
 ```json
 {
   "ok": true,
   "data": {},
-  "meta": {
-    "request_id": "..."
-  }
+  "meta": {"request_id": "..."}
 }
 ```
 
-Errors should use:
+JSON error:
 
 ```json
 {
   "ok": false,
   "error": {
-    "code": "ATL-AREA-NNN",
-    "message": "Human-readable message",
+    "code": "...",
+    "message": "...",
     "details": {}
   },
-  "meta": {
-    "request_id": "..."
-  }
+  "meta": {"request_id": "..."}
 }
 ```
 
-Binary image endpoints should still return an `X-Request-ID` header.
+Binary image responses must include `X-Request-ID`.
 
-## Logging and error-code rule
+When an API changes, update `docs/API_CONTRACTS.md`. When stable error behavior changes, update `docs/ERROR_CODES.md` and the central backend error-code definitions together.
 
-Most non-trivial code should log useful events and failures.
+## 6. Runtime data is not patch content
 
-Use central error codes from:
+Local working copies may contain valuable untracked/runtime data:
 
-```text
-apps/pc-studio/backend/app/core/error_codes.py
-docs/ERROR_CODES.md
-```
+- `datasets/` captures and labels;
+- `outputs/` training runs;
+- trained `*.pt` models;
+- local runtime settings/zones;
+- virtual environments and frontend dependencies/builds.
 
-Do not raise anonymous exceptions for expected project errors. Use `AppError` where possible.
+Never use destructive cleanup commands such as `git clean -fd` on the user's working project. Do not overwrite or delete runtime data unless the user explicitly asks for that exact data operation.
 
-## Safety rule
-
-Do not add instructions for controlling real public traffic lights. Use language such as:
-
-```text
-traffic-light simulation
-model junction
-LED demo
-prototype controller
-human-supervised decision support
-```
-
-Avoid claiming:
+Never package these in a source patch:
 
 ```text
-road-ready
-certified
-safe for public deployment
-automatically controls real traffic infrastructure
+datasets/
+outputs/
+*.pt
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.pyc
 ```
 
-## Versioning rule
+## 7. Change strategy
 
-Use the underscore version style requested by the project owner:
+Before editing:
+
+1. Confirm current version state.
+2. Identify the smallest files/responsibilities involved.
+3. Inspect existing tests and contracts.
+4. Decide whether this is a fix to the current candidate or a new release.
+
+While editing:
+
+- preserve existing working behavior unless the task explicitly changes it;
+- prefer small helper modules over duplicated constants/logic;
+- avoid speculative framework rewrites;
+- avoid mixing unrelated cleanup into a feature patch;
+- keep filesystem writes atomic/rollback-aware where data integrity matters;
+- keep original-image coordinates as canonical CV data; scale only in presentation layers;
+- document assumptions that materially affect later agents.
+
+Optimization means reducing duplication, unclear ownership, accidental coupling, and validation gaps. It does not mean rewriting working code for style alone.
+
+## 8. Testing evidence must be precise
+
+Run the relevant checks available in the environment. Typical validation includes:
 
 ```text
-0_0_0 = initial skeleton
-0_0_1 = documentation/version cleanup
-0_0_2 = human and AI-agent instruction docs
-0_0_3 = modular code, API, logging, and error-code standards
+python -m compileall
+backend service/unit tests
+live API smoke tests when backend can run
+existing regression tests
+python scripts/check_structure.py
+npm run typecheck
+npm run build
+git diff --check
+stale-version scan
+patch exclusion scan
+ZIP integrity/structure check
 ```
 
-For patch zips, include **only changed files** with the same relative paths. Do not package the whole repository unless explicitly requested.
+Report three categories separately:
 
-## Editing rule
+1. **Actually run here** — commands genuinely executed in the agent environment.
+2. **Targeted/synthetic checks** — isolated checks that do not equal a full local regression run.
+3. **Owner/local checks still required** — hardware/UI/runtime checks the agent could not perform.
 
-Make the smallest useful change. Do not rewrite unrelated files. Do not rename folders unless the user explicitly asks.
+Never call a version “passed” based on category 1 or 2. Owner acceptance is separate.
 
-When adding or modifying behavior, update at least one of:
+## 9. Documentation requirements
+
+For each patch, keep current-state documentation synchronized. At minimum review/update as applicable:
+
+- `VERSION`
+- `CHANGELOG.md`
+- `README.md`
+- affected app README(s)
+- `docs/PATCH_<version>.md`
+- `docs/LOCAL_TESTING.md`
+- `docs/TEST_READY_CHECKLIST.md`
+- `docs/PC_STUDIO_FUNCTION_LIST.md`
+- `docs/API_CONTRACTS.md` if APIs changed
+- `docs/ERROR_CODES.md` if stable errors changed
+- current roadmap/layout/start/versioning/agent docs when their wording is stale
+
+Historical changelog/patch documents may intentionally contain old versions. Do not “clean” history during stale-version scans.
+
+## 10. Patch packaging and handoff
+
+Create a **changed-files-only** ZIP. Every member path must begin with:
 
 ```text
-README.md
-CHANGELOG.md
-VERSION
-docs/PATCH_<version>.md
-relevant docs/*.md
+AI_Traffic_Light/...
 ```
 
-## Dataset and labeling rule
+Run `scripts/validate_patch_zip.py` on the finished archive. The validator checks path safety, exclusions, and ZIP integrity; compare the manifest against the actual change set to prove changed-files-only scope.
 
-- Captured images, manual labels, generated YOLO splits, and trained weights are runtime data and must stay out of patch ZIPs.
-- Keep class IDs aligned with `packages/schema/classes.default.json` unless an explicit schema migration is approved.
-- Manual labels are human annotations; do not describe them as automatic AI labels.
-- A reviewed frame with zero boxes is a valid negative example; an unreviewed frame is not equivalent to a negative label.
-- Frames tagged `bad` should not be included in managed training builds.
+Handoff must include:
 
-## Trained-model inference rule
+- patch ZIP;
+- exact changed-files manifest;
+- SHA-256;
+- implementation summary;
+- limitations;
+- tests actually run;
+- local tests still required;
+- exact acceptance checks.
 
-- Trained `best.pt` files remain runtime output under `outputs/training/`; never package model weights into code patches.
-- Prefer loading trained models on the PC only. Device-camera firmware remains frame capture/sender logic.
-- Live inference results must preserve original camera coordinates so overlays and later zone counting are auditable.
-- Do not silently connect live detections to physical traffic-light control. Current live inference is visualization/test input for later simulation logic only.
+The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is not sufficient.
 
-## Data and secrets rule
+## 11. Local update safety after GitHub upload
 
-Do not commit:
+Start with:
 
-```text
-API keys
-passwords
-Wi-Fi credentials
-private camera IPs if sensitive
-large datasets
-large trained model files
-personal data from real pedestrians or vehicles
+```powershell
+Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
+git status --short
 ```
 
-Use placeholders and `.gitkeep` files for folders that will later contain large/private data.
+Review untracked files before pulling. Preserve datasets, training outputs, models, labels, and runtime files. Then use a fast-forward-only pull when safe:
 
+```powershell
+git pull --ff-only origin main
+Get-Content .\AI_Traffic_Light\VERSION
+```
 
-## Current candidate note
-- Current candidate patch in this workspace: 0_2_0 (capture deletion, camera-aligned zones, Live AI zone overlays, and compact signal overlay).
+Do not invent cleanup steps to force the pull.
+
+## 12. When uncertain
+
+Choose the smallest safe interpretation that preserves the current accepted behavior and candidate state. State the assumption in the patch note rather than silently broadening scope.

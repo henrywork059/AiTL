@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.project_version import PROJECT_MODE, PROJECT_VERSION
+
 
 PC_STUDIO_PAGES: list[dict[str, Any]] = [
     {"id": "dashboard", "label": "Dashboard", "status": "test-ready"},
@@ -21,8 +23,8 @@ PC_STUDIO_PAGES: list[dict[str, Any]] = [
 def get_template_summary() -> dict[str, Any]:
     """Return PC Studio pages and current implementation status."""
     return {
-        "version": "0_2_0",
-        "mode": "camera_aligned_zones_and_capture_lifecycle_test_ready",
+        "version": PROJECT_VERSION,
+        "mode": PROJECT_MODE,
         "pages": PC_STUDIO_PAGES,
         "implementation_note": (
             "All main PC Studio pages expose working prototype behavior: live/camera tools, camera-aligned persistent zones, "

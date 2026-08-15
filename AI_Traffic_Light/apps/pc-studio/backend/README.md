@@ -14,6 +14,14 @@ FastAPI backend for the local AI Traffic Light prototype.
 - persist runtime confidence/polling/patience/log-level settings;
 - expose recent real backend log records with request IDs where available.
 
-Local datasets, runtime settings/zones, and trained models remain runtime data. Trained models stay under `outputs/training/` and are not part of code patches.
+## Release metadata
+
+Root `AI_Traffic_Light/VERSION` is the canonical project release state. `app/core/project_version.py` validates and exposes that metadata to FastAPI app metadata, `/health`, smoke status, and template status so those surfaces do not carry independent hard-coded release strings.
+
+If required `VERSION` fields or underscore-formatted version values are invalid, backend startup/import fails clearly rather than silently reporting an inconsistent release.
+
+## Runtime data and safety
+
+Local datasets, runtime settings/zones, and trained models remain runtime data. Trained models stay under `outputs/training/` and are not part of source patches.
 
 This backend is for prototype, simulation, classroom, and supervised testing only. It is not a public-road traffic controller.

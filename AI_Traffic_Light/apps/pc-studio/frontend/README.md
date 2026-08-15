@@ -17,6 +17,12 @@ React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
 When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
 
+## Release metadata
+
+Frontend fallback/navigation version labels use the shared `src/constants/projectVersion.ts` constant rather than repeating the current release string in each page/API fixture. `scripts/check_structure.py` verifies that this shared frontend value matches root `AI_Traffic_Light/VERSION` and that known version surfaces use the shared constant.
+
+Root `VERSION` remains the authoritative project release state; the frontend constant is a build-safe mirror checked during repository validation.
+
 ## Run
 
 ```powershell

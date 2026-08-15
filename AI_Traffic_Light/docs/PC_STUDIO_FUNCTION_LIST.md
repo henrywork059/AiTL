@@ -33,9 +33,14 @@
 - generate simulation-only phase recommendations with reasons and frame/zone audit data
 - show a compact simulation-only traffic signal at the top-right of Live AI
 
-## System
+## System / development integrity
 - persist runtime confidence, camera-status polling, training patience, and log level
 - inspect real recent backend logs with request IDs/error codes when available
+- load backend release metadata from root `VERSION` instead of duplicating release strings across runtime endpoints
+- reuse one checked frontend project-version constant for Dashboard, navigation, and offline fallback metadata
+- validate repository/version surfaces with `scripts/check_structure.py`
+- validate patch ZIP path/exclusion/integrity rules with `scripts/validate_patch_zip.py`
+- provide explicit AI-agent workflow/checklist documentation for candidate gating, testing evidence, and runtime-data preservation
 
 ## Still later
 - automatic labeling

@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.project_version import PROJECT_MODE, PROJECT_VERSION
 from app.services.mock_data import get_mock_detection_frame
 from app.services.runtime_settings import runtime_settings_service
 from app.services.template_state import get_template_summary
 from app.services.traffic_logic import evaluate_traffic_state
 from app.services.zones import zone_service
-
-APP_VERSION = "0_2_0"
-APP_MODE = "camera_aligned_zones_and_capture_lifecycle_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -104,13 +102,13 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_2_0 remains a supervised prototype and cannot control real public traffic infrastructure.",
+            "detail": f"{PROJECT_VERSION} remains a supervised prototype and cannot control real public traffic infrastructure.",
         },
     ]
 
     return {
-        "version": APP_VERSION,
-        "mode": APP_MODE,
+        "version": PROJECT_VERSION,
+        "mode": PROJECT_MODE,
         "ready_for": [
             "frontend_layout_test",
             "backend_startup_test",
