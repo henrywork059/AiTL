@@ -64,6 +64,23 @@ def list_captures(
     return ok(data, request_id=request.state.request_id)
 
 
+@router.delete("/captures/{capture_id}")
+def delete_capture(capture_id: str, request: Request) -> dict:
+    """Delete one saved image together with its metadata and optional manual labels."""
+    deleted = dataset_capture_service.delete_capture(capture_id)
+    training_status = dataset_labeling_service.training_dataset_status()
+    data = {**deleted, "training_dataset": training_status}
+    logger.info(
+        "Dataset capture delete API completed",
+        extra={
+            "request_id": request.state.request_id,
+            "capture_id": capture_id,
+            "training_dataset_stale": training_status["stale"],
+        },
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
 @router.get("/captures/{capture_id}/image")
 def captured_image(capture_id: str, request: Request) -> FileResponse:
     """Return one saved capture image for local review."""
@@ -127,6 +144,7 @@ def dataset_functions(request: Request) -> dict:
             "save_capture_metadata_json",
             "capture_receiver_or_simulation_frame",
             "browse_captured_frames",
+            "delete_captured_frame",
             "save_manual_bounding_box_labels",
             "save_reviewed_negative_frame",
             "exclude_bad_frames_from_training_build",

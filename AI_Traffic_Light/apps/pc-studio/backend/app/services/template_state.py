@@ -21,13 +21,13 @@ PC_STUDIO_PAGES: list[dict[str, Any]] = [
 def get_template_summary() -> dict[str, Any]:
     """Return PC Studio pages and current implementation status."""
     return {
-        "version": "0_1_7",
-        "mode": "convergence_and_prototype_tools_test_ready",
+        "version": "0_2_0",
+        "mode": "camera_aligned_zones_and_capture_lifecycle_test_ready",
         "pages": PC_STUDIO_PAGES,
         "implementation_note": (
-            "All main PC Studio pages now expose working prototype behavior: live/camera tools, persistent zones, "
-            "zone-aware simulation decisions, capture/label/train/model management, runtime settings, and real recent logs. "
-            "Training includes convergence history and patience-based early stopping. Model export, automatic labeling, "
+            "All main PC Studio pages expose working prototype behavior: live/camera tools, camera-aligned persistent zones, "
+            "Live AI zone/signal overlays, zone-aware simulation decisions, capture deletion, labeling/training/model management, "
+            "runtime settings, and real recent logs. Training includes convergence history and early stopping. Model export, automatic labeling, "
             "and physical public-road control remain disabled."
         ),
     }

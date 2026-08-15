@@ -1,5 +1,5 @@
-version: 0_1_7
-status: training convergence, early stopping, and real prototype tools candidate
-previous_version: 0_1_6
-passed_baseline: 0_1_5
-notes: V017 adds per-epoch training convergence history and a live frontend plot, forwards configurable patience to Ultralytics for automatic early stopping, replaces the Zone Editor/Traffic Logic/Settings/Logs mock-template surfaces with working prototype implementations, and removes stale hard-coded project-stage text from the Dashboard. Persistent zones drive live detection-centre counting and simulation-only traffic recommendations; runtime settings persist confidence, camera-status polling, training patience, and log level; logs show real backend records. Model export, automatic labeling, device firmware completion, and physical public-road traffic control remain outside this candidate. V017 is not passed until the owner completes the V017 acceptance checklist.
+version: 0_2_0
+status: camera-aligned zones and capture lifecycle candidate
+previous_version: 0_1_7
+passed_baseline: 0_1_7
+notes: V020 allows users to delete saved captures together with paired metadata and manual labels, uses the current receiver/simulation camera feed as the Zone Editor background, overlays persisted zones on Live AI with correct reference-to-frame scaling, and adds a compact simulation-only traffic signal at the top-right of the Live AI canvas. V017 convergence monitoring, early stopping, persistent settings/logs, live zone counting, capture/label/train/model management, and safety boundaries remain in scope. Physical public-road traffic control remains disabled. V020 is not passed until the owner completes the V020 acceptance checklist.

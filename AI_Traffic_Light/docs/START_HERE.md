@@ -1,18 +1,19 @@
-# Start Here — Current V017 candidate
+# Start Here — Current V020 candidate
 
-The project has moved beyond the original mock/template skeleton. The current passed baseline remains `0_1_5`; V016 and this V017 patch remain candidates until owner acceptance.
+The owner-confirmed passed baseline is `0_1_7`. V020 / `0_2_0` is the current candidate.
 
 ## Current working path
 
 1. Start the FastAPI PC Studio backend.
 2. Start the React/Vite frontend.
 3. Use receiver or synthetic-camera frames.
-4. Capture and manually label useful frames.
-5. Build the managed YOLO dataset.
-6. Train locally and monitor validation convergence; patience-based early stopping can end a converged run before the maximum epoch count.
-7. Load a trained model in Live AI.
-8. Edit persistent zones and inspect live detection-centre counts in Traffic Logic.
-9. Adjust runtime settings and inspect recent backend logs when troubleshooting.
+4. Draw and save traffic zones directly over the current camera/simulation image.
+5. Inspect the same saved zones and compact simulated signal on Live AI.
+6. Capture useful frames; delete unwanted captures when needed.
+7. Manually label retained frames and build the managed YOLO dataset.
+8. Train locally with convergence monitoring and patience-based early stopping.
+9. Load/manage trained models and inspect zone-aware simulation recommendations.
+10. Adjust runtime settings and inspect recent backend logs when troubleshooting.
 
 ## Still outside the current prototype
 
@@ -22,4 +23,4 @@ The project has moved beyond the original mock/template skeleton. The current pa
 - production-grade tracking or multi-camera synchronization;
 - direct control of real public-road traffic infrastructure.
 
-The traffic recommendation pages are for simulation, demonstration, classroom testing, and human-supervised analysis only.
+Traffic recommendations and the Live AI signal graphic are simulation/display outputs only.

@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_DATASET_ROOT = PROJECT_ROOT / "datasets"
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+CAPTURE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,160}$")
 IMAGE_SUFFIXES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -51,7 +52,7 @@ class CaptureRecord:
 
 
 class DatasetCaptureService:
-    """Persist camera frames and paired metadata inside the project dataset folder."""
+    """Persist and remove camera captures inside the project dataset folder."""
 
     def __init__(self, dataset_root: Path | None = None) -> None:
         configured_root = os.environ.get("AITL_DATASET_DIR")
@@ -161,6 +162,105 @@ class DatasetCaptureService:
         )
         return record
 
+    def delete_capture(self, capture_id: str) -> dict:
+        """Delete one capture image, metadata, and optional manual-label document."""
+        if not CAPTURE_ID_PATTERN.fullmatch(capture_id):
+            raise AppError(
+                ErrorCode.INVALID_REQUEST,
+                "capture_id contains unsupported characters.",
+                status_code=422,
+                details={"capture_id": capture_id},
+            )
+
+        matches = list(self._capture_root.glob(f"*/metadata/{capture_id}.json"))
+        if not matches:
+            raise AppError(
+                ErrorCode.DATASET_ITEM_NOT_FOUND,
+                "The requested captured frame was not found.",
+                status_code=404,
+                details={"capture_id": capture_id},
+            )
+        if len(matches) > 1:
+            raise AppError(
+                ErrorCode.DATASET_READ_FAILED,
+                "Duplicate capture IDs were found in the dataset.",
+                status_code=500,
+                details={"capture_id": capture_id},
+            )
+
+        metadata_path = matches[0]
+        try:
+            record = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if not isinstance(record, dict) or str(record.get("capture_id")) != capture_id:
+                raise ValueError("capture metadata mismatch")
+            session_id = str(record.get("session_id", ""))
+            if not SESSION_ID_PATTERN.fullmatch(session_id):
+                raise ValueError("invalid session id")
+            image_path = self._safe_dataset_path(str(record.get("image_path", "")))
+            declared_metadata = self._safe_dataset_path(str(record.get("metadata_path", "")))
+            if declared_metadata != metadata_path.resolve():
+                raise ValueError("metadata path mismatch")
+            label_path = self._capture_root / session_id / "labels" / f"{capture_id}.json"
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise AppError(
+                ErrorCode.DATASET_READ_FAILED,
+                "Failed to read capture metadata before deletion.",
+                status_code=500,
+                details={"capture_id": capture_id},
+            ) from exc
+
+        originals = [path for path in (image_path, label_path, metadata_path) if path.is_file()]
+        staged: list[tuple[Path, Path]] = []
+        with self._lock:
+            try:
+                for original in originals:
+                    temporary = original.with_name(f".{original.name}.{uuid4().hex}.delete")
+                    os.replace(original, temporary)
+                    staged.append((original, temporary))
+            except OSError as exc:
+                for original, temporary in reversed(staged):
+                    try:
+                        if temporary.exists() and not original.exists():
+                            os.replace(temporary, original)
+                    except OSError:
+                        logger.exception("Failed to roll back capture deletion", extra={"capture_id": capture_id})
+                raise AppError(
+                    ErrorCode.DATASET_DELETE_FAILED,
+                    "Failed to delete the captured frame safely.",
+                    status_code=500,
+                    details={"capture_id": capture_id},
+                ) from exc
+
+            cleanup_failed = False
+            for _, temporary in staged:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    cleanup_failed = True
+                    logger.warning("Capture delete staging file could not be removed", extra={"path": str(temporary)})
+            if self._last_capture and self._last_capture.capture_id == capture_id:
+                self._last_capture = None
+
+        session_root = self._capture_root / session_id
+        for directory in (session_root / "labels", session_root / "metadata", session_root / "images", session_root):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+
+        deleted_paths = [original.relative_to(self._dataset_root).as_posix() for original, _ in staged]
+        logger.info(
+            "Dataset capture deleted",
+            extra={"capture_id": capture_id, "session_id": session_id, "deleted_file_count": len(deleted_paths)},
+        )
+        return {
+            "capture_id": capture_id,
+            "session_id": session_id,
+            "deleted": True,
+            "deleted_paths": deleted_paths,
+            "cleanup_pending": cleanup_failed,
+        }
+
     def status(self) -> dict:
         image_count = 0
         metadata_count = 0
@@ -183,6 +283,15 @@ class DatasetCaptureService:
             "dataset_path": "datasets/captures",
             "last_capture": self._last_capture.to_dict() if self._last_capture else None,
         }
+
+    def _safe_dataset_path(self, relative_path: str) -> Path:
+        requested = Path(relative_path)
+        if requested.is_absolute():
+            raise ValueError("absolute dataset path")
+        resolved = (self._dataset_root / requested).resolve()
+        if not resolved.is_relative_to(self._dataset_root):
+            raise ValueError("dataset path outside root")
+        return resolved
 
     @staticmethod
     def _atomic_write(path: Path, content: bytes) -> None:

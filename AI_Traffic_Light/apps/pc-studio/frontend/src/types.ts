@@ -178,6 +178,16 @@ export type DatasetCaptureList = {
   classes: LabelClass[];
 };
 
+
+export type CaptureDeleteResult = {
+  capture_id: string;
+  session_id: string;
+  deleted: boolean;
+  deleted_paths: string[];
+  cleanup_pending: boolean;
+  training_dataset: TrainingDatasetStatus;
+};
+
 export type CaptureLabelDocument = {
   capture_id: string;
   session_id: string;

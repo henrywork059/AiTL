@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_2_0 — Camera-aligned zones and capture lifecycle
+
+- Added permanent capture deletion from Dataset Capture and Dataset Review. Deleting a capture removes its image, paired metadata, and saved manual-label document.
+- Added stable `ATL-DATASET-007` for capture-deletion failures while retaining `ATL-DATASET-003` for missing captures.
+- Added `DELETE /api/dataset/captures/{capture_id}` with standard API envelopes, request IDs, logging, and managed-training-dataset staleness reporting.
+- Changed Zone Editor to draw polygons directly over the current receiver or simulation frame while keeping the validated 1280×720 reference coordinate system used by traffic counting.
+- Added saved-zone overlays to real Live AI camera frames with reference-to-frame coordinate scaling and a Show zones visibility toggle.
+- Added a compact simulation-only traffic signal overlay at the top-right of the Live AI canvas.
+- Updated version/status surfaces to `0_2_0` and promoted owner-confirmed V017 / `0_1_7` to the passed baseline.
+- Preserved V017 convergence monitoring, patience-based early stopping, persistent settings/logs, traffic logic, labeling, training, model management, and prototype-only safety boundaries.
+- Physical public-road traffic control remains disabled.
+
 ## 0_1_7 — Training convergence, early stopping, and real prototype tools
 
 - Added per-epoch YOLO training metric history for validation fitness, mAP50-95, mAP50, and available train/validation loss totals.

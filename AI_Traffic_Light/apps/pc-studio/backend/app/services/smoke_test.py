@@ -8,8 +8,8 @@ from app.services.template_state import get_template_summary
 from app.services.traffic_logic import evaluate_traffic_state
 from app.services.zones import zone_service
 
-APP_VERSION = "0_1_7"
-APP_MODE = "convergence_and_prototype_tools_test_ready"
+APP_VERSION = "0_2_0"
+APP_MODE = "camera_aligned_zones_and_capture_lifecycle_test_ready"
 
 
 def get_smoke_status() -> dict[str, Any]:
@@ -50,7 +50,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "dataset.capture",
             "label": "Persistent dataset capture",
             "status": "pass",
-            "detail": "The latest receiver or simulation frame can be saved with paired JSON metadata.",
+            "detail": "The latest receiver or simulation frame can be saved with paired JSON metadata and unwanted captures can be deleted safely.",
         },
         {
             "id": "dataset.labeling",
@@ -104,7 +104,7 @@ def get_smoke_status() -> dict[str, Any]:
             "id": "safety.real_control",
             "label": "Physical traffic control disabled",
             "status": "pass",
-            "detail": "0_1_7 remains a supervised prototype and cannot control real public traffic infrastructure.",
+            "detail": "0_2_0 remains a supervised prototype and cannot control real public traffic infrastructure.",
         },
     ]
 
@@ -117,9 +117,13 @@ def get_smoke_status() -> dict[str, Any]:
             "camera_frame_upload_test",
             "camera_simulation_test",
             "persistent_zone_editing_test",
+            "camera_aligned_zone_editor_test",
+            "live_ai_zone_overlay_test",
+            "live_ai_signal_overlay_test",
             "live_zone_counting_test",
             "simulation_decision_test",
             "persistent_frame_capture_test",
+            "capture_delete_test",
             "manual_bounding_box_labeling_test",
             "managed_yolo_dataset_build_test",
             "training_convergence_plot_test",
@@ -152,6 +156,7 @@ def get_smoke_status() -> dict[str, Any]:
             "/api/camera/simulation/settings",
             "/api/dataset/status",
             "/api/dataset/captures",
+            "/api/dataset/captures/{capture_id}",
             "/api/dataset/captures/{capture_id}/image",
             "/api/dataset/captures/{capture_id}/labels",
             "/api/dataset/training-dataset/status",

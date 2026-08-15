@@ -1,6 +1,7 @@
 import type {
   BackendHealth,
   CameraStatus,
+  CaptureDeleteResult,
   CaptureLabelDocument,
   CaptureQualityTag,
   CaptureRecord,
@@ -40,14 +41,14 @@ type LogsResponse = {
 const fallbackHealth: BackendHealth = {
   status: "fallback",
   app: "pc-studio-backend",
-  version: "0_1_7",
+  version: "0_2_0",
   mode: "frontend_fallback",
   safe_mode: true,
   message: "Backend is not connected. Frontend is using local fallback data.",
 };
 
 const fallbackSmokeStatus: SmokeStatus = {
-  version: "0_1_7",
+  version: "0_2_0",
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test"],
   not_ready_for: ["backend_features", "physical_traffic_light_control"],
@@ -298,6 +299,13 @@ export async function captureLatestFrame(input: {
 
 export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> {
   return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList);
+}
+
+export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> {
+  return requestJsonStrict<CaptureDeleteResult>(
+    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function captureImageUrl(captureId: string): string {

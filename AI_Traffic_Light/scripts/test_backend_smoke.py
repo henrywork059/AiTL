@@ -62,7 +62,7 @@ def main() -> int:
             print(f"- {failure}")
         return 1
 
-    print("Smoke test passed. V017 convergence, zones, traffic simulation, settings, logs, and existing APIs responded successfully.")
+    print("Smoke test passed. V020 capture lifecycle, camera-aligned zones, live overlays, training, settings, logs, and existing APIs responded successfully.")
     return 0
 
 

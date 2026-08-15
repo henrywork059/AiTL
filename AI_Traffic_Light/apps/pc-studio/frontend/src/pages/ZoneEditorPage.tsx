@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { fetchActiveZones, resetActiveZones, saveActiveZones } from "../api";
+import { API_BASE, fetchActiveZones, resetActiveZones, saveActiveZones } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
-import type { Zone, ZoneStatus, ZoneType } from "../types";
+import type { CameraStatus, Zone, ZoneStatus, ZoneType } from "../types";
 import "./zoneEditor.css";
 
 const ZONE_TYPES: ZoneType[] = ["pedestrian_waiting", "crossing", "vehicle_queue", "ignore"];
 const WIDTH = 1280;
 const HEIGHT = 720;
 
+type Props = {
+  cameraStatus: CameraStatus | null;
+};
+
 function clonePoints(points: [number, number][]): [number, number][] {
   return points.map(([x, y]) => [x, y]);
 }
 
-export function ZoneEditorPage() {
+export function ZoneEditorPage({ cameraStatus }: Props) {
   const [status, setStatus] = useState<ZoneStatus | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -134,24 +138,42 @@ export function ZoneEditorPage() {
     }
   }
 
+  const cameraUrl = cameraStatus?.frame_available
+    ? `${API_BASE}/api/camera/frame?t=${cameraStatus.frame_number}`
+    : null;
+
+
   return (
     <div className="page-stack">
       <div className="zone-editor-layout">
         <section className="panel zone-canvas-panel">
           <div className="panel-header">
             <div>
-              <h2>Persistent zone reference</h2>
-              <p className="placeholder-copy">Click to edit polygon points on the 1280 × 720 simulation reference frame.</p>
+              <h2>Camera-aligned zone editor</h2>
+              <p className="placeholder-copy">Draw zones directly over the current receiver or simulation camera feed.</p>
             </div>
-            <span className="status-pill">{status?.source ?? "loading"}</span>
+            <span className="status-pill">{cameraStatus?.frame_available ? `${cameraStatus.origin ?? "camera"} frame ${cameraStatus.frame_number}` : "no camera frame"}</span>
           </div>
 
           <svg className="zone-editor-canvas" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} onClick={canvasClick} role="img" aria-label="Editable traffic zone reference canvas">
-            <rect x="0" y="0" width="1280" height="178" className="zone-sidewalk" />
-            <rect x="0" y="179" width="1280" height="446" className="zone-road" />
-            <rect x="0" y="625" width="1280" height="95" className="zone-sidewalk" />
-            <rect x="520" y="179" width="240" height="446" className="zone-crossing-bed" />
-            {[220, 285, 350, 415, 480, 545].map((y) => <rect key={y} x="538" y={y} width="204" height="22" className="zone-zebra" />)}
+            {cameraUrl ? (
+              <image
+                href={cameraUrl}
+                x="0"
+                y="0"
+                width={WIDTH}
+                height={HEIGHT}
+                preserveAspectRatio="none"
+                className="zone-camera-image"
+              />
+            ) : (
+              <>
+                <rect x="0" y="0" width={WIDTH} height={HEIGHT} className="zone-camera-empty" />
+                <text x={WIDTH / 2} y={HEIGHT / 2} textAnchor="middle" className="zone-camera-empty-text">
+                  Start simulation or provide a camera frame to align zones.
+                </text>
+              </>
+            )}
             {zones.map((zone) => (
               <polygon
                 key={zone.id}
@@ -162,7 +184,7 @@ export function ZoneEditorPage() {
             {points.length >= 2 && <polyline points={points.map(([x, y]) => `${x},${y}`).join(" ")} className="zone-draft-line" />}
             {points.map(([x, y], index) => <circle key={`${x}-${y}-${index}`} cx={x} cy={y} r="9" className="zone-draft-point" />)}
           </svg>
-          <p className="small-note">The editor uses a fixed reference coordinate system. Live detections are scaled into this reference before zone counting.</p>
+          <p className="small-note">The camera image is mapped into the 1280 × 720 zone reference coordinates. Saved zones use the same scaling in Traffic Logic and Live AI.</p>
         </section>
 
         <aside className="side-column">

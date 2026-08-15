@@ -91,3 +91,17 @@
 @media (max-width: 1300px) {
   .zone-editor-layout { grid-template-columns: 1fr; }
 }
+
+.zone-camera-image {
+  opacity: 0.88;
+}
+
+.zone-camera-empty {
+  fill: #05070a;
+}
+
+.zone-camera-empty-text {
+  fill: #8b949e;
+  font-size: 24px;
+  pointer-events: none;
+}

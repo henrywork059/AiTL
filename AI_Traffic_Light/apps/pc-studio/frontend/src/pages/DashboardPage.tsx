@@ -19,16 +19,16 @@ function statusClass(status: string) {
 export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refreshing }: Props) {
   const passCount = smokeStatus?.checks.filter((check) => check.status === "pass").length ?? 0;
   const warnCount = smokeStatus?.checks.filter((check) => check.status === "warn").length ?? 0;
-  const version = health?.version ?? smokeStatus?.version ?? "0_1_7";
+  const version = health?.version ?? smokeStatus?.version ?? "0_2_0";
 
   return (
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: version, note: "convergence + prototype tools candidate" },
+          { label: "Project stage", value: version, note: "camera-aligned zones + capture lifecycle candidate" },
           { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Training", value: "early stop", note: "live convergence history" },
+          { label: "Live AI", value: "zones + signal", note: "camera-aligned overlay" },
         ]}
       />
 

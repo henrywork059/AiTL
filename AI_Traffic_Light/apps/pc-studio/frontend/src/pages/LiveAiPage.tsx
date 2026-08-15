@@ -12,6 +12,7 @@ import { CameraDetectionView } from "../components/CameraDetectionView";
 import { DetectionTable } from "../components/DetectionTable";
 import { InferencePanel } from "../components/InferencePanel";
 import { LiveView } from "../components/LiveView";
+import { LiveTrafficSignalOverlay } from "../components/LiveTrafficSignalOverlay";
 import { StatusPanel } from "../components/StatusPanel";
 import { TrafficLight } from "../components/TrafficLight";
 import { ZonePanel } from "../components/ZonePanel";
@@ -62,6 +63,7 @@ export function LiveAiPage({
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
+  const [showZones, setShowZones] = useState(true);
   const [enabledClasses, setEnabledClasses] = useState<string[]>([]);
   const autoLoadAttempted = useRef(false);
 
@@ -275,19 +277,24 @@ export function LiveAiPage({
           </div>
         </div>
 
-        {hasCameraFrame ? (
-          <CameraDetectionView
-            cameraStatus={cameraStatus}
-            frame={liveFrame}
-            detections={liveDetections}
-            showBoxes={showBoxes}
-            showLabels={showLabels}
-          />
-        ) : mockFrame ? (
-          <LiveView frame={mockFrame} detections={mockDetections} zones={zones} />
-        ) : (
-          <p>Loading view...</p>
-        )}
+        <div className="live-canvas-shell">
+          {hasCameraFrame ? (
+            <CameraDetectionView
+              cameraStatus={cameraStatus}
+              frame={liveFrame}
+              detections={liveDetections}
+              zones={zones}
+              showBoxes={showBoxes}
+              showLabels={showLabels}
+              showZones={showZones}
+            />
+          ) : mockFrame ? (
+            <LiveView frame={mockFrame} detections={mockDetections} zones={showZones ? zones : []} />
+          ) : (
+            <p>Loading view...</p>
+          )}
+          <LiveTrafficSignalOverlay traffic={traffic} />
+        </div>
 
         <div className="live-inference-meta wrap-row">
           <span>Camera: <strong>{cameraStatus?.active_source_id ?? "none"}</strong></span>
@@ -302,6 +309,7 @@ export function LiveAiPage({
             <div className="button-row wrap-row">
               <label className="inline-toggle"><input type="checkbox" checked={showBoxes} onChange={(event) => setShowBoxes(event.target.checked)} /> Show boxes</label>
               <label className="inline-toggle"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Show labels</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showZones} onChange={(event) => setShowZones(event.target.checked)} /> Show zones</label>
             </div>
             <div className="class-filter-group">
               <strong>Visible classes</strong>
@@ -344,7 +352,7 @@ export function LiveAiPage({
         />
         {traffic && <TrafficLight traffic={traffic} />}
         {traffic && <StatusPanel traffic={traffic} />}
-        <p className="small-note">Traffic decision cards now use zone-aware simulation state in 0_1_7; they remain disconnected from physical traffic signals.</p>
+        <p className="small-note">The compact signal overlay and traffic decision cards use zone-aware simulation state in 0_2_0; they remain disconnected from physical traffic signals.</p>
         <ZonePanel zones={zones} />
       </aside>
 

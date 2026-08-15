@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import {
   buildTrainingDataset,
   captureImageUrl,
+  deleteDatasetCapture,
   fetchCaptureLabels,
   fetchDatasetCaptures,
   fetchTrainingDatasetStatus,
@@ -29,6 +30,7 @@ export function DatasetReviewPage() {
   const [trainingDataset, setTrainingDataset] = useState<TrainingDatasetStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [building, setBuilding] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -116,6 +118,30 @@ export function DatasetReviewPage() {
     }
   }
 
+  async function deleteSelectedCapture() {
+    if (!selectedCapture) return;
+    if (dirty && !window.confirm("This frame has unsaved label changes. Delete the captured image and discard those changes?")) return;
+    if (!window.confirm(`Delete captured image ${selectedCapture.capture_id}? The image, metadata, and saved manual labels will be permanently removed.`)) return;
+    setDeleting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await deleteDatasetCapture(selectedCapture.capture_id);
+      setLabelDocument(null);
+      setLabels([]);
+      setDirty(false);
+      setTrainingDataset(result.training_dataset);
+      await refreshCaptures(null);
+      setMessage(result.training_dataset.stale
+        ? `Deleted ${result.capture_id}. The managed YOLO dataset is now stale and should be rebuilt.`
+        : `Deleted ${result.capture_id}.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Captured image could not be deleted.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function buildDataset() {
     setBuilding(true);
     setError(null);
@@ -140,7 +166,7 @@ export function DatasetReviewPage() {
               <h2>Captured frames</h2>
               <p className="placeholder-copy">{captures.length} saved frame{captures.length === 1 ? "" : "s"}</p>
             </div>
-            <button onClick={() => void refreshCaptures(selectedCaptureId)} disabled={loading}>Refresh</button>
+            <button onClick={() => void refreshCaptures(selectedCaptureId)} disabled={loading || deleting}>Refresh</button>
           </div>
           <div className="capture-browser-list">
             {captures.map((capture) => (
@@ -184,8 +210,11 @@ export function DatasetReviewPage() {
                   </select>
                 </label>
                 <div className="label-toolbar-actions">
-                  <button onClick={() => updateLabels([])} disabled={labels.length === 0}>Clear boxes</button>
-                  <button onClick={() => void saveLabels()} disabled={saving}>{saving ? "Saving..." : "Save labels"}</button>
+                  <button onClick={() => updateLabels([])} disabled={labels.length === 0 || deleting}>Clear boxes</button>
+                  <button onClick={() => void saveLabels()} disabled={saving || deleting}>{saving ? "Saving..." : "Save labels"}</button>
+                  <button onClick={() => void deleteSelectedCapture()} disabled={saving || deleting}>
+                    {deleting ? "Deleting..." : "Delete captured image"}
+                  </button>
                 </div>
               </div>
               <LabelingCanvas
@@ -198,7 +227,7 @@ export function DatasetReviewPage() {
                 onChange={updateLabels}
               />
               <p className="small-note">
-                Saving zero boxes marks the image as a reviewed negative example. Frames tagged <code>bad</code> remain reviewable but are excluded from the managed training build.
+                Deleting a capture also removes its metadata and saved manual labels. If that capture was included in the managed YOLO build, the dataset becomes stale until rebuilt.
               </p>
               <div className="saved-label-list">
                 {labels.map((label, index) => (

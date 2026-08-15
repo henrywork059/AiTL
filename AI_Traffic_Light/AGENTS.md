@@ -15,8 +15,8 @@ docs/DEBUGGING_AND_LOGGING.md
 ## Project identity
 
 Project name: **AI Traffic Light**
-Current patch line: **0_1_x**
-Current patch: **0_1_7**
+Current patch line: **0_2_x**
+Current patch: **0_2_0**
 
 This is a student-scale AI vision traffic-light prototype. It is for simulation, demonstration, data capture, supervised labeling, local trained-model inference, and controlled testing. It must not be described or modified as a ready-to-deploy public-road traffic signal controller.
 
@@ -186,4 +186,4 @@ Use placeholders and `.gitkeep` files for folders that will later contain large/
 
 
 ## Current candidate note
-- Current candidate patch in this workspace: 0_1_7 (training convergence, automatic early stopping, and working prototype tools).
+- Current candidate patch in this workspace: 0_2_0 (capture deletion, camera-aligned zones, Live AI zone overlays, and compact signal overlay).

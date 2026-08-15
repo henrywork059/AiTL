@@ -44,6 +44,7 @@ class ErrorCode(str, Enum):
     DATASET_LABEL_INVALID = "ATL-DATASET-004"
     DATASET_TRAINING_NOT_READY = "ATL-DATASET-005"
     DATASET_BUILD_FAILED = "ATL-DATASET-006"
+    DATASET_DELETE_FAILED = "ATL-DATASET-007"
 
     TRAINING_NOT_READY = "ATL-TRAIN-001"
     TRAINING_CONFIG_INVALID = "ATL-TRAIN-002"
@@ -88,6 +89,7 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.DATASET_LABEL_INVALID: "Dataset label data is invalid.",
     ErrorCode.DATASET_TRAINING_NOT_READY: "The labeled dataset is not ready for a train/validation build.",
     ErrorCode.DATASET_BUILD_FAILED: "Failed to build the managed training dataset.",
+    ErrorCode.DATASET_DELETE_FAILED: "Failed to delete the selected dataset capture.",
     ErrorCode.TRAINING_NOT_READY: "Training prerequisites are not ready.",
     ErrorCode.TRAINING_CONFIG_INVALID: "Training configuration is invalid.",
     ErrorCode.TRAINING_RUN_FAILED: "Training run failed.",

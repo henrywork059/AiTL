@@ -24,10 +24,27 @@ Binary image responses include `X-Request-ID`.
 - `POST /api/camera/simulation/settings`
   - optional body fields: `{ "density": "busy", "paused": true }`.
 
+
+## Dataset capture lifecycle
+
+- `GET /api/dataset/status`
+  - returns persistent image/metadata/session counts and the latest capture when one exists.
+- `POST /api/dataset/captures`
+  - saves the exact current receiver/simulation frame with paired metadata.
+- `GET /api/dataset/captures`
+  - lists saved captures and manual-label state.
+- `DELETE /api/dataset/captures/{capture_id}`
+  - permanently removes the saved image, paired metadata, and optional manual-label JSON for one capture.
+  - response also includes current managed-training-dataset status so the UI can report when a previous YOLO build has become stale.
+  - missing captures use `ATL-DATASET-003`; deletion failures use `ATL-DATASET-007`.
+- `GET /api/dataset/captures/{capture_id}/image`
+- `GET|PUT /api/dataset/captures/{capture_id}/labels`
+
 ## Zones
 
 - `GET /api/zones/active`
-  - returns the validated active zone set, reference resolution, persistence source, and config path.
+  - returns the validated active zone set, 1280×720 reference resolution, persistence source, and config path.
+  - the frontend maps the current camera image into this reference coordinate system for editing and scales saved polygons into the active frame for Live AI overlays.
 - `PUT /api/zones/active`
   - body: `{ "zones": [{ "id": "...", "type": "crossing", "label": "...", "polygon": [[x,y], ...] }] }`.
   - replaces the complete active zone set after validation and persists it to `config/zones.json`.

@@ -1,15 +1,34 @@
 import { API_BASE, inferredFrameUrl } from "../api";
-import type { CameraStatus, Detection, DetectionFrame } from "../types";
+import type { CameraStatus, Detection, DetectionFrame, Zone } from "../types";
 
 type Props = {
   cameraStatus: CameraStatus | null;
   frame: DetectionFrame | null;
   detections: Detection[];
+  zones: Zone[];
   showBoxes: boolean;
   showLabels: boolean;
+  showZones: boolean;
 };
 
-export function CameraDetectionView({ cameraStatus, frame, detections, showBoxes, showLabels }: Props) {
+const ZONE_REFERENCE_WIDTH = 1280;
+const ZONE_REFERENCE_HEIGHT = 720;
+
+function scaledZonePoints(zone: Zone, width: number, height: number): string {
+  const scaleX = width / ZONE_REFERENCE_WIDTH;
+  const scaleY = height / ZONE_REFERENCE_HEIGHT;
+  return zone.polygon.map(([x, y]) => `${x * scaleX},${y * scaleY}`).join(" ");
+}
+
+export function CameraDetectionView({
+  cameraStatus,
+  frame,
+  detections,
+  zones,
+  showBoxes,
+  showLabels,
+  showZones,
+}: Props) {
   if (!cameraStatus?.frame_available) {
     return (
       <div className="live-camera-empty">
@@ -25,6 +44,8 @@ export function CameraDetectionView({ cameraStatus, frame, detections, showBoxes
     ? inferredFrameUrl(frame.source_id, frame.source_frame_number, frame.timestamp_ms)
     : `${API_BASE}/api/camera/frame?t=${cameraStatus.frame_number}`;
 
+  const shouldRenderOverlay = (showZones && zones.length > 0) || (frame !== null && showBoxes);
+
   return (
     <div className="live-camera-stage" style={{ aspectRatio: `${width} / ${height}` }}>
       <img
@@ -32,14 +53,32 @@ export function CameraDetectionView({ cameraStatus, frame, detections, showBoxes
         src={imageUrl}
         alt="Current camera frame"
       />
-      {frame && showBoxes && (
+      {shouldRenderOverlay && (
         <svg
           className="live-detection-overlay"
-          viewBox={`0 0 ${frame.image_width} ${frame.image_height}`}
+          viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
-          aria-label="Live object detection overlay"
+          aria-label="Live object detection and configured zone overlay"
         >
-          {detections.map((detection) => {
+          {showZones && zones.map((zone) => (
+            <g key={zone.id} className="live-zone-group">
+              <polygon
+                points={scaledZonePoints(zone, width, height)}
+                className={`live-zone-polygon live-zone-${zone.type}`}
+              />
+              {zone.polygon[0] && (
+                <text
+                  className="live-zone-label"
+                  x={zone.polygon[0][0] * (width / ZONE_REFERENCE_WIDTH) + 8}
+                  y={zone.polygon[0][1] * (height / ZONE_REFERENCE_HEIGHT) + 22}
+                >
+                  {zone.label}
+                </text>
+              )}
+            </g>
+          ))}
+
+          {frame && showBoxes && detections.map((detection) => {
             const [x1, y1, x2, y2] = detection.box_xyxy;
             const labelY = Math.max(22, y1 - 8);
             const labelWidth = Math.max(120, detection.class_name.length * 15 + 70);

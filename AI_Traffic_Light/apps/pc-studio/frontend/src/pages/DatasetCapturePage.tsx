@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_BASE, captureLatestFrame, fetchDatasetStatus } from "../api";
+import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatus } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import type { CameraStatus, CaptureQualityTag, CaptureRecord, DatasetStatus } from "../types";
 
@@ -13,13 +13,14 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
   const [qualityTag, setQualityTag] = useState<CaptureQualityTag>("unreviewed");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<CaptureRecord | null>(null);
 
   async function refreshStatus() {
     const nextStatus = await fetchDatasetStatus();
     setDatasetStatus(nextStatus);
-    if (nextStatus.last_capture) setLastCapture(nextStatus.last_capture);
+    setLastCapture(nextStatus.last_capture);
   }
 
   useEffect(() => {
@@ -40,6 +41,23 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
       setMessage(error instanceof Error ? error.message : "Capture failed.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteLastCapture() {
+    if (!lastCapture) return;
+    if (!window.confirm(`Delete captured image ${lastCapture.capture_id}? Its metadata and manual labels will also be removed.`)) return;
+    setDeleting(true);
+    setMessage(null);
+    try {
+      const result = await deleteDatasetCapture(lastCapture.capture_id);
+      setLastCapture(null);
+      setMessage(`Deleted ${result.capture_id}.`);
+      await refreshStatus();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Capture could not be deleted.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -89,10 +107,10 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
               Note
               <textarea value={note} maxLength={500} rows={4} onChange={(event) => setNote(event.target.value)} />
             </label>
-            <button onClick={() => void saveCurrentFrame()} disabled={saving || !cameraStatus?.frame_available || !sessionId}>
+            <button onClick={() => void saveCurrentFrame()} disabled={saving || deleting || !cameraStatus?.frame_available || !sessionId}>
               {saving ? "Saving..." : "Capture current frame"}
             </button>
-            {message && <p className={message.startsWith("Saved") ? "success-message" : "error-message"}>{message}</p>}
+            {message && <p className={message.startsWith("Saved") || message.startsWith("Deleted") ? "success-message" : "error-message"}>{message}</p>}
           </section>
 
           <section className="panel compact-panel">
@@ -103,7 +121,14 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
               <div><span>Sessions</span><strong>{datasetStatus?.session_count ?? 0}</strong></div>
               <div><span>Folder</span><strong>{datasetStatus?.dataset_path ?? "datasets/captures"}</strong></div>
             </div>
-            {lastCapture && <code className="endpoint-code">{lastCapture.image_path}</code>}
+            {lastCapture && (
+              <>
+                <code className="endpoint-code">{lastCapture.image_path}</code>
+                <button type="button" onClick={() => void deleteLastCapture()} disabled={deleting || saving}>
+                  {deleting ? "Deleting..." : "Delete last capture"}
+                </button>
+              </>
+            )}
           </section>
         </aside>
       </div>

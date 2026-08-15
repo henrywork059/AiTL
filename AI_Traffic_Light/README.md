@@ -4,7 +4,7 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 
 ## Current candidate
 
-- `0_1_7` — training convergence, automatic early stopping, and working prototype tools
+- `0_2_0` — capture deletion, camera-aligned zones, Live AI zone overlays, and compact signal display
 
 ## Implemented prototype functions
 
@@ -12,6 +12,7 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - use a controllable synthetic traffic scene with top-to-bottom pedestrians and horizontal vehicle motion
 - choose light / normal / busy simulation density and pause/resume an inspection frame
 - capture and persist dataset images
+- delete unwanted captures together with paired metadata and saved manual labels
 - manually label frames in the app
 - build a managed YOLO dataset
 - run local Ultralytics YOLO training
@@ -19,7 +20,9 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - stop training automatically when validation fitness stops improving for the configured patience window
 - discover, choose, default, and delete local trained models
 - run live inference overlays on receiver/simulation frames
-- create, edit, persist, and reset traffic-zone polygons
+- create, edit, persist, and reset traffic-zone polygons directly over the current camera/simulation feed
+- overlay saved zones on Live AI with reference-to-frame scaling
+- show the simulation-only traffic phase as a compact signal at the top-right of Live AI
 - count live detection centres inside configured zones
 - generate auditable simulation-only traffic phase recommendations from zone counts
 - persist active runtime settings

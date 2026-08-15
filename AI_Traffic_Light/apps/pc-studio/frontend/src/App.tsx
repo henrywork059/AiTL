@@ -110,7 +110,7 @@ export default function App() {
   }, [refreshAll]);
 
   useEffect(() => {
-    if (!["camera_sources", "dataset_capture", "live_ai"].includes(activePage)) return undefined;
+    if (!["camera_sources", "dataset_capture", "zone_editor", "live_ai"].includes(activePage)) return undefined;
 
     const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
     void refreshCamera();
@@ -189,7 +189,7 @@ export default function App() {
           />
         );
       case "zone_editor":
-        return <ZoneEditorPage />;
+        return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":
         return <TrafficLogicPage />;
       case "dataset_capture":

@@ -201,3 +201,92 @@
 .compact-header {
   align-items: center;
 }
+
+.live-canvas-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.live-zone-polygon {
+  fill: rgba(88, 166, 255, 0.08);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.live-zone-pedestrian_waiting { stroke: #a371f7; }
+.live-zone-crossing { stroke: #58a6ff; }
+.live-zone-vehicle_queue { stroke: #f0883e; }
+.live-zone-ignore { stroke: #8b949e; }
+
+.live-zone-label {
+  fill: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.9);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.live-signal-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(5, 7, 10, 0.86);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+}
+
+.live-signal-head {
+  display: grid;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 7px;
+  background: #11151a;
+}
+
+.live-signal-lamp {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  opacity: 0.18;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.live-signal-lamp.active { opacity: 1; }
+.live-signal-red { background: #ff5c5c; }
+.live-signal-amber { background: #f2cc60; }
+.live-signal-green { background: #3fb950; }
+
+.live-signal-copy {
+  display: grid;
+  gap: 1px;
+  max-width: 118px;
+  color: #c9d1d9;
+  font-size: 9px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.live-signal-copy strong {
+  color: #ffffff;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .live-signal-overlay {
+    top: 8px;
+    right: 8px;
+    transform: scale(0.88);
+    transform-origin: top right;
+  }
+}

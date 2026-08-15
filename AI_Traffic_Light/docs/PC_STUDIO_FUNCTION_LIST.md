@@ -9,6 +9,7 @@
 
 ## Dataset
 - capture latest frame with metadata
+- delete a captured image together with metadata and saved manual labels
 - manual bounding-box labeling
 - managed YOLO dataset build
 
@@ -19,20 +20,18 @@
 - configurable patience-based automatic early stopping
 
 ## Inference / Models
-- discover local trained models
-- choose a model to load
-- set a default model for auto-load
-- delete an outdated model run
+- discover/load/default/delete trained models
 - run live detections on receiver/simulation frames
 - adjust backend confidence down to 1%
-- toggle overlay boxes and labels
-- filter visible classes
+- toggle detection boxes, labels, classes, and saved zone overlays
 
 ## Zones / Traffic simulation
-- edit and persist polygon zones
+- edit and persist polygons directly over the current camera/simulation feed
 - reset simulation-aligned reference zones
+- scale persisted zones onto Live AI frames
 - count live detection centres inside zones
 - generate simulation-only phase recommendations with reasons and frame/zone audit data
+- show a compact simulation-only traffic signal at the top-right of Live AI
 
 ## System
 - persist runtime confidence, camera-status polling, training patience, and log level
