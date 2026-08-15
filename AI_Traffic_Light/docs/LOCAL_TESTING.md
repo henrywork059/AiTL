@@ -114,20 +114,23 @@ It cannot prove that every included file actually changed. Compare the ZIP manif
 
 ## 8. Key V021 manual checks
 
-1. Dashboard and visible version surfaces report `0_2_1` with the traffic-analytics candidate wording.
+1. Dashboard and visible version surfaces report `0_2_1` with the signal-aware traffic-analytics candidate wording.
 2. `/health`, `/api/smoke/status`, and `/api/template/pc-studio` report `0_2_1` consistently.
-3. Start simulation or upload a device frame and load a trained model. Confirm Traffic Logic shows whole-frame pedestrian/vehicle totals.
-4. In Zone Editor, create and save at least two `counting_region` polygons over different areas. Navigate away/back and confirm they persist.
-5. Confirm Traffic Logic shows separate pedestrian/vehicle/total occupancy for the configured regions while the existing simulation recommendation still depends only on waiting/crossing/queue logic.
-6. Leave the backend/model/simulation running for at least 20-30 seconds, open Traffic Analytics, and confirm timestamped points accumulate rather than duplicating one source frame.
-7. Switch Analytics between Whole frame and each counting region; confirm the chart and current/average/peak metrics change with the selected scope.
-8. Change time windows and confirm the number/range of plotted samples changes appropriately.
-9. Confirm busiest-region and phase-change summaries render when enough data exists.
-10. Export CSV and confirm the selected scope/time window is represented and the file contains timestamp/frame/count/phase/decision columns.
-11. Use Clear history after confirmation and verify the stored history is reset while captures, labels, zones, trained models, and settings remain intact. If valid inference continues, new samples may begin appearing again on the next recorder interval.
-12. Confirm the UI/documentation describes counts as sampled occupancy, not unique passage/throughput.
-13. Recheck original V020 camera-backed Zone Editor, Live AI saved-zone overlay, **Show zones**, compact simulated signal, and capture deletion lifecycle.
-14. Recheck V017 training convergence/early stopping, Settings, Logs, model selection/default/delete, confidence controls, simulation density/pause, capture, labeling, and training.
-15. Confirm no feature controls physical public-road traffic infrastructure.
+3. Start Simulation and watch a full signal cycle. Confirm vehicles stay in road lanes, stop behind the white stop lines during yellow/all-red/pedestrian phases, and move through the crossing on vehicle green.
+4. Confirm pedestrians approach from both sidewalks, wait at the curb during vehicle phases, begin crossing only on WALK, and continue clearing during CLEAR without new pedestrians entering.
+5. Confirm the signal drawn inside the camera frame and the compact Live AI signal show the same phase. Pause the simulation and confirm both agent positions and phase/countdown freeze.
+6. Start simulation or upload a device frame and load a trained model. Confirm Traffic Logic shows whole-frame pedestrian/vehicle totals. In simulation mode, confirm Active phase follows the simulator while Detection recommendation remains separately visible.
+7. In Zone Editor, create and save at least two `counting_region` polygons over different areas. Navigate away/back and confirm they persist.
+8. Confirm Traffic Logic shows separate pedestrian/vehicle/total occupancy for the configured regions while `counting_region` remains analytics-only.
+9. Leave the backend/model/simulation running for at least 20-30 seconds, open Traffic Analytics, and confirm timestamped points accumulate rather than duplicating one source frame.
+10. Switch Analytics between Whole frame and each counting region; confirm the chart and current/average/peak metrics change with the selected scope.
+11. Change time windows and confirm the number/range of plotted samples changes appropriately.
+12. Confirm busiest-region and phase-change summaries render when enough data exists.
+13. Export CSV and confirm the selected scope/time window is represented and the file contains timestamp/frame/count/phase/decision columns.
+14. Use Clear history after confirmation and verify the stored history is reset while captures, labels, zones, trained models, and settings remain intact. If valid inference continues, new samples may begin appearing again on the next recorder interval.
+15. Confirm the UI/documentation describes counts as sampled occupancy, not unique passage/throughput.
+16. Recheck original V020 camera-backed Zone Editor, Live AI saved-zone overlay, **Show zones**, compact simulated signal, and capture deletion lifecycle.
+17. Recheck V017 training convergence/early stopping, Settings, Logs, model selection/default/delete, confidence controls, simulation density/pause, capture, labeling, and training.
+18. Confirm no feature controls physical public-road traffic infrastructure.
 
 Only the owner can mark V021 passed after the required manual checks.

@@ -9,8 +9,9 @@ FastAPI backend for the local AI Traffic Light prototype.
 - run optional local Ultralytics training with per-epoch convergence history and automatic early stopping;
 - discover, load, default, and delete trained `best.pt` models;
 - run trained-model inference on receiver/simulation frames;
+- generate persistent signal-aware synthetic vehicle/pedestrian motion with stop-line and crosswalk waiting behavior;
 - persist editable traffic zones used by the camera-aligned frontend editor and count live detection centres inside them;
-- return simulation-only traffic recommendations from current zone counts;
+- return the active synthetic signal phase plus detection-driven recommendation metadata from current zone counts;
 - return whole-frame and per-region pedestrian/vehicle occupancy counts;
 - record bounded detection-backed traffic occupancy history under `outputs/traffic_history/`;
 - expose history queries, CSV export, peak/average/busiest-region summaries, and explicit history clearing;

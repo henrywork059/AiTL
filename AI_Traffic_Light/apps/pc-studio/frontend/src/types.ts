@@ -54,6 +54,9 @@ export type TrafficState = {
   vehicles_total?: number;
   decision: string;
   decision_reason: string;
+  recommended_phase?: TrafficState["phase"];
+  recommended_decision?: string;
+  recommended_decision_reason?: string;
   extension_seconds: number;
   data_source?: string;
   evaluated_at_ms?: number | null;

@@ -3,6 +3,8 @@
 ## Camera
 - receive JPEG/PNG frame
 - simulation mode and latest-frame preview
+- stateful signal-aware vehicle/pedestrian agents with lane, stop-line, curb, WALK, and CLEAR behavior
+- deterministic simulation signal phase/countdown exposed through camera status
 - Light / Normal / Busy synthetic density
 - pause/resume synthetic scene
 
@@ -30,7 +32,7 @@
 - count whole-frame pedestrians and vehicles from detection frames
 - count pedestrians/vehicles separately in each configured non-ignore region
 - generate simulation-only phase recommendations using the existing decision zones
-- show a compact simulation-only traffic signal in Live AI
+- show a compact simulation-only traffic signal in Live AI synchronized to the signal obeyed by synthetic agents
 
 ## Traffic analytics
 - record timestamped pedestrian/vehicle occupancy samples while the backend runs

@@ -212,15 +212,50 @@ def evaluate_traffic_state(
     return state
 
 
+def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
+    """Align displayed traffic phase with the signal that synthetic agents actually obey.
+
+    The detection-driven result is retained as recommendation metadata. This keeps
+    simulation motion deterministic and non-circular: rendering never depends on
+    inference, while the traffic layer can still explain what detections recommend.
+    """
+    if not camera_frame_service.simulation_enabled:
+        return state
+
+    signal = camera_frame_service.simulation_signal_state()
+    recommendation_phase = state["phase"]
+    recommendation_decision = state["decision"]
+    recommendation_reason = state["decision_reason"]
+    state = dict(state)
+    state.update(
+        {
+            "recommended_phase": recommendation_phase,
+            "recommended_decision": recommendation_decision,
+            "recommended_decision_reason": recommendation_reason,
+            "phase": signal["phase"],
+            "decision": "follow_simulation_signal",
+            "decision_reason": (
+                f"Synthetic vehicles and pedestrians obey the active {signal['phase'].replace('_', ' ')} "
+                f"signal ({signal['seconds_remaining']:.1f}s remaining). Detection-based recommendation: "
+                f"{recommendation_phase.replace('_', ' ')} — {recommendation_reason}"
+            ),
+            "extension_seconds": int(round(float(signal["seconds_remaining"]))),
+            "data_source": f"simulation_signal+{state.get('data_source', 'traffic_evaluation')}",
+        }
+    )
+    validate_traffic_state(state)
+    return state
+
+
 def get_live_traffic_state() -> dict[str, Any]:
     """Run or reuse current inference and evaluate it against persisted zones for simulation-only logic."""
     zones = zone_service.zones()
     frame = camera_frame_service.latest_frame()
     if frame is None:
-        return evaluate_traffic_state(None, zones, source="no_camera_frame")
+        return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="no_camera_frame"))
     status = inference_service.status()
     if not status.get("model_loaded"):
-        return evaluate_traffic_state(None, zones, source="model_not_loaded")
+        return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="model_not_loaded"))
     try:
         settings = runtime_settings_service.get()
         detection_frame = inference_service.detect_frame(
@@ -238,9 +273,11 @@ def get_live_traffic_state() -> dict[str, Any]:
                 "Traffic simulation could not obtain live detections",
                 extra={"error_code": exc.code.value},
             )
-            return evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}")
+            return _apply_active_simulation_signal(
+                evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}")
+            )
         raise
-    return evaluate_traffic_state(detection_frame, zones)
+    return _apply_active_simulation_signal(evaluate_traffic_state(detection_frame, zones))
 
 
 # Backward-compatible name used by older smoke code and offline fixtures.

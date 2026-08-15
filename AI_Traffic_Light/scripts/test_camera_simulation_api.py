@@ -1,4 +1,4 @@
-"""Focused FastAPI checks for V016 camera simulation controls."""
+"""Focused FastAPI checks for signal-aware camera simulation controls."""
 from __future__ import annotations
 
 import sys
@@ -48,23 +48,28 @@ def main() -> int:
     start = assert_envelope(client.post("/api/camera/simulation/start"))
     assert start["data"]["simulation_enabled"] is True
     assert start["data"]["simulation_density"] == "normal"
+    assert start["data"]["simulation_signal_phase"] == "vehicle_green"
+    assert start["data"]["simulation_signal_seconds_remaining"] is not None
+    assert start["data"]["simulation_signal_cycle_seconds"] == 34.0
+    assert start["data"]["simulation_signal_vehicle_go"] is True
+    assert start["data"]["simulation_signal_pedestrian_walk"] is False
 
-    busy = assert_envelope(
-        client.post("/api/camera/simulation/settings", json={"density": "busy"}),
-    )
+    busy = assert_envelope(client.post("/api/camera/simulation/settings", json={"density": "busy"}))
     assert busy["data"]["simulation_density"] == "busy"
 
-    paused = assert_envelope(
-        client.post("/api/camera/simulation/settings", json={"paused": True}),
-    )
+    paused = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": True}))
     assert paused["data"]["simulation_paused"] is True
+    paused_phase = paused["data"]["simulation_signal_phase"]
     frame_number = paused["data"]["frame_number"]
 
-    frame = client.get("/api/camera/frame", headers={"X-Request-ID": "req_v016_binary"})
+    frame = client.get("/api/camera/frame", headers={"X-Request-ID": "req_v021_signal_binary"})
     assert frame.status_code == 200
     assert frame.headers["content-type"].startswith("image/png")
-    assert frame.headers["x-request-id"] == "req_v016_binary"
+    assert frame.headers["x-request-id"] == "req_v021_signal_binary"
     assert int(frame.headers["x-frame-number"]) == frame_number
+
+    paused_status = assert_envelope(client.get("/api/camera/status"))
+    assert paused_status["data"]["simulation_signal_phase"] == paused_phase
 
     invalid = assert_envelope(
         client.post("/api/camera/simulation/settings", json={"density": "extreme"}),
@@ -72,13 +77,12 @@ def main() -> int:
     )
     assert invalid["error"]["code"] == "ATL-API-002"
 
-    resumed = assert_envelope(
-        client.post("/api/camera/simulation/settings", json={"paused": False}),
-    )
+    resumed = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": False}))
     assert resumed["data"]["simulation_paused"] is False
 
     stopped = assert_envelope(client.post("/api/camera/simulation/stop"))
     assert stopped["data"]["simulation_enabled"] is False
+    assert stopped["data"]["simulation_signal_phase"] is None
 
     pause_while_stopped = assert_envelope(
         client.post("/api/camera/simulation/settings", json={"paused": True}),
@@ -87,7 +91,8 @@ def main() -> int:
     assert pause_while_stopped["error"]["code"] == "ATL-CAMERA-004"
 
     print("[PASS] simulation settings API preserves standard envelopes and request IDs")
-    print("[PASS] density and pause/resume settings are exposed through thin camera routes")
+    print("[PASS] camera status exposes the exact signal phase/countdown obeyed by simulated agents")
+    print("[PASS] density and pause/resume settings preserve the signal-aware simulator")
     print("[PASS] binary camera frame includes X-Request-ID")
     print("[PASS] invalid settings use stable existing error codes")
     return 0

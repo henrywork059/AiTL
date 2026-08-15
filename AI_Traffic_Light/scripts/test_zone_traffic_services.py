@@ -11,7 +11,8 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.error_codes import ErrorCode  # noqa: E402
 from app.core.exceptions import AppError  # noqa: E402
-from app.services.traffic_logic import evaluate_traffic_state  # noqa: E402
+from app.services.camera_frames import camera_frame_service  # noqa: E402
+from app.services.traffic_logic import _apply_active_simulation_signal, evaluate_traffic_state  # noqa: E402
 from app.services.zones import ZoneService  # noqa: E402
 
 
@@ -93,11 +94,25 @@ def main() -> int:
         assert waiting_state["phase"] == "vehicle_yellow"
         assert waiting_state["decision"] == "prepare_pedestrian_green"
 
+        camera_frame_service.set_simulation(True)
+        try:
+            with camera_frame_service._lock:
+                camera_frame_service._simulation_clock_s = 18.2
+            aligned = _apply_active_simulation_signal(dict(waiting_state))
+            assert aligned["phase"] == "pedestrian_green"
+            assert aligned["recommended_phase"] == "vehicle_yellow"
+            assert aligned["recommended_decision"] == "prepare_pedestrian_green"
+            assert aligned["decision"] == "follow_simulation_signal"
+            assert "Detection-based recommendation" in aligned["decision_reason"]
+        finally:
+            camera_frame_service.set_simulation(False)
+
     print("[PASS] zone defaults and analytics counting regions can be saved/reloaded")
     print("[PASS] invalid polygons use the stable zone error code")
     print("[PASS] whole-frame pedestrian/vehicle occupancy is counted")
     print("[PASS] per-region pedestrian/vehicle counts are independent of traffic-phase rules")
     print("[PASS] existing crossing and vehicle-queue decisions remain simulation-only")
+    print("[PASS] simulation traffic phase matches the signal obeyed by synthetic agents while retaining recommendation metadata")
     return 0
 
 

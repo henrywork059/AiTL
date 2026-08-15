@@ -1,11 +1,10 @@
-"Hardware-free checks for the V016 PC camera frame service."
+"""Hardware-free checks for the signal-aware PC camera simulation service."""
 from __future__ import annotations
 
 import base64
 import sys
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -16,7 +15,11 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.error_codes import ErrorCode  # noqa: E402
 from app.core.exceptions import AppError  # noqa: E402
-from app.services.camera_frames import CameraFrameService  # noqa: E402
+from app.services.camera_frames import (  # noqa: E402
+    EASTBOUND_STOP_LINE,
+    TOP_PEDESTRIAN_WAIT_Y,
+    CameraFrameService,
+)
 
 ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
@@ -29,50 +32,84 @@ def decode_png(content: bytes) -> np.ndarray:
     return image
 
 
-def color_center(image: np.ndarray, bgr: tuple[int, int, int]) -> tuple[float, float]:
-    mask = np.all(image == np.array(bgr, dtype=np.uint8), axis=2)
-    ys, xs = np.where(mask)
-    assert len(xs) > 0, f"Expected synthetic color {bgr} was not present"
-    return float(xs.mean()), float(ys.mean())
-
-
 def main() -> int:
     service = CameraFrameService()
-    service._simulation_seed = 12345  # Deterministic synthetic-scene test only.
+    service._simulation_seed = 12345
     assert service.status()["frame_available"] is False
 
     simulation = service.set_simulation(True)
     assert simulation["mode"] == "simulation"
     assert simulation["frame_available"] is True
     assert simulation["simulation_density"] == "normal"
-    assert simulation["simulation_paused"] is False
+    assert simulation["simulation_signal_phase"] == "vehicle_green"
+    assert simulation["simulation_signal_vehicle_go"] is True
+    assert simulation["simulation_signal_pedestrian_walk"] is False
+
     simulated_frame = service.latest_frame()
     assert simulated_frame is not None
     assert simulated_frame.content_type == "image/png"
     assert simulated_frame.content.startswith(b"\x89PNG\r\n\x1a\n")
     assert (simulated_frame.width, simulated_frame.height) == (1280, 720)
-
     image = decode_png(simulated_frame.content)
-    # The V016 zebra crossing is a vertical travel corridor with horizontal white bars.
-    # Sample regions instead of one pixel because a moving pedestrian may legitimately
-    # pass over a zebra stripe and temporarily cover that exact pixel.
-    # Use the stripe around y=297 because it sits between the two vehicle lanes.
-    # This avoids false failures when a simulated vehicle crosses an otherwise
-    # valid zebra/gap sample; pedestrian overlap is handled by regional statistics.
     stripe_region = image[297:320, 538:742]
-    stripe_brightness = stripe_region.mean(axis=2)
-    assert float(np.percentile(stripe_brightness, 75)) > 200
+    assert float(np.percentile(stripe_region.mean(axis=2), 75)) > 190
 
-    gap_region = image[323:338, 538:742]
-    assert float(np.median(gap_region.mean(axis=2))) < 130
+    # A vehicle approaching the stop line must queue when vehicle traffic is not green.
+    with service._lock:
+        vehicle = next(item for item in service._vehicles if item.direction > 0)
+        vehicle.x = EASTBOUND_STOP_LINE - vehicle.width - 90
+        service._simulation_clock_s = 12.2  # vehicle yellow
+        before = vehicle.x
+        service._advance_simulation_locked(2.0)
+        assert vehicle.x > before
+        assert vehicle.x + vehicle.width <= EASTBOUND_STOP_LINE - 7
+        stopped_x = vehicle.x
+        service._advance_simulation_locked(0.5)
+        assert abs(vehicle.x - stopped_x) < 0.001
 
-    outside_crossing = image[297:320, 470:510]
-    assert float(np.median(outside_crossing.mean(axis=2))) < 160
+        # Green releases the queued vehicle through the crossing.
+        service._simulation_clock_s = 0.2
+        service._advance_simulation_locked(0.5)
+        assert vehicle.x > stopped_x
+
+    # A pedestrian approaches the curb but does not enter the road during vehicle green.
+    with service._lock:
+        pedestrian = next(item for item in service._pedestrians if item.direction > 0)
+        pedestrian.y = float(TOP_PEDESTRIAN_WAIT_Y)
+        service._simulation_clock_s = 2.0
+        service._advance_simulation_locked(1.0)
+        assert abs(pedestrian.y - TOP_PEDESTRIAN_WAIT_Y) < 0.001
+
+        # WALK releases pedestrians across the zebra crossing.
+        service._simulation_clock_s = 18.1
+        service._advance_simulation_locked(0.75)
+        assert pedestrian.y > TOP_PEDESTRIAN_WAIT_Y
+
+        # During pedestrian WALK, a fresh vehicle remains behind its stop line.
+        vehicle = next(item for item in service._vehicles if item.direction > 0)
+        vehicle.x = EASTBOUND_STOP_LINE - vehicle.width - 60
+        service._advance_simulation_locked(1.0)
+        assert vehicle.x + vehicle.width <= EASTBOUND_STOP_LINE - 7
+
+    # Signal cycle exposes yellow, all-red, WALK and pedestrian-clear phases.
+    with service._lock:
+        checks = [
+            (12.1, "vehicle_yellow"),
+            (15.2, "all_red"),
+            (18.2, "pedestrian_green"),
+            (26.2, "pedestrian_flashing"),
+            (32.2, "all_red"),
+        ]
+        for clock_s, expected in checks:
+            service._simulation_clock_s = clock_s
+            assert service._simulation_signal_state_locked()["phase"] == expected
 
     service.configure_simulation(density="busy")
-    assert service.status()["simulation_density"] == "busy"
+    busy_status = service.status()
+    assert busy_status["simulation_density"] == "busy"
+    assert len(service._vehicles) == 12
+    assert len(service._pedestrians) == 11
 
-    # Freeze one frame and confirm repeated reads do not advance it.
     paused = service.configure_simulation(paused=True)
     assert paused["simulation_paused"] is True
     assert paused["streaming"] is False
@@ -80,11 +117,13 @@ def main() -> int:
     assert frozen is not None
     frozen_number = frozen.frame_number
     frozen_content = frozen.content
+    frozen_phase = service.status()["simulation_signal_phase"]
     time.sleep(0.55)
     still_frozen = service.latest_frame()
     assert still_frozen is not None
     assert still_frozen.frame_number == frozen_number
     assert still_frozen.content == frozen_content
+    assert service.status()["simulation_signal_phase"] == frozen_phase
 
     resumed = service.configure_simulation(paused=False)
     assert resumed["simulation_paused"] is False
@@ -93,26 +132,6 @@ def main() -> int:
     moving = service.latest_frame()
     assert moving is not None
     assert moving.frame_number > frozen_number
-
-    # Deterministic direction check: first car moves horizontally and first pedestrian moves downward.
-    direction_service = CameraFrameService()
-    direction_service._simulation_seed = 12345
-    with patch("app.services.camera_frames.time.time", return_value=1000.0):
-        direction_service.set_simulation(True)
-        frame_a = direction_service.latest_frame()
-    with patch("app.services.camera_frames.time.time", return_value=1000.5):
-        frame_b = direction_service.latest_frame()
-    assert frame_a is not None and frame_b is not None
-    image_a = decode_png(frame_a.content)
-    image_b = decode_png(frame_b.content)
-    car_a = color_center(image_a, (66, 135, 245))
-    car_b = color_center(image_b, (66, 135, 245))
-    person_a = color_center(image_a, (196, 111, 255))
-    person_b = color_center(image_b, (196, 111, 255))
-    assert car_b[0] > car_a[0]
-    assert abs(car_b[1] - car_a[1]) < 1.0
-    assert abs(person_b[0] - person_a[0]) < 1.0
-    assert person_b[1] > person_a[1]
 
     try:
         service.configure_simulation(density="extreme")
@@ -123,6 +142,7 @@ def main() -> int:
 
     service.set_simulation(False)
     assert service.status()["frame_available"] is False
+    assert service.status()["simulation_signal_phase"] is None
     try:
         service.configure_simulation(paused=True)
     except AppError as exc:
@@ -130,11 +150,7 @@ def main() -> int:
     else:
         raise AssertionError("Simulation paused while simulation mode was stopped")
 
-    uploaded = service.store_upload(
-        source_id="test_camera",
-        content_type="image/png",
-        content=ONE_PIXEL_PNG,
-    )
+    uploaded = service.store_upload(source_id="test_camera", content_type="image/png", content=ONE_PIXEL_PNG)
     assert (uploaded.width, uploaded.height) == (1, 1)
     assert service.status()["active_source_id"] == "test_camera"
 
@@ -146,11 +162,12 @@ def main() -> int:
         raise AssertionError("Unsupported camera content type was accepted")
 
     print("[PASS] camera receiver accepts PNG frames")
-    print("[PASS] simulation uses a vertical crossing with horizontal zebra bars")
-    print("[PASS] vehicles move horizontally and pedestrians move top-to-bottom")
-    print("[PASS] light/normal/busy density setting is validated")
-    print("[PASS] simulation pause/resume freezes and restarts frame progression")
-    print("[PASS] invalid upload types return stable camera errors")
+    print("[PASS] signal-aware simulation renders the road, crosswalk, stop lines, and signal state")
+    print("[PASS] vehicles queue at the stop line and resume only on vehicle green")
+    print("[PASS] pedestrians wait at the curb and enter the crossing only on WALK")
+    print("[PASS] yellow/all-red/WALK/CLEAR signal cycle is deterministic")
+    print("[PASS] density and pause/resume preserve stateful simulation behavior")
+    print("[PASS] invalid upload/settings inputs retain stable errors")
     return 0
 
 

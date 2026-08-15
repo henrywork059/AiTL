@@ -55,13 +55,14 @@ export function TrafficLogicPage() {
               <div className="metric-card"><span>Pedestrians waiting</span><strong>{traffic.pedestrians_waiting}</strong></div>
               <div className="metric-card"><span>Pedestrians crossing</span><strong>{traffic.pedestrians_crossing}</strong></div>
               <div className="metric-card"><span>Vehicles queued</span><strong>{traffic.vehicles_waiting}</strong></div>
-              <div className="metric-card"><span>Suggested extension</span><strong>{traffic.extension_seconds}s</strong></div>
+              <div className="metric-card"><span>{traffic.recommended_phase ? "Phase remaining" : "Suggested extension"}</span><strong>{traffic.extension_seconds}s</strong></div>
             </div>
           ) : <p>Evaluating current traffic state...</p>}
           {traffic && (
             <>
               <div className="camera-status-list training-status-list">
                 <div><span>Decision</span><strong>{traffic.decision.split("_").join(" ")}</strong></div>
+                {traffic.recommended_phase && <div><span>Detection recommendation</span><strong>{traffic.recommended_phase.split("_").join(" ")}</strong></div>}
                 <div><span>Data source</span><strong>{traffic.data_source ?? "unknown"}</strong></div>
                 <div><span>Frame</span><strong>{traffic.evaluated_frame_number ?? "none"}</strong></div>
               </div>
@@ -80,7 +81,7 @@ export function TrafficLogicPage() {
               {zoneCounts.map(([zoneId, count]) => <div key={zoneId}><span>{zoneId}</span><strong>{count}</strong></div>)}
             </div>
           )}
-          <p className="small-note">Decision-zone counts preserve the existing traffic logic. Counting-region totals are analytics-only and do not change the phase recommendation.</p>
+          <p className="small-note">Decision-zone counts preserve the detection-based recommendation logic. In simulation mode the active phase follows the deterministic simulator signal; the detection recommendation is shown separately. Counting-region totals remain analytics-only.</p>
         </section>
       </div>
 

@@ -13,6 +13,7 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - receive or simulate camera frames
 - use a controllable synthetic traffic scene with top-to-bottom pedestrians and horizontal vehicle motion
 - choose light / normal / busy simulation density and pause/resume an inspection frame
+- run a stateful signal-aware junction simulation where vehicles queue at stop lines and pedestrians wait for WALK before using the zebra crossing
 - capture and persist dataset images
 - delete unwanted captures together with paired metadata and saved manual labels
 - manually label frames in the app
@@ -24,7 +25,7 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - run live inference overlays on receiver/simulation frames
 - create, edit, persist, and reset traffic-zone polygons directly over the current camera/simulation feed
 - overlay saved zones on Live AI with reference-to-frame scaling
-- show the simulation-only traffic phase as a compact signal at the top-right of Live AI
+- show the exact simulation signal obeyed by synthetic agents as a compact signal at the top-right of Live AI
 - count live detection centres inside configured zones
 - generate auditable simulation-only traffic phase recommendations from zone counts
 - count whole-frame detected pedestrians and vehicles per sampled frame

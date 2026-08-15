@@ -5,8 +5,8 @@ React/Vite GUI for the AI Traffic Light PC Studio prototype.
 ## Current working surfaces
 
 - Dashboard with current project/version and live smoke-test state;
-- Live AI receiver/simulation preview with trained-model boxes, saved zone overlays, visibility controls, and a compact simulated traffic signal;
-- Camera receiver plus density/pause-controlled simulation;
+- Live AI receiver/simulation preview with trained-model boxes, saved zone overlays, visibility controls, and a compact signal synchronized to the simulation agents;
+- Camera receiver plus density/pause-controlled signal-aware simulation with lane/stop-line vehicle behavior and curb/WALK pedestrian behavior;
 - persistent polygon Zone Editor drawn directly over the current camera/simulation frame;
 - live zone-count and simulation-only Traffic Logic view;
 - analytics-only counting regions created in the existing Zone Editor;

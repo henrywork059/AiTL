@@ -42,11 +42,27 @@ Errors use the documented `error` envelope. Binary/image and CSV responses inclu
 
 `counting_region` is analytics-only. It can overlap other regions and does not alter the simulation phase recommendation. Existing non-ignore traffic zones also expose pedestrian/vehicle region occupancy for analytics.
 
+### Signal-aware simulation status fields
+
+When simulation mode is active, camera status/start/settings responses also include:
+
+- `simulation_signal_phase`: active phase obeyed by synthetic agents (`vehicle_green`, `vehicle_yellow`, `all_red`, `pedestrian_green`, or `pedestrian_flashing`);
+- `simulation_signal_seconds_remaining`: approximate seconds remaining in the active phase;
+- `simulation_signal_cycle_seconds`: total deterministic cycle length (`34.0`);
+- `simulation_signal_vehicle_go`: true only during vehicle green;
+- `simulation_signal_pedestrian_walk`: true only during pedestrian WALK.
+
+When receiver mode is active, phase/countdown/cycle fields are `null` and the boolean go/walk flags are false.
+
 ## Traffic simulation state
+
+In simulation mode, `phase` is the active simulator signal that synthetic agents obey. The detection-driven phase/decision are retained as optional `recommended_phase`, `recommended_decision`, and `recommended_decision_reason` fields so the UI can compare the active safe simulation cycle with the CV recommendation without creating a circular dependency.
+
 
 - `GET /api/traffic/state`
   - obtains/reuses the current trained-model detection frame when available;
-  - returns the existing simulation-only phase recommendation;
+  - in receiver mode, returns the detection-driven simulation-only phase recommendation;
+  - in simulation mode, returns the exact active simulator signal as `phase` and preserves detection-driven output under `recommended_*`;
   - returns whole-frame sampled occupancy as `pedestrians_total` and `vehicles_total`;
   - returns `evaluated_at_ms`, source frame/timestamp metadata, `zone_counts`, and per-zone `region_counts`;
   - `region_counts[zone_id]` has `{ "pedestrians": n, "vehicles": n, "total": n }`;

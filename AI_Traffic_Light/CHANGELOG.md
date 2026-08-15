@@ -10,6 +10,10 @@
 - Added `GET /api/traffic/history`, `GET /api/traffic/history/export.csv`, and `DELETE /api/traffic/history` with request IDs/logging and stable `ATL-TRAFFIC-004..006` storage errors.
 - Extended `GET /api/traffic/state` with whole-frame totals, evaluation/source timestamps, and structured `region_counts`.
 - Clarified throughout the app/docs that analytics values are sampled occupancy, not unique passage/flow counts; stable cross-frame object tracking is not implemented.
+- Reworked the synthetic camera scene into a persistent signal-aware agent simulation: vehicles remain in horizontal lanes, queue at stop lines when not permitted to enter, and resume on vehicle green.
+- Reworked synthetic pedestrians to approach and wait at the curb, traverse the actual zebra crossing only after WALK begins, and finish clearing the crossing before vehicle traffic resumes.
+- Added a deterministic 34-second simulation signal cycle (vehicle green, vehicle yellow, all-red, pedestrian WALK, pedestrian CLEAR, all-red) with an on-frame signal/countdown and camera-status signal metadata.
+- In simulation mode, `/api/traffic/state.phase` now reflects the exact signal the synthetic agents obey while the detection-driven phase/decision are retained as `recommended_*` metadata for comparison.
 - Preserved V020 capture deletion, camera-aligned zones, Live AI zone/signal overlays, and V017 training/inference/settings/logging behavior.
 - Physical public-road traffic control remains disabled.
 

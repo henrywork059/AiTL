@@ -54,6 +54,17 @@ Stable traffic-history errors:
 
 These values are **sampled occupancy**, not unique passage/throughput counts. A vehicle visible in ten samples contributes one occupied vehicle to each of those ten samples; it is not counted as ten unique vehicles. Reliable unique passage counts require cross-frame tracking with stable track IDs and are intentionally not claimed by this patch.
 
+## Signal-aware simulation refinement
+
+- Replaces the previous position-from-clock animation with persistent synthetic vehicle and pedestrian agents.
+- Vehicles stay in horizontal road lanes, approach the crossing, queue behind direction-specific stop lines during yellow/all-red/pedestrian phases, and resume only on vehicle green. Vehicles already committed past a stop line are allowed to clear the crossing rather than stopping inside it.
+- Pedestrians approach the curb from both sides, wait outside the road until `pedestrian_green` (WALK), then traverse the zebra crossing. `pedestrian_flashing` is a CLEAR interval: pedestrians already crossing continue, but new crossings do not begin.
+- Uses a deterministic 34-second cycle: 12 s vehicle green, 3 s vehicle yellow, 3 s all-red, 8 s pedestrian WALK, 6 s pedestrian CLEAR, 2 s all-red.
+- The simulated camera frame visibly renders stop lines, vehicle/pedestrian signal heads, phase, and seconds remaining.
+- Camera status exposes `simulation_signal_phase`, `simulation_signal_seconds_remaining`, `simulation_signal_cycle_seconds`, `simulation_signal_vehicle_go`, and `simulation_signal_pedestrian_walk`.
+- In simulation mode the traffic-state `phase` is aligned to the active simulation signal so Live AI signal graphics cannot contradict agent motion. Detection-driven output remains available as `recommended_phase`, `recommended_decision`, and `recommended_decision_reason`.
+- This remains a local visualization/simulation model only; it is not traffic engineering timing logic and is not connected to physical signals.
+
 ## Compatibility and safety
 
 V020 capture deletion, camera-aligned zone editing, Live AI zone overlays, Show zones control, and compact simulated traffic signal remain in scope. V017 training convergence/early stopping, settings/logs, model management, capture/label/build/training, and inference behavior remain regression requirements.
