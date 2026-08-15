@@ -1,4 +1,4 @@
-"""Hardware-free checks for the V016 PC camera frame service."""
+"Hardware-free checks for the V016 PC camera frame service."
 from __future__ import annotations
 
 import base64
@@ -54,9 +54,20 @@ def main() -> int:
 
     image = decode_png(simulated_frame.content)
     # The V016 zebra crossing is a vertical travel corridor with horizontal white bars.
-    assert int(image[210, 640].mean()) > 200
-    assert int(image[240, 640].mean()) < 130
-    assert int(image[210, 500].mean()) < 160
+    # Sample regions instead of one pixel because a moving pedestrian may legitimately
+    # pass over a zebra stripe and temporarily cover that exact pixel.
+    # Use the stripe around y=297 because it sits between the two vehicle lanes.
+    # This avoids false failures when a simulated vehicle crosses an otherwise
+    # valid zebra/gap sample; pedestrian overlap is handled by regional statistics.
+    stripe_region = image[297:320, 538:742]
+    stripe_brightness = stripe_region.mean(axis=2)
+    assert float(np.percentile(stripe_brightness, 75)) > 200
+
+    gap_region = image[323:338, 538:742]
+    assert float(np.median(gap_region.mean(axis=2))) < 130
+
+    outside_crossing = image[297:320, 470:510]
+    assert float(np.median(outside_crossing.mean(axis=2))) < 160
 
     service.configure_simulation(density="busy")
     assert service.status()["simulation_density"] == "busy"
