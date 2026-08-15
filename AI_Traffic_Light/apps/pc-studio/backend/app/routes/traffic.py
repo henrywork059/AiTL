@@ -2,6 +2,8 @@ from fastapi import APIRouter, Query, Request, Response
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
+from app.services.object_tracking import object_tracking_service
+from app.services.traffic_flow import traffic_flow_service
 from app.services.traffic_history import traffic_history_service
 from app.services.traffic_logic import get_live_traffic_state
 from app.services.zones import zone_service
@@ -90,5 +92,90 @@ def clear_traffic_history(request: Request) -> dict:
     logger.info(
         "Traffic history cleared through API",
         extra={"request_id": request.state.request_id, "removed_samples": data.get("removed_samples")},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+@router.get("/tracks")
+def tracking_status(request: Request) -> dict:
+    """Return active in-memory prototype tracks for the latest processed detection frame."""
+    data = object_tracking_service.status()
+    logger.info(
+        "Traffic tracking status returned",
+        extra={"request_id": request.state.request_id, "active_track_count": data.get("active_track_count")},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/flow")
+def traffic_flow(
+    request: Request,
+    minutes: int = Query(default=15, ge=0, le=360),
+    limit: int = Query(default=10000, ge=1, le=50000),
+    line_id: str | None = Query(default=None, min_length=1, max_length=64),
+    region_id: str | None = Query(default=None, min_length=1, max_length=64),
+    class_name: str | None = Query(default=None, min_length=1, max_length=64),
+) -> dict:
+    """Return persisted track-derived line crossings, region events, dwell metrics, and minute buckets."""
+    data = traffic_flow_service.query(
+        zones=zone_service.zones(),
+        minutes=minutes,
+        limit=limit,
+        line_id=line_id,
+        region_id=region_id,
+        class_name=class_name,
+    )
+    logger.info(
+        "Traffic flow analytics returned",
+        extra={
+            "request_id": request.state.request_id,
+            "event_count": len(data.get("events", [])),
+            "minutes": minutes,
+            "line_id": line_id,
+            "region_id": region_id,
+            "class_name": class_name,
+        },
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/flow/export.csv")
+def traffic_flow_export(
+    request: Request,
+    minutes: int = Query(default=15, ge=0, le=360),
+    limit: int = Query(default=50000, ge=1, le=100000),
+    line_id: str | None = Query(default=None, min_length=1, max_length=64),
+    region_id: str | None = Query(default=None, min_length=1, max_length=64),
+    class_name: str | None = Query(default=None, min_length=1, max_length=64),
+) -> Response:
+    """Export selected track-derived flow events as CSV."""
+    csv_text = traffic_flow_service.export_csv(
+        zones=zone_service.zones(),
+        minutes=minutes,
+        limit=limit,
+        line_id=line_id,
+        region_id=region_id,
+        class_name=class_name,
+    )
+    logger.info(
+        "Traffic flow CSV exported",
+        extra={"request_id": request.state.request_id, "minutes": minutes, "line_id": line_id, "region_id": region_id},
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="aitl_traffic_flow.csv"',
+            "X-Request-ID": request.state.request_id,
+        },
+    )
+
+
+@router.delete("/flow")
+def clear_traffic_flow(request: Request) -> dict:
+    """Clear persisted track-event analytics without deleting occupancy history or project data."""
+    data = traffic_flow_service.clear()
+    logger.info(
+        "Traffic flow history cleared through API",
+        extra={"request_id": request.state.request_id, "removed_events": data.get("removed_events")},
     )
     return ok(data, request_id=request.state.request_id)

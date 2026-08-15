@@ -19,8 +19,8 @@ Use this as the short execution checklist. See `../AGENTS.md` and `AI_AGENT_GUID
 - [ ] Reuse shared API client, types, error codes, logging, and request IDs.
 - [ ] Preserve existing accepted/candidate behavior outside the task.
 - [ ] Keep traffic decisions simulation/recommendation-only.
-- [ ] Avoid destructive operations on datasets, outputs, models, labels, traffic history, or runtime config.
-- [ ] Do not call repeated detection occupancy samples unique passage/throughput without implemented tracking.
+- [ ] Avoid destructive operations on datasets, outputs, models, labels, occupancy/flow history, or runtime config.
+- [ ] Keep occupancy and flow separate. Only call a passage unique when it comes from a recorded track/counting-line event; document tracker limitations.
 
 ## Version and documentation
 

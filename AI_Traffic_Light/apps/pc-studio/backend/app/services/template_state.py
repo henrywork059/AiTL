@@ -29,8 +29,8 @@ def get_template_summary() -> dict[str, Any]:
         "pages": PC_STUDIO_PAGES,
         "implementation_note": (
             "All main PC Studio pages expose working prototype behavior: live/camera tools, camera-aligned persistent zones, "
-            "Live AI zone/signal overlays, zone-aware simulation decisions, persistent traffic occupancy history/analytics, capture deletion, labeling/training/model management, "
-            "runtime settings, and real recent logs. Training includes convergence history and early stopping. Model export, automatic labeling, "
+            "Live AI zone/signal overlays, zone-aware simulation decisions, occupancy history plus cross-frame tracking/flow analytics, capture deletion, labeling/training/model management, "
+            "runtime settings, and real recent logs. V022 adds stable prototype track IDs, counting-line passages, region entry/exit/dwell, and flow CSV export. Training includes convergence history and early stopping. Model export, automatic labeling, "
             "and physical public-road control remain disabled."
         ),
     }

@@ -101,3 +101,44 @@
   font-size: 11px;
   overflow-wrap: anywhere;
 }
+
+.traffic-mode-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  background: #0d1117;
+}
+
+.traffic-mode-tabs button.active {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.16);
+}
+
+.traffic-event-table-wrap {
+  overflow-x: auto;
+}
+
+.traffic-event-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.traffic-event-table th,
+.traffic-event-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #21262d;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.traffic-event-table th {
+  color: #8b949e;
+  font-weight: 600;
+}
+
+.traffic-event-table td {
+  color: #c9d1d9;
+}

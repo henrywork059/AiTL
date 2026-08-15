@@ -18,7 +18,7 @@ DEFAULT_ZONE_PATH = PROJECT_ROOT / "config" / "zones.json"
 REFERENCE_WIDTH = 1280
 REFERENCE_HEIGHT = 720
 ZONE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-ZONE_TYPES = {"pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"}
+ZONE_TYPES = {"pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "counting_line", "ignore"}
 
 DEFAULT_ZONES: list[dict[str, Any]] = [
     {
@@ -154,12 +154,15 @@ class ZoneService:
                     status_code=422,
                     details={"zone_id": zone_id},
                 )
-            if not isinstance(polygon, list) or not 3 <= len(polygon) <= 32:
+            minimum_points = 2 if zone_type == "counting_line" else 3
+            maximum_points = 2 if zone_type == "counting_line" else 32
+            if not isinstance(polygon, list) or not minimum_points <= len(polygon) <= maximum_points:
+                expected = "exactly 2 points" if zone_type == "counting_line" else "3-32 points"
                 raise AppError(
                     ErrorCode.ZONE_CONFIG_INVALID,
-                    "Each zone polygon must contain 3-32 points.",
+                    f"Zone geometry for {zone_type} must contain {expected}.",
                     status_code=422,
-                    details={"zone_id": zone_id},
+                    details={"zone_id": zone_id, "zone_type": zone_type},
                 )
             points: list[list[int]] = []
             for point in polygon:
@@ -187,6 +190,13 @@ class ZoneService:
                         details={"zone_id": zone_id, "point": [x, y]},
                     )
                 points.append([x, y])
+            if zone_type == "counting_line" and points[0] == points[1]:
+                raise AppError(
+                    ErrorCode.ZONE_CONFIG_INVALID,
+                    "A counting line must use two different points.",
+                    status_code=422,
+                    details={"zone_id": zone_id},
+                )
             seen.add(zone_id)
             validated.append({"id": zone_id, "type": zone_type, "label": label, "polygon": points})
         return validated

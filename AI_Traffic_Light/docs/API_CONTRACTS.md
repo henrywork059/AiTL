@@ -31,16 +31,16 @@ Errors use the documented `error` envelope. Binary/image and CSV responses inclu
 - `GET /api/dataset/training-dataset/status`
 - `POST /api/dataset/training-dataset`
 
-## Zones and counting regions
+## Zones, counting regions, and counting lines
 
 - `GET /api/zones/active`
   - returns the active zone set in the 1280×720 reference coordinate system.
 - `PUT /api/zones/active`
   - replaces the complete active zone set after validation.
-  - supported types: `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, `ignore`.
+  - supported types: `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, `counting_line`, `ignore`.
 - `POST /api/zones/reset`
 
-`counting_region` is analytics-only. It can overlap other regions and does not alter the simulation phase recommendation. Existing non-ignore traffic zones also expose pedestrian/vehicle region occupancy for analytics.
+`counting_region` and `counting_line` are analytics-only and do not alter the simulation phase recommendation. Polygon types use 3-32 points; `counting_line` uses exactly two distinct points. Existing non-ignore polygon zones expose pedestrian/vehicle region occupancy and track entry/exit/dwell analytics.
 
 ### Signal-aware simulation status fields
 
@@ -68,14 +68,14 @@ In simulation mode, `phase` is the active simulator signal that synthetic agents
   - `region_counts[zone_id]` has `{ "pedestrians": n, "vehicles": n, "total": n }`;
   - no response is connected to physical public-road traffic infrastructure.
 
-The whole-frame and region counts are per-frame occupancy observations. They are not unique passage/throughput counts because the current inference path does not maintain stable object track IDs across frames.
+Whole-frame and region counts remain per-frame occupancy observations. V022 separately assigns prototype track IDs and generates unique-passage events only when a track crosses a configured `counting_line`; do not sum occupancy samples and call them throughput.
 
 ## Traffic history and analytics
 
 - `GET /api/traffic/history?minutes=15&limit=2000&region_id=<optional>`
   - `minutes`: `0..360`; `0` means all retained samples.
   - `limit`: `1..10000`.
-  - optional `region_id` selects one configured non-ignore zone; omitted means whole frame.
+  - optional `region_id` selects one configured non-ignore polygon region; counting lines are excluded from occupancy scopes; omitted means whole frame.
   - returns recording configuration, selected scope, available regions, ordered points, and summary statistics.
   - each point includes recorded/source timestamps, source frame number, pedestrian occupancy, vehicle occupancy, phase, and decision.
   - summary includes averages, peaks with timestamps, phase-change count/latest phase change, and busiest configured region.
@@ -87,6 +87,30 @@ The whole-frame and region counts are per-frame occupancy observations. They are
   - does not delete captures, labels, zones, settings, trained models, or training runs.
 
 History is stored locally under `outputs/traffic_history/history.jsonl`, is runtime data, and is excluded from source patches. Default target sampling interval is 1000 ms and default retained capacity is 21,600 samples. Environment overrides are `AITL_TRAFFIC_HISTORY_INTERVAL_MS`, `AITL_TRAFFIC_HISTORY_MAX_SAMPLES`, and `AITL_TRAFFIC_HISTORY_PATH`.
+
+## Cross-frame tracking and flow analytics
+
+`GET /api/inference/detections` now enriches supported traffic classes (`person`, `car`, `bus`, `truck`, `motorcycle`, `bicycle`) with optional `track_id` and `track_age_frames`. Repeated processing of the same source frame is idempotent and cannot generate duplicate flow events.
+
+- `GET /api/traffic/tracks`
+  - returns current in-memory tracking status, active tracks, class counts, tracker session ID, and latest processed source frame.
+- `GET /api/traffic/flow?minutes=15&limit=10000&line_id=<optional>&region_id=<optional>&class_name=<optional>`
+  - `minutes`: `0..360`; `0` means all retained events.
+  - optional `line_id` filters a configured `counting_line`.
+  - optional `region_id` filters a configured polygon region.
+  - optional `class_name` filters one detected class.
+  - returns raw ordered events, per-minute buckets, configured lines/regions, persistence status, and summary metrics.
+  - `line_crossing` events include one of `left_to_right`, `right_to_left`, `top_to_bottom`, or `bottom_to_top`.
+  - each track is counted at most once per counting line in the current prototype session to suppress jitter double-counting.
+  - `region_entry`/`region_exit` events represent outside/inside transitions; completed exits include `dwell_ms`. Pedestrian exits from `pedestrian_waiting` regions contribute to average pedestrian-wait duration.
+- `GET /api/traffic/flow/export.csv?...`
+  - exports selected flow events as UTF-8 CSV with `X-Request-ID`.
+- `DELETE /api/traffic/flow`
+  - clears only persisted flow-event history. It does not clear V021 occupancy history, zones, captures, labels, settings, models, or training runs.
+
+Flow events are stored under `outputs/traffic_flow/events.jsonl`, are runtime/user data, and are excluded from source patches. Default capacity is 50,000 events. Environment overrides: `AITL_TRAFFIC_FLOW_PATH` and `AITL_TRAFFIC_FLOW_MAX_EVENTS`.
+
+The V022 tracker is lightweight class-aware centroid/IoU matching. Heavy occlusion, abrupt motion, long detection gaps, or crowded same-class crossings can still lose/swap IDs; flow remains prototype analytics, not certified traffic measurement.
 
 ## Training
 

@@ -15,6 +15,8 @@ import type {
   RuntimeSettings,
   SimulationDensity,
   SmokeStatus,
+  TrafficFlow,
+  TrafficFlowClearResult,
   TrafficHistory,
   TrafficHistoryClearResult,
   TrafficState,
@@ -72,6 +74,34 @@ const fallbackSmokeStatus: SmokeStatus = {
   },
 };
 
+
+const fallbackTrafficFlow: TrafficFlow = {
+  recording: false,
+  max_events: 0,
+  stored_events: 0,
+  flow_path: "outputs/traffic_flow/events.jsonl",
+  oldest_event_at_ms: null,
+  newest_event_at_ms: null,
+  minutes: 15,
+  filters: { line_id: null, region_id: null, class_name: null },
+  lines: [],
+  regions: [],
+  events: [],
+  buckets: [],
+  summary: {
+    unique_passages: 0,
+    unique_vehicle_passages: 0,
+    unique_pedestrian_passages: 0,
+    region_entries: 0,
+    region_exits: 0,
+    average_dwell_ms: 0,
+    average_pedestrian_wait_ms: 0,
+    direction_counts: {},
+    line_counts: {},
+    region_average_dwell_ms: {},
+    unique_event_tracks: 0,
+  },
+};
 
 const fallbackTrafficHistory: TrafficHistory = {
   recording: false,
@@ -278,6 +308,40 @@ export function trafficHistoryExportUrl(minutes = 15, regionId: string | null = 
   const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
   if (regionId) params.set("region_id", regionId);
   return `${API_BASE}/api/traffic/history/export.csv?${params.toString()}`;
+}
+
+export async function fetchTrafficFlow(
+  minutes = 15,
+  lineId: string | null = null,
+  regionId: string | null = null,
+  className: string | null = null,
+): Promise<TrafficFlow> {
+  const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
+  if (lineId) params.set("line_id", lineId);
+  if (regionId) params.set("region_id", regionId);
+  if (className) params.set("class_name", className);
+  return requestJson<TrafficFlow>(`${API_BASE}/api/traffic/flow?${params.toString()}`, {
+    ...fallbackTrafficFlow,
+    minutes,
+    filters: { line_id: lineId, region_id: regionId, class_name: className },
+  });
+}
+
+export async function clearTrafficFlow(): Promise<TrafficFlowClearResult> {
+  return requestJsonStrict<TrafficFlowClearResult>(`${API_BASE}/api/traffic/flow`, { method: "DELETE" });
+}
+
+export function trafficFlowExportUrl(
+  minutes = 15,
+  lineId: string | null = null,
+  regionId: string | null = null,
+  className: string | null = null,
+): string {
+  const params = new URLSearchParams({ minutes: String(minutes), limit: "100000" });
+  if (lineId) params.set("line_id", lineId);
+  if (regionId) params.set("region_id", regionId);
+  if (className) params.set("class_name", className);
+  return `${API_BASE}/api/traffic/flow/export.csv?${params.toString()}`;
 }
 
 export async function fetchRecentLogs(limit = 100): Promise<RecentLog[]> {

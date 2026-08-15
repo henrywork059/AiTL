@@ -30,6 +30,9 @@
 .zone-editor-crossing { stroke: #58a6ff; }
 .zone-editor-vehicle_queue { stroke: #f0883e; }
 .zone-editor-counting_region { stroke: #3fb950; stroke-dasharray: 10 6; }
+.zone-editor-counting_line { stroke: #f2cc60; stroke-dasharray: 14 7; }
+.zone-editor-line { stroke-width: 7; vector-effect: non-scaling-stroke; }
+.zone-editor-selected-line { stroke-width: 11; }
 .zone-editor-ignore { stroke: #8b949e; }
 .zone-editor-selected { fill: rgba(126, 231, 135, 0.14); stroke-width: 6; }
 

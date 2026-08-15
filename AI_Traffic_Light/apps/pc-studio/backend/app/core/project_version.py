@@ -61,4 +61,4 @@ def load_project_version(path: Path = VERSION_FILE) -> ProjectVersionInfo:
 
 PROJECT_VERSION_INFO = load_project_version()
 PROJECT_VERSION = PROJECT_VERSION_INFO.version
-PROJECT_MODE = "camera_zones_capture_and_traffic_analytics_candidate"
+PROJECT_MODE = "cross_frame_tracking_and_flow_analytics_candidate"

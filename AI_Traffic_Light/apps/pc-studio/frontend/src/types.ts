@@ -4,6 +4,34 @@ export type Detection = {
   class_name: string;
   confidence: number;
   box_xyxy: [number, number, number, number];
+  track_id?: string;
+  track_age_frames?: number;
+};
+
+export type TrackingTrack = {
+  track_id: string;
+  class_id: number;
+  class_name: string;
+  box_xyxy: [number, number, number, number];
+  center_xy: [number, number];
+  first_seen_ms: number;
+  last_seen_ms: number;
+  age_frames: number;
+  missed_frames: number;
+  inside_regions: string[];
+};
+
+export type TrackingStatus = {
+  session_id: string;
+  active_track_count: number;
+  active_vehicle_tracks: number;
+  active_pedestrian_tracks: number;
+  total_tracks_created: number;
+  events_recorded: number;
+  last_source_id: string | null;
+  last_frame_number: number | null;
+  tracks: TrackingTrack[];
+  prototype_tracker: string;
 };
 
 export type DetectionFrame = {
@@ -14,9 +42,10 @@ export type DetectionFrame = {
   timestamp_ms: number;
   source_frame_number?: number;
   detections: Detection[];
+  tracking?: TrackingStatus;
 };
 
-export type ZoneType = "pedestrian_waiting" | "crossing" | "vehicle_queue" | "counting_region" | "ignore";
+export type ZoneType = "pedestrian_waiting" | "crossing" | "vehicle_queue" | "counting_region" | "counting_line" | "ignore";
 
 export type Zone = {
   id: string;
@@ -64,6 +93,7 @@ export type TrafficState = {
   evaluated_frame_number?: number | null;
   zone_counts?: Record<string, number>;
   region_counts?: Record<string, RegionCount>;
+  tracking?: TrackingStatus;
   prototype_only?: boolean;
 };
 
@@ -141,6 +171,76 @@ export type TrafficHistoryClearResult = {
   history_path: string;
   oldest_recorded_at_ms: number | null;
   newest_recorded_at_ms: number | null;
+};
+
+
+export type TrafficFlowEvent = {
+  event_id: string;
+  event_type: "line_crossing" | "region_entry" | "region_exit" | string;
+  timestamp_ms: number;
+  source_frame_number: number;
+  track_id: string;
+  class_id: number;
+  class_name: string;
+  line_id?: string;
+  line_label?: string;
+  region_id?: string;
+  region_label?: string;
+  region_type?: string;
+  direction?: "left_to_right" | "right_to_left" | "top_to_bottom" | "bottom_to_top" | string;
+  dwell_ms?: number;
+  x: number;
+  y: number;
+};
+
+export type TrafficFlowBucket = {
+  bucket_start_ms: number;
+  line_crossings: number;
+  vehicles: number;
+  pedestrians: number;
+  region_entries: number;
+  region_exits: number;
+};
+
+export type TrafficFlowSummary = {
+  unique_passages: number;
+  unique_vehicle_passages: number;
+  unique_pedestrian_passages: number;
+  region_entries: number;
+  region_exits: number;
+  average_dwell_ms: number;
+  average_pedestrian_wait_ms: number;
+  direction_counts: Record<string, number>;
+  line_counts: Record<string, number>;
+  region_average_dwell_ms: Record<string, number>;
+  unique_event_tracks: number;
+};
+
+export type TrafficFlow = {
+  recording: boolean;
+  max_events: number;
+  stored_events: number;
+  flow_path: string;
+  oldest_event_at_ms: number | null;
+  newest_event_at_ms: number | null;
+  minutes: number;
+  filters: { line_id: string | null; region_id: string | null; class_name: string | null };
+  lines: { id: string; label: string }[];
+  regions: { id: string; label: string; type: string }[];
+  events: TrafficFlowEvent[];
+  buckets: TrafficFlowBucket[];
+  summary: TrafficFlowSummary;
+};
+
+export type TrafficFlowClearResult = {
+  cleared: boolean;
+  removed_events: number;
+  recording: boolean;
+  max_events: number;
+  stored_events: number;
+  flow_path: string;
+  oldest_event_at_ms: number | null;
+  newest_event_at_ms: number | null;
 };
 
 export type BackendHealth = {

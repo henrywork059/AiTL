@@ -33,6 +33,7 @@
               "crossing",
               "vehicle_queue",
               "counting_region",
+              "counting_line",
               "ignore"
             ]
           },
@@ -41,7 +42,6 @@
           },
           "polygon": {
             "type": "array",
-            "minItems": 3,
             "items": {
               "type": "array",
               "minItems": 2,
@@ -49,9 +49,40 @@
               "items": {
                 "type": "number"
               }
+            },
+            "maxItems": 32
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "counting_line"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "polygon": {
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "polygon": {
+                  "minItems": 3,
+                  "maxItems": 32
+                }
+              }
             }
           }
-        }
+        ]
       }
     }
   }

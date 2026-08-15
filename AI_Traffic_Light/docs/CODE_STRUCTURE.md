@@ -114,12 +114,15 @@ Frontend failures should preserve actionable backend error messages/codes throug
 Keep responsibilities separated:
 
 ```text
-services/traffic_logic.py      one-frame counting + simulation recommendation
+services/traffic_logic.py      one-frame occupancy counting + simulation recommendation
+services/object_tracking.py    frame-deduplicated cross-frame identity + line/region event generation
 services/traffic_history.py    bounded persistent occupancy history/query/export
-services/traffic_recorder.py   background sampling lifecycle
+services/traffic_flow.py       bounded persistent track-event query/summary/export
+services/traffic_recorder.py   background occupancy sampling lifecycle
 routes/traffic.py              thin HTTP translation only
-frontend TrafficAnalyticsPage  analytics page coordination
-TrafficHistoryChart            reusable chart rendering
+frontend TrafficAnalyticsPage  occupancy/flow page coordination
+TrafficHistoryChart            reusable occupancy chart rendering
+TrafficFlowChart               reusable per-minute flow/region-event chart rendering
 ```
 
-`counting_region` is a zone-schema concept used for analytics only. Per-frame occupancy is not unique flow tracking.
+`counting_region` and `counting_line` are analytics-only zone-schema concepts. Occupancy remains per-frame. Unique passage is derived only from a stable track crossing a counting line.

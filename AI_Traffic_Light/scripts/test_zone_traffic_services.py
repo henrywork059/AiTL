@@ -40,12 +40,19 @@ def main() -> int:
             "label": "Analytics Left",
             "polygon": [[0, 0], [480, 0], [480, 719], [0, 719]],
         }
-        saved = service.save([*defaults["zones"][:3], counting_region])
+        counting_line = {
+            "id": "flow_line",
+            "type": "counting_line",
+            "label": "Flow Line",
+            "polygon": [[500, 190], [500, 615]],
+        }
+        saved = service.save([*defaults["zones"][:3], counting_region, counting_line])
         assert saved["source"] == "persisted"
         assert any(zone["type"] == "counting_region" for zone in saved["zones"])
+        assert any(zone["type"] == "counting_line" for zone in saved["zones"])
         assert zone_path.is_file()
         reloaded = ZoneService(zone_path=zone_path).status()
-        assert len(reloaded["zones"]) == 4
+        assert len(reloaded["zones"]) == 5
 
         try:
             service.save([
@@ -56,7 +63,16 @@ def main() -> int:
         else:
             raise AssertionError("Invalid two-point polygon was accepted")
 
-        zones = [*defaults["zones"], counting_region]
+        try:
+            service.save([
+                {"id": "bad_line", "type": "counting_line", "label": "Bad line", "polygon": [[20, 20], [20, 20]]}
+            ])
+        except AppError as exc:
+            assert exc.code == ErrorCode.ZONE_CONFIG_INVALID
+        else:
+            raise AssertionError("Zero-length counting line was accepted")
+
+        zones = [*defaults["zones"], counting_region, counting_line]
         frame = {
             "image_width": 1280,
             "image_height": 720,
@@ -107,7 +123,7 @@ def main() -> int:
         finally:
             camera_frame_service.set_simulation(False)
 
-    print("[PASS] zone defaults and analytics counting regions can be saved/reloaded")
+    print("[PASS] zone defaults, counting regions, and two-point counting lines can be saved/reloaded")
     print("[PASS] invalid polygons use the stable zone error code")
     print("[PASS] whole-frame pedestrian/vehicle occupancy is counted")
     print("[PASS] per-region pedestrian/vehicle counts are independent of traffic-phase rules")

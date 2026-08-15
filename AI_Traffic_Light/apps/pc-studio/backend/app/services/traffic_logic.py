@@ -8,6 +8,7 @@ from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.services.camera_frames import camera_frame_service
 from app.services.inference import inference_service
+from app.services.object_tracking import object_tracking_service
 from app.services.runtime_settings import runtime_settings_service
 from app.services.zones import REFERENCE_HEIGHT, REFERENCE_WIDTH, zone_service
 
@@ -65,7 +66,7 @@ def _empty_region_counts(zones: list[dict[str, Any]]) -> dict[str, dict[str, int
     return {
         zone["id"]: {"pedestrians": 0, "vehicles": 0, "total": 0}
         for zone in zones
-        if zone.get("type") != "ignore"
+        if zone.get("type") not in {"ignore", "counting_line"}
     }
 
 
@@ -77,12 +78,13 @@ def evaluate_traffic_state(
 ) -> dict[str, Any]:
     """Convert one detection frame and persisted zones into supervised prototype traffic metrics.
 
-    Counts are per-frame occupancy samples. They are not unique passage counts because
-    the current prototype does not assign persistent track IDs across frames.
+    Counts here remain per-frame occupancy samples. V022 separately derives unique
+    passage/entry/exit events from cross-frame track IDs; occupancy is intentionally
+    preserved so the two metrics are never conflated.
     """
     evaluated_at_ms = int(time() * 1000)
     region_counts = _empty_region_counts(zones)
-    zone_counts = {zone["id"]: 0 for zone in zones}
+    zone_counts = {zone["id"]: 0 for zone in zones if zone.get("type") != "counting_line"}
 
     if detection_frame is None:
         state = {
@@ -101,6 +103,7 @@ def evaluate_traffic_state(
             "evaluated_frame_number": None,
             "zone_counts": zone_counts,
             "region_counts": region_counts,
+            "tracking": object_tracking_service.status(),
             "prototype_only": True,
         }
         validate_traffic_state(state)
@@ -114,7 +117,7 @@ def evaluate_traffic_state(
     pedestrians_total = 0
     vehicles_total = 0
     ignore_zones = [zone for zone in zones if zone.get("type") == "ignore"]
-    counting_zones = [zone for zone in zones if zone.get("type") != "ignore"]
+    counting_zones = [zone for zone in zones if zone.get("type") not in {"ignore", "counting_line"}]
     crossing_zones = [zone for zone in zones if zone.get("type") == "crossing"]
     waiting_zones = [zone for zone in zones if zone.get("type") == "pedestrian_waiting"]
     queue_zones = [zone for zone in zones if zone.get("type") == "vehicle_queue"]
@@ -206,6 +209,7 @@ def evaluate_traffic_state(
         "evaluated_frame_number": detection_frame.get("source_frame_number"),
         "zone_counts": zone_counts,
         "region_counts": region_counts,
+        "tracking": detection_frame.get("tracking") if isinstance(detection_frame.get("tracking"), dict) else object_tracking_service.status(),
         "prototype_only": True,
     }
     validate_traffic_state(state)
@@ -252,9 +256,11 @@ def get_live_traffic_state() -> dict[str, Any]:
     zones = zone_service.zones()
     frame = camera_frame_service.latest_frame()
     if frame is None:
+        object_tracking_service.reset_active()
         return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="no_camera_frame"))
     status = inference_service.status()
     if not status.get("model_loaded"):
+        object_tracking_service.reset_active()
         return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="model_not_loaded"))
     try:
         settings = runtime_settings_service.get()
@@ -262,6 +268,7 @@ def get_live_traffic_state() -> dict[str, Any]:
             frame,
             confidence_threshold=float(settings["default_confidence"]),
         )
+        detection_frame = object_tracking_service.update(detection_frame, zones)
     except AppError as exc:
         if exc.code in {
             ErrorCode.MODEL_NOT_LOADED,

@@ -147,10 +147,12 @@ For camera/inference overlays:
 
 For traffic analytics:
 
-- treat per-frame counts as occupancy observations, not unique arrivals/departures;
-- do not sum occupancy samples and label that as throughput;
-- `counting_region` is analytics-only and must not silently change simulation recommendations;
-- unique flow counting requires an explicit tracking/line-crossing design with stable object identity.
+- treat per-frame counts as occupancy observations and never sum them into throughput;
+- V022 flow events come from explicit cross-frame track identity plus counting-line/region transitions;
+- only call a passage unique when one stable track generates one `line_crossing` event for that counting line;
+- keep `counting_region` and `counting_line` analytics-only and separate from simulation recommendations;
+- preserve frame deduplication so multiple API/background polls cannot double-count one source frame;
+- document that the current centroid/IoU tracker can lose/swap IDs under occlusion/crowding.
 
 For mutation APIs, do not silently hide real backend errors behind offline fallback behavior unless the existing contract intentionally does so.
 
@@ -165,6 +167,7 @@ outputs/training/**
 manual label JSON
 runtime zone/settings JSON
 outputs/traffic_history/**
+outputs/traffic_flow/**
 trained *.pt files
 ```
 

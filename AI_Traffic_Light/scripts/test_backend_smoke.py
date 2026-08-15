@@ -19,6 +19,8 @@ ENDPOINTS = [
     "/api/zones/active",
     "/api/traffic/state",
     "/api/traffic/history?minutes=1&limit=10",
+    "/api/traffic/tracks",
+    "/api/traffic/flow?minutes=1&limit=10",
     "/api/settings/runtime",
     "/api/logs/recent?limit=5",
     "/api/camera/status",
@@ -108,6 +110,18 @@ def main() -> int:
         print(f"[FAIL] /api/traffic/history/export.csv -> {exc}")
         failures.append(f"traffic history CSV export: {exc}")
 
+    try:
+        flow_csv, flow_headers = fetch_text("/api/traffic/flow/export.csv?minutes=1&limit=10")
+        flow_ok = flow_csv.startswith("event_id,") and bool(flow_headers.get("x-request-id"))
+        print(f"[{'PASS' if flow_ok else 'FAIL'}] /api/traffic/flow/export.csv")
+        if not flow_csv.startswith("event_id,"):
+            failures.append("traffic flow CSV export: missing expected header row")
+        if not flow_headers.get("x-request-id"):
+            failures.append("traffic flow CSV export: missing X-Request-ID")
+    except Exception as exc:  # noqa: BLE001 - smoke test should report all failures.
+        print(f"[FAIL] /api/traffic/flow/export.csv -> {exc}")
+        failures.append(f"traffic flow CSV export: {exc}")
+
     print()
     if failures:
         print("Smoke test failed:")
@@ -116,7 +130,7 @@ def main() -> int:
         return 1
 
     print(
-        f"Smoke test passed for {expected_version}. Core V021 APIs, request IDs, and version surfaces responded consistently."
+        f"Smoke test passed for {expected_version}. Core V022 occupancy/tracking/flow APIs, request IDs, and version surfaces responded consistently."
     )
     return 0
 

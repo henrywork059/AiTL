@@ -66,10 +66,22 @@ export function CameraDetectionView({
         >
           {showZones && zones.map((zone) => (
             <g key={zone.id} className="live-zone-group">
-              <polygon
-                points={scaledZonePoints(zone, width, height)}
-                className={`live-zone-polygon ${zoneVisualClass(zone)}`}
-              />
+              {zone.type === "counting_line" && zone.polygon.length === 2 ? (
+                <line
+                  x1={zone.polygon[0][0] * (width / ZONE_REFERENCE_WIDTH)}
+                  y1={zone.polygon[0][1] * (height / ZONE_REFERENCE_HEIGHT)}
+                  x2={zone.polygon[1][0] * (width / ZONE_REFERENCE_WIDTH)}
+                  y2={zone.polygon[1][1] * (height / ZONE_REFERENCE_HEIGHT)}
+                  className="live-zone-polygon live-zone-crossing"
+                  strokeDasharray="14 7"
+                  strokeWidth={6}
+                />
+              ) : (
+                <polygon
+                  points={scaledZonePoints(zone, width, height)}
+                  className={`live-zone-polygon ${zoneVisualClass(zone)}`}
+                />
+              )}
               {zone.polygon[0] && (
                 <text
                   className="live-zone-label"
@@ -85,7 +97,9 @@ export function CameraDetectionView({
           {frame && showBoxes && detections.map((detection) => {
             const [x1, y1, x2, y2] = detection.box_xyxy;
             const labelY = Math.max(22, y1 - 8);
-            const labelWidth = Math.max(120, detection.class_name.length * 15 + 70);
+            const trackText = detection.track_id ? ` ${detection.track_id}` : "";
+            const labelText = `${detection.class_name}${trackText} ${(detection.confidence * 100).toFixed(0)}%`;
+            const labelWidth = Math.max(150, labelText.length * 8 + 18);
             return (
               <g key={detection.id}>
                 <rect
@@ -106,7 +120,7 @@ export function CameraDetectionView({
                       rx={5}
                     />
                     <text className="live-detection-label" x={x1 + 7} y={labelY - 5}>
-                      {detection.class_name} {(detection.confidence * 100).toFixed(0)}%
+                      {labelText}
                     </text>
                   </>
                 )}

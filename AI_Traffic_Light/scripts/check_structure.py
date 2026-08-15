@@ -20,6 +20,8 @@ REQUIRED_PATHS = (
     "apps/pc-studio/backend/app/services/smoke_test.py",
     "apps/pc-studio/backend/app/services/template_state.py",
     "apps/pc-studio/backend/app/services/traffic_history.py",
+    "apps/pc-studio/backend/app/services/traffic_flow.py",
+    "apps/pc-studio/backend/app/services/object_tracking.py",
     "apps/pc-studio/backend/app/services/traffic_recorder.py",
     "apps/pc-studio/backend/app/services/traffic_logic.py",
     "apps/pc-studio/frontend/src/App.tsx",
@@ -27,6 +29,7 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
     "apps/pc-studio/frontend/src/components/TrafficHistoryChart.tsx",
+    "apps/pc-studio/frontend/src/components/TrafficFlowChart.tsx",
     "apps/pc-studio/frontend/src/constants/appNavigation.ts",
     "apps/pc-studio/frontend/src/constants/projectVersion.ts",
     "apps/device-camera/esp32-cam/src/main.cpp",
@@ -41,6 +44,7 @@ REQUIRED_PATHS = (
     "docs/TEST_READY_CHECKLIST.md",
     "docs/VERSIONING.md",
     "scripts/validate_patch_zip.py",
+    "scripts/test_object_tracking_flow.py",
 )
 
 BACKEND_VERSION_SURFACES = (

@@ -4,9 +4,9 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 
 ## Current candidate
 
-- `0_2_1` — candidate adding timestamped traffic occupancy analytics, user-defined counting regions, CSV export, history reset, and summary metrics on top of the V020 feature set.
-- Previous candidate: `0_2_0`.
-- Owner-confirmed passed baseline remains `0_1_7` until V021 is explicitly accepted.
+- `0_2_2` — candidate adding cross-frame object IDs, directional counting lines, unique passage events, region entry/exit/dwell analytics, and persistent flow-event history on top of V021.
+- Previous candidate: `0_2_1`.
+- Owner-confirmed passed baseline remains `0_1_7` until a newer candidate is explicitly accepted.
 
 ## Implemented prototype functions
 
@@ -22,17 +22,20 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - monitor per-epoch validation fitness / mAP convergence
 - stop training automatically when validation fitness stops improving for the configured patience window
 - discover, choose, default, and delete local trained models
-- run live inference overlays on receiver/simulation frames
+- run live inference overlays on receiver/simulation frames and assign prototype track IDs across consecutive frames
 - create, edit, persist, and reset traffic-zone polygons directly over the current camera/simulation feed
 - overlay saved zones on Live AI with reference-to-frame scaling
 - show the exact simulation signal obeyed by synthetic agents as a compact signal at the top-right of Live AI
 - count live detection centres inside configured zones
 - generate auditable simulation-only traffic phase recommendations from zone counts
 - count whole-frame detected pedestrians and vehicles per sampled frame
-- define multiple analytics-only counting regions in the existing Zone Editor
+- define multiple analytics-only counting regions and two-point counting lines in the existing Zone Editor
 - record bounded traffic occupancy history while the backend runs
 - plot whole-frame or region-specific pedestrian/vehicle occupancy over selectable time windows
-- export traffic history to CSV, clear it explicitly, and inspect average/peak/busiest-region plus phase-change summaries
+- export occupancy history to CSV, clear it explicitly, and inspect average/peak/busiest-region plus phase-change summaries
+- record unique directional passage events when a stable track crosses a counting line
+- record region entry/exit and completed dwell duration, including pedestrian waiting-zone dwell
+- persist/filter/plot/export track-derived flow events separately from sampled occupancy
 - persist active runtime settings
 - inspect real recent backend logs with request/error metadata
 - keep long model IDs and paths contained inside the Live AI model panel
@@ -63,7 +66,12 @@ The patch ZIP validator checks structural safety and exclusions. A changed-files
 
 ## Analytics semantics
 
-Traffic history stores **sampled occupancy**: how many detected pedestrians/vehicles are present in each sampled frame or region. It is not a unique passage counter because the current prototype does not assign stable tracking IDs across frames. Runtime history is stored under `outputs/traffic_history/` and is not source-patch content.
+V022 keeps two metrics deliberately separate:
+
+- **Occupancy** — V021-style sampled counts showing how many detections are present in a frame/region at a point in time. Runtime data is stored under `outputs/traffic_history/`.
+- **Flow** — V022 track-derived events. A unique passage is counted only when one stable prototype track crosses one configured `counting_line`; region entry/exit and dwell are separate event types stored under `outputs/traffic_flow/`.
+
+The tracker uses lightweight class-aware centroid/IoU matching. Heavy occlusion or crowded same-class motion can still lose/swap IDs, so flow remains prototype analytics rather than certified traffic measurement. Both runtime directories are excluded from source patches.
 
 ## Safety scope
 

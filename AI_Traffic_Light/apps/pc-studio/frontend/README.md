@@ -1,23 +1,23 @@
-# PC Studio Frontend — V021 candidate
+# PC Studio Frontend — V022 candidate
 
 React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
 ## Current working surfaces
 
 - Dashboard with current project/version and live smoke-test state;
-- Live AI receiver/simulation preview with trained-model boxes, saved zone overlays, visibility controls, and a compact signal synchronized to the simulation agents;
+- Live AI receiver/simulation preview with trained-model boxes, stable prototype track IDs, saved zone/line overlays, visibility controls, and a compact signal synchronized to the simulation agents;
 - Camera receiver plus density/pause-controlled signal-aware simulation with lane/stop-line vehicle behavior and curb/WALK pedestrian behavior;
-- persistent polygon Zone Editor drawn directly over the current camera/simulation frame;
+- persistent camera-aligned Zone Editor supporting polygon regions plus two-point counting lines;
 - live zone-count and simulation-only Traffic Logic view;
 - analytics-only counting regions created in the existing Zone Editor;
-- Traffic Analytics page with selectable time windows/scopes, vehicle/pedestrian trend plot, peak/average/busiest-region summaries, phase-change context, CSV export, and explicit history clearing;
+- Traffic Analytics with separate Occupancy and Flow / Tracks modes, unique directional passage plots, region entry/exit/dwell summaries, event table, CSV export, and separate clear actions;
 - dataset capture, capture deletion, manual review/labeling, and managed YOLO dataset build;
 - local training controls with a live convergence plot and early-stop patience;
 - Model Registry for load/default/delete actions;
 - persistent runtime Settings;
 - recent real backend Logs & Errors.
 
-Traffic analytics represents sampled occupancy rather than unique tracked passages. When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
+Occupancy remains sampled per-frame data. Flow mode uses cross-frame track IDs and counts a unique passage only when a track crosses a configured counting line; region entry/exit/dwell are recorded separately. The tracker is intentionally lightweight and can lose/swap IDs under heavy occlusion. When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
 
 ## Release metadata
 

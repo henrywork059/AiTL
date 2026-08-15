@@ -27,6 +27,12 @@ ZONES = [
         "label": "Crossing",
         "polygon": [[500, 0], [780, 0], [780, 720], [500, 720]],
     },
+    {
+        "id": "flow_line",
+        "type": "counting_line",
+        "label": "Flow line",
+        "polygon": [[640, 0], [640, 720]],
+    },
 ]
 
 
@@ -89,6 +95,7 @@ def main() -> int:
         assert whole["summary"]["phase_change_count"] == 2
         assert whole["summary"]["busiest_region"]["id"] == "count_left"
         assert whole["points"][1]["vehicles"] == 4
+        assert all(region["id"] != "flow_line" for region in whole["regions"])
 
         left = service.query(zones=ZONES, minutes=0, limit=100, region_id="count_left")
         assert left["scope"]["label"] == "Left counting region"

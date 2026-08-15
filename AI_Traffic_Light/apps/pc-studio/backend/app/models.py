@@ -8,6 +8,8 @@ class Detection(BaseModel):
     class_name: str
     confidence: float = Field(ge=0, le=1)
     box_xyxy: list[int]
+    track_id: str | None = None
+    track_age_frames: int | None = None
 
 
 class DetectionFrame(BaseModel):
@@ -22,7 +24,7 @@ class DetectionFrame(BaseModel):
 
 class Zone(BaseModel):
     id: str
-    type: Literal["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"]
+    type: Literal["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "counting_line", "ignore"]
     label: str
     polygon: list[list[int]]
 
@@ -53,6 +55,10 @@ class TrafficState(BaseModel):
     evaluated_frame_number: int | None = None
     zone_counts: dict[str, int] = Field(default_factory=dict)
     region_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+    tracking: dict = Field(default_factory=dict)
+    recommended_phase: str | None = None
+    recommended_decision: str | None = None
+    recommended_decision_reason: str | None = None
     prototype_only: bool = True
 
 

@@ -55,6 +55,7 @@ export function TrafficLogicPage() {
               <div className="metric-card"><span>Pedestrians waiting</span><strong>{traffic.pedestrians_waiting}</strong></div>
               <div className="metric-card"><span>Pedestrians crossing</span><strong>{traffic.pedestrians_crossing}</strong></div>
               <div className="metric-card"><span>Vehicles queued</span><strong>{traffic.vehicles_waiting}</strong></div>
+              <div className="metric-card"><span>Active tracks</span><strong>{traffic.tracking?.active_track_count ?? 0}</strong></div>
               <div className="metric-card"><span>{traffic.recommended_phase ? "Phase remaining" : "Suggested extension"}</span><strong>{traffic.extension_seconds}s</strong></div>
             </div>
           ) : <p>Evaluating current traffic state...</p>}
@@ -65,6 +66,7 @@ export function TrafficLogicPage() {
                 {traffic.recommended_phase && <div><span>Detection recommendation</span><strong>{traffic.recommended_phase.split("_").join(" ")}</strong></div>}
                 <div><span>Data source</span><strong>{traffic.data_source ?? "unknown"}</strong></div>
                 <div><span>Frame</span><strong>{traffic.evaluated_frame_number ?? "none"}</strong></div>
+                <div><span>Tracked vehicles / pedestrians</span><strong>{traffic.tracking?.active_vehicle_tracks ?? 0} / {traffic.tracking?.active_pedestrian_tracks ?? 0}</strong></div>
               </div>
               <p className="reason-text">{traffic.decision_reason}</p>
             </>
@@ -81,7 +83,7 @@ export function TrafficLogicPage() {
               {zoneCounts.map(([zoneId, count]) => <div key={zoneId}><span>{zoneId}</span><strong>{count}</strong></div>)}
             </div>
           )}
-          <p className="small-note">Decision-zone counts preserve the detection-based recommendation logic. In simulation mode the active phase follows the deterministic simulator signal; the detection recommendation is shown separately. Counting-region totals remain analytics-only.</p>
+          <p className="small-note">Decision-zone counts preserve the detection-based recommendation logic. In simulation mode the active phase follows the deterministic simulator signal; the detection recommendation is shown separately. Counting-region and counting-line analytics remain independent of the simulated phase decision.</p>
         </section>
       </div>
 
@@ -108,7 +110,8 @@ export function TrafficLogicPage() {
           <article className="function-item"><div><strong>Crossing occupied</strong><p>Keep the simulated pedestrian phase active while detected people remain in a crossing zone.</p></div><span className="status-pill">active</span></article>
           <article className="function-item"><div><strong>Pedestrian waiting</strong><p>When the crossing is clear and a person is in a waiting zone, prepare the simulated pedestrian phase.</p></div><span className="status-pill">active</span></article>
           <article className="function-item"><div><strong>Vehicle queue</strong><p>When pedestrian zones are clear and four or more vehicles are queued, recommend a bounded vehicle-green extension.</p></div><span className="status-pill">active</span></article>
-          <article className="function-item"><div><strong>Counting region</strong><p>Count vehicle and pedestrian occupancy for analytics without influencing any simulated signal decision.</p></div><span className="status-pill">analytics only</span></article>
+          <article className="function-item"><div><strong>Counting region</strong><p>Count occupancy plus tracked entry/exit/dwell events without influencing any simulated signal decision.</p></div><span className="status-pill">analytics only</span></article>
+          <article className="function-item"><div><strong>Counting line</strong><p>Generate one directional unique-passage event per tracked object crossing a two-point line.</p></div><span className="status-pill">flow only</span></article>
         </div>
         <p className="small-note">These are human-supervised prototype recommendations. They are not connected to real traffic signals or public-road infrastructure.</p>
       </section>

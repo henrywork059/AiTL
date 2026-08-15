@@ -1,5 +1,20 @@
 # Changelog
 
+## 0_2_2 — Cross-frame tracking and flow analytics
+
+- Added a lightweight class-aware centroid/IoU tracker that assigns stable prototype `track_id` values across consecutive detection frames and deduplicates repeated processing of the same source frame.
+- Added `counting_line` geometry to the existing camera-aligned Zone Editor. Counting lines use exactly two points and remain analytics-only.
+- Added one directional passage event per tracked object/counting-line pair, with `left_to_right`, `right_to_left`, `top_to_bottom`, or `bottom_to_top` direction.
+- Added tracked region entry/exit events and completed dwell duration for configured non-ignore polygon regions, including pedestrian waiting-zone dwell summaries.
+- Added bounded persistent flow-event runtime storage under `outputs/traffic_flow/events.jsonl`, plus time/class/line/region filters, minute buckets, CSV export, and explicit flow-history clearing.
+- Added `GET /api/traffic/tracks`, `GET /api/traffic/flow`, `GET /api/traffic/flow/export.csv`, and `DELETE /api/traffic/flow` while preserving standard request IDs/envelopes and existing occupancy-history APIs.
+- Extended live inference detections with optional `track_id`/track age metadata and shows track IDs beside Live AI detection labels.
+- Expanded Traffic Analytics with separate Occupancy and Flow / Tracks modes so V021 sampled occupancy is not conflated with V022 unique counting-line passage events.
+- Added new stable flow storage errors `ATL-TRAFFIC-007..009` and focused tracking/flow tests.
+- Preserved V021 signal-aware simulation, occupancy/counting-region analytics, capture lifecycle, zone overlays, training/inference/model management, settings/logs, and the prototype-only safety boundary.
+- The tracker is intentionally lightweight: heavy occlusion, abrupt motion, or crowded same-class crossings can still cause ID loss/swaps. Unique-passage figures apply only to recorded counting-line events, not to all detections seen.
+- Physical public-road traffic control remains disabled.
+
 ## 0_2_1 — Traffic occupancy analytics and counting regions
 
 - Added persistent detection-backed pedestrian/vehicle occupancy history sampled while the backend runs.

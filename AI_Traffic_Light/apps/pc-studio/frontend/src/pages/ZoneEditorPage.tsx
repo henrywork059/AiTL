@@ -5,7 +5,7 @@ import { FunctionChecklist } from "../components/FunctionChecklist";
 import type { CameraStatus, Zone, ZoneStatus, ZoneType } from "../types";
 import "./zoneEditor.css";
 
-const ZONE_TYPES: ZoneType[] = ["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"];
+const ZONE_TYPES: ZoneType[] = ["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "counting_line", "ignore"];
 const WIDTH = 1280;
 const HEIGHT = 720;
 
@@ -59,7 +59,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     setLabel("New Zone");
     setZoneType("counting_region");
     setPoints([]);
-    setMessage("Click the reference canvas to add at least three polygon points.");
+    setMessage("Click the reference canvas to draw a polygon, or choose counting line and add exactly two points.");
     setError(null);
   }
 
@@ -67,7 +67,8 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.round(((event.clientX - rect.left) / rect.width) * WIDTH);
     const y = Math.round(((event.clientY - rect.top) / rect.height) * HEIGHT);
-    setPoints((current) => [...current, [Math.max(0, Math.min(WIDTH - 1, x)), Math.max(0, Math.min(HEIGHT - 1, y))]]);
+    const nextPoint: [number, number] = [Math.max(0, Math.min(WIDTH - 1, x)), Math.max(0, Math.min(HEIGHT - 1, y))];
+    setPoints((current) => zoneType === "counting_line" && current.length >= 2 ? current : [...current, nextPoint]);
   }
 
   function applyDraft() {
@@ -77,8 +78,15 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       setError("Zone ID must use 1-64 letters, numbers, underscores, or dashes.");
       return;
     }
-    if (!cleanLabel || points.length < 3) {
-      setError("Give the zone a label and at least three polygon points.");
+    const validGeometry = zoneType === "counting_line" ? points.length === 2 : points.length >= 3;
+    if (!cleanLabel || !validGeometry) {
+      setError(zoneType === "counting_line"
+        ? "Give the counting line a label and exactly two points."
+        : "Give the zone a label and at least three polygon points.");
+      return;
+    }
+    if (zoneType === "counting_line" && points[0][0] === points[1][0] && points[0][1] === points[1][1]) {
+      setError("A counting line must use two different points.");
       return;
     }
     if (zones.some((zone) => zone.id === cleanId && zone.id !== selectedId)) {
@@ -173,7 +181,16 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
                 </text>
               </>
             )}
-            {zones.map((zone) => (
+            {zones.map((zone) => zone.type === "counting_line" && zone.polygon.length === 2 ? (
+              <line
+                key={zone.id}
+                x1={zone.polygon[0][0]}
+                y1={zone.polygon[0][1]}
+                x2={zone.polygon[1][0]}
+                y2={zone.polygon[1][1]}
+                className={`zone-editor-line zone-editor-counting_line ${zone.id === selectedId ? "zone-editor-selected-line" : ""}`}
+              />
+            ) : (
               <polygon
                 key={zone.id}
                 points={zone.polygon.map(([x, y]) => `${x},${y}`).join(" ")}
@@ -183,7 +200,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
             {points.length >= 2 && <polyline points={points.map(([x, y]) => `${x},${y}`).join(" ")} className="zone-draft-line" />}
             {points.map(([x, y], index) => <circle key={`${x}-${y}-${index}`} cx={x} cy={y} r="9" className="zone-draft-point" />)}
           </svg>
-          <p className="small-note">The camera image is mapped into the 1280 × 720 zone reference coordinates. <strong>Counting region</strong> zones are analytics-only: they count detected people/vehicles but do not alter simulated traffic-phase rules.</p>
+          <p className="small-note">The camera image is mapped into the 1280 × 720 reference coordinates. <strong>Counting regions</strong> provide occupancy/entry/dwell analytics. <strong>Counting lines</strong> use exactly two points and generate one unique directional passage event per tracked object. Neither changes simulated traffic-phase rules.</p>
         </section>
 
         <aside className="side-column">
@@ -192,7 +209,11 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
             <label>Zone ID<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} /></label>
             <label>Label<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
             <label>Type
-              <select value={zoneType} onChange={(event) => setZoneType(event.target.value as ZoneType)}>
+              <select value={zoneType} onChange={(event) => {
+                const nextType = event.target.value as ZoneType;
+                setZoneType(nextType);
+                if (nextType === "counting_line") setPoints((current) => current.slice(0, 2));
+              }}>
                 {ZONE_TYPES.map((type) => <option key={type} value={type}>{type.split("_").join(" ")}</option>)}
               </select>
             </label>

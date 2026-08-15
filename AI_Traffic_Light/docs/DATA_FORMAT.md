@@ -17,7 +17,9 @@ Bounding boxes remain in original image coordinates, not display coordinates.
       "class_id": 0,
       "class_name": "person",
       "confidence": 0.92,
-      "box_xyxy": [120, 80, 260, 420]
+      "box_xyxy": [120, 80, 260, 420],
+      "track_id": "trk_a1b2c3_00007",
+      "track_age_frames": 12
     }
   ]
 }
@@ -38,7 +40,18 @@ Bounding boxes remain in original image coordinates, not display coordinates.
 }
 ```
 
-Supported zone types are `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, and `ignore`. `counting_region` is analytics-only and does not alter the traffic simulation decision rules.
+Supported types are `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, `counting_line`, and `ignore`. Polygon types use 3-32 points. A `counting_line` uses exactly two distinct points in the same 1280×720 reference coordinate system. `counting_region` and `counting_line` are analytics-only and do not alter simulation decision rules.
+
+Counting-line example:
+
+```json
+{
+  "id": "eastbound_flow",
+  "type": "counting_line",
+  "label": "Eastbound flow line",
+  "polygon": [[500, 180], [500, 620]]
+}
+```
 
 ## Traffic state occupancy fields
 
@@ -71,9 +84,23 @@ Runtime history uses JSON Lines under `outputs/traffic_history/history.jsonl`. E
 
 History files are runtime/user data and are not source-patch content.
 
+## Flow event format
+
+Track-derived runtime events are JSON Lines under `outputs/traffic_flow/events.jsonl`. Example unique passage:
+
+```json
+{"event_id":"trk_a1b2c3_00007:line:eastbound_flow","event_type":"line_crossing","timestamp_ms":1786780005000,"source_frame_number":52,"track_id":"trk_a1b2c3_00007","class_name":"car","line_id":"eastbound_flow","line_label":"Eastbound flow line","direction":"left_to_right","x":505.3,"y":402.1}
+```
+
+A completed region exit may additionally contain `region_id`, `region_label`, `region_type`, and `dwell_ms`.
+
 ## Counting semantics
 
-The current history records **occupancy observations**: how many detections are present in a sampled frame/region. It does not infer unique people/vehicles passing through over time because there is no stable cross-frame tracking ID yet. Do not sum occupancy samples and describe the result as throughput.
+- **Occupancy** remains a sampled observation: how many detections are present in a frame/region. Never sum occupancy samples and describe the result as throughput.
+- **Unique passage** is a V022 track-derived event: one tracked object crossing one configured counting line. Each track is counted at most once per line in the current prototype session.
+- **Region dwell** begins on a track's region entry (or first observation inside the region) and is finalized on region exit.
+
+Track IDs are prototype IDs produced by lightweight centroid/IoU association; heavy occlusion or crowded motion can cause ID loss/swaps.
 
 ## Coordinate rule
 

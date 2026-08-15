@@ -127,7 +127,7 @@ class TrafficHistoryService:
         region_id: str | None = None,
     ) -> dict[str, Any]:
         """Return a bounded time series plus summary statistics for the whole frame or one region."""
-        zone_by_id = {zone["id"]: zone for zone in zones if zone.get("type") != "ignore"}
+        zone_by_id = {zone["id"]: zone for zone in zones if zone.get("type") not in {"ignore", "counting_line"}}
         if region_id is not None and region_id not in zone_by_id:
             raise AppError(
                 ErrorCode.ZONE_NOT_FOUND,
@@ -157,7 +157,7 @@ class TrafficHistoryService:
             "regions": [
                 {"id": zone["id"], "label": zone["label"], "type": zone["type"]}
                 for zone in zones
-                if zone.get("type") != "ignore"
+                if zone.get("type") not in {"ignore", "counting_line"}
             ],
             "points": points,
             "summary": self._summary(points, records, zone_by_id),

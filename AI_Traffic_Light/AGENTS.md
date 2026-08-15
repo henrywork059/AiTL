@@ -18,10 +18,10 @@ Always inspect the current GitHub `main` branch before producing a patch when th
 
 At the time of this file update:
 
-- current candidate: V021 / `0_2_1`;
-- previous version: V020 / `0_2_0`;
+- current candidate: V022 / `0_2_2`;
+- previous version: V021 / `0_2_1`;
 - owner-confirmed passed baseline: V017 / `0_1_7`;
-- the owner explicitly requested V021 as the next candidate even though V020 was not separately promoted; V021 remains a candidate until the owner explicitly confirms its acceptance checks.
+- the owner explicitly requested V022 as the next candidate even though V021 was not separately promoted; V022 remains a candidate until the owner explicitly confirms its acceptance checks.
 
 Rules:
 
@@ -172,8 +172,8 @@ While editing:
 - avoid mixing unrelated cleanup into a feature patch;
 - keep filesystem writes atomic/rollback-aware where data integrity matters;
 - keep original-image coordinates as canonical CV data; scale only in presentation layers;
-- describe repeated detection counts over time as sampled occupancy unless stable cross-frame tracking is actually implemented;
-- keep `counting_region` analytics-only unless the owner explicitly changes the simulation decision design;
+- keep sampled occupancy and track-derived flow as separate metrics; only describe a passage as unique when it comes from a recorded track/counting-line event;
+- keep `counting_region` and `counting_line` analytics-only unless the owner explicitly changes the simulation decision design;
 - document assumptions that materially affect later agents.
 
 Optimization means reducing duplication, unclear ownership, accidental coupling, and validation gaps. It does not mean rewriting working code for style alone.
