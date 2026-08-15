@@ -26,10 +26,10 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: version, note: "camera-aligned zones + capture lifecycle candidate" },
+          { label: "Project stage", value: version, note: "traffic analytics + counting regions candidate" },
           { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
           { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Live AI", value: "zones + signal", note: "camera-aligned overlay" },
+          { label: "Analytics", value: "history + regions", note: "sampled occupancy over time" },
         ]}
       />
 

@@ -5,7 +5,7 @@ import { FunctionChecklist } from "../components/FunctionChecklist";
 import type { CameraStatus, Zone, ZoneStatus, ZoneType } from "../types";
 import "./zoneEditor.css";
 
-const ZONE_TYPES: ZoneType[] = ["pedestrian_waiting", "crossing", "vehicle_queue", "ignore"];
+const ZONE_TYPES: ZoneType[] = ["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"];
 const WIDTH = 1280;
 const HEIGHT = 720;
 
@@ -57,7 +57,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     setSelectedId(null);
     setZoneId(candidate);
     setLabel("New Zone");
-    setZoneType("crossing");
+    setZoneType("counting_region");
     setPoints([]);
     setMessage("Click the reference canvas to add at least three polygon points.");
     setError(null);
@@ -142,7 +142,6 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     ? `${API_BASE}/api/camera/frame?t=${cameraStatus.frame_number}`
     : null;
 
-
   return (
     <div className="page-stack">
       <div className="zone-editor-layout">
@@ -150,7 +149,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
           <div className="panel-header">
             <div>
               <h2>Camera-aligned zone editor</h2>
-              <p className="placeholder-copy">Draw zones directly over the current receiver or simulation camera feed.</p>
+              <p className="placeholder-copy">Draw traffic decision zones or analytics-only counting regions directly over the current receiver or simulation camera feed.</p>
             </div>
             <span className="status-pill">{cameraStatus?.frame_available ? `${cameraStatus.origin ?? "camera"} frame ${cameraStatus.frame_number}` : "no camera frame"}</span>
           </div>
@@ -184,7 +183,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
             {points.length >= 2 && <polyline points={points.map(([x, y]) => `${x},${y}`).join(" ")} className="zone-draft-line" />}
             {points.map(([x, y], index) => <circle key={`${x}-${y}-${index}`} cx={x} cy={y} r="9" className="zone-draft-point" />)}
           </svg>
-          <p className="small-note">The camera image is mapped into the 1280 × 720 zone reference coordinates. Saved zones use the same scaling in Traffic Logic and Live AI.</p>
+          <p className="small-note">The camera image is mapped into the 1280 × 720 zone reference coordinates. <strong>Counting region</strong> zones are analytics-only: they count detected people/vehicles but do not alter simulated traffic-phase rules.</p>
         </section>
 
         <aside className="side-column">

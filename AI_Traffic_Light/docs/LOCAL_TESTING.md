@@ -1,6 +1,6 @@
-# Local Testing Notes (V020)
+# Local Testing Notes (V021)
 
-V020 / `0_2_0` remains a candidate. The owner-confirmed passed baseline is V017 / `0_1_7`. This maintenance hardening does not promote V020.
+V021 / `0_2_1` is the current candidate, explicitly requested as the next patch after V020 / `0_2_0`. The owner-confirmed passed baseline remains V017 / `0_1_7`. Automated checks do not promote V021.
 
 ## 1. Use the backend virtual environment
 
@@ -44,6 +44,7 @@ python .\scripts\test_camera_simulation_api.py
 python .\scripts\test_dataset_capture_delete.py
 python .\scripts\test_training_service.py
 python .\scripts\test_zone_traffic_services.py
+python .\scripts\test_traffic_history_service.py
 python .\scripts\test_runtime_settings_logs.py
 python .\scripts\test_prototype_tools_api.py
 ```
@@ -65,11 +66,13 @@ In another PowerShell, with the backend `.venv` active, run from `AI_Traffic_Lig
 python .\scripts\test_backend_smoke.py
 ```
 
-The smoke script now also checks:
+The smoke script also checks:
 
 - standard `ok` envelopes;
 - `meta.request_id` on JSON endpoints;
-- `/health`, `/api/smoke/status`, and `/api/template/pc-studio` all report the root `VERSION` value.
+- `/health`, `/api/smoke/status`, and `/api/template/pc-studio` all report the root `VERSION` value;
+- the traffic-history JSON endpoint responds;
+- the CSV export has the expected header and `X-Request-ID`.
 
 ## 5. Frontend validation
 
@@ -109,19 +112,22 @@ The validator rejects files outside `AI_Traffic_Light/`, path traversal, ZIP cor
 
 It cannot prove that every included file actually changed. Compare the ZIP manifest against `git diff --name-only` or the intended changed-file manifest separately.
 
-## 8. Key V020 manual checks
+## 8. Key V021 manual checks
 
-1. Dashboard and visible version surfaces report `0_2_0`.
-2. `/health`, `/api/smoke/status`, and `/api/template/pc-studio` report `0_2_0` consistently.
-3. Start simulation or upload a device frame, then open Zone Editor; the current camera frame is the editor background.
-4. Draw/edit/save a zone over a visible feature. Navigate away and back and confirm geometry persists.
-5. Open Live AI and confirm the same saved zones are overlaid on the live camera image.
-6. Toggle **Show zones** off/on and confirm only zone graphics change; detections continue normally.
-7. Confirm a compact traffic signal is visible at the top-right of the Live AI image and changes with the simulation-only traffic phase.
-8. Capture an image, then delete it from Dataset Capture; counts and last-capture state update.
-9. Capture another image, save manual labels, delete it in Dataset Review, and confirm image/metadata/labels disappear.
-10. If the deleted item was used in a managed YOLO build, confirm the UI reports that the managed dataset requires rebuilding.
-11. Recheck V017 training convergence/early stopping, Settings, Logs, Traffic Logic, model selection/default/delete, confidence controls, simulation density/pause, capture, labeling, and training.
-12. Confirm no feature controls physical public-road traffic infrastructure.
+1. Dashboard and visible version surfaces report `0_2_1` with the traffic-analytics candidate wording.
+2. `/health`, `/api/smoke/status`, and `/api/template/pc-studio` report `0_2_1` consistently.
+3. Start simulation or upload a device frame and load a trained model. Confirm Traffic Logic shows whole-frame pedestrian/vehicle totals.
+4. In Zone Editor, create and save at least two `counting_region` polygons over different areas. Navigate away/back and confirm they persist.
+5. Confirm Traffic Logic shows separate pedestrian/vehicle/total occupancy for the configured regions while the existing simulation recommendation still depends only on waiting/crossing/queue logic.
+6. Leave the backend/model/simulation running for at least 20-30 seconds, open Traffic Analytics, and confirm timestamped points accumulate rather than duplicating one source frame.
+7. Switch Analytics between Whole frame and each counting region; confirm the chart and current/average/peak metrics change with the selected scope.
+8. Change time windows and confirm the number/range of plotted samples changes appropriately.
+9. Confirm busiest-region and phase-change summaries render when enough data exists.
+10. Export CSV and confirm the selected scope/time window is represented and the file contains timestamp/frame/count/phase/decision columns.
+11. Use Clear history after confirmation and verify the stored history is reset while captures, labels, zones, trained models, and settings remain intact. If valid inference continues, new samples may begin appearing again on the next recorder interval.
+12. Confirm the UI/documentation describes counts as sampled occupancy, not unique passage/throughput.
+13. Recheck original V020 camera-backed Zone Editor, Live AI saved-zone overlay, **Show zones**, compact simulated signal, and capture deletion lifecycle.
+14. Recheck V017 training convergence/early stopping, Settings, Logs, model selection/default/delete, confidence controls, simulation density/pause, capture, labeling, and training.
+15. Confirm no feature controls physical public-road traffic infrastructure.
 
-Only the owner can mark V020 passed after the required manual checks.
+Only the owner can mark V021 passed after the required manual checks.

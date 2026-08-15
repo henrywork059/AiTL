@@ -18,6 +18,7 @@ ENDPOINTS = [
     "/api/template/pc-studio",
     "/api/zones/active",
     "/api/traffic/state",
+    "/api/traffic/history?minutes=1&limit=10",
     "/api/settings/runtime",
     "/api/logs/recent?limit=5",
     "/api/camera/status",
@@ -44,6 +45,14 @@ def fetch_json(path: str) -> dict:
     with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=10) as response:
         raw = response.read().decode("utf-8")
     return json.loads(raw)
+
+
+
+def fetch_text(path: str) -> tuple[str, dict[str, str]]:
+    with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=10) as response:
+        raw = response.read().decode("utf-8")
+        headers = {key.lower(): value for key, value in response.headers.items()}
+    return raw, headers
 
 
 def main() -> int:
@@ -87,6 +96,18 @@ def main() -> int:
     if len(set(observed_versions.values())) > 1:
         failures.append(f"version endpoints disagree: {observed_versions}")
 
+    try:
+        csv_text, csv_headers = fetch_text("/api/traffic/history/export.csv?minutes=1&limit=10")
+        csv_ok = csv_text.startswith("recorded_at_ms,") and bool(csv_headers.get("x-request-id"))
+        print(f"[{'PASS' if csv_ok else 'FAIL'}] /api/traffic/history/export.csv")
+        if not csv_text.startswith("recorded_at_ms,"):
+            failures.append("traffic history CSV export: missing expected header row")
+        if not csv_headers.get("x-request-id"):
+            failures.append("traffic history CSV export: missing X-Request-ID")
+    except Exception as exc:  # noqa: BLE001 - smoke test should report all failures.
+        print(f"[FAIL] /api/traffic/history/export.csv -> {exc}")
+        failures.append(f"traffic history CSV export: {exc}")
+
     print()
     if failures:
         print("Smoke test failed:")
@@ -95,7 +116,7 @@ def main() -> int:
         return 1
 
     print(
-        f"Smoke test passed for {expected_version}. Core V020 APIs, request IDs, and version surfaces responded consistently."
+        f"Smoke test passed for {expected_version}. Core V021 APIs, request IDs, and version surfaces responded consistently."
     )
     return 0
 

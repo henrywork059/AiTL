@@ -145,6 +145,13 @@ For camera/inference overlays:
 - do not persist browser/canvas pixel coordinates as canonical data;
 - keep visibility toggles presentation-only unless the user explicitly requests inference changes.
 
+For traffic analytics:
+
+- treat per-frame counts as occupancy observations, not unique arrivals/departures;
+- do not sum occupancy samples and label that as throughput;
+- `counting_region` is analytics-only and must not silently change simulation recommendations;
+- unique flow counting requires an explicit tracking/line-crossing design with stable object identity.
+
 For mutation APIs, do not silently hide real backend errors behind offline fallback behavior unless the existing contract intentionally does so.
 
 ## 8. Data-integrity protocol
@@ -157,6 +164,7 @@ datasets/yolo/**
 outputs/training/**
 manual label JSON
 runtime zone/settings JSON
+outputs/traffic_history/**
 trained *.pt files
 ```
 

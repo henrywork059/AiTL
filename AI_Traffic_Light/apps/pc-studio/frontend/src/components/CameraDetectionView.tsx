@@ -20,6 +20,10 @@ function scaledZonePoints(zone: Zone, width: number, height: number): string {
   return zone.polygon.map(([x, y]) => `${x * scaleX},${y * scaleY}`).join(" ");
 }
 
+function zoneVisualClass(zone: Zone): string {
+  return zone.type === "counting_region" ? "live-zone-crossing" : `live-zone-${zone.type}`;
+}
+
 export function CameraDetectionView({
   cameraStatus,
   frame,
@@ -64,7 +68,7 @@ export function CameraDetectionView({
             <g key={zone.id} className="live-zone-group">
               <polygon
                 points={scaledZonePoints(zone, width, height)}
-                className={`live-zone-polygon live-zone-${zone.type}`}
+                className={`live-zone-polygon ${zoneVisualClass(zone)}`}
               />
               {zone.polygon[0] && (
                 <text

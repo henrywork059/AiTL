@@ -4,6 +4,7 @@ export type AppPageId =
   | "camera_sources"
   | "zone_editor"
   | "traffic_logic"
+  | "traffic_analytics"
   | "dataset_capture"
   | "dataset_review"
   | "train_export"

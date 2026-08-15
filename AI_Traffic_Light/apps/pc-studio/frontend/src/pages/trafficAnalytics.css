@@ -1,0 +1,103 @@
+.traffic-analytics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.traffic-analytics-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  color: #c9d1d9;
+}
+
+.traffic-analytics-controls select {
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 9px 10px;
+}
+
+.traffic-analytics-actions {
+  margin-left: auto;
+}
+
+.traffic-chart-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.traffic-history-chart {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  background: rgba(5, 7, 10, 0.55);
+}
+
+.traffic-chart-axis {
+  stroke: #8b949e;
+  stroke-width: 1.5;
+}
+
+.traffic-chart-grid {
+  stroke: rgba(139, 148, 158, 0.2);
+  stroke-width: 1;
+}
+
+.traffic-chart-label {
+  fill: #8b949e;
+  font-size: 12px;
+}
+
+.traffic-chart-line {
+  fill: none;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.traffic-chart-vehicles { stroke: #f0883e; }
+.traffic-chart-pedestrians { stroke: #a371f7; }
+
+.traffic-chart-legend {
+  display: flex;
+  gap: 18px;
+  color: #c9d1d9;
+  font-size: 13px;
+}
+
+.traffic-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.traffic-legend-line {
+  width: 22px;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.traffic-legend-vehicles { background: #f0883e; }
+.traffic-legend-pedestrians { background: #a371f7; }
+
+.traffic-chart-empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #30363d;
+  border-radius: 12px;
+  color: #8b949e;
+}
+
+.traffic-analytics-metrics .metric-card small {
+  display: block;
+  margin-top: 4px;
+  color: #8b949e;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}

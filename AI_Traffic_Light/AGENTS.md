@@ -18,10 +18,10 @@ Always inspect the current GitHub `main` branch before producing a patch when th
 
 At the time of this file update:
 
-- current candidate: V020 / `0_2_0`;
-- previous version: `0_1_7`;
+- current candidate: V021 / `0_2_1`;
+- previous version: V020 / `0_2_0`;
 - owner-confirmed passed baseline: V017 / `0_1_7`;
-- V020 is still a candidate until the owner explicitly confirms its acceptance checks.
+- the owner explicitly requested V021 as the next candidate even though V020 was not separately promoted; V021 remains a candidate until the owner explicitly confirms its acceptance checks.
 
 Rules:
 
@@ -137,6 +137,7 @@ Local working copies may contain valuable untracked/runtime data:
 - `outputs/` training runs;
 - trained `*.pt` models;
 - local runtime settings/zones;
+- `outputs/traffic_history/` occupancy analytics history;
 - virtual environments and frontend dependencies/builds.
 
 Never use destructive cleanup commands such as `git clean -fd` on the user's working project. Do not overwrite or delete runtime data unless the user explicitly asks for that exact data operation.
@@ -171,6 +172,8 @@ While editing:
 - avoid mixing unrelated cleanup into a feature patch;
 - keep filesystem writes atomic/rollback-aware where data integrity matters;
 - keep original-image coordinates as canonical CV data; scale only in presentation layers;
+- describe repeated detection counts over time as sampled occupancy unless stable cross-frame tracking is actually implemented;
+- keep `counting_region` analytics-only unless the owner explicitly changes the simulation decision design;
 - document assumptions that materially affect later agents.
 
 Optimization means reducing duplication, unclear ownership, accidental coupling, and validation gaps. It does not mean rewriting working code for style alone.

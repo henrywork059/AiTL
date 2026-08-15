@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +26,19 @@ from app.routes.template import router as template_router
 from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
+from app.services.traffic_recorder import traffic_recorder_service
 
 logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    """Start and stop background prototype services with the FastAPI process."""
+    traffic_recorder_service.start()
+    try:
+        yield
+    finally:
+        traffic_recorder_service.stop()
 
 
 def create_app() -> FastAPI:
@@ -36,7 +49,7 @@ def create_app() -> FastAPI:
     """
     configure_logging()
 
-    app = FastAPI(title="AI Traffic Light PC Studio Backend", version=PROJECT_VERSION)
+    app = FastAPI(title="AI Traffic Light PC Studio Backend", version=PROJECT_VERSION, lifespan=app_lifespan)
 
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(

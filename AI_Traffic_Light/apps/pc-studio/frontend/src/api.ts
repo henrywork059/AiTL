@@ -15,6 +15,8 @@ import type {
   RuntimeSettings,
   SimulationDensity,
   SmokeStatus,
+  TrafficHistory,
+  TrafficHistoryClearResult,
   TrafficState,
   TrainingConfig,
   TrainingDatasetStatus,
@@ -67,6 +69,31 @@ const fallbackSmokeStatus: SmokeStatus = {
     mock_detection_count: mockFrame.detections.length,
     mock_zone_count: mockZones.length,
     mock_traffic_phase: mockTrafficState.phase,
+  },
+};
+
+
+const fallbackTrafficHistory: TrafficHistory = {
+  recording: false,
+  sample_interval_ms: 1000,
+  max_samples: 0,
+  stored_samples: 0,
+  history_path: "outputs/traffic_history/history.jsonl",
+  oldest_recorded_at_ms: null,
+  newest_recorded_at_ms: null,
+  scope: { region_id: null, label: "Whole frame", type: "whole_frame" },
+  minutes: 15,
+  regions: [],
+  points: [],
+  summary: {
+    sample_count: 0,
+    average_pedestrians: 0,
+    average_vehicles: 0,
+    peak_pedestrians: { count: 0, recorded_at_ms: null },
+    peak_vehicles: { count: 0, recorded_at_ms: null },
+    phase_change_count: 0,
+    latest_phase_change: null,
+    busiest_region: null,
   },
 };
 
@@ -229,6 +256,28 @@ export async function resetActiveZones(): Promise<ZoneStatus> {
 
 export async function fetchTrafficState(): Promise<TrafficState> {
   return requestJson<TrafficState>(`${API_BASE}/api/traffic/state`, mockTrafficState);
+}
+
+export async function fetchTrafficHistory(minutes = 15, regionId: string | null = null): Promise<TrafficHistory> {
+  const params = new URLSearchParams({ minutes: String(minutes), limit: "10000" });
+  if (regionId) params.set("region_id", regionId);
+  return requestJson<TrafficHistory>(`${API_BASE}/api/traffic/history?${params.toString()}`, {
+    ...fallbackTrafficHistory,
+    minutes,
+    scope: regionId
+      ? { region_id: regionId, label: regionId, type: "counting_region" }
+      : fallbackTrafficHistory.scope,
+  });
+}
+
+export async function clearTrafficHistory(): Promise<TrafficHistoryClearResult> {
+  return requestJsonStrict<TrafficHistoryClearResult>(`${API_BASE}/api/traffic/history`, { method: "DELETE" });
+}
+
+export function trafficHistoryExportUrl(minutes = 15, regionId: string | null = null): string {
+  const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
+  if (regionId) params.set("region_id", regionId);
+  return `${API_BASE}/api/traffic/history/export.csv?${params.toString()}`;
 }
 
 export async function fetchRecentLogs(limit = 100): Promise<RecentLog[]> {

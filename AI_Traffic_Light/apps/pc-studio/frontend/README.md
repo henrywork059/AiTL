@@ -1,4 +1,4 @@
-# PC Studio Frontend — V020 candidate
+# PC Studio Frontend — V021 candidate
 
 React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
@@ -9,13 +9,15 @@ React/Vite GUI for the AI Traffic Light PC Studio prototype.
 - Camera receiver plus density/pause-controlled simulation;
 - persistent polygon Zone Editor drawn directly over the current camera/simulation frame;
 - live zone-count and simulation-only Traffic Logic view;
+- analytics-only counting regions created in the existing Zone Editor;
+- Traffic Analytics page with selectable time windows/scopes, vehicle/pedestrian trend plot, peak/average/busiest-region summaries, phase-change context, CSV export, and explicit history clearing;
 - dataset capture, capture deletion, manual review/labeling, and managed YOLO dataset build;
 - local training controls with a live convergence plot and early-stop patience;
 - Model Registry for load/default/delete actions;
 - persistent runtime Settings;
 - recent real backend Logs & Errors.
 
-When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
+Traffic analytics represents sampled occupancy rather than unique tracked passages. When the backend is unavailable, limited local fixture data may still render so the frontend can show an offline state. Working connected pages use the real backend APIs rather than the legacy mock fixtures.
 
 ## Release metadata
 

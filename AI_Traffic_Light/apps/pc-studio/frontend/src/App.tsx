@@ -21,6 +21,7 @@ import { LiveAiPage } from "./pages/LiveAiPage";
 import { LogsPage } from "./pages/LogsPage";
 import { ModelRegistryPage } from "./pages/ModelRegistryPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { TrafficAnalyticsPage } from "./pages/TrafficAnalyticsPage";
 import { TrafficLogicPage } from "./pages/TrafficLogicPage";
 import { TrainExportPage } from "./pages/TrainExportPage";
 import { ZoneEditorPage } from "./pages/ZoneEditorPage";
@@ -192,6 +193,8 @@ export default function App() {
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":
         return <TrafficLogicPage />;
+      case "traffic_analytics":
+        return <TrafficAnalyticsPage />;
       case "dataset_capture":
         return <DatasetCapturePage cameraStatus={cameraStatus} />;
       case "dataset_review":

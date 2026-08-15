@@ -2,7 +2,7 @@
 
 ## Detection result
 
-Bounding boxes should be stored in **original image coordinates**, not display coordinates.
+Bounding boxes remain in original image coordinates, not display coordinates.
 
 ```json
 {
@@ -29,37 +29,61 @@ Bounding boxes should be stored in **original image coordinates**, not display c
 {
   "zones": [
     {
-      "id": "ped_waiting_left",
-      "type": "pedestrian_waiting",
-      "label": "Pedestrian Waiting Zone",
+      "id": "entrance_region",
+      "type": "counting_region",
+      "label": "Entrance analytics region",
       "polygon": [[60, 420], [360, 420], [360, 680], [60, 680]]
     }
   ]
 }
 ```
 
-## Traffic state
+Supported zone types are `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, and `ignore`. `counting_region` is analytics-only and does not alter the traffic simulation decision rules.
+
+## Traffic state occupancy fields
+
+A detection-backed traffic state can include:
 
 ```json
 {
   "phase": "vehicle_green",
-  "pedestrians_waiting": 4,
-  "pedestrians_crossing": 1,
-  "vehicles_waiting": 7,
-  "decision": "extend_pedestrian_green",
-  "decision_reason": "Pedestrian waiting count is high",
-  "extension_seconds": 5
+  "pedestrians_total": 4,
+  "vehicles_total": 7,
+  "evaluated_at_ms": 1786780000000,
+  "source_timestamp_ms": 1786779999500,
+  "region_counts": {
+    "entrance_region": {
+      "pedestrians": 2,
+      "vehicles": 3,
+      "total": 5
+    }
+  }
 }
 ```
 
+## Traffic history sample
+
+Runtime history uses JSON Lines under `outputs/traffic_history/history.jsonl`. Each line is one sampled detection frame:
+
+```json
+{"recorded_at_ms":1786780000000,"source_timestamp_ms":1786779999500,"source_frame_number":42,"phase":"vehicle_green","decision":"hold_vehicle_green","pedestrians":4,"vehicles":7,"region_counts":{"entrance_region":{"pedestrians":2,"vehicles":3,"total":5}}}
+```
+
+History files are runtime/user data and are not source-patch content.
+
+## Counting semantics
+
+The current history records **occupancy observations**: how many detections are present in a sampled frame/region. It does not infer unique people/vehicles passing through over time because there is no stable cross-frame tracking ID yet. Do not sum occupancy samples and describe the result as throughput.
+
 ## Coordinate rule
 
-Always keep three coordinate spaces separate:
+Always keep these coordinate spaces separate:
 
 ```text
 1. Original image coordinates
 2. Model input coordinates
-3. GUI display/canvas coordinates
+3. 1280×720 zone reference coordinates
+4. GUI display/canvas coordinates
 ```
 
-Most detection GUI bugs come from mixing these spaces.
+Detection centres are scaled into the zone reference space for region membership. Display scaling is presentation-only.

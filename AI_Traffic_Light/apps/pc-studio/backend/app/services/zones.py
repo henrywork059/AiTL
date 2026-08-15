@@ -18,7 +18,7 @@ DEFAULT_ZONE_PATH = PROJECT_ROOT / "config" / "zones.json"
 REFERENCE_WIDTH = 1280
 REFERENCE_HEIGHT = 720
 ZONE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-ZONE_TYPES = {"pedestrian_waiting", "crossing", "vehicle_queue", "ignore"}
+ZONE_TYPES = {"pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"}
 
 DEFAULT_ZONES: list[dict[str, Any]] = [
     {

@@ -20,8 +20,9 @@ def health(request: Request) -> dict:
             "mode": PROJECT_MODE,
             "safe_mode": True,
             "message": (
-                "Backend is ready for camera/simulation, camera-aligned persistent zones, Live AI zone/signal overlays, "
-                "capture deletion, capture/label/train/model workflows, convergence monitoring, settings, and logs."
+                "Backend is ready for camera/simulation, camera-aligned persistent zones, counting regions, "
+                "sampled traffic occupancy history/analytics, Live AI overlays, capture/label/train/model workflows, "
+                "convergence monitoring, settings, and logs."
             ),
         },
         request_id=request.state.request_id,

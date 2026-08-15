@@ -2,8 +2,7 @@
 
 ## Camera
 - receive JPEG/PNG frame
-- simulation mode
-- latest-frame preview
+- simulation mode and latest-frame preview
 - Light / Normal / Busy synthetic density
 - pause/resume synthetic scene
 
@@ -26,23 +25,34 @@
 - toggle detection boxes, labels, classes, and saved zone overlays
 
 ## Zones / Traffic simulation
-- edit and persist polygons directly over the current camera/simulation feed
-- reset simulation-aligned reference zones
-- scale persisted zones onto Live AI frames
-- count live detection centres inside zones
-- generate simulation-only phase recommendations with reasons and frame/zone audit data
-- show a compact simulation-only traffic signal at the top-right of Live AI
+- edit/persist polygons over the current camera/simulation feed
+- waiting, crossing, vehicle queue, ignore, and analytics-only counting-region types
+- count whole-frame pedestrians and vehicles from detection frames
+- count pedestrians/vehicles separately in each configured non-ignore region
+- generate simulation-only phase recommendations using the existing decision zones
+- show a compact simulation-only traffic signal in Live AI
+
+## Traffic analytics
+- record timestamped pedestrian/vehicle occupancy samples while the backend runs
+- select whole-frame or named-region time series
+- plot occupancy over selectable time windows
+- calculate current, average, peak, busiest-region, and phase-change summaries
+- export selected history to CSV
+- explicitly clear analytics history without touching datasets/models/zones
 
 ## System / development integrity
 - persist runtime confidence, camera-status polling, training patience, and log level
-- inspect real recent backend logs with request IDs/error codes when available
-- load backend release metadata from root `VERSION` instead of duplicating release strings across runtime endpoints
-- reuse one checked frontend project-version constant for Dashboard, navigation, and offline fallback metadata
-- validate repository/version surfaces with `scripts/check_structure.py`
-- validate patch ZIP path/exclusion/integrity rules with `scripts/validate_patch_zip.py`
-- provide explicit AI-agent workflow/checklist documentation for candidate gating, testing evidence, and runtime-data preservation
+- inspect real recent backend logs with request IDs/error codes
+- load backend release metadata from root `VERSION`
+- validate repository/version surfaces and patch ZIP safety
+- preserve runtime datasets, models, training outputs, and traffic history outside source patches
+
+## Counting limitation
+
+Current traffic analytics are sampled occupancy counts, not unique passage/throughput counts. Cross-frame tracking is a later feature.
 
 ## Still later
+- cross-frame object tracking / unique passage counting
 - automatic labeling
 - model export/runtime package
 - physical public-road traffic control

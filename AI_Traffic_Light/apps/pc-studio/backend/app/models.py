@@ -22,7 +22,7 @@ class DetectionFrame(BaseModel):
 
 class Zone(BaseModel):
     id: str
-    type: Literal["pedestrian_waiting", "crossing", "vehicle_queue", "ignore"]
+    type: Literal["pedestrian_waiting", "crossing", "vehicle_queue", "counting_region", "ignore"]
     label: str
     polygon: list[list[int]]
 
@@ -42,12 +42,17 @@ class TrafficState(BaseModel):
     pedestrians_waiting: int
     pedestrians_crossing: int
     vehicles_waiting: int
+    pedestrians_total: int = 0
+    vehicles_total: int = 0
     decision: str
     decision_reason: str
     extension_seconds: int = 0
     data_source: str | None = None
+    evaluated_at_ms: int | None = None
+    source_timestamp_ms: int | None = None
     evaluated_frame_number: int | None = None
     zone_counts: dict[str, int] = Field(default_factory=dict)
+    region_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
     prototype_only: bool = True
 
 

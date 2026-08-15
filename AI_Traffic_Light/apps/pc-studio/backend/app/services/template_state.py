@@ -11,6 +11,7 @@ PC_STUDIO_PAGES: list[dict[str, Any]] = [
     {"id": "camera_sources", "label": "Camera Sources", "status": "test-ready"},
     {"id": "zone_editor", "label": "Zone Editor", "status": "test-ready"},
     {"id": "traffic_logic", "label": "Traffic Logic", "status": "test-ready"},
+    {"id": "traffic_analytics", "label": "Traffic Analytics", "status": "test-ready"},
     {"id": "dataset_capture", "label": "Dataset Capture", "status": "test-ready"},
     {"id": "dataset_review", "label": "Dataset Review", "status": "test-ready"},
     {"id": "train_export", "label": "Train / Export", "status": "test-ready"},
@@ -28,7 +29,7 @@ def get_template_summary() -> dict[str, Any]:
         "pages": PC_STUDIO_PAGES,
         "implementation_note": (
             "All main PC Studio pages expose working prototype behavior: live/camera tools, camera-aligned persistent zones, "
-            "Live AI zone/signal overlays, zone-aware simulation decisions, capture deletion, labeling/training/model management, "
+            "Live AI zone/signal overlays, zone-aware simulation decisions, persistent traffic occupancy history/analytics, capture deletion, labeling/training/model management, "
             "runtime settings, and real recent logs. Training includes convergence history and early stopping. Model export, automatic labeling, "
             "and physical public-road control remain disabled."
         ),

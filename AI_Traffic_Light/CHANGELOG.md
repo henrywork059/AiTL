@@ -1,5 +1,18 @@
 # Changelog
 
+## 0_2_1 — Traffic occupancy analytics and counting regions
+
+- Added persistent detection-backed pedestrian/vehicle occupancy history sampled while the backend runs.
+- Added whole-frame pedestrian/vehicle totals and per-region pedestrian/vehicle/combined counts while preserving existing traffic-decision counters.
+- Added analytics-only `counting_region` polygons so multiple arbitrary regions can be defined without changing simulation phase recommendation rules.
+- Added a Traffic Analytics page with selectable time windows and whole-frame/region scopes, timestamp-aware vehicle/pedestrian trend plots, current/average/peak metrics, busiest-region summary, and simulation phase-change context.
+- Added CSV export and explicit traffic-history clear actions. Runtime history is stored under `outputs/traffic_history/` and excluded from source patches.
+- Added `GET /api/traffic/history`, `GET /api/traffic/history/export.csv`, and `DELETE /api/traffic/history` with request IDs/logging and stable `ATL-TRAFFIC-004..006` storage errors.
+- Extended `GET /api/traffic/state` with whole-frame totals, evaluation/source timestamps, and structured `region_counts`.
+- Clarified throughout the app/docs that analytics values are sampled occupancy, not unique passage/flow counts; stable cross-frame object tracking is not implemented.
+- Preserved V020 capture deletion, camera-aligned zones, Live AI zone/signal overlays, and V017 training/inference/settings/logging behavior.
+- Physical public-road traffic control remains disabled.
+
 ## 0_2_0 — Camera-aligned zones and capture lifecycle
 
 - Added permanent capture deletion from Dataset Capture and Dataset Review. Deleting a capture removes its image, paired metadata, and saved manual-label document.
@@ -8,8 +21,8 @@
 - Changed Zone Editor to draw polygons directly over the current receiver or simulation frame while keeping the validated 1280×720 reference coordinate system used by traffic counting.
 - Added saved-zone overlays to real Live AI camera frames with reference-to-frame coordinate scaling and a Show zones visibility toggle.
 - Added a compact simulation-only traffic signal overlay at the top-right of the Live AI canvas.
-- Updated version/status surfaces to `0_2_0` and promoted owner-confirmed V017 / `0_1_7` to the passed baseline.
-- Added maintenance hardening while keeping V020 as the unaccepted candidate: backend release surfaces now read validated root `VERSION` metadata instead of duplicating release strings, and frontend Dashboard/navigation/fallback surfaces now reuse one checked project-version constant.
+- Updated version/status surfaces to `0_2_0` while keeping owner-confirmed V017 / `0_1_7` as the passed baseline until owner acceptance.
+- Added maintenance hardening while keeping V020 as an unaccepted candidate: backend release surfaces read validated root `VERSION` metadata instead of duplicating release strings, and frontend Dashboard/navigation/fallback surfaces reuse one checked project-version constant.
 - Expanded repository checks to validate required release fields, candidate/baseline state, patch/changelog presence, backend version-source use, and current frontend version surfaces.
 - Expanded the live backend smoke script to require request IDs and verify health/smoke/template versions match root `VERSION`.
 - Added a patch-ZIP validator for `AI_Traffic_Light/` path enforcement, forbidden runtime/generated content, path traversal, and ZIP integrity.

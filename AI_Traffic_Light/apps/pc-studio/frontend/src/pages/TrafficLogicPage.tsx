@@ -35,6 +35,7 @@ export function TrafficLogicPage() {
   }, []);
 
   const zoneCounts = Object.entries(traffic?.zone_counts ?? {});
+  const regionCounts = Object.entries(traffic?.region_counts ?? {});
 
   return (
     <div className="page-stack">
@@ -49,6 +50,8 @@ export function TrafficLogicPage() {
           </div>
           {traffic ? (
             <div className="metric-grid">
+              <div className="metric-card"><span>Total pedestrians</span><strong>{traffic.pedestrians_total ?? 0}</strong></div>
+              <div className="metric-card"><span>Total vehicles</span><strong>{traffic.vehicles_total ?? 0}</strong></div>
               <div className="metric-card"><span>Pedestrians waiting</span><strong>{traffic.pedestrians_waiting}</strong></div>
               <div className="metric-card"><span>Pedestrians crossing</span><strong>{traffic.pedestrians_crossing}</strong></div>
               <div className="metric-card"><span>Vehicles queued</span><strong>{traffic.vehicles_waiting}</strong></div>
@@ -69,7 +72,7 @@ export function TrafficLogicPage() {
         </section>
 
         <section className="panel">
-          <div className="panel-header"><h2>Zone counts</h2><span className="status-pill">live centres</span></div>
+          <div className="panel-header"><h2>Decision-zone counts</h2><span className="status-pill">live centres</span></div>
           {zoneCounts.length === 0 ? (
             <p className="placeholder-copy">No zone-count result is available until the backend has a camera frame, loaded model, and active zones.</p>
           ) : (
@@ -77,9 +80,26 @@ export function TrafficLogicPage() {
               {zoneCounts.map(([zoneId, count]) => <div key={zoneId}><span>{zoneId}</span><strong>{count}</strong></div>)}
             </div>
           )}
-          <p className="small-note">Detection box centres are scaled into the 1280 × 720 zone reference frame. Ignore zones take priority over counting zones.</p>
+          <p className="small-note">Decision-zone counts preserve the existing traffic logic. Counting-region totals are analytics-only and do not change the phase recommendation.</p>
         </section>
       </div>
+
+      <section className="panel">
+        <div className="panel-header"><h2>Per-region pedestrian / vehicle counts</h2><span className="status-pill">all non-ignore zones</span></div>
+        {regionCounts.length === 0 ? (
+          <p className="placeholder-copy">No region occupancy result is available yet.</p>
+        ) : (
+          <div className="function-list">
+            {regionCounts.map(([zoneId, counts]) => (
+              <article className="function-item" key={zoneId}>
+                <div><strong>{zoneId}</strong><p>{counts.pedestrians} pedestrian(s), {counts.vehicles} vehicle(s), {counts.total} total detected centres.</p></div>
+                <span className="status-pill">{counts.total}</span>
+              </article>
+            ))}
+          </div>
+        )}
+        <p className="small-note">Detection box centres are scaled into the 1280 × 720 reference frame. Ignore zones take priority. Overlapping regions are counted independently.</p>
+      </section>
 
       <section className="panel">
         <div className="panel-header"><h2>Prototype decision rules</h2><span className="status-pill muted">simulation only</span></div>
@@ -87,6 +107,7 @@ export function TrafficLogicPage() {
           <article className="function-item"><div><strong>Crossing occupied</strong><p>Keep the simulated pedestrian phase active while detected people remain in a crossing zone.</p></div><span className="status-pill">active</span></article>
           <article className="function-item"><div><strong>Pedestrian waiting</strong><p>When the crossing is clear and a person is in a waiting zone, prepare the simulated pedestrian phase.</p></div><span className="status-pill">active</span></article>
           <article className="function-item"><div><strong>Vehicle queue</strong><p>When pedestrian zones are clear and four or more vehicles are queued, recommend a bounded vehicle-green extension.</p></div><span className="status-pill">active</span></article>
+          <article className="function-item"><div><strong>Counting region</strong><p>Count vehicle and pedestrian occupancy for analytics without influencing any simulated signal decision.</p></div><span className="status-pill">analytics only</span></article>
         </div>
         <p className="small-note">These are human-supervised prototype recommendations. They are not connected to real traffic signals or public-road infrastructure.</p>
       </section>

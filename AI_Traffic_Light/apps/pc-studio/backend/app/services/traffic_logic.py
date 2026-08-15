@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import time
 from typing import Any
 
 from app.core.error_codes import ErrorCode
@@ -60,25 +61,46 @@ def _scaled_center(detection: dict[str, Any], width: int, height: int) -> tuple[
     return centre_x * scale_x, centre_y * scale_y
 
 
+def _empty_region_counts(zones: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    return {
+        zone["id"]: {"pedestrians": 0, "vehicles": 0, "total": 0}
+        for zone in zones
+        if zone.get("type") != "ignore"
+    }
+
+
 def evaluate_traffic_state(
     detection_frame: dict[str, Any] | None,
     zones: list[dict[str, Any]],
     *,
     source: str = "live_zone_evaluation",
 ) -> dict[str, Any]:
-    """Convert one detection frame and persisted zones into a supervised simulation recommendation."""
+    """Convert one detection frame and persisted zones into supervised prototype traffic metrics.
+
+    Counts are per-frame occupancy samples. They are not unique passage counts because
+    the current prototype does not assign persistent track IDs across frames.
+    """
+    evaluated_at_ms = int(time() * 1000)
+    region_counts = _empty_region_counts(zones)
+    zone_counts = {zone["id"]: 0 for zone in zones}
+
     if detection_frame is None:
         state = {
             "phase": "vehicle_green",
             "pedestrians_waiting": 0,
             "pedestrians_crossing": 0,
             "vehicles_waiting": 0,
+            "pedestrians_total": 0,
+            "vehicles_total": 0,
             "decision": "await_live_detections",
             "decision_reason": "No trained-model detection frame is available yet. Load a model and provide a camera or simulation frame.",
             "extension_seconds": 0,
             "data_source": source,
+            "evaluated_at_ms": evaluated_at_ms,
+            "source_timestamp_ms": None,
             "evaluated_frame_number": None,
-            "zone_counts": {},
+            "zone_counts": zone_counts,
+            "region_counts": region_counts,
             "prototype_only": True,
         }
         validate_traffic_state(state)
@@ -86,14 +108,17 @@ def evaluate_traffic_state(
 
     width = int(detection_frame.get("image_width") or REFERENCE_WIDTH)
     height = int(detection_frame.get("image_height") or REFERENCE_HEIGHT)
-    zone_counts = {zone["id"]: 0 for zone in zones}
     pedestrian_waiting = 0
     pedestrian_crossing = 0
     vehicles_waiting = 0
+    pedestrians_total = 0
+    vehicles_total = 0
     ignore_zones = [zone for zone in zones if zone.get("type") == "ignore"]
+    counting_zones = [zone for zone in zones if zone.get("type") != "ignore"]
     crossing_zones = [zone for zone in zones if zone.get("type") == "crossing"]
     waiting_zones = [zone for zone in zones if zone.get("type") == "pedestrian_waiting"]
     queue_zones = [zone for zone in zones if zone.get("type") == "vehicle_queue"]
+    analytics_zones = [zone for zone in zones if zone.get("type") == "counting_region"]
 
     for detection in detection_frame.get("detections", []):
         try:
@@ -102,25 +127,47 @@ def evaluate_traffic_state(
             continue
         if any(point_in_polygon(centre, zone["polygon"]) for zone in ignore_zones):
             continue
+
         class_name = str(detection.get("class_name", ""))
+        group: str | None = None
+        if class_name == "person":
+            pedestrians_total += 1
+            group = "pedestrians"
+        elif class_name in VEHICLE_CLASSES:
+            vehicles_total += 1
+            group = "vehicles"
+
+        if group is None:
+            continue
+
+        for zone in counting_zones:
+            if point_in_polygon(centre, zone["polygon"]):
+                region = region_counts[zone["id"]]
+                region[group] += 1
+                region["total"] += 1
+
         if class_name == "person":
             crossing_matches = [zone for zone in crossing_zones if point_in_polygon(centre, zone["polygon"])]
             if crossing_matches:
                 pedestrian_crossing += 1
                 for zone in crossing_matches:
                     zone_counts[zone["id"]] += 1
-                continue
-            waiting_matches = [zone for zone in waiting_zones if point_in_polygon(centre, zone["polygon"])]
-            if waiting_matches:
-                pedestrian_waiting += 1
-                for zone in waiting_matches:
-                    zone_counts[zone["id"]] += 1
-        elif class_name in VEHICLE_CLASSES:
+            else:
+                waiting_matches = [zone for zone in waiting_zones if point_in_polygon(centre, zone["polygon"])]
+                if waiting_matches:
+                    pedestrian_waiting += 1
+                    for zone in waiting_matches:
+                        zone_counts[zone["id"]] += 1
+        else:
             queue_matches = [zone for zone in queue_zones if point_in_polygon(centre, zone["polygon"])]
             if queue_matches:
                 vehicles_waiting += 1
                 for zone in queue_matches:
                     zone_counts[zone["id"]] += 1
+
+        for zone in analytics_zones:
+            if point_in_polygon(centre, zone["polygon"]):
+                zone_counts[zone["id"]] += 1
 
     if pedestrian_crossing > 0:
         phase = "pedestrian_green"
@@ -148,12 +195,17 @@ def evaluate_traffic_state(
         "pedestrians_waiting": pedestrian_waiting,
         "pedestrians_crossing": pedestrian_crossing,
         "vehicles_waiting": vehicles_waiting,
+        "pedestrians_total": pedestrians_total,
+        "vehicles_total": vehicles_total,
         "decision": decision,
         "decision_reason": reason,
         "extension_seconds": extension_seconds,
         "data_source": source,
+        "evaluated_at_ms": evaluated_at_ms,
+        "source_timestamp_ms": detection_frame.get("timestamp_ms"),
         "evaluated_frame_number": detection_frame.get("source_frame_number"),
         "zone_counts": zone_counts,
+        "region_counts": region_counts,
         "prototype_only": True,
     }
     validate_traffic_state(state)

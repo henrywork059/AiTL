@@ -37,6 +37,9 @@ class ErrorCode(str, Enum):
     TRAFFIC_STATE_INVALID = "ATL-TRAFFIC-001"
     TRAFFIC_RULE_INVALID = "ATL-TRAFFIC-002"
     TRAFFIC_DECISION_FAILED = "ATL-TRAFFIC-003"
+    TRAFFIC_HISTORY_READ_FAILED = "ATL-TRAFFIC-004"
+    TRAFFIC_HISTORY_WRITE_FAILED = "ATL-TRAFFIC-005"
+    TRAFFIC_HISTORY_CLEAR_FAILED = "ATL-TRAFFIC-006"
 
     DATASET_WRITE_FAILED = "ATL-DATASET-001"
     DATASET_READ_FAILED = "ATL-DATASET-002"
@@ -83,6 +86,9 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TRAFFIC_STATE_INVALID: "Traffic state is invalid.",
     ErrorCode.TRAFFIC_RULE_INVALID: "Traffic rule is invalid.",
     ErrorCode.TRAFFIC_DECISION_FAILED: "Traffic decision failed.",
+    ErrorCode.TRAFFIC_HISTORY_READ_FAILED: "Failed to read traffic history.",
+    ErrorCode.TRAFFIC_HISTORY_WRITE_FAILED: "Failed to write traffic history.",
+    ErrorCode.TRAFFIC_HISTORY_CLEAR_FAILED: "Failed to clear traffic history.",
     ErrorCode.DATASET_WRITE_FAILED: "Failed to write dataset item.",
     ErrorCode.DATASET_READ_FAILED: "Failed to read dataset item.",
     ErrorCode.DATASET_ITEM_NOT_FOUND: "Dataset item was not found.",

@@ -107,3 +107,19 @@ Non-trivial backend behavior should expose at least one useful diagnostic mechan
 - focused test coverage.
 
 Frontend failures should preserve actionable backend error messages/codes through the shared API client.
+
+
+## Traffic analytics ownership
+
+Keep responsibilities separated:
+
+```text
+services/traffic_logic.py      one-frame counting + simulation recommendation
+services/traffic_history.py    bounded persistent occupancy history/query/export
+services/traffic_recorder.py   background sampling lifecycle
+routes/traffic.py              thin HTTP translation only
+frontend TrafficAnalyticsPage  analytics page coordination
+TrafficHistoryChart            reusable chart rendering
+```
+
+`counting_region` is a zone-schema concept used for analytics only. Per-frame occupancy is not unique flow tracking.

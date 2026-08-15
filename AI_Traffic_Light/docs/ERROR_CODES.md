@@ -22,8 +22,17 @@ Stable project errors used by the current prototype APIs.
 ## Zones
 
 - `ATL-ZONE-001` — zone configuration invalid
-- `ATL-ZONE-002` — zone not found
+- `ATL-ZONE-002` — requested zone/counting region not found
 - `ATL-ZONE-003` — zone save failed
+
+## Traffic / analytics
+
+- `ATL-TRAFFIC-001` — traffic state invalid
+- `ATL-TRAFFIC-002` — traffic rule invalid
+- `ATL-TRAFFIC-003` — traffic decision failed
+- `ATL-TRAFFIC-004` — persisted traffic history read failed
+- `ATL-TRAFFIC-005` — traffic history sample write/compaction failed
+- `ATL-TRAFFIC-006` — traffic history clear failed
 
 ## Models
 

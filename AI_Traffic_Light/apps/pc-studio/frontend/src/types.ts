@@ -16,7 +16,7 @@ export type DetectionFrame = {
   detections: Detection[];
 };
 
-export type ZoneType = "pedestrian_waiting" | "crossing" | "vehicle_queue" | "ignore";
+export type ZoneType = "pedestrian_waiting" | "crossing" | "vehicle_queue" | "counting_region" | "ignore";
 
 export type Zone = {
   id: string;
@@ -34,6 +34,12 @@ export type ZoneStatus = {
   config_path: string;
 };
 
+export type RegionCount = {
+  pedestrians: number;
+  vehicles: number;
+  total: number;
+};
+
 export type TrafficState = {
   phase:
     | "vehicle_green"
@@ -44,13 +50,94 @@ export type TrafficState = {
   pedestrians_waiting: number;
   pedestrians_crossing: number;
   vehicles_waiting: number;
+  pedestrians_total?: number;
+  vehicles_total?: number;
   decision: string;
   decision_reason: string;
   extension_seconds: number;
   data_source?: string;
+  evaluated_at_ms?: number | null;
+  source_timestamp_ms?: number | null;
   evaluated_frame_number?: number | null;
   zone_counts?: Record<string, number>;
+  region_counts?: Record<string, RegionCount>;
   prototype_only?: boolean;
+};
+
+export type TrafficHistoryPoint = {
+  recorded_at_ms: number;
+  source_timestamp_ms: number;
+  source_frame_number: number;
+  pedestrians: number;
+  vehicles: number;
+  phase: string;
+  decision: string;
+};
+
+export type TrafficRegionSummary = {
+  id: string;
+  label: string;
+  type: ZoneType | string;
+};
+
+export type TrafficPeak = {
+  count: number;
+  recorded_at_ms: number | null;
+};
+
+export type TrafficPhaseChange = {
+  recorded_at_ms: number;
+  from: string;
+  to: string;
+};
+
+export type TrafficBusiestRegion = {
+  id: string;
+  label: string;
+  type: string;
+  average_total: number;
+};
+
+export type TrafficHistorySummary = {
+  sample_count: number;
+  average_pedestrians: number;
+  average_vehicles: number;
+  peak_pedestrians: TrafficPeak;
+  peak_vehicles: TrafficPeak;
+  phase_change_count: number;
+  latest_phase_change: TrafficPhaseChange | null;
+  busiest_region: TrafficBusiestRegion | null;
+};
+
+export type TrafficHistory = {
+  recording: boolean;
+  sample_interval_ms: number;
+  max_samples: number;
+  stored_samples: number;
+  history_path: string;
+  oldest_recorded_at_ms: number | null;
+  newest_recorded_at_ms: number | null;
+  scope: {
+    region_id: string | null;
+    label: string;
+    type: string;
+  };
+  minutes: number;
+  regions: TrafficRegionSummary[];
+  points: TrafficHistoryPoint[];
+  summary: TrafficHistorySummary;
+};
+
+export type TrafficHistoryClearResult = {
+  cleared: boolean;
+  removed_samples: number;
+  recording: boolean;
+  sample_interval_ms: number;
+  max_samples: number;
+  stored_samples: number;
+  history_path: string;
+  oldest_recorded_at_ms: number | null;
+  newest_recorded_at_ms: number | null;
 };
 
 export type BackendHealth = {
@@ -177,7 +264,6 @@ export type DatasetCaptureList = {
   total: number;
   classes: LabelClass[];
 };
-
 
 export type CaptureDeleteResult = {
   capture_id: string;

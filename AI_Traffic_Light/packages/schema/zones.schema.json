@@ -32,6 +32,7 @@
               "pedestrian_waiting",
               "crossing",
               "vehicle_queue",
+              "counting_region",
               "ignore"
             ]
           },
