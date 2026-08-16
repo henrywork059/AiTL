@@ -58,3 +58,11 @@ Never package or overwrite local:
 - `DELETE /api/traffic/signal-rules/history`
 
 See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
+
+
+## Same-candidate regression repair
+
+- Fixed the stateful signal controller when the private simulation clock is intentionally moved backwards by inherited deterministic camera-simulation tests or an explicit simulation reset.
+- The controller now rebuilds transient phase state from cycle start on clock rewind, preserving the configured protected phase sequence instead of retaining a phase whose start time is in the future.
+- Added a focused rewind regression assertion to `scripts/test_signal_rules_service.py`.
+- Version remains `0_2_3`; this repair does not promote the owner-confirmed `0_2_2` passed baseline.

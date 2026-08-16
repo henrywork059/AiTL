@@ -235,6 +235,7 @@ class SignalRulesService:
         self._resume_after_incident = False
         self._reinitialize_pending = False
         self._cycle_started_clock = 0.0
+        self._last_clock_s = 0.0
         self._last_observation: dict[str, Any] = {}
         self._last_observation_monotonic: float | None = None
         self._pedestrian_wait = _DemandMemory()
@@ -340,6 +341,7 @@ class SignalRulesService:
         self._resume_after_incident = False
         self._reinitialize_pending = False
         self._cycle_started_clock = max(0.0, float(simulation_clock_s))
+        self._last_clock_s = max(0.0, float(simulation_clock_s))
         self._pedestrian_wait = _DemandMemory()
         self._vehicle_wait = _DemandMemory()
         self._crossing = _DemandMemory()
@@ -582,6 +584,14 @@ class SignalRulesService:
         self._last_active_rules = []
 
     def _advance_phase_locked(self, clock: float) -> None:
+        # The normal simulator clock is monotonic. Tests and explicit simulation
+        # resets may intentionally seek it backwards; rebuild transient controller
+        # state from cycle start so protected phases still map deterministically to
+        # the requested clock instead of retaining a phase from the future.
+        if clock + 1e-9 < self._last_clock_s:
+            self._reset_runtime_locked(0.0)
+        self._last_clock_s = clock
+
         if self._reinitialize_pending:
             self._reinitialize_pending = False
             self._cycle_started_clock = clock

@@ -79,6 +79,16 @@ def main() -> None:
         assert reanchored["phase"] in {"vehicle_green", "vehicle_yellow", "all_red", "pedestrian_green", "pedestrian_flashing"}
         assert reanchored["elapsed_seconds"] == 0.0
 
+        # The camera simulation regression suite intentionally seeks its private
+        # clock backwards. The stateful controller must rebuild from cycle start
+        # instead of retaining a phase whose start time is now in the future.
+        service.reset_runtime(0.0)
+        forward = service.signal_state(12.2)
+        assert forward["phase"] == "vehicle_yellow"
+        rewound = service.signal_state(0.2)
+        assert rewound["phase"] == "vehicle_green"
+        assert rewound["elapsed_seconds"] == 0.2
+
         preview = service.preview({
             "phase_key": "vehicle_green",
             "vehicles_waiting": 10,

@@ -2,6 +2,8 @@
 
 ## 0_2_3 — Configurable adaptive signal rules
 
+- Same-candidate repair: handle intentional backward simulation-clock seeks by rebuilding transient signal-controller phase state, preserving inherited deterministic camera simulation tests.
+
 - Promoted the owner-confirmed passed baseline to V022 / `0_2_2` and created V023 / `0_2_3` as the new candidate.
 - Replaced the simulator's hard-coded signal-duration sequence with a persistent user-configurable simulation policy while preserving the protected phase order.
 - Added editable min/base/max timing for vehicle green, vehicle yellow, both all-red clearances, pedestrian WALK, and pedestrian CLEAR plus a maximum-cycle bound.
