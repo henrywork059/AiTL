@@ -2,6 +2,7 @@
 
 ## 0_2_3 — Configurable adaptive signal rules
 
+- Same-candidate test-harness repair: add the PC Studio backend directory to `scripts/test_signal_rules_service.py` import path so the standalone regression script can resolve `app` from the project root.
 - Same-candidate repair: handle intentional backward simulation-clock seeks by rebuilding transient signal-controller phase state, preserving inherited deterministic camera simulation tests.
 
 - Promoted the owner-confirmed passed baseline to V022 / `0_2_2` and created V023 / `0_2_3` as the new candidate.

@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import sys
 import tempfile
 
-from app.core.exceptions import AppError
-from app.services.signal_rules import SignalRulesService
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = PROJECT_ROOT / "apps" / "pc-studio" / "backend"
+sys.path.insert(0, str(BACKEND_ROOT))
+
+from app.core.exceptions import AppError  # noqa: E402
+from app.services.signal_rules import SignalRulesService  # noqa: E402
 
 
 def main() -> None:

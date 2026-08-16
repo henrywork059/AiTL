@@ -66,3 +66,10 @@ See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
 - The controller now rebuilds transient phase state from cycle start on clock rewind, preserving the configured protected phase sequence instead of retaining a phase whose start time is in the future.
 - Added a focused rewind regression assertion to `scripts/test_signal_rules_service.py`.
 - Version remains `0_2_3`; this repair does not promote the owner-confirmed `0_2_2` passed baseline.
+
+## Same-candidate standalone test import repair
+
+- Added the PC Studio backend directory to `scripts/test_signal_rules_service.py` before importing `app`, matching the established standalone test-script pattern.
+- Fixes `ModuleNotFoundError: No module named 'app'` when the test is run from the `AI_Traffic_Light` project root with the backend virtual environment active.
+- Application/controller behavior is unchanged; version remains `0_2_3` and passed baseline remains `0_2_2`.
+
