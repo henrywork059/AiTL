@@ -40,3 +40,9 @@ Live AI keeps trained-model/track/zone overlays and the compact simulation signa
 ## Safety presentation
 
 All signal timing/rule controls are described as simulator policy. No page implies direct physical/public-road traffic-light control. Mobility/fall conditions are not shown as live detections unless a compatible future perception source actually provides them.
+
+## Shared visual system
+
+The frontend visual language is now defined separately in `docs/PC_STUDIO_DESIGN_SYSTEM.md` and implemented through `src/styles/` design tokens/base/layout/components. The GUI layout document remains responsible for page structure and control placement.
+
+V023 uses a restrained dark operations/workbench presentation: solid graphite layers, compact 4–8px radii, low elevation, desaturated semantic colors, no decorative full-page gradient/glass treatment, and no generic purple/neon “AI” accent. Page-specific styles should consume the shared tokens instead of introducing private palettes.

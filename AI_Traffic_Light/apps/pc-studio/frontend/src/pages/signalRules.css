@@ -1,28 +1,183 @@
-.signal-policy-toolbar { display: grid; gap: 12px; }
-.signal-toolbar-actions, .button-row, .signal-config-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.signal-tabs { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border, #30363d); padding-bottom: 8px; }
-.signal-tab { border: 1px solid var(--border, #30363d); background: transparent; color: inherit; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
-.signal-tab.active { background: rgba(88, 166, 255, 0.14); border-color: #58a6ff; }
-.signal-config-bar label, .signal-limit-grid label, .signal-rule-fields label, .signal-test-grid label { display: grid; gap: 5px; font-size: 0.85rem; }
-.signal-config-bar select, .signal-config-bar input, .signal-timing-row input, .signal-limit-grid input, .signal-rule-fields input, .signal-test-grid input { min-width: 90px; }
-.inline-check { display: flex !important; align-items: center; gap: 7px !important; }
-.signal-timing-table { display: grid; gap: 6px; margin-top: 12px; }
-.signal-timing-row { display: grid; grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(90px, 1fr)); gap: 10px; align-items: center; padding: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.025); }
-.signal-timing-row.header { background: transparent; border-bottom: 1px solid var(--border, #30363d); }
-.signal-limit-grid, .signal-rule-fields, .signal-test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
-.signal-rule-editor-list, .signal-rule-status-list, .signal-history-list { display: grid; gap: 10px; }
-.signal-rule-editor { border: 1px solid var(--border, #30363d); border-radius: 10px; padding: 12px; }
-.signal-rule-editor-head, .signal-rule-status { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.signal-rule-status { border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding: 8px 0; }
-.signal-rule-status:last-child { border-bottom: none; }
-.signal-rule-status p { margin: 4px 0 0; }
-.signal-rule-active { border-color: #3fb950; }
-.signal-rule-suppressed { border-color: #d29922; }
-.signal-rule-unavailable { opacity: 0.75; }
-.warning-box { border: 1px solid #d29922; border-radius: 8px; padding: 10px; }
-.signal-preview-result { margin-top: 14px; border-top: 1px solid var(--border, #30363d); padding-top: 12px; }
-.wrap { flex-wrap: wrap; }
+.signal-policy-toolbar {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.signal-toolbar-actions,
+.signal-config-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.signal-tabs {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+  padding-bottom: 0;
+}
+
+.signal-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.signal-tab:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  border-color: transparent;
+  color: var(--color-text-primary);
+}
+
+.signal-tab.active {
+  background: transparent;
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.signal-config-bar label,
+.signal-limit-grid label,
+.signal-rule-fields label,
+.signal-test-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.signal-config-bar select,
+.signal-config-bar input,
+.signal-timing-row input,
+.signal-limit-grid input,
+.signal-rule-fields input,
+.signal-test-grid input {
+  min-width: 90px;
+}
+
+.inline-check {
+  display: flex !important;
+  align-items: center;
+  gap: 7px !important;
+}
+
+.signal-timing-table {
+  display: grid;
+  gap: 0;
+  margin-top: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.signal-timing-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(90px, 1fr));
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+}
+
+.signal-timing-row:last-child {
+  border-bottom: 0;
+}
+
+.signal-timing-row.header {
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.signal-limit-grid,
+.signal-rule-fields,
+.signal-test-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin-top: 14px;
+}
+
+.signal-rule-editor-list,
+.signal-rule-status-list,
+.signal-history-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.signal-rule-editor {
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: var(--space-3);
+}
+
+.signal-rule-editor-head,
+.signal-rule-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.signal-rule-status {
+  border-left: 3px solid var(--color-border-default);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+  padding: 9px 10px;
+  background: var(--color-surface-muted);
+}
+
+.signal-rule-status:last-child {
+  border-bottom: 0;
+}
+
+.signal-rule-status p {
+  margin: var(--space-1) 0 0;
+}
+
+.signal-rule-active {
+  border-left-color: var(--color-success);
+}
+
+.signal-rule-suppressed {
+  border-left-color: var(--color-warning);
+}
+
+.signal-rule-unavailable {
+  border-left-color: var(--color-border-strong);
+  opacity: 0.76;
+}
+
+.warning-box {
+  border: var(--border-width) solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-surface);
+  padding: 10px;
+}
+
+.signal-preview-result {
+  margin-top: 14px;
+  border-top: var(--border-width) solid var(--color-border-subtle);
+  padding-top: var(--space-3);
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
 @media (max-width: 760px) {
-  .signal-timing-row { grid-template-columns: 1fr 1fr; }
-  .signal-timing-row.header { display: none; }
+  .signal-timing-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .signal-timing-row.header {
+    display: none;
+  }
 }

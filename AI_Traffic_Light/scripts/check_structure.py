@@ -26,6 +26,11 @@ REQUIRED_PATHS = (
     "apps/pc-studio/backend/app/services/traffic_logic.py",
     "apps/pc-studio/backend/app/services/signal_rules.py",
     "apps/pc-studio/frontend/src/App.tsx",
+    "apps/pc-studio/frontend/src/styles.css",
+    "apps/pc-studio/frontend/src/styles/tokens.css",
+    "apps/pc-studio/frontend/src/styles/base.css",
+    "apps/pc-studio/frontend/src/styles/layout.css",
+    "apps/pc-studio/frontend/src/styles/components.css",
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
@@ -43,6 +48,7 @@ REQUIRED_PATHS = (
     "docs/AI_AGENT_CHECKLIST.md",
     "docs/CODE_STRUCTURE.md",
     "docs/DEVELOPMENT_WORKFLOW.md",
+    "docs/PC_STUDIO_DESIGN_SYSTEM.md",
     "docs/LOCAL_TESTING.md",
     "docs/TEST_READY_CHECKLIST.md",
     "docs/VERSIONING.md",
@@ -59,6 +65,14 @@ BACKEND_VERSION_SURFACES = (
 )
 
 FRONTEND_VERSION_SOURCE = "apps/pc-studio/frontend/src/constants/projectVersion.ts"
+
+FRONTEND_STYLE_ENTRYPOINT = "apps/pc-studio/frontend/src/styles.css"
+REQUIRED_STYLE_IMPORTS = (
+    './styles/tokens.css',
+    './styles/base.css',
+    './styles/layout.css',
+    './styles/components.css',
+)
 FRONTEND_VERSION_SURFACES = (
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
@@ -161,6 +175,18 @@ def validate_frontend_version_surfaces(root: Path, current_version: str, errors:
             add_error(errors, f"Frontend version surface does not reference shared PROJECT_VERSION metadata: {relative_path}")
 
 
+def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
+    entrypoint = root / FRONTEND_STYLE_ENTRYPOINT
+    if not entrypoint.exists():
+        return
+    text = entrypoint.read_text(encoding="utf-8")
+    for relative_import in REQUIRED_STYLE_IMPORTS:
+        if f'@import "{relative_import}";' not in text:
+            add_error(errors, f"Frontend style entrypoint is missing required import: {relative_import}")
+    if "gradient(" in text.lower():
+        add_error(errors, "Frontend shared style entrypoint must not contain decorative gradient styling; use the design-system layers/tokens.")
+
+
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
@@ -169,6 +195,7 @@ def main() -> int:
     fields = validate_version(root, errors)
     validate_backend_version_source(root, errors)
     validate_frontend_version_surfaces(root, fields.get("version", ""), errors)
+    validate_frontend_style_system(root, errors)
     if errors:
         print("AiTL structure/version validation failed:")
         for error in errors:

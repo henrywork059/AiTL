@@ -1,0 +1,86 @@
+:root {
+  color-scheme: dark;
+
+  /* Typography */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  /* Neutral operations-console surfaces */
+  --color-canvas: #111315;
+  --color-shell: #15181b;
+  --color-surface: #1b1f23;
+  --color-surface-raised: #20252a;
+  --color-surface-muted: #171a1d;
+  --color-field: #14171a;
+  --color-media: #0b0d0f;
+  --color-control-hover: #292f34;
+
+  /* Camera / SVG scene surfaces */
+  --color-scene-sky: #1a1e21;
+  --color-scene-road: #292e33;
+  --color-overlay-label: #ffffff;
+  --color-overlay-label-bg: rgba(0, 0, 0, 0.76);
+  --color-overlay-label-stroke: #000000;
+  --color-crosswalk-fill: rgba(236, 239, 242, 0.08);
+  --color-crosswalk-stroke: rgba(236, 239, 242, 0.42);
+  --color-zone-fill: rgba(120, 154, 170, 0.08);
+
+  /* Borders */
+  --color-border-subtle: #30363c;
+  --color-border-default: #3b434a;
+  --color-border-strong: #535d66;
+
+  /* Text */
+  --color-text-primary: #edf0f2;
+  --color-text-secondary: #b8bec4;
+  --color-text-muted: #90979e;
+  --color-text-inverse: #101214;
+
+  /* Interaction: deliberately desaturated, not an AI/neon accent */
+  --color-accent: #708e88;
+  --color-accent-hover: #82a098;
+  --color-accent-active: #5f7a75;
+  --color-accent-surface: #202c2a;
+  --color-focus: #a8bdb6;
+
+  /* Semantic state */
+  --color-success: #84a887;
+  --color-success-surface: #1d2a20;
+  --color-warning: #c0a36b;
+  --color-warning-surface: #30291d;
+  --color-danger: #c97b75;
+  --color-danger-surface: #312120;
+  --color-info: #86a2b1;
+  --color-info-surface: #202a30;
+
+  /* Detection / scene overlays: distinct but restrained */
+  --color-person: #c6a36d;
+  --color-vehicle: #789aaa;
+  --color-crossing: #7f9f8b;
+  --color-queue: #b68b68;
+  --color-road-line: #c2a66e;
+  --color-signal-red: #cf625e;
+  --color-signal-amber: #c29b55;
+  --color-signal-green: #6e9b72;
+  --color-signal-off: #292d31;
+  --color-signal-lamp-border: rgba(255, 255, 255, 0.14);
+
+  /* Spacing: 4px base with a compact desktop rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Geometry */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+
+  /* Elevation stays subtle; panels are separated mainly by borders/layers. */
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.22);
+}

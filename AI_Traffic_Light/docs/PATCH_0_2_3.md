@@ -78,3 +78,26 @@ See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
 - Updated `scripts/test_zone_traffic_services.py` to assert the V023 explanation text `Detection recommendation:` instead of the pre-V023 wording `Detection-based recommendation`.
 - The existing recommendation metadata assertions remain unchanged, so the test still verifies that the active simulation signal and detection-driven recommendation are both retained.
 - No application/runtime behavior changed; version remains `0_2_3` and passed baseline remains `0_2_2`.
+
+## Same-candidate PC Studio design-system patch
+
+- Centralized shared visual decisions under `apps/pc-studio/frontend/src/styles/`: `tokens.css`, `base.css`, `layout.css`, and `components.css`, with `src/styles.css` retained as the stable entrypoint.
+- Added `docs/PC_STUDIO_DESIGN_SYSTEM.md` as the authoritative visual-style contract and linked it from the GUI layout/frontend README.
+- Restyled PC Studio as a restrained dark operations/workbench interface: solid graphite surfaces, smaller 4–8px radii, low elevation, neutral navigation, and desaturated semantic status colors.
+- Removed the decorative page gradient and generic purple/neon AI-like accent treatment from shared UI and Traffic Logic styling.
+- Kept page-specific `signalRules.css` for Traffic Logic structure while moving its palette/geometry decisions onto shared tokens.
+- Added a visible keyboard focus treatment and standardized field/button styling without adding any frontend dependency or webfont.
+- Research direction was informed by IBM Carbon, GitHub Primer, Atlassian Design System, and GOV.UK guidance on role-based tokens, layering, compact geometry, and systematic spacing; AiTL remains its own implementation.
+- No API, backend, signal-rule, inference, dataset, training, tracking, or persisted runtime-data behavior changed.
+- Version remains `0_2_3`; owner-confirmed passed baseline remains `0_2_2`.
+
+### Visual acceptance checks
+
+- Every main page uses the same graphite canvas/shell/panel hierarchy with no full-page gradient or translucent glass panels.
+- Sidebar active state is neutral with a narrow accent edge rather than a saturated blue tile.
+- Standard panels and controls use compact radii; status pills remain the only general pill-shaped element.
+- Traffic Logic tabs/rule cards consume the same tokens as the rest of PC Studio.
+- Success/warning/error states remain distinguishable and include textual labels/reasons.
+- Keyboard tabbing shows a visible focus outline on buttons/inputs/selects/textareas/links.
+- Live AI/Zone overlay colors remain distinguishable after the palette change.
+- Frontend `npm run typecheck` and `npm run build` pass.

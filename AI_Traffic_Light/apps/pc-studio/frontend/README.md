@@ -15,6 +15,12 @@ React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
 Mobility assistance and fall/incident controls are explicit simulation/test inputs. The frontend does not claim the current model can detect wheelchairs or falls.
 
+## Visual system
+
+Shared presentation is isolated under `src/styles/` and documented in `docs/PC_STUDIO_DESIGN_SYSTEM.md`. `src/styles.css` is the stable import entrypoint. Pages may keep small page-specific CSS files for layout/behavior, but they should consume shared design tokens instead of defining independent palettes.
+
+The current theme is a restrained dark operations/workbench UI: solid neutral surfaces, compact radii, low elevation, desaturated status colors, and no decorative gradient/glass/neon AI styling.
+
 Run:
 
 ```powershell
