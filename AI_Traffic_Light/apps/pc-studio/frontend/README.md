@@ -21,7 +21,7 @@ Mobility assistance and fall/incident controls are explicit simulation/test inpu
 
 Shared presentation is isolated under `src/styles/` and documented in `docs/PC_STUDIO_DESIGN_SYSTEM.md`. `src/styles.css` is the stable import entrypoint. Pages may keep small page-specific CSS files for layout/behavior, but they should consume shared design tokens instead of defining independent palettes.
 
-The current theme is a restrained dark operations/workbench UI: solid neutral surfaces, compact radii, low elevation, desaturated status colors, and no decorative gradient/glass/neon AI styling.
+The current visual system is system-adaptive. Light mode uses quiet neutral layers; dark mode follows the Material 2 dark-surface model with a `#121212` base and progressively lighter elevated surfaces. Interaction uses a desaturated Blue Grey family, while semantic/simulated-signal colors remain sparse. Decorative gradient/glass/neon AI styling is intentionally excluded.
 
 Run:
 

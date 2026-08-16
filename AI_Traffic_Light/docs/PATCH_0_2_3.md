@@ -112,3 +112,14 @@ See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
 - Preserved dedicated high-contrast camera/zone/detection overlay colors independently of the application appearance.
 - No backend, API, signal-rule, training, dataset, inference, tracking, or traffic-analytics behavior changed. Version remains `0_2_3`; passed baseline remains `0_2_2`.
 
+## Material dark-theme color refinement
+
+- Refined the same-candidate PC Studio design-system patch using the owner-supplied Material Design 2 dark-theme properties reference.
+- Dark appearance now starts from Material's `#121212` baseline and exposes explicit 0dp / 1dp / 2dp / 4dp / 8dp neutral surface levels (`#121212`, `#1e1e1e`, `#232323`, `#272727`, `#2e2e2e`) so elevation is communicated primarily through increasing surface lightness rather than shadow.
+- Replaced the earlier custom steel-blue dark accent with a light/desaturated Material Blue Grey family (`200/100/300` roles) and kept accent use sparse.
+- Dark borders now use low-opacity on-surface white instead of additional opaque gray hues; ordinary dark-theme panel shadow is removed.
+- Dark text uses high/medium/muted on-surface emphasis rather than pure white everywhere, while keeping normal/muted text above the intended WCAG AA contrast target on normal surfaces.
+- Success/warning/danger/info use light tones with low-opacity tinted surfaces so status color remains readable without becoming a large saturated fill.
+- Light appearance remains neutral and now uses the darker Blue Grey tonal family for the same interaction role, keeping the interaction hue consistent across appearances.
+- No backend, API, simulator, rule-engine, dataset, training, inference, tracking, or analytics behavior changed. Version remains `0_2_3`; passed baseline remains `0_2_2`.
+

@@ -31,8 +31,9 @@ The system is AiTL-specific; it does not copy the appearance of Apple, Figma, Ma
   - https://uxpilot.ai/blogs/color-theory-in-web-design
 - Figma color-theory resource — use color harmony deliberately; a dominant/support/accent relationship is preferable to unrelated competing hues; tune saturation/value and preserve accessibility:
   - https://www.figma.com/resource-library/what-is-color-theory/
-- Material Design 2 color system — primary/secondary color roles, background/surface/error roles, “on” colors for legibility, and color as a hierarchy/interactivity signal:
+- Material Design 2 color system and dark-theme properties — primary/secondary/background/surface/error roles, “on” colors, a `#121212` dark baseline, lighter surfaces at higher elevation, light/desaturated dark-theme accents, and sparse color use:
   - https://m2.material.io/design/color/the-color-system.html
+  - https://m2.material.io/design/color/dark-theme.html#properties
 
 ## Palette model
 
@@ -56,14 +57,15 @@ The often-cited 60/30/10 color heuristic is treated as a direction rather than a
 
 This follows the operating-system preference automatically. Do not add a separate app-specific light/dark switch unless the owner explicitly requests one.
 
-Dark appearance is not a simple inversion. It uses:
+Dark appearance is not a simple inversion. It follows the Material 2 dark-theme surface model more directly:
 
-- dimmer base canvas/shell colors;
-- slightly brighter foreground/elevated surfaces;
-- brighter text and interaction colors;
-- separate semantic surface values.
+- the application canvas and navigation shell use the `#121212` baseline;
+- raised surfaces become progressively lighter rather than relying on dark-theme shadows;
+- interaction color uses a light/desaturated Blue Grey tone instead of a saturated blue/cyan/purple accent;
+- light semantic tones appear only in small status/state regions;
+- foreground hierarchy uses off-white/gray on-surface roles rather than pure white everywhere.
 
-This preserves the perception of depth and legibility in the same way that base/elevated dark layers are used in mature platform interfaces.
+This creates depth through controlled luminance changes while leaving the overwhelming majority of the UI neutral.
 
 ## Source layout
 
@@ -84,35 +86,57 @@ src/pages/*.css                genuinely page-specific layout only
 
 | Role | Token | Value |
 | --- | --- | --- |
-| Canvas | `--color-canvas` | `#f2f3f1` |
-| Shell | `--color-shell` | `#e8eae7` |
+| Canvas | `--color-canvas` | `#f5f5f5` |
+| Shell | `--color-shell` | `#eeeeee` |
 | Surface | `--color-surface` | `#ffffff` |
-| Raised surface | `--color-surface-raised` | `#f6f7f5` |
-| Muted surface | `--color-surface-muted` | `#f0f1ef` |
+| Raised surface | `--color-surface-raised` | `#fafafa` |
 | Field | `--color-field` | `#ffffff` |
-| Primary text | `--color-text-primary` | `#202522` |
-| Secondary text | `--color-text-secondary` | `#46504a` |
-| Muted text | `--color-text-muted` | `#657069` |
-| Interaction accent | `--color-accent` | `#315f78` |
-| Accent surface | `--color-accent-surface` | `#e4eef2` |
-| Focus | `--color-focus` | `#4d7990` |
+| Primary text | `--color-text-primary` | `#212121` |
+| Secondary text | `--color-text-secondary` | `#616161` |
+| Muted text | `--color-text-muted` | `#757575` |
+| Interaction accent | `--color-accent` | `#455a64` (Blue Grey 700) |
+| Accent surface | `--color-accent-surface` | `#eceff1` |
+| Focus | `--color-focus` | `#546e7a` |
 
-### Dark appearance
+### Dark appearance role mapping
 
 | Role | Token | Value |
 | --- | --- | --- |
-| Canvas | `--color-canvas` | `#151816` |
-| Shell | `--color-shell` | `#1a1e1b` |
-| Surface | `--color-surface` | `#202521` |
-| Raised surface | `--color-surface-raised` | `#272d29` |
-| Muted surface | `--color-surface-muted` | `#1b201c` |
-| Field | `--color-field` | `#171b18` |
-| Primary text | `--color-text-primary` | `#f0f3f1` |
-| Secondary text | `--color-text-secondary` | `#c2c9c4` |
-| Muted text | `--color-text-muted` | `#919b94` |
-| Interaction accent | `--color-accent` | `#78a4b9` |
-| Accent surface | `--color-accent-surface` | `#22333b` |
-| Focus | `--color-focus` | `#9bc3d4` |
+| Canvas / shell | `--color-canvas`, `--color-shell` | `#121212` (0dp) |
+| Surface / panel | `--color-surface` | `#1e1e1e` (1dp) |
+| Raised control | `--color-surface-raised` | `#232323` (2dp) |
+| Hover surface | `--color-control-hover` | `#272727` (4dp) |
+| Pressed / overlay surface | `--color-control-pressed`, `--color-surface-overlay` | `#2e2e2e` (8dp) |
+| Primary text | `--color-text-primary` | `#e0e0e0` |
+| Secondary text | `--color-text-secondary` | `#bdbdbd` |
+| Muted text | `--color-text-muted` | `#a0a0a0` |
+| Interaction accent | `--color-accent` | `#b0bec5` (Blue Grey 200) |
+| Accent hover | `--color-accent-hover` | `#cfd8dc` (Blue Grey 100) |
+| Accent active | `--color-accent-active` | `#90a4ae` (Blue Grey 300) |
+| Focus | `--color-focus` | `#cfd8dc` |
+
+
+## Material dark surface ramp
+
+Material 2's dark-theme model treats elevation as a luminance change: a neutral dark base receives progressively stronger light overlays as a surface rises. PC Studio encodes the commonly used 0/1/2/4/8dp levels as explicit tokens so components do not invent arbitrary dark grays.
+
+| Conceptual elevation | Token | Surface |
+| --- | --- | --- |
+| 0dp / canvas | `--color-dark-surface-0` | `#121212` |
+| 1dp / standard panel | `--color-dark-surface-1` | `#1e1e1e` |
+| 2dp / raised control | `--color-dark-surface-2` | `#232323` |
+| 4dp / hover emphasis | `--color-dark-surface-4` | `#272727` |
+| 8dp / pressed/overlay emphasis | `--color-dark-surface-8` | `#2e2e2e` |
+
+These tokens are an elevation vocabulary, not five interchangeable decorative grays. Normal desktop panels use the 1dp role; ordinary buttons use 2dp; hover/pressed feedback may move upward through the ramp. Dark panels deliberately have no default shadow because the surface-lightness difference already carries depth.
+
+## Dark-theme color usage
+
+- Large surfaces remain neutral. Do not fill major panels, page backgrounds, or navigation regions with the interaction color.
+- Primary interaction uses the light/desaturated Blue Grey family so links, focus, selection, and active controls remain visible without producing high-chroma vibration against dark gray.
+- Semantic green/amber/red/info tones are light enough to remain readable but are paired with approximately 10% tinted surfaces rather than large opaque blocks.
+- Camera and traffic-signal visualization colors remain separate because those colors encode scene objects and simulated signal meaning, not application chrome.
+- Text should not default to pure `#ffffff`; the high-emphasis role is `#e0e0e0`, with lower-emphasis roles stepping down through `#bdbdbd` and `#a0a0a0`.
 
 ## Semantic colors
 
@@ -128,7 +152,7 @@ Traffic signal red/amber/green have their own scene tokens because those hues de
 
 ## Contrast targets
 
-Normal text should meet at least 4.5:1 against its intended surface. The current palette was selected so primary and secondary text substantially exceed that threshold, and muted text remains above the AA target on its normal panel/surface combinations.
+Normal text should meet at least 4.5:1 against its intended surface. On the dark 1dp panel (`#1e1e1e`), the current primary (`#e0e0e0`), secondary (`#bdbdbd`), and muted (`#a0a0a0`) roles all remain above that target. The dark base is also intentionally far below the light foreground values so the hierarchy remains readable across the defined elevation ramp.
 
 Do not lower contrast to create a “soft” aesthetic. If visual hierarchy needs to recede, change weight, size, spacing, or surface role before making text difficult to read.
 
@@ -199,6 +223,7 @@ Camera overlays are an exception to the application palette because they must st
 - glassmorphism/backdrop blur as a default surface treatment;
 - multiple unrelated accent hues competing for attention;
 - page-local hard-coded UI colors when a role token exists;
+- arbitrary dark grays that bypass the shared Material-derived elevation ramp;
 - oversized card radii and excessive pill controls;
 - low-contrast gray text used only to appear sophisticated;
 - app-specific appearance controls that fight the operating-system preference.
@@ -208,7 +233,7 @@ Camera overlays are an exception to the application palette because they must st
 1. Reuse an existing semantic/role token before creating a new value.
 2. New shared tokens must describe a reusable role, not a one-page color preference.
 3. Page CSS should be structural and consume the shared palette.
-4. Keep neutral surfaces dominant and interaction color sparse.
+4. Keep neutral surfaces dominant and interaction color sparse; in dark appearance use the defined elevation ramp rather than shadows or arbitrary surface colors.
 5. Preserve semantic meanings of success/warning/danger/accent.
 6. Validate light mode, dark mode, keyboard focus, and reduced-motion behavior for visual changes.
 7. Run frontend typecheck/build and `scripts/check_structure.py` after design-system changes.

@@ -51,7 +51,7 @@ button:hover:not(:disabled) {
 }
 
 button:active:not(:disabled) {
-  background: var(--color-surface-muted);
+  background: var(--color-control-pressed);
 }
 
 button:disabled {
