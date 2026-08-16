@@ -2,6 +2,7 @@
 
 ## 0_2_3 — Configurable adaptive signal rules
 
+- Same-candidate inherited-test repair: align `test_zone_traffic_services.py` with V023's intentional `Detection recommendation:` explanation text while preserving the existing `recommended_phase`, `recommended_decision`, and recommendation-reason assertions.
 - Same-candidate test-harness repair: add the PC Studio backend directory to `scripts/test_signal_rules_service.py` import path so the standalone regression script can resolve `app` from the project root.
 - Same-candidate repair: handle intentional backward simulation-clock seeks by rebuilding transient signal-controller phase state, preserving inherited deterministic camera simulation tests.
 

@@ -119,7 +119,7 @@ def main() -> int:
             assert aligned["recommended_phase"] == "vehicle_yellow"
             assert aligned["recommended_decision"] == "prepare_pedestrian_green"
             assert aligned["decision"] == "follow_simulation_signal"
-            assert "Detection-based recommendation" in aligned["decision_reason"]
+            assert "Detection recommendation:" in aligned["decision_reason"]
         finally:
             camera_frame_service.set_simulation(False)
 

@@ -73,3 +73,8 @@ See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
 - Fixes `ModuleNotFoundError: No module named 'app'` when the test is run from the `AI_Traffic_Light` project root with the backend virtual environment active.
 - Application/controller behavior is unchanged; version remains `0_2_3` and passed baseline remains `0_2_2`.
 
+## Same-candidate Traffic Logic assertion repair
+
+- Updated `scripts/test_zone_traffic_services.py` to assert the V023 explanation text `Detection recommendation:` instead of the pre-V023 wording `Detection-based recommendation`.
+- The existing recommendation metadata assertions remain unchanged, so the test still verifies that the active simulation signal and detection-driven recommendation are both retained.
+- No application/runtime behavior changed; version remains `0_2_3` and passed baseline remains `0_2_2`.
