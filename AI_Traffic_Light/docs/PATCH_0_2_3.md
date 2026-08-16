@@ -101,3 +101,14 @@ See `docs/API_CONTRACTS.md` and `docs/TEST_READY_CHECKLIST.md`.
 - Keyboard tabbing shows a visible focus outline on buttons/inputs/selects/textareas/links.
 - Live AI/Zone overlay colors remain distinguishable after the palette change.
 - Frontend `npm run typecheck` and `npm run build` pass.
+## Reference-informed design-system refinement
+
+- Refined the same-candidate PC Studio visual-system patch using the owner-supplied Apple HIG, UX Pilot color-theory, Figma color-theory, and Material Design 2 color-system references.
+- Added automatic `prefers-color-scheme` light/dark appearance rather than forcing a dark-only app identity.
+- Reworked shared tokens around explicit background/surface/raised/field, on-surface text, interaction, and semantic-state roles.
+- Kept the palette narrow: neutral layers dominate, one muted steel-blue family communicates interaction, and green/amber/red remain semantic/simulated-signal colors rather than decorative technology accents.
+- Strengthened hierarchy with base/elevated surface separation and a page-header divider while retaining compact desktop spacing/radii.
+- Added `prefers-contrast: more`, `prefers-reduced-motion: reduce`, `forced-colors`, focus-visible, and system selection treatments.
+- Preserved dedicated high-contrast camera/zone/detection overlay colors independently of the application appearance.
+- No backend, API, signal-rule, training, dataset, inference, tracking, or traffic-analytics behavior changed. Version remains `0_2_3`; passed baseline remains `0_2_2`.
+

@@ -1,143 +1,215 @@
 # PC Studio Design System — V023 candidate
 
-This document is the authoritative visual-style reference for the PC Studio frontend. It defines the shared visual language; page documentation such as `PC_STUDIO_GUI_LAYOUT.md` defines information architecture and page contents.
+This document is the authoritative visual-style reference for the PC Studio frontend. Page documents such as `PC_STUDIO_GUI_LAYOUT.md` define information architecture; this document defines visual hierarchy, color roles, typography, spacing, elevation, interaction states, and accessibility behavior.
 
-## Design direction
+## Design intent
 
-PC Studio is a desktop engineering/prototype workbench. It should look like a restrained operations console, not a consumer AI assistant or marketing site.
+PC Studio is a desktop engineering/prototype workbench. The interface should feel calm, precise, and platform-native rather than like a consumer AI assistant, promotional dashboard, or neon technology demo.
 
-Use:
+The design uses a restrained neutral foundation with one cool interaction family. Most of the screen is carried by background/surface/text values; color is reserved for interaction and genuine semantic state.
 
-- solid neutral surfaces with clear layer separation;
-- compact typography and spacing suitable for dense technical information;
-- low elevation and mostly 1px borders;
-- small 4–8px corner radii for ordinary controls and containers;
-- one desaturated interaction accent;
-- semantic success/warning/danger colors only when the meaning requires them;
-- persistent labels and text explanations instead of relying on color alone.
+### Principles
 
-Avoid:
+1. **Hierarchy before decoration.** Separation comes from typography, spacing, base/elevated surfaces, and borders before color or shadow.
+2. **Harmony through repetition.** The same tokens, radii, spacing steps, and interaction treatments repeat across pages.
+3. **Consistency of meaning.** A color role must keep the same meaning everywhere. Interaction color is not reused as a health/status color.
+4. **System adaptation.** The web UI follows the operating-system light/dark preference with `prefers-color-scheme`; there is no separate PC Studio appearance toggle.
+5. **Legibility first.** Text/background pairs target at least WCAG AA 4.5:1 for normal text; muted text is still designed to remain readable.
+6. **Color is supporting information.** Status text, labels, icons, borders, and written explanations remain present so color is never the only state cue.
+7. **Motion is optional.** Cosmetic transitions are short and are effectively disabled when the user requests reduced motion.
 
-- decorative full-page gradients;
-- glassmorphism, backdrop blur, translucent floating cards, or glow effects;
-- purple/neon coloring as a generic technology/AI signal;
-- oversized 14–24px card radii;
-- excessive pill-shaped controls (pills are reserved for compact status badges);
-- decorative animation that does not communicate state;
-- page-local raw colors when a shared semantic token already exists.
+## Research basis
+
+The system is AiTL-specific; it does not copy the appearance of Apple, Figma, Material, or UX Pilot. Their guidance is used as design rationale:
+
+- Apple Human Interface Guidelines — hierarchy, harmony, consistency, semantic/adaptive color, base/elevated dark surfaces, system appearance adaptation, and contrast guidance:
+  - https://developer.apple.com/design/human-interface-guidelines
+  - https://developer.apple.com/design/human-interface-guidelines/color
+  - https://developer.apple.com/design/human-interface-guidelines/dark-mode
+  - https://developer.apple.com/design/human-interface-guidelines/accessibility
+- UX Pilot color-theory guide — keep palettes tight, assign explicit roles, use tones for understated dashboard polish, reserve accent color for key emphasis, and check text contrast:
+  - https://uxpilot.ai/blogs/color-theory-in-web-design
+- Figma color-theory resource — use color harmony deliberately; a dominant/support/accent relationship is preferable to unrelated competing hues; tune saturation/value and preserve accessibility:
+  - https://www.figma.com/resource-library/what-is-color-theory/
+- Material Design 2 color system — primary/secondary color roles, background/surface/error roles, “on” colors for legibility, and color as a hierarchy/interactivity signal:
+  - https://m2.material.io/design/color/the-color-system.html
+
+## Palette model
+
+The palette is intentionally narrow:
+
+- **dominant:** neutral canvas/shell/surfaces;
+- **supporting:** neutral text/border/elevated layers;
+- **interaction accent:** one muted steel-blue family;
+- **semantic exceptions:** green, amber, and red only for success/warning/danger and the actual simulated signal lamps;
+- **visualization exceptions:** separate camera-overlay colors that do not leak into application chrome.
+
+The often-cited 60/30/10 color heuristic is treated as a direction rather than a literal measurement: neutral surfaces occupy the overwhelming majority of the interface, supporting neutral layers provide hierarchy, and accent/semantic color remains sparse.
+
+## Appearance adaptation
+
+`src/styles/tokens.css` defines the light appearance first and overrides role tokens inside:
+
+```css
+@media (prefers-color-scheme: dark) { ... }
+```
+
+This follows the operating-system preference automatically. Do not add a separate app-specific light/dark switch unless the owner explicitly requests one.
+
+Dark appearance is not a simple inversion. It uses:
+
+- dimmer base canvas/shell colors;
+- slightly brighter foreground/elevated surfaces;
+- brighter text and interaction colors;
+- separate semantic surface values.
+
+This preserves the perception of depth and legibility in the same way that base/elevated dark layers are used in mature platform interfaces.
 
 ## Source layout
 
 ```text
 src/styles.css                 stable shared CSS entrypoint
-src/styles/tokens.css          authoritative design tokens
-src/styles/base.css            document, typography, controls, focus treatment
-src/styles/layout.css          application shell and responsive page grids
-src/styles/components.css      reusable panels, navigation, status, tables, forms, overlays
-src/pages/*.css                page-only layout/behavior styling when genuinely specific
+src/styles/tokens.css          authoritative role tokens + light/dark variants
+src/styles/base.css            document, typography, controls, focus/accessibility
+src/styles/layout.css          shell, page hierarchy, responsive grids
+src/styles/components.css      reusable panels/navigation/status/forms/tables/overlays
+src/pages/*.css                genuinely page-specific layout only
 ```
 
-`src/main.tsx` continues to import only `src/styles.css`. Shared styles must not be imported separately by pages.
+`src/main.tsx` imports only `src/styles.css`. Pages may import page-specific CSS, but page CSS must consume shared tokens rather than define a second palette.
 
-Page-specific CSS may consume tokens but should not duplicate the palette. `signalRules.css` is currently the main example: it owns Traffic Logic-specific tabs/timing/rule layout while shared controls, surfaces, and colors come from the design system.
+## Core role tokens
 
-## Core visual tokens
+### Light appearance
 
-| Role | Token | Current value / intent |
+| Role | Token | Value |
 | --- | --- | --- |
-| Canvas | `--color-canvas` | `#111315`, neutral application background |
-| Shell | `--color-shell` | `#15181b`, sidebar/status shell |
-| Surface | `--color-surface` | `#1b1f23`, standard panel |
-| Raised surface | `--color-surface-raised` | `#20252a`, headers/selected neutral state |
-| Field | `--color-field` | `#14171a`, inputs and code fields |
-| Subtle border | `--color-border-subtle` | `#30363c` |
-| Strong border | `--color-border-strong` | `#535d66` |
-| Primary text | `--color-text-primary` | `#edf0f2` |
-| Secondary text | `--color-text-secondary` | `#b8bec4` |
-| Muted text | `--color-text-muted` | `#90979e` |
-| Interaction accent | `--color-accent` | `#708e88`, muted/desaturated teal-gray |
-| Focus | `--color-focus` | `#a8bdb6`, visible keyboard focus |
-| Success | `--color-success` | muted green, successful/implemented states only |
-| Warning | `--color-warning` | muted amber, warning/pending states only |
-| Danger | `--color-danger` | muted red, errors/destructive states only |
-| Information | `--color-info` | muted steel-blue, informational/code emphasis |
+| Canvas | `--color-canvas` | `#f2f3f1` |
+| Shell | `--color-shell` | `#e8eae7` |
+| Surface | `--color-surface` | `#ffffff` |
+| Raised surface | `--color-surface-raised` | `#f6f7f5` |
+| Muted surface | `--color-surface-muted` | `#f0f1ef` |
+| Field | `--color-field` | `#ffffff` |
+| Primary text | `--color-text-primary` | `#202522` |
+| Secondary text | `--color-text-secondary` | `#46504a` |
+| Muted text | `--color-text-muted` | `#657069` |
+| Interaction accent | `--color-accent` | `#315f78` |
+| Accent surface | `--color-accent-surface` | `#e4eef2` |
+| Focus | `--color-focus` | `#4d7990` |
 
-Detection/scene overlays use separate role tokens (`--color-person`, `--color-vehicle`, `--color-crossing`, `--color-queue`) so model/zone visualization remains distinguishable without leaking those colors into general application chrome.
+### Dark appearance
+
+| Role | Token | Value |
+| --- | --- | --- |
+| Canvas | `--color-canvas` | `#151816` |
+| Shell | `--color-shell` | `#1a1e1b` |
+| Surface | `--color-surface` | `#202521` |
+| Raised surface | `--color-surface-raised` | `#272d29` |
+| Muted surface | `--color-surface-muted` | `#1b201c` |
+| Field | `--color-field` | `#171b18` |
+| Primary text | `--color-text-primary` | `#f0f3f1` |
+| Secondary text | `--color-text-secondary` | `#c2c9c4` |
+| Muted text | `--color-text-muted` | `#919b94` |
+| Interaction accent | `--color-accent` | `#78a4b9` |
+| Accent surface | `--color-accent-surface` | `#22333b` |
+| Focus | `--color-focus` | `#9bc3d4` |
+
+## Semantic colors
+
+Semantic color is not decorative:
+
+- `--color-success`: healthy/implemented/successful;
+- `--color-warning`: warning/pending/suppressed;
+- `--color-danger`: failed/error/destructive;
+- `--color-info`: code, endpoint, or informational emphasis;
+- `--color-accent`: navigation, selection, focus, links, and active controls.
+
+Traffic signal red/amber/green have their own scene tokens because those hues describe the simulated signal itself rather than general application state.
+
+## Contrast targets
+
+Normal text should meet at least 4.5:1 against its intended surface. The current palette was selected so primary and secondary text substantially exceed that threshold, and muted text remains above the AA target on its normal panel/surface combinations.
+
+Do not lower contrast to create a “soft” aesthetic. If visual hierarchy needs to recede, change weight, size, spacing, or surface role before making text difficult to read.
+
+The CSS also responds to `prefers-contrast: more` by strengthening borders and promoting muted text toward the secondary-text role.
 
 ## Typography
 
-Use the native Windows/system UI stack:
+Use the platform stack:
 
 ```text
-Segoe UI Variable Text → Segoe UI → system-ui
+Segoe UI Variable Text → Segoe UI → system-ui → -apple-system
 ```
 
-Do not add a webfont merely for visual novelty. Technical identifiers and endpoint/path text use the system monospace stack headed by Cascadia Code when available.
+This avoids an unnecessary branded webfont and makes the Windows desktop development environment feel native. Technical identifiers use Cascadia Code when available, then the system monospace fallback chain.
 
 Hierarchy:
 
 - page title: 26px, semibold;
 - panel title: 16px;
-- local/subsection heading: 14px;
-- standard UI/body text: inherited browser/system size;
-- metadata and status text: 11–12px.
+- subsection heading: 14px;
+- body/control text: system default;
+- metadata/status: 11–12px.
 
-Keep headings concise and functional. Avoid oversized hero typography inside the application shell.
+No hero typography is used inside the application shell.
 
-## Spacing and geometry
+## Spacing, shape, and elevation
 
-The shared spacing scale is based on a 4px unit: 4, 8, 12, 16, 20, 24, and 32px. Prefer these tokens rather than arbitrary gaps.
+Use the 4px rhythm: 4, 8, 12, 16, 20, 24, and 32px.
 
-Corner radii:
+Corner radii remain compact:
 
-- small: 4px;
-- normal controls: 6px;
-- panels/media frames: 8px;
-- 999px only for compact status pills or truly circular/pill geometry.
+- 4px for small geometry/progress tracks;
+- 6px for controls and small containers;
+- 8px for panels/media frames;
+- pill geometry only for compact statuses or inherently circular/pill controls.
 
-Panels use a subtle 1px border and minimal 1–2px shadow. Layer/background contrast, not a large shadow, provides hierarchy.
+Use borders and surface-value changes for depth. Panel shadow is deliberately minimal. Do not introduce decorative glow, backdrop blur, glass effects, or large floating-card shadows.
 
-## Interaction rules
+## Navigation and controls
 
-- Default buttons are neutral. Do not make every action a saturated primary button.
-- Active navigation uses a neutral raised surface plus a narrow accent edge instead of a bright filled tile.
-- Tabs use a restrained underline/edge treatment rather than a glowing filled chip.
-- Inputs/selects/textareas share the same field surface and border.
-- All interactive elements must retain an obvious `:focus-visible` outline.
-- Disabled controls may use opacity, but text must remain readable.
+- Sidebar navigation is neutral by default.
+- Active navigation uses a subtle accent-tinted surface plus a 2px accent edge; it does not become a saturated tile.
+- Traffic Logic tabs use an underline/edge rather than filled rounded chips.
+- Buttons are neutral by default; do not make every button a saturated primary CTA.
+- Links, selection controls, checkboxes/radios/ranges, focus rings, and selected navigation share the interaction accent family.
+- Hover and pressed states use nearby tones of the same role rather than introducing new hues.
 
-## Status and semantic color
+## Status and visualization
 
-Color must communicate an existing state, not decorate the interface.
+Status badges may use semantic color because their purpose is state communication. They must also include readable words such as `active`, `warning`, `failed`, or equivalent contextual text.
 
-- green: success, implemented, healthy;
-- amber: warning, pending, suppressed;
-- red: error/danger;
-- informational steel-blue: code/endpoint/information emphasis;
-- accent: selection/focus/navigation, not health status.
+Camera overlays are an exception to the application palette because they must stay legible over arbitrary imagery. Overlay labels remain high-contrast white-on-dark even when the rest of the application is in light appearance.
 
-Pair status color with text such as `active`, `warning`, `failed`, or a written explanation. Do not encode rule state by color alone.
+## Accessibility behavior
 
-## Research basis
+- `:focus-visible` uses a clear 2px focus outline.
+- `prefers-reduced-motion: reduce` effectively removes nonessential transitions/animations.
+- `prefers-contrast: more` increases border/text differentiation.
+- `forced-colors: active` is not blocked by custom forced-color overrides.
+- Do not encode state by color alone.
+- Test both system light and dark appearances before accepting a visual patch.
 
-This is an AiTL-specific design system, not a copy of another product. The architecture follows established guidance:
+## Avoid
 
-- IBM Carbon: role-based color tokens and neutral surface layering; AI-specific tokens are separate from ordinary product UI tokens.
-  - https://carbondesignsystem.com/elements/color/tokens/
-  - https://preview.carbondesignsystem.com/building-blocks/foundations/color/overview
-- GitHub Primer: functional/component color tokens, responsive product foundations, and compact default geometry (6px default radius).
-  - https://primer.style/product/getting-started/foundations/color-usage/
-  - https://primer.style/product/primitives/size/
-- Atlassian Design System: design tokens as the single source of truth for repeatable visual decisions.
-  - https://atlassian.design/foundations/tokens/design-tokens/
-- GOV.UK Design System: consistent spacing scales and established conventions rather than arbitrary one-off styling.
-  - https://design-system.service.gov.uk/styles/spacing/
+- decorative full-page gradients;
+- purple/cyan neon “AI” styling;
+- glow effects and animated technology decoration;
+- glassmorphism/backdrop blur as a default surface treatment;
+- multiple unrelated accent hues competing for attention;
+- page-local hard-coded UI colors when a role token exists;
+- oversized card radii and excessive pill controls;
+- low-contrast gray text used only to appear sophisticated;
+- app-specific appearance controls that fight the operating-system preference.
 
 ## Change rules for future patches
 
-1. Reuse an existing token before introducing a new visual value.
-2. Add new shared tokens only when the role is reusable across multiple surfaces.
-3. Keep page CSS structural; avoid page-private palettes.
-4. Do not bring back decorative gradients/glows/glass effects without an explicit owner request.
-5. When changing the visual language, update this document and run frontend typecheck/build plus manual cross-page checks.
-6. Keep the simulator/prototype safety wording visible where relevant; visual polish must never imply production public-road control capability.
+1. Reuse an existing semantic/role token before creating a new value.
+2. New shared tokens must describe a reusable role, not a one-page color preference.
+3. Page CSS should be structural and consume the shared palette.
+4. Keep neutral surfaces dominant and interaction color sparse.
+5. Preserve semantic meanings of success/warning/danger/accent.
+6. Validate light mode, dark mode, keyboard focus, and reduced-motion behavior for visual changes.
+7. Run frontend typecheck/build and `scripts/check_structure.py` after design-system changes.
+8. Visual polish must not imply production/public-road traffic-control capability; AiTL remains a simulation/recommendation prototype.

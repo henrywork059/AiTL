@@ -30,7 +30,7 @@
 }
 
 .signal-tab:hover:not(:disabled) {
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   border-color: transparent;
   color: var(--color-text-primary);
 }
@@ -38,7 +38,7 @@
 .signal-tab.active {
   background: transparent;
   border-color: var(--color-accent);
-  color: var(--color-text-primary);
+  color: var(--color-accent);
 }
 
 .signal-config-bar label,
@@ -82,7 +82,7 @@
   align-items: center;
   padding: 9px 10px;
   border-bottom: var(--border-width) solid var(--color-border-subtle);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
 }
 
 .signal-timing-row:last-child {
@@ -90,7 +90,7 @@
 }
 
 .signal-timing-row.header {
-  background: var(--color-surface-raised);
+  background: var(--color-surface-muted);
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 600;
@@ -115,7 +115,7 @@
 .signal-rule-editor {
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   padding: var(--space-3);
 }
 
@@ -131,7 +131,7 @@
   border-left: 3px solid var(--color-border-default);
   border-bottom: var(--border-width) solid var(--color-border-subtle);
   padding: 9px 10px;
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
 }
 
 .signal-rule-status:last-child {
@@ -152,7 +152,7 @@
 
 .signal-rule-unavailable {
   border-left-color: var(--color-border-strong);
-  opacity: 0.76;
+  color: var(--color-text-muted);
 }
 
 .warning-box {

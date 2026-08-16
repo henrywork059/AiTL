@@ -1,6 +1,6 @@
 .app-frame {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: 264px minmax(0, 1fr);
   min-height: calc(100vh - 40px);
 }
 
@@ -27,7 +27,7 @@
 
 .content-frame {
   min-width: 0;
-  padding: var(--space-5);
+  padding: var(--space-6);
 }
 
 .page-header {
@@ -35,7 +35,9 @@
   justify-content: space-between;
   gap: var(--space-6);
   align-items: flex-start;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
 .page-stack {

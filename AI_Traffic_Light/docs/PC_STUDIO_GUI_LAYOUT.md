@@ -46,3 +46,9 @@ All signal timing/rule controls are described as simulator policy. No page impli
 The frontend visual language is now defined separately in `docs/PC_STUDIO_DESIGN_SYSTEM.md` and implemented through `src/styles/` design tokens/base/layout/components. The GUI layout document remains responsible for page structure and control placement.
 
 V023 uses a restrained dark operations/workbench presentation: solid graphite layers, compact 4–8px radii, low elevation, desaturated semantic colors, no decorative full-page gradient/glass treatment, and no generic purple/neon “AI” accent. Page-specific styles should consume the shared tokens instead of introducing private palettes.
+## Shared visual hierarchy
+
+PC Studio uses the shared design system in `docs/PC_STUDIO_DESIGN_SYSTEM.md`. The shell follows the operating-system light/dark preference and uses neutral base/elevated surfaces, compact radii, restrained borders, native system typography, and one muted steel-blue interaction family. Semantic green/amber/red is reserved for real state meaning and the simulated signal; page-specific styling must consume shared role tokens.
+
+The page header uses a subtle separator so page identity remains visually above panel content. Sidebar selection and Traffic Logic tabs use restrained accent edges/underlines rather than saturated filled cards. Camera/detection overlays retain dedicated high-contrast visualization colors so they remain readable over imagery in either application appearance.
+

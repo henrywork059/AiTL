@@ -2,6 +2,8 @@
 
 React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
+Visual styling is governed by `docs/PC_STUDIO_DESIGN_SYSTEM.md` and the role-token files under `src/styles/`. The interface follows the operating-system light/dark preference, uses neutral layered surfaces with one restrained interaction accent, and reserves red/amber/green for semantic/simulated-signal meaning rather than decorative "AI" styling.
+
 ## Current working surfaces
 
 - Dashboard, Live AI, Camera Sources, camera-aligned Zone Editor, Traffic Analytics, Dataset Capture/Review, Train/Export, Model Registry, Settings, and Logs;

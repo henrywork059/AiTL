@@ -186,6 +186,30 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
     if "gradient(" in text.lower():
         add_error(errors, "Frontend shared style entrypoint must not contain decorative gradient styling; use the design-system layers/tokens.")
 
+    token_path = root / "apps/pc-studio/frontend/src/styles/tokens.css"
+    if token_path.exists():
+        token_text = token_path.read_text(encoding="utf-8")
+        required_tokens = (
+            "--color-canvas",
+            "--color-surface",
+            "--color-text-primary",
+            "--color-accent",
+            "--color-success",
+            "--color-warning",
+            "--color-danger",
+        )
+        for token in required_tokens:
+            if token not in token_text:
+                add_error(errors, f"Frontend design tokens are missing required role: {token}")
+        if "color-scheme: light dark" not in token_text or "prefers-color-scheme: dark" not in token_text:
+            add_error(errors, "Frontend design tokens must preserve system-adaptive light/dark appearance support.")
+
+    signal_css = root / "apps/pc-studio/frontend/src/pages/signalRules.css"
+    if signal_css.exists():
+        signal_text = signal_css.read_text(encoding="utf-8")
+        if re.search(r"#[0-9a-fA-F]{3,8}\b", signal_text):
+            add_error(errors, "Traffic Logic page CSS must consume shared color tokens instead of page-local hex colors.")
+
 
 def main() -> int:
     args = parse_args()

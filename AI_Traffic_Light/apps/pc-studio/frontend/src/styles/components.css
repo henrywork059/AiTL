@@ -49,10 +49,10 @@
 }
 
 .nav-button.active {
-  background: var(--color-surface-raised);
+  background: var(--color-accent-surface);
   border-color: var(--color-border-default);
   color: var(--color-text-primary);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .nav-button.active small {
@@ -188,7 +188,7 @@
 .zone-vehicle_queue { stroke: var(--color-queue); }
 
 .zone-label {
-  fill: var(--color-text-primary);
+  fill: var(--color-overlay-label);
   font-size: 22px;
   font-weight: 700;
   paint-order: stroke;
@@ -280,7 +280,7 @@
 .log-row {
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
 }
 
 .metric-card {
@@ -316,7 +316,6 @@
 
 input[type="range"] {
   width: 100%;
-  accent-color: var(--color-accent);
 }
 
 .button-row {
@@ -358,7 +357,7 @@ input[type="range"] {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--color-surface-muted);
+  background: var(--color-surface);
 }
 
 th,
@@ -375,7 +374,7 @@ tr:last-child td {
 
 th {
   color: var(--color-text-muted);
-  background: var(--color-surface-raised);
+  background: var(--color-surface-muted);
   font-weight: 600;
 }
 

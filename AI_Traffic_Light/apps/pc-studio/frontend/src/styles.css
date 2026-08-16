@@ -1,8 +1,9 @@
 /*
  * PC Studio shared visual entrypoint.
  *
- * Keep shared appearance in src/styles/ and page-only rules beside the page.
- * See docs/PC_STUDIO_DESIGN_SYSTEM.md before introducing new visual values.
+ * Role tokens include system-adaptive light/dark appearances. Keep shared
+ * appearance in src/styles/ and page-only layout beside the page.
+ * See docs/PC_STUDIO_DESIGN_SYSTEM.md before introducing visual values.
  */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
