@@ -1,8 +1,13 @@
-# PC Studio Frontend — V023 candidate
+# PC Studio Frontend — V024 candidate
 
 React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
 Visual styling is governed by `docs/PC_STUDIO_DESIGN_SYSTEM.md` and the role-token files under `src/styles/`. The interface follows the operating-system light/dark preference, uses neutral layered surfaces with one restrained interaction accent, and reserves red/amber/green for semantic/simulated-signal meaning rather than decorative "AI" styling.
+
+
+## V024 polling hardening
+
+`src/lib/useSerialPolling.ts` is the shared scheduler for top-level periodic API refreshes. Camera status and Live AI traffic/zone context now schedule the next refresh only after the previous async request settles, preventing overlapping interval requests during a slow backend response. The existing live-detection loop remains self-serial.
 
 ## Current working surfaces
 

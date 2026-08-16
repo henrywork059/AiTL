@@ -6,7 +6,7 @@ This is the current incremental patch workflow for AiTL.
 
 Inspect current GitHub `main`, then read `AGENTS.md`, `VERSION`, `docs/AI_AGENT_GUIDE.md`, and `docs/AI_AGENT_CHECKLIST.md`.
 
-Current state for this documentation: V023 / `0_2_3` is the candidate; V022 / `0_2_2` is the owner-confirmed passed baseline. Do not promote V023 because automated tests pass.
+Current state for this documentation: V024 / `0_2_4` is the candidate; V023 / `0_2_3` is the previous candidate; V022 / `0_2_2` remains the owner-confirmed passed baseline. The owner explicitly requested V024 before accepting V023. Do not promote V024 because automated tests pass.
 
 ## 2. Inspect the affected contract and implementation
 
@@ -18,7 +18,9 @@ Backend: `main.py` wiring only; `routes/` HTTP translation; `services/` business
 
 Frontend: `App.tsx` composition only; `pages/` page behavior; `components/` reusable UI; `api.ts`/`apiClient.ts` API access; shared types/constants.
 
-V023 signal policy logic belongs in `services/signal_rules.py`; the camera simulator consumes the resulting phase and must not duplicate arbitration rules.
+V023+ signal policy logic belongs in `services/signal_rules.py`; the camera simulator consumes the resulting phase and must not duplicate arbitration rules.
+
+V024 shared persistence mechanics belong in `app/core/json_store.py`; domain services retain validation/error ownership. Async periodic frontend work that can overlap should use serial scheduling rather than raw async `setInterval`.
 
 ## 4. Preserve runtime data
 

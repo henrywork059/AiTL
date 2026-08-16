@@ -1,10 +1,10 @@
-# PC Studio Function List (V023 candidate highlights)
+# PC Studio Function List (V024 candidate highlights)
 
 ## Camera / simulation
 - receive JPEG/PNG device frames;
 - signal-aware synthetic scene with vehicle stop-line queues and pedestrian curb/WALK behavior;
 - Light / Normal / Busy density and pause/resume;
-- V023 configurable protected simulated signal timing consumed by synthetic agents.
+- V023+ configurable protected simulated signal timing consumed by synthetic agents.
 
 ## Signal rules / traffic simulation
 - edit six normal-operation phase base/min/max durations;
@@ -38,6 +38,13 @@
 - runtime rule config/history, datasets, models, occupancy/flow history excluded from source patches;
 - repository/version and patch-ZIP validation.
 
+
+## V024 maintenance / reliability
+- shared atomic JSON persistence for runtime settings, zones, and model-registry metadata;
+- synchronized zone and model-registry state transitions;
+- reusable non-overlapping App-level camera/live-context polling;
+- architecture/regression guards for persistence and polling mechanics.
+
 ## Limitations / later
 
-V023 signal behavior remains a supervised local simulation. Wheelchair/mobility and fall detection are not live perception capabilities unless a compatible future model/source supplies them. The tracker is lightweight and not certified measurement. Future directions include model evaluation/quality, policy A/B simulation benchmarking, rule import/export, stronger tracking, and richer experiment reports. Physical public-road traffic control is explicitly outside scope.
+V023+ signal behavior remains a supervised local simulation. Wheelchair/mobility and fall detection are not live perception capabilities unless a compatible future model/source supplies them. The tracker is lightweight and not certified measurement. Future directions include model evaluation/quality, policy A/B simulation benchmarking, rule import/export, stronger tracking, and richer experiment reports. Physical public-road traffic control is explicitly outside scope.

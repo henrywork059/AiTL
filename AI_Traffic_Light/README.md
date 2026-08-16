@@ -4,9 +4,10 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 
 ## Current candidate
 
-- `0_2_3` — candidate adding configurable normal signal timings, bounded adaptive timing rules, profile/test/dry-run controls, rule explainability, and signal-decision history on top of V022.
-- Previous version: `0_2_2`.
+- `0_2_4` — maintenance hardening and polling optimization candidate, preserving V023 adaptive signal behavior.
+- Previous version/candidate: `0_2_3`.
 - Owner-confirmed passed baseline: `0_2_2`.
+- V024 was explicitly requested before V023 was explicitly accepted, so V023 is not treated as a passed baseline.
 
 ## Implemented prototype functions
 
@@ -27,9 +28,17 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - keep sampled occupancy analytics separate from track-derived passage/region flow events;
 - persist occupancy history, flow events, runtime settings, and inspect backend logs.
 
+
+## V024 maintenance integrity
+
+- Shared `app/core/json_store.py` atomically replaces runtime-settings, zone, and model-registry JSON using unique same-directory temporary files.
+- Zone writes and model-registry transitions are synchronized inside their services.
+- Top-level camera-status and Live AI traffic/zone refreshes use reusable serial polling so one slow request cannot overlap the next scheduled poll from the same loop.
+- API endpoints, stable error codes, signal-rule semantics, dataset/model formats, and the V023 design system are unchanged.
+
 ## Signal-policy semantics
 
-The V023 controller starts from user-configured normal phase durations. Adaptive rules can extend or reduce the current simulated phase only within validated min/max bounds and the configured cycle cap. Yellow/all-red transition ordering remains protected; adaptive logic cannot jump directly between conflicting movement phases.
+The V023+ controller starts from user-configured normal phase durations. Adaptive rules can extend or reduce the current simulated phase only within validated min/max bounds and the configured cycle cap. Yellow/all-red transition ordering remains protected; adaptive logic cannot jump directly between conflicting movement phases.
 
 If detection observations are stale/unavailable, Adaptive mode falls back to the saved normal timings. Short detection dropouts retain demand briefly, and rule persistence/cooldown prevents single-frame spikes or repeated per-poll extensions.
 
@@ -56,7 +65,7 @@ Useful entry points:
 - `docs/LOCAL_TESTING.md`
 - `docs/TEST_READY_CHECKLIST.md`
 - `docs/API_CONTRACTS.md`
-- `docs/PATCH_0_2_3.md`
+- `docs/PATCH_0_2_4.md`
 
 Repository helpers:
 

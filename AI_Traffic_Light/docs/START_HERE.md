@@ -1,17 +1,16 @@
-# Start Here — Current V023 candidate
+# Start Here — Current V024 candidate
 
-The current candidate is V023 / `0_2_3`. V022 / `0_2_2` is the owner-confirmed passed baseline.
+The current candidate is V024 / `0_2_4`. V023 / `0_2_3` is the previous candidate; V022 / `0_2_2` remains the owner-confirmed passed baseline because V023 was not explicitly accepted.
 
-## What V023 adds
+## What V024 hardens
 
-1. Traffic Logic now manages a persistent user-defined simulated signal policy.
-2. Normal Timing edits min/base/max values for all six protected phase slots.
-3. Fixed mode uses normal timing only; Adaptive mode applies bounded live-demand rules; Test mode additionally accepts explicit manual accessibility/incident inputs.
-4. Rule priority, persistence/hysteresis, cooldowns, demand memory, stale-data fallback, phase/cycle caps, pending demand and minimum service are visible/auditable.
-5. Protected phase order remains vehicle green → yellow → all-red → pedestrian WALK → CLEAR → all-red.
-6. Test-mode incident input produces simulated all-red hold until explicitly cleared.
-7. Preview scenarios and dry-run evaluate rules without unsafe arbitrary phase jumps.
-8. Signal decision history persists under `outputs/signal_rules/` and is independent of occupancy/flow histories.
+- shared atomic JSON replacement for runtime settings, zones, and model-registry metadata;
+- synchronized zone writes and model-registry state transitions;
+- non-overlapping App-level camera/live-context polling through `useSerialPolling`;
+- architecture and regression checks that protect those maintenance boundaries;
+- no API, signal-semantic, dataset/model-format, or design-system changes.
+
+## Inherited V023 capabilities
 
 V023 inherits accepted V022 cross-frame tracking/counting-line flow and V021 occupancy analytics. Occupancy and flow remain separate metrics.
 
@@ -22,12 +21,14 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 $py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
 & $py -m compileall ".\apps\pc-studio\backend\app" ".\scripts"
 & $py ".\scripts\check_structure.py"
+& $py ".\scripts\test_atomic_json_store.py"
+& $py ".\scripts\test_frontend_polling_structure.py"
 & $py ".\scripts\test_signal_rules_service.py"
 ```
 
 Then run the complete non-live `scripts/test_*.py` regression set, start the backend, run `test_backend_smoke.py`, and run frontend `npm ci`, `npm run typecheck`, and `npm run build`.
 
-See `LOCAL_TESTING.md` and `TEST_READY_CHECKLIST.md` for the full V023 acceptance sequence.
+See `LOCAL_TESTING.md` and `TEST_READY_CHECKLIST.md` for the full V024 acceptance sequence, including inherited V023 behavior checks.
 
 ## Perception limitation
 

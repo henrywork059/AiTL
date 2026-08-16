@@ -16,6 +16,7 @@ REQUIRED_PATHS = (
     "README.md",
     "apps/pc-studio/backend/app/main.py",
     "apps/pc-studio/backend/app/core/project_version.py",
+    "apps/pc-studio/backend/app/core/json_store.py",
     "apps/pc-studio/backend/app/routes/health.py",
     "apps/pc-studio/backend/app/services/smoke_test.py",
     "apps/pc-studio/backend/app/services/template_state.py",
@@ -32,6 +33,7 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/styles/layout.css",
     "apps/pc-studio/frontend/src/styles/components.css",
     "apps/pc-studio/frontend/src/api.ts",
+    "apps/pc-studio/frontend/src/lib/useSerialPolling.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficLogicPage.tsx",
@@ -53,6 +55,8 @@ REQUIRED_PATHS = (
     "docs/TEST_READY_CHECKLIST.md",
     "docs/VERSIONING.md",
     "scripts/validate_patch_zip.py",
+    "scripts/test_atomic_json_store.py",
+    "scripts/test_frontend_polling_structure.py",
     "scripts/test_object_tracking_flow.py",
     "scripts/test_signal_rules_service.py",
 )
@@ -77,6 +81,16 @@ FRONTEND_VERSION_SURFACES = (
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/constants/appNavigation.ts",
+)
+
+ATOMIC_JSON_SERVICES = (
+    "apps/pc-studio/backend/app/services/runtime_settings.py",
+    "apps/pc-studio/backend/app/services/zones.py",
+    "apps/pc-studio/backend/app/services/model_registry.py",
+)
+
+SERIAL_POLLING_SURFACES = (
+    "apps/pc-studio/frontend/src/App.tsx",
 )
 
 
@@ -218,6 +232,47 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
             add_error(errors, "Traffic Logic page CSS must consume shared color tokens instead of page-local hex colors.")
 
 
+
+def validate_atomic_json_persistence(root: Path, errors: list[str]) -> None:
+    helper = root / "apps/pc-studio/backend/app/core/json_store.py"
+    if helper.exists():
+        helper_text = helper.read_text(encoding="utf-8")
+        for required in ("tempfile.mkstemp", "os.fsync", "os.replace"):
+            if required not in helper_text:
+                add_error(errors, f"Atomic JSON helper is missing required operation: {required}")
+
+    for relative_path in ATOMIC_JSON_SERVICES:
+        path = root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "write_json_atomic" not in text:
+            add_error(errors, f"Persistent JSON service must use shared atomic writer: {relative_path}")
+        if '.with_suffix(".tmp")' in text or ".with_suffix('.tmp')" in text:
+            add_error(errors, f"Persistent JSON service reintroduces a shared fixed .tmp path: {relative_path}")
+        if "write_text(json.dumps" in text:
+            add_error(errors, f"Persistent JSON service bypasses the shared atomic writer: {relative_path}")
+
+
+def validate_frontend_polling(root: Path, errors: list[str]) -> None:
+    hook = root / "apps/pc-studio/frontend/src/lib/useSerialPolling.ts"
+    if hook.exists():
+        hook_text = hook.read_text(encoding="utf-8")
+        if "window.setTimeout" not in hook_text or "finally" not in hook_text:
+            add_error(errors, "Serial polling hook must schedule the next poll after the previous async task settles.")
+        if "window.setInterval" in hook_text:
+            add_error(errors, "Serial polling hook must not use setInterval because async polls may overlap.")
+
+    for relative_path in SERIAL_POLLING_SURFACES:
+        path = root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "useSerialPolling" not in text:
+            add_error(errors, f"High-frequency frontend surface must use serial polling helper: {relative_path}")
+        if "window.setInterval" in text:
+            add_error(errors, f"High-frequency frontend surface must not use overlapping setInterval polling: {relative_path}")
+
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
@@ -227,6 +282,8 @@ def main() -> int:
     validate_backend_version_source(root, errors)
     validate_frontend_version_surfaces(root, fields.get("version", ""), errors)
     validate_frontend_style_system(root, errors)
+    validate_atomic_json_persistence(root, errors)
+    validate_frontend_polling(root, errors)
     if errors:
         print("AiTL structure/version validation failed:")
         for error in errors:

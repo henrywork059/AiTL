@@ -1,4 +1,4 @@
-# PC Studio Backend — V023 candidate
+# PC Studio Backend — V024 candidate
 
 FastAPI backend for the local AI Traffic Light prototype.
 
@@ -12,6 +12,14 @@ FastAPI backend for the local AI Traffic Light prototype.
 - evaluate bounded adaptive timing rules with priority ordering, persistence, cooldown, demand memory, stale-data fallback, protected phase order, and maximum-cycle limits;
 - expose live signal-policy status, rule health/arbitration, dry previews, Test-mode accessibility/incident inputs, incident clearing, adaptive-state reset, and decision-history APIs;
 - persist signal policy in `config/signal_rules.json` and runtime decision history in `outputs/signal_rules/decision_history.jsonl`.
+
+
+## V024 maintenance hardening
+
+- `app/core/json_store.py` centralizes atomic UTF-8 JSON replacement for runtime settings, zones, and model-registry metadata using unique same-directory temporary files, flush/fsync, and `os.replace`.
+- Zone saves use the service lock shared with reads.
+- Model-registry discovery/default/delete/metadata transitions use a re-entrant lock.
+- Service validation, return shapes, logging, API envelopes, and existing stable error codes are unchanged.
 
 The current perception model is not claimed to detect wheelchairs/mobility aids or person-fall incidents. Those conditions are Test-mode inputs until a compatible detector is deliberately added.
 

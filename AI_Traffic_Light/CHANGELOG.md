@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_2_4 — Maintenance hardening and polling optimization
+
+- Created V024 / `0_2_4` at the owner's explicit request while keeping owner-confirmed `passed_baseline: 0_2_2`; V023 was not implicitly promoted.
+- Added shared `app/core/json_store.py` atomic JSON persistence using a unique same-directory temporary file, flush/fsync, and `os.replace`, with cleanup on failure.
+- Migrated runtime settings, editable zones, and model-registry metadata to the shared JSON persistence helper without changing their API envelopes or stable error codes.
+- Serialized zone configuration writes with the existing service lock and added a re-entrant model-registry lock so discovery/default/delete/metadata transitions do not race inside the process.
+- Added reusable frontend `useSerialPolling` scheduling so the top-level camera-status and Live AI traffic/zone refresh loops wait for each async poll to settle before scheduling the next one.
+- Added focused atomic-persistence regression coverage and repository architecture guards against fixed shared `.tmp` files, direct JSON writes in migrated services, or reintroduced top-level `setInterval` polling.
+- Preserved V023 adaptive signal behavior and Material-derived PC Studio design system, V022 tracking/flow, V021 occupancy, dataset/training/inference/model workflows, request IDs, logging, and prototype-only safety boundaries.
+- No API endpoints, schemas, or stable error-code definitions changed. Physical/public-road traffic control remains disabled.
+
 ## 0_2_3 — Configurable adaptive signal rules
 
 - Same-candidate Material dark-theme refinement: use the Material 2 `#121212` base, explicit 0/1/2/4/8dp surface-lightness ramp, low-opacity on-surface borders, Blue Grey light/desaturated interaction tones, and sparse light semantic accents so dark mode communicates elevation and hierarchy without neon/AI-dashboard coloring.

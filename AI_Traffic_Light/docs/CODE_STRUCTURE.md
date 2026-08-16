@@ -1,128 +1,56 @@
 # Code Structure Rules
 
-AiTL should stay modular enough that a developer or AI agent can identify one clear owner for each behavior.
+AiTL should keep one clear owner for each behavior. Routes translate HTTP; services own behavior; UI pages coordinate page behavior; components/helpers own reusable mechanics.
 
-## Core principles
-
-```text
-One module = one cohesive responsibility.
-Routes translate HTTP; services own behavior.
-UI pages coordinate page behavior; components render reusable pieces.
-Shared project facts should have one authoritative source when practical.
-A patch should solve one logical problem without unrelated rewrites.
-```
-
-File length alone is not a reason to split a module. Split when responsibilities, side effects, or test boundaries are mixed.
-
-## Backend structure
+## Backend
 
 ```text
 apps/pc-studio/backend/app/
   main.py                 FastAPI creation/wiring only
   models.py               Pydantic request/response models
   core/
-    api_response.py        standard envelope helpers
-    error_codes.py         stable ErrorCode definitions
-    exceptions.py          AppError/global handlers
-    logging_config.py      structured logging/buffer setup
-    middleware.py          request context/request ID
+    api_response.py        envelope helpers
+    error_codes.py         stable errors
+    exceptions.py          AppError/handlers
+    json_store.py          shared atomic UTF-8 JSON read/write primitive
+    logging_config.py      structured logging
+    middleware.py          request IDs
     project_version.py     validated root VERSION metadata
   routes/                  thin HTTP handlers
-  services/                camera/data/model/training/zone/traffic business logic
+  services/                domain behavior/state/filesystem/model logic
 ```
 
-### Backend boundaries
+### Persistence rule
 
-Keep these out of routes when possible:
+Services own schemas, validation, locks, logging, and stable error mapping. When a service needs replace-style JSON persistence, prefer `core/json_store.py` rather than duplicating temporary-file mechanics. The V024-migrated runtime-settings, zones, and model-registry services must not use one predictable shared `.tmp` path. A successful write presents a complete JSON document; a serialization/write failure must not replace the prior valid target.
 
-- filesystem operations;
-- training/inference algorithms;
-- dataset construction;
-- model registry state;
-- zone/traffic calculations;
-- multi-step rollback/cleanup behavior.
+Multi-step state transitions that can race inside one process need service-level synchronization. Zone save/read uses one lock; model-registry discovery/default/delete/metadata transitions use a re-entrant lock.
 
-Route handlers may validate/translate HTTP-level input and invoke a service.
-
-Backend release labels must use `core/project_version.py`; do not duplicate literal project versions in health/smoke/template/app wiring.
-
-## Frontend structure
+## Frontend
 
 ```text
 apps/pc-studio/frontend/src/
-  App.tsx                 page switching and top-level coordination
-  api.ts                  domain API functions/fallback values
-  layout/                 shell/navigation layout
-  pages/                  page-level behavior
-  components/             reusable visual/interaction components
-  constants/              navigation/function/release metadata
-  lib/                    API client, logging, error helpers
-  types.ts                shared domain/API types
-  types/                  app-specific type modules
+  App.tsx                 page switching/top-level coordination
+  api.ts                  typed domain API functions
+  layout/                 shell/navigation
+  pages/                  page behavior
+  components/             reusable presentation
+  constants/              navigation/release metadata
+  lib/
+    apiClient.ts           shared API envelope/error handling
+    useSerialPolling.ts    non-overlapping periodic async scheduler
+  styles/                 design-system tokens/layers
+  types.ts / types/       shared domain types
 ```
 
-### Frontend boundaries
+### Polling rule
 
-Do not move camera, inference, dataset, or traffic business rules into `App.tsx` just because state is already available there. Pass state/callbacks to pages or extract a focused helper/component.
+Do not use `setInterval` for async work when a new tick can start before the previous request settles. Use `useSerialPolling` or an equivalent self-scheduling `setTimeout` loop so there is at most one in-flight poll per loop and cleanup cancels future schedules. Live inference already uses a self-serial detection loop; V024 migrates App-level camera and live-context polling.
 
-Keep domain response types centralized instead of creating slightly different local interfaces per page. Keep the frontend release mirror in `constants/projectVersion.ts`; current version surfaces should import it rather than repeat release literals.
+## CV / analytics invariants
 
-## CV coordinate rule
-
-Canonical detection boxes use original image coordinates. Persistent zones use the validated reference coordinate system. Display layers may scale those values to the rendered image/canvas.
-
-Do not persist browser/canvas pixels as the canonical record.
-
-## State and side-effect rule
-
-When a workflow mutates user data, the module owning the workflow should make the whole state transition understandable and testable. Examples include:
-
-- capture image + metadata + optional labels;
-- managed YOLO build + staleness state;
-- training run + model registry discovery;
-- runtime settings/zone persistence.
-
-Prefer explicit return state after a mutation so the UI can refresh from authoritative backend data.
+Canonical boxes use original-image coordinates; zones use the validated reference coordinates; display scaling is presentation-only. Occupancy remains per-frame. Unique passage comes only from stable track identity plus counting-line events.
 
 ## Refactor heuristic
 
-Consider extraction when a module:
-
-- performs unrelated workflows;
-- repeats the same validation/constant in multiple places;
-- requires duplicated error handling;
-- cannot be unit-tested without unrelated I/O;
-- gains a second distinct state machine.
-
-Do not introduce abstraction layers with no current reuse or test benefit.
-
-## Debugging requirement
-
-Non-trivial backend behavior should expose at least one useful diagnostic mechanism:
-
-- structured log context;
-- request ID propagation;
-- stable error code;
-- explicit status/result data;
-- focused test coverage.
-
-Frontend failures should preserve actionable backend error messages/codes through the shared API client.
-
-
-## Traffic analytics ownership
-
-Keep responsibilities separated:
-
-```text
-services/traffic_logic.py      one-frame occupancy counting + simulation recommendation
-services/object_tracking.py    frame-deduplicated cross-frame identity + line/region event generation
-services/traffic_history.py    bounded persistent occupancy history/query/export
-services/traffic_flow.py       bounded persistent track-event query/summary/export
-services/traffic_recorder.py   background occupancy sampling lifecycle
-routes/traffic.py              thin HTTP translation only
-frontend TrafficAnalyticsPage  occupancy/flow page coordination
-TrafficHistoryChart            reusable occupancy chart rendering
-TrafficFlowChart               reusable per-minute flow/region-event chart rendering
-```
-
-`counting_region` and `counting_line` are analytics-only zone-schema concepts. Occupancy remains per-frame. Unique passage is derived only from a stable track crossing a counting line.
+Extract shared mechanics when a fact/algorithm is duplicated across multiple modules, when side effects are inconsistently implemented, or when a second caller/test clearly benefits. Do not refactor merely because a file is long.

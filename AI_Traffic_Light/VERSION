@@ -1,5 +1,5 @@
-version: 0_2_3
-status: configurable adaptive signal rules candidate
-previous_version: 0_2_2
+version: 0_2_4
+status: maintenance hardening and polling optimization candidate
+previous_version: 0_2_3
 passed_baseline: 0_2_2
-notes: V022 / 0_2_2 was explicitly owner-accepted before this patch. V023 adds persistent user-defined normal signal timings; Fixed, Adaptive, and Test modes; bounded rule-based duration extension/reduction; rule priority, persistence, cooldown, demand memory, stale-data fallback, protected transition/minimum-service constraints, manual accessibility/incident test inputs, dry-run previews, runtime decision history, and live rule explainability. Wheelchair/mobility and fall/incident conditions are not claimed as live detections without a compatible perception source. All signal behavior remains simulation/recommendation-only and physical public-road traffic control remains disabled.
+notes: The owner explicitly requested V024 before explicitly accepting V023, so the owner-confirmed passed baseline remains V022 / 0_2_2. V024 is a maintenance release that centralizes atomic JSON replacement for runtime settings, zones, and model-registry metadata; closes zone/model-registry synchronization gaps; replaces overlapping top-level camera/live-context interval polling with one reusable serial polling hook; preserves the V023 Material-derived design system and adaptive simulation behavior; and adds architecture/regression checks. Physical/public-road traffic control remains disabled.

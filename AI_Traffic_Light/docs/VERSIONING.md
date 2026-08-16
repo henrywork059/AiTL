@@ -1,6 +1,6 @@
 # Versioning and Acceptance State
 
-AiTL uses underscore project versions such as `0_2_2` and `0_2_3`.
+AiTL uses underscore project versions such as `0_2_3` and `0_2_4`.
 
 ## Canonical source
 
@@ -9,12 +9,12 @@ Root `VERSION` is authoritative and contains `version`, `status`, `previous_vers
 ## Current state
 
 ```text
-candidate:         0_2_3 (V023)
-previous_version:  0_2_2 (V022)
+candidate:         0_2_4 (V024)
+previous_version:  0_2_3 (V023)
 passed_baseline:   0_2_2 (V022)
 ```
 
-The owner explicitly accepted V022 before requesting V023. V023 remains unaccepted until the owner completes its manual acceptance checks and explicitly confirms it passed.
+The owner explicitly accepted V022 before requesting V023. The owner later explicitly requested V024 without explicitly accepting V023, so the passed baseline remains V022. V024 remains unaccepted until the owner completes its manual acceptance checks and explicitly confirms it passed.
 
 ## Candidate versus passed baseline
 
@@ -25,7 +25,7 @@ Automated tests, builds, GitHub upload, or agent judgment never promote `passed_
 
 ## Increment rule
 
-If V023 has a bug before acceptance, normally repair V023 / `0_2_3`; do not silently create V024. After explicit V023 acceptance, normal development continues from `0_2_3` unless the owner requests another version.
+If a candidate has a bug before acceptance, normally repair that same candidate; do not silently create the next version. The owner may explicitly override this rule, as happened when V024 was requested before V023 acceptance. After explicit acceptance, normal development continues from the accepted version unless the owner requests another version.
 
 ## Version surfaces
 
@@ -45,4 +45,4 @@ Tool manifests such as npm `package.json` use dotted semantic versions and are n
 
 ## Patch ZIP naming
 
-Use a descriptive candidate name such as `AiTL_V023_adaptive_signal_rules_patch.zip`. Archives remain changed-files-only and every member path starts with `AI_Traffic_Light/`.
+Use a descriptive candidate name such as `AiTL_V024_maintenance_hardening_patch.zip`. Archives remain changed-files-only and every member path starts with `AI_Traffic_Light/`.

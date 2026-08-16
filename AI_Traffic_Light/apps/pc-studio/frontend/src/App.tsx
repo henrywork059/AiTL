@@ -13,6 +13,7 @@ import {
 } from "./api";
 import { AppStatusBar } from "./components/AppStatusBar";
 import { AppShell } from "./layout/AppShell";
+import { useSerialPolling } from "./lib/useSerialPolling";
 import { CameraSourcesPage } from "./pages/CameraSourcesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DatasetCapturePage } from "./pages/DatasetCapturePage";
@@ -37,6 +38,8 @@ import type {
   TrafficState,
   Zone,
 } from "./types";
+
+const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "dataset_capture", "zone_editor", "live_ai"];
 
 export default function App() {
   const [frame, setFrame] = useState<DetectionFrame | null>(null);
@@ -110,29 +113,27 @@ export default function App() {
     void refreshAll();
   }, [refreshAll]);
 
-  useEffect(() => {
-    if (!["camera_sources", "dataset_capture", "zone_editor", "live_ai"].includes(activePage)) return undefined;
+  const pollCameraStatus = useCallback(async () => {
+    setCameraStatus(await fetchCameraStatus());
+  }, []);
 
-    const refreshCamera = async () => setCameraStatus(await fetchCameraStatus());
-    void refreshCamera();
-    const timerId = window.setInterval(
-      () => void refreshCamera(),
-      activePage === "live_ai" ? runtimeSettings.live_poll_interval_ms : 1000,
-    );
-    return () => window.clearInterval(timerId);
-  }, [activePage, runtimeSettings.live_poll_interval_ms]);
+  const pollLiveContext = useCallback(async () => {
+    const [nextTraffic, nextZones] = await Promise.all([fetchTrafficState(), fetchActiveZones()]);
+    setTraffic(nextTraffic);
+    setZones(nextZones.zones);
+  }, []);
 
-  useEffect(() => {
-    if (activePage !== "live_ai") return undefined;
-    const refreshLiveContext = async () => {
-      const [nextTraffic, nextZones] = await Promise.all([fetchTrafficState(), fetchActiveZones()]);
-      setTraffic(nextTraffic);
-      setZones(nextZones.zones);
-    };
-    void refreshLiveContext();
-    const timerId = window.setInterval(() => void refreshLiveContext(), 1000);
-    return () => window.clearInterval(timerId);
-  }, [activePage]);
+  useSerialPolling(
+    pollCameraStatus,
+    activePage === "live_ai" ? runtimeSettings.live_poll_interval_ms : 1000,
+    { enabled: CAMERA_POLL_PAGES.includes(activePage), immediate: true },
+  );
+
+  useSerialPolling(
+    pollLiveContext,
+    1000,
+    { enabled: activePage === "live_ai", immediate: true },
+  );
 
   const changeCameraSimulation = useCallback(async (enabled: boolean) => {
     setChangingCameraMode(true);

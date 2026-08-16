@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from threading import Lock
@@ -8,6 +7,7 @@ from typing import Any
 
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
+from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger, set_runtime_log_level
 
 logger = get_logger(__name__)
@@ -38,8 +38,8 @@ class RuntimeSettingsService:
                 settings = dict(DEFAULT_SETTINGS)
             else:
                 try:
-                    payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError) as exc:
+                    payload = read_json(self._settings_path)
+                except (OSError, ValueError) as exc:
                     raise AppError(
                         ErrorCode.SETTINGS_READ_FAILED,
                         "Failed to read the persisted runtime settings.",
@@ -54,11 +54,8 @@ class RuntimeSettingsService:
         validated = self._validate(settings, error_code=ErrorCode.SETTINGS_WRITE_FAILED)
         try:
             with self._lock:
-                self._settings_path.parent.mkdir(parents=True, exist_ok=True)
-                temporary = self._settings_path.with_suffix(".tmp")
-                temporary.write_text(json.dumps(validated, indent=2) + "\n", encoding="utf-8")
-                temporary.replace(self._settings_path)
-        except OSError as exc:
+                write_json_atomic(self._settings_path, validated)
+        except (OSError, TypeError, ValueError) as exc:
             logger.exception("Runtime settings save failed", extra={"error_code": ErrorCode.SETTINGS_WRITE_FAILED.value})
             raise AppError(
                 ErrorCode.SETTINGS_WRITE_FAILED,

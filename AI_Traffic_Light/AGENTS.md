@@ -18,10 +18,10 @@ Always inspect the current GitHub `main` branch before producing a patch when th
 
 At the time of this file update:
 
-- current candidate: V023 / `0_2_3`;
-- previous version: V022 / `0_2_2`;
+- current candidate: V024 / `0_2_4`;
+- previous version: V023 / `0_2_3`;
 - owner-confirmed passed baseline: V022 / `0_2_2`;
-- the owner explicitly accepted V022 before requesting the V023 configurable adaptive signal-rules patch.
+- the owner explicitly requested V024 before explicitly accepting V023, so V023 is not silently promoted.
 
 Rules:
 
@@ -60,12 +60,12 @@ app/main.py       app creation, middleware, handlers, router wiring only
 app/routes/       HTTP translation only; routes stay thin
 app/services/     business/state/filesystem/inference/training logic
 app/models.py     Pydantic request/response models
-app/core/         envelopes, errors, logging, middleware, shared app metadata
+app/core/         envelopes, errors, logging, middleware, version metadata, shared persistence helpers
 ```
 
-Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
+Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`. Shared replace-style JSON persistence for migrated services belongs in `app/core/json_store.py`; services retain domain validation, locks, logging, and stable error translation.
 
-Signal policy ownership for V023 belongs in `app/services/signal_rules.py`. The camera simulator consumes the resulting protected simulated phase; routes must not implement rule/arbitration logic.
+Signal policy ownership for V023+ belongs in `app/services/signal_rules.py`. The camera simulator consumes the resulting protected simulated phase; routes must not implement rule/arbitration logic.
 
 ### Frontend
 
@@ -77,12 +77,13 @@ src/pages/           page-level UI/state
 src/components/      small reusable UI components
 src/api.ts           typed API functions and controlled fallbacks
 src/lib/apiClient.ts shared envelope/error handling
+src/lib/useSerialPolling.ts non-overlapping periodic async refresh
 src/types.ts         shared domain/API types
 src/types/           app-specific type modules
 src/constants/       navigation/function metadata
 ```
 
-Do not turn `App.tsx` into a business-logic container. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`.
+Do not turn `App.tsx` into a business-logic container. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`. V024 App-level camera/live-context polling must remain non-overlapping; prefer the shared serial polling helper rather than async `setInterval` loops.
 
 ## 5. API contract is stable unless the task changes it
 
@@ -123,7 +124,7 @@ Before editing, confirm version state, identify the smallest responsible modules
 
 Preserve existing behavior outside the task. Keep original-image coordinates canonical. Keep sampled occupancy separate from track-derived flow. Keep `counting_region` and `counting_line` analytics-only unless explicitly changed.
 
-For V023 signal logic:
+For V023+ signal logic:
 
 - user rules may alter bounded **simulated phase durations**, not arbitrary physical control outputs;
 - the protected phase order remains vehicle green → vehicle yellow → all-red → pedestrian WALK → pedestrian CLEAR → all-red;

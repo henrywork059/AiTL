@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import re
@@ -9,6 +8,7 @@ from typing import Any
 
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
+from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -79,11 +79,9 @@ class ZoneService:
             "zones": validated,
         }
         try:
-            self._zone_path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self._zone_path.with_suffix(".tmp")
-            temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-            temporary.replace(self._zone_path)
-        except OSError as exc:
+            with self._lock:
+                write_json_atomic(self._zone_path, payload)
+        except (OSError, TypeError, ValueError) as exc:
             logger.exception("Zone configuration save failed", extra={"error_code": ErrorCode.ZONE_SAVE_FAILED.value})
             raise AppError(
                 ErrorCode.ZONE_SAVE_FAILED,
@@ -101,8 +99,8 @@ class ZoneService:
             if not self._zone_path.is_file():
                 return ([dict(zone) for zone in DEFAULT_ZONES], "defaults")
             try:
-                payload = json.loads(self._zone_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
+                payload = read_json(self._zone_path)
+            except (OSError, ValueError) as exc:
                 logger.exception("Zone configuration read failed", extra={"error_code": ErrorCode.ZONE_CONFIG_INVALID.value})
                 raise AppError(
                     ErrorCode.ZONE_CONFIG_INVALID,
