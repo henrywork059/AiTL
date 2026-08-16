@@ -1,198 +1,63 @@
 # Development Workflow
 
-This is the current incremental patch workflow for AiTL. It replaces the old skeleton-era mock-first instructions.
+This is the current incremental patch workflow for AiTL.
 
-## 1. Establish repository and version state
+## 1. Establish repository/version state
 
-Inspect current GitHub `main`, then read:
+Inspect current GitHub `main`, then read `AGENTS.md`, `VERSION`, `docs/AI_AGENT_GUIDE.md`, and `docs/AI_AGENT_CHECKLIST.md`.
 
-```text
-AGENTS.md
-VERSION
-docs/AI_AGENT_GUIDE.md
-docs/AI_AGENT_CHECKLIST.md
-```
-
-The current V020 / `0_2_0` state remains a candidate until owner acceptance. Its recorded passed baseline is V017 / `0_1_7`.
-
-Never start a later release solely because V020 exists on `main` or automated tests pass.
+Current state for this documentation: V023 / `0_2_3` is the candidate; V022 / `0_2_2` is the owner-confirmed passed baseline. Do not promote V023 because automated tests pass.
 
 ## 2. Inspect the affected contract and implementation
 
-Before editing, inspect the smallest relevant set of:
-
-```text
-backend routes/services/models/core
-frontend page/component/api/types
-API_CONTRACTS.md
-ERROR_CODES.md
-DATA_FORMAT.md / packages/schema/
-existing tests
-current patch/testing docs
-```
-
-Write down the behavior that must remain unchanged. This is especially important for camera alignment, dataset lifecycle, training, inference, zones, and simulation-only traffic logic.
+Inspect the smallest relevant backend routes/services/models/core, frontend page/component/API/types, API/error/data contracts, existing tests, and patch/testing docs. Preserve camera alignment, dataset lifecycle, training/inference, zones, occupancy/flow separation, and simulation-only traffic behavior.
 
 ## 3. Implement the smallest cohesive change
 
-Backend layering:
+Backend: `main.py` wiring only; `routes/` HTTP translation; `services/` business logic; `models.py` Pydantic; `core/` shared envelope/error/logging/request/version infrastructure.
 
-```text
-main.py → app wiring only
-routes/ → HTTP translation
-services/ → business logic
-models.py → Pydantic models
-core/ → shared envelope/error/logging/request/version infrastructure
-```
+Frontend: `App.tsx` composition only; `pages/` page behavior; `components/` reusable UI; `api.ts`/`apiClient.ts` API access; shared types/constants.
 
-Frontend layering:
+V023 signal policy logic belongs in `services/signal_rules.py`; the camera simulator consumes the resulting phase and must not duplicate arbitration rules.
 
-```text
-App.tsx → composition/top-level coordination
-pages/ → page behavior
-components/ → reusable UI
-api.ts + lib/apiClient.ts → API access
-types → shared contracts
-```
+## 4. Preserve runtime data
 
-Do not mix unrelated cleanup into a feature/fix patch.
+Never use `git clean -fd`. Preserve `datasets/`, `outputs/`, `*.pt`, labels, runtime zones/settings, `config/signal_rules.json`, and occupancy/flow/signal-decision history.
 
-## 4. Preserve local runtime data
+## 5. Standard local validation
 
-The working repository can contain untracked data that must survive source updates:
-
-```text
-datasets/
-outputs/
-trained *.pt models
-manual labels
-runtime settings/zones
-```
-
-Do not use `git clean -fd` on the user's working project. Do not treat untracked runtime files as failed source hygiene.
-
-## 5. Backend local environment (Windows / PowerShell)
-
-From the backend directory:
-
-```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\backend"
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-training.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-When running project test scripts, keep this `.venv` active. If interpreter selection is uncertain, use the backend virtual-environment Python explicitly from the project root.
-
-## 6. Frontend local environment
-
-In a second PowerShell:
-
-```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
-npm ci
-npm run typecheck
-npm run build
-npm run dev
-```
-
-## 7. Validation sequence
-
-From `AI_Traffic_Light` with the backend `.venv` active:
+Use the backend `.venv` for Python validation:
 
 ```powershell
 python -m compileall .\apps\pc-studio\backend\app .\scripts
 python .\scripts\check_structure.py
 ```
 
-Run the relevant service/regression scripts. With the backend running, run:
+Run all relevant service/regression tests plus live `test_backend_smoke.py` when the backend is running. Frontend release validation uses `npm ci`, `npm run typecheck`, and `npm run build`. Run `git diff --check` from the complete repository.
 
-```powershell
-python .\scripts\test_backend_smoke.py
-```
+## 6. Documentation synchronization
 
-Frontend release validation:
+Review/update `VERSION`, `CHANGELOG.md`, root/app READMEs, `docs/PATCH_<version>.md`, `LOCAL_TESTING.md`, `TEST_READY_CHECKLIST.md`, `PC_STUDIO_FUNCTION_LIST.md`, API/error docs when contracts change, and current start/versioning/roadmap/agent docs when their state becomes stale.
 
-```powershell
-npm run typecheck
-npm run build
-```
+## 7. Changed-files-only packaging
 
-Repository validation from the complete Git working tree:
+Construct the ZIP from an explicit manifest. All members begin `AI_Traffic_Light/`. Never include `datasets/`, `outputs/`, `*.pt`, `.venv/`, `node_modules/`, `dist/`, `__pycache__/`, or `*.pyc`.
 
-```powershell
-git diff --check
-```
+Run `python .\scripts\validate_patch_zip.py <patch.zip>`, compare its members with the intended manifest, and calculate SHA-256 for ZIP and manifest.
 
-Then inspect the change list and stale runtime version surfaces.
+## 8. Owner acceptance
 
-## 8. Documentation synchronization
+Automated tests establish test readiness only. The owner manually checks the candidate and explicitly confirms acceptance before `passed_baseline` changes.
 
-Every patch should review/update:
+## 9. Windows update after GitHub upload
 
-```text
-VERSION
-CHANGELOG.md
-README.md
-affected app README(s)
-docs/PATCH_<version>.md
-docs/LOCAL_TESTING.md
-docs/TEST_READY_CHECKLIST.md
-docs/PC_STUDIO_FUNCTION_LIST.md
-```
-
-Update API/error docs only when those contracts change. Update agent/versioning/architecture/roadmap/start docs when the current workflow or state they describe has changed.
-
-## 9. Changed-files-only packaging
-
-Construct the ZIP from the explicit changed-file manifest. Do not zip the project folder wholesale.
-
-All ZIP paths must begin:
-
-```text
-AI_Traffic_Light/
-```
-
-Never include:
-
-```text
-datasets/
-outputs/
-*.pt
-.venv/
-node_modules/
-dist/
-__pycache__/
-*.pyc
-```
-
-Validate the completed archive:
-
-```powershell
-python .\scripts\validate_patch_zip.py <patch.zip>
-```
-
-Also inspect the ZIP manifest against the intended changed-file list and calculate SHA-256.
-
-## 10. Owner acceptance is a separate gate
-
-Automated tests establish test readiness, not a passed release. The owner manually checks the UI/features and explicitly confirms acceptance. Only then may `passed_baseline` be promoted.
-
-## 11. Updating the Windows working copy after GitHub upload
-
-The owner uploads the extracted changed files to GitHub `main`. Then start locally with:
+The owner uploads the **extracted changed files** to GitHub `main`. Then:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
 git status --short
-```
-
-Review the output and preserve runtime data. When the tracked working tree permits a safe fast-forward:
-
-```powershell
 git pull --ff-only origin main
 Get-Content .\AI_Traffic_Light\VERSION
 ```
 
-Then reinstall/check backend/frontend dependencies as needed and repeat the acceptance checks.
+Review local changes/untracked runtime data before pulling and never invent destructive cleanup to force the update.

@@ -11,6 +11,7 @@ import numpy as np
 
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
+from app.services.signal_rules import signal_rules_service
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -27,16 +28,6 @@ EASTBOUND_STOP_LINE = 495
 WESTBOUND_STOP_LINE = 785
 TOP_PEDESTRIAN_WAIT_Y = 126
 BOTTOM_PEDESTRIAN_WAIT_Y = 674
-
-SIMULATION_SIGNAL_SEQUENCE: tuple[tuple[str, float], ...] = (
-    ("vehicle_green", 12.0),
-    ("vehicle_yellow", 3.0),
-    ("all_red", 3.0),
-    ("pedestrian_green", 8.0),
-    ("pedestrian_flashing", 6.0),
-    ("all_red", 2.0),
-)
-SIMULATION_SIGNAL_CYCLE_SECONDS = sum(duration for _, duration in SIMULATION_SIGNAL_SEQUENCE)
 
 
 @dataclass(frozen=True)
@@ -96,24 +87,11 @@ def _png_dimensions(content: bytes) -> tuple[int, int] | None:
 def _jpeg_dimensions(content: bytes) -> tuple[int, int] | None:
     if len(content) < 4 or content[:2] != b"\xff\xd8":
         return None
-
     index = 2
     start_of_frame_markers = {
-        0xC0,
-        0xC1,
-        0xC2,
-        0xC3,
-        0xC5,
-        0xC6,
-        0xC7,
-        0xC9,
-        0xCA,
-        0xCB,
-        0xCD,
-        0xCE,
-        0xCF,
+        0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+        0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
     }
-
     while index < len(content):
         while index < len(content) and content[index] != 0xFF:
             index += 1
@@ -121,23 +99,20 @@ def _jpeg_dimensions(content: bytes) -> tuple[int, int] | None:
             index += 1
         if index >= len(content):
             break
-
         marker = content[index]
         index += 1
         if marker in {0x01, 0xD8, 0xD9} or 0xD0 <= marker <= 0xD7:
             continue
         if index + 2 > len(content):
             break
-
-        segment_length = int.from_bytes(content[index : index + 2], "big")
+        segment_length = int.from_bytes(content[index:index + 2], "big")
         if segment_length < 2 or index + segment_length > len(content):
             break
         if marker in start_of_frame_markers and segment_length >= 7:
-            height = int.from_bytes(content[index + 3 : index + 5], "big")
-            width = int.from_bytes(content[index + 5 : index + 7], "big")
+            height = int.from_bytes(content[index + 3:index + 5], "big")
+            width = int.from_bytes(content[index + 5:index + 7], "big")
             return (width, height) if width > 0 and height > 0 else None
         index += segment_length
-
     return None
 
 
@@ -150,7 +125,6 @@ def _image_dimensions(content: bytes, content_type: str) -> tuple[int, int] | No
 
 
 def _draw_pedestrian(canvas: np.ndarray, x: int, y: int, color: tuple[int, int, int], stride: int) -> None:
-    """Draw a compact walking pedestrian centred on ``x, y``."""
     cv2.circle(canvas, (x, y - 28), 14, color, thickness=-1)
     cv2.line(canvas, (x, y - 12), (x, y + 24), color, thickness=10)
     cv2.line(canvas, (x, y), (x - 18, y + 18), color, thickness=8)
@@ -168,12 +142,10 @@ def _draw_vehicle(
     color: tuple[int, int, int],
     vehicle_type: str,
 ) -> None:
-    """Draw a compact side-view vehicle for the synthetic horizontal lanes."""
     height = 58 if vehicle_type == "car" else 72
     body_top = y - height // 2
     body_bottom = y + height // 2
     cv2.rectangle(canvas, (x, body_top), (x + width, body_bottom), color, thickness=-1)
-
     if vehicle_type == "car":
         roof_left = x + width // 4
         roof_right = x + (width * 3) // 4
@@ -188,7 +160,6 @@ def _draw_vehicle(
                 (77, 93, 110),
                 thickness=-1,
             )
-
     wheel_y = body_bottom + 4
     cv2.circle(canvas, (x + 34, wheel_y), 14, (18, 20, 23), thickness=-1)
     cv2.circle(canvas, (x + width - 34, wheel_y), 14, (18, 20, 23), thickness=-1)
@@ -232,11 +203,7 @@ class CameraFrameService:
                 details={"content_type": normalized_type or "missing"},
             )
         if not content:
-            raise AppError(
-                ErrorCode.CAMERA_FRAME_INVALID,
-                "The camera upload did not contain image bytes.",
-                status_code=422,
-            )
+            raise AppError(ErrorCode.CAMERA_FRAME_INVALID, "The camera upload did not contain image bytes.", status_code=422)
         if len(content) > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
@@ -244,7 +211,6 @@ class CameraFrameService:
                 status_code=413,
                 details={"size_bytes": len(content), "max_size_bytes": MAX_FRAME_BYTES},
             )
-
         dimensions = _image_dimensions(content, normalized_type)
         if dimensions is None:
             raise AppError(
@@ -253,7 +219,6 @@ class CameraFrameService:
                 status_code=422,
                 details={"content_type": normalized_type},
             )
-
         with self._lock:
             self._frame_counter += 1
             frame = CameraFrame(
@@ -274,6 +239,7 @@ class CameraFrameService:
         self._last_simulation_tick = -1
         self._simulation_clock_s = 0.0
         self._simulation_last_update_monotonic = time.monotonic()
+        signal_rules_service.reset_runtime(0.0)
         density_offset = {"light": 101, "normal": 211, "busy": 307}[self._simulation_density]
         self._simulation_rng = random.Random(self._simulation_seed + density_offset)
         self._initialize_agents_locked()
@@ -290,10 +256,10 @@ class CameraFrameService:
                 self._simulation_last_update_monotonic = None
                 self._vehicles = []
                 self._pedestrians = []
+                signal_rules_service.reset_runtime(0.0)
         return self.status()
 
     def configure_simulation(self, *, density: str | None = None, paused: bool | None = None) -> dict:
-        """Update synthetic-scene density or pause state without changing camera mode."""
         with self._lock:
             reset_agents = False
             if density is not None:
@@ -308,7 +274,6 @@ class CameraFrameService:
                 if normalized_density != self._simulation_density:
                     self._simulation_density = normalized_density
                     reset_agents = True
-
             if paused is not None:
                 if not self._simulation_enabled:
                     raise AppError(
@@ -322,10 +287,8 @@ class CameraFrameService:
                     if not paused:
                         self._simulation_frame = None
                         self._last_simulation_tick = -1
-
             if reset_agents and self._simulation_enabled:
                 self._reset_simulation_locked()
-
         return self.status()
 
     def latest_frame(self) -> CameraFrame | None:
@@ -337,9 +300,13 @@ class CameraFrameService:
             return self._uploaded_frame
 
     def simulation_signal_state(self) -> dict:
-        """Return the deterministic signal state that simulated agents actually obey."""
         with self._lock:
             return dict(self._simulation_signal_state_locked())
+
+    def reset_simulation_signal_policy(self) -> dict:
+        """Reset transient adaptive policy state at the current simulation clock."""
+        with self._lock:
+            return signal_rules_service.reset_runtime(self._simulation_clock_s)
 
     def status(self) -> dict:
         frame = self.latest_frame()
@@ -357,9 +324,12 @@ class CameraFrameService:
             "simulation_density": simulation_density,
             "simulation_signal_phase": signal["phase"] if signal else None,
             "simulation_signal_seconds_remaining": signal["seconds_remaining"] if signal else None,
-            "simulation_signal_cycle_seconds": SIMULATION_SIGNAL_CYCLE_SECONDS if signal else None,
+            "simulation_signal_cycle_seconds": signal["base_cycle_seconds"] if signal else None,
             "simulation_signal_vehicle_go": signal["vehicle_go"] if signal else False,
             "simulation_signal_pedestrian_walk": signal["pedestrian_walk"] if signal else False,
+            "simulation_signal_mode": signal["mode"] if signal else None,
+            "simulation_signal_profile": signal["active_profile"] if signal else None,
+            "simulation_signal_active_rules": signal["active_rules"] if signal else [],
             "frame_available": frame is not None,
             "streaming": frame is not None and (
                 (simulation_enabled and not simulation_paused)
@@ -384,49 +354,20 @@ class CameraFrameService:
             return self._simulation_enabled
 
     def _simulation_signal_state_locked(self) -> dict:
-        position = self._simulation_clock_s % SIMULATION_SIGNAL_CYCLE_SECONDS
-        elapsed = 0.0
-        for phase, duration in SIMULATION_SIGNAL_SEQUENCE:
-            if position < elapsed + duration:
-                remaining = elapsed + duration - position
-                return {
-                    "phase": phase,
-                    "seconds_remaining": round(remaining, 1),
-                    "vehicle_go": phase == "vehicle_green",
-                    "pedestrian_walk": phase == "pedestrian_green",
-                    "pedestrian_clear": phase == "pedestrian_flashing",
-                }
-            elapsed += duration
-        return {
-            "phase": "all_red",
-            "seconds_remaining": 0.0,
-            "vehicle_go": False,
-            "pedestrian_walk": False,
-            "pedestrian_clear": False,
-        }
+        return signal_rules_service.signal_state(self._simulation_clock_s)
 
     def _initialize_agents_locked(self) -> None:
         vehicle_count = {"light": 4, "normal": 8, "busy": 12}[self._simulation_density]
         pedestrian_count = {"light": 4, "normal": 7, "busy": 11}[self._simulation_density]
         vehicle_palette = [
-            (66, 135, 245),
-            (94, 176, 110),
-            (230, 144, 81),
-            (181, 105, 200),
-            (94, 188, 214),
-            (122, 128, 137),
+            (66, 135, 245), (94, 176, 110), (230, 144, 81),
+            (181, 105, 200), (94, 188, 214), (122, 128, 137),
         ]
         pedestrian_palette = [
-            (196, 111, 255),
-            (119, 187, 255),
-            (119, 220, 157),
-            (255, 158, 132),
-            (164, 142, 245),
-            (114, 212, 229),
+            (196, 111, 255), (119, 187, 255), (119, 220, 157),
+            (255, 158, 132), (164, 142, 245), (114, 212, 229),
         ]
-
         self._vehicles = []
-        per_direction = vehicle_count // 2
         for index in range(vehicle_count):
             direction = 1 if index % 2 == 0 else -1
             lane_index = index // 2
@@ -451,7 +392,6 @@ class CameraFrameService:
                     vehicle_type=vehicle_type,
                 )
             )
-
         self._pedestrians = []
         for index in range(pedestrian_count):
             direction = 1 if index % 2 == 0 else -1
@@ -485,7 +425,6 @@ class CameraFrameService:
         phase = self._simulation_signal_state_locked()["phase"]
         vehicle_go = phase == "vehicle_green"
         gap = 22.0
-
         eastbound = sorted((v for v in self._vehicles if v.direction > 0), key=lambda item: item.x, reverse=True)
         ahead: _SimVehicle | None = None
         for vehicle in eastbound:
@@ -498,7 +437,6 @@ class CameraFrameService:
                 proposed = min(proposed, ahead.x - gap - vehicle.width)
             vehicle.x = proposed
             ahead = vehicle
-
         westbound = sorted((v for v in self._vehicles if v.direction < 0), key=lambda item: item.x)
         ahead = None
         for vehicle in westbound:
@@ -511,7 +449,6 @@ class CameraFrameService:
                 proposed = max(proposed, ahead.x + ahead.width + gap)
             vehicle.x = proposed
             ahead = vehicle
-
         for vehicle in self._vehicles:
             if vehicle.direction > 0 and vehicle.x > FRAME_WIDTH + 120:
                 peers = [item.x for item in self._vehicles if item.direction > 0 and item is not vehicle]
@@ -529,7 +466,6 @@ class CameraFrameService:
     def _advance_pedestrians_locked(self, dt: float) -> None:
         phase = self._simulation_signal_state_locked()["phase"]
         can_start_crossing = phase == "pedestrian_green"
-
         for pedestrian in self._pedestrians:
             delta = pedestrian.speed * dt * pedestrian.direction
             if pedestrian.direction > 0:
@@ -559,7 +495,6 @@ class CameraFrameService:
         self._simulation_last_update_monotonic = now_mono
         if not self._simulation_paused:
             self._advance_simulation_locked(dt)
-
         tick = int(self._simulation_clock_s * 2)
         if self._simulation_frame is not None and tick == self._last_simulation_tick:
             return
@@ -574,11 +509,9 @@ class CameraFrameService:
         cv2.rectangle(canvas, (0, ROAD_BOTTOM), (FRAME_WIDTH - 1, FRAME_HEIGHT - 1), (72, 79, 84), thickness=-1)
         cv2.line(canvas, (0, ROAD_TOP), (FRAME_WIDTH - 1, ROAD_TOP), (128, 136, 144), thickness=5)
         cv2.line(canvas, (0, ROAD_BOTTOM), (FRAME_WIDTH - 1, ROAD_BOTTOM), (128, 136, 144), thickness=5)
-
         for lane_y in (310, 500):
             for x in range(0, FRAME_WIDTH, 86):
                 cv2.line(canvas, (x, lane_y), (min(x + 50, FRAME_WIDTH - 1), lane_y), (46, 176, 224), thickness=5)
-
         cv2.rectangle(canvas, (CROSSING_LEFT, ROAD_TOP), (CROSSING_RIGHT, ROAD_BOTTOM), (55, 59, 63), thickness=-1)
         for stripe_y in range(205, 610, 46):
             cv2.rectangle(
@@ -588,12 +521,10 @@ class CameraFrameService:
                 (225, 228, 230),
                 thickness=-1,
             )
-
         cv2.line(canvas, (EASTBOUND_STOP_LINE, ROAD_TOP), (EASTBOUND_STOP_LINE, ROAD_BOTTOM), (240, 240, 240), thickness=6)
         cv2.line(canvas, (WESTBOUND_STOP_LINE, ROAD_TOP), (WESTBOUND_STOP_LINE, ROAD_BOTTOM), (240, 240, 240), thickness=6)
         cv2.putText(canvas, "STOP", (410, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (220, 220, 220), 2)
         cv2.putText(canvas, "STOP", (800, 445), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (220, 220, 220), 2)
-
         for vehicle in self._vehicles:
             _draw_vehicle(
                 canvas,
@@ -603,7 +534,6 @@ class CameraFrameService:
                 color=vehicle.color,
                 vehicle_type=vehicle.vehicle_type,
             )
-
         stride_sign = 5 if tick % 2 == 0 else -5
         for index, pedestrian in enumerate(self._pedestrians):
             _draw_pedestrian(
@@ -613,10 +543,8 @@ class CameraFrameService:
                 color=pedestrian.color,
                 stride=stride_sign if index % 2 == 0 else -stride_sign,
             )
-
         self._draw_signal_heads(canvas, signal)
-
-        cv2.rectangle(canvas, (24, 20), (610, 137), (14, 17, 20), thickness=-1)
+        cv2.rectangle(canvas, (24, 20), (720, 158), (14, 17, 20), thickness=-1)
         cv2.putText(canvas, "PC CAMERA SIMULATION - SIGNAL AWARE", (46, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (126, 231, 135), 2)
         cv2.putText(
             canvas,
@@ -636,9 +564,18 @@ class CameraFrameService:
             (217, 221, 224),
             1,
         )
+        rule_label = ", ".join(signal.get("active_rules", [])[:2]) or "normal timing"
+        cv2.putText(
+            canvas,
+            f"policy: {signal.get('mode', 'fixed')} / {signal.get('active_profile', 'Normal')}   {rule_label}",
+            (46, 132),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (217, 221, 224),
+            1,
+        )
         state_label = "PAUSED - inspection frame" if self._simulation_paused else f"frame {self._frame_counter}"
-        cv2.putText(canvas, state_label, (46, 131), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (217, 221, 224), 1)
-
+        cv2.putText(canvas, state_label, (46, 153), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (217, 221, 224), 1)
         encoded_ok, encoded = cv2.imencode(".png", canvas)
         if not encoded_ok:
             raise AppError(
@@ -672,7 +609,6 @@ class CameraFrameService:
         ]
         for center, off_color, on_color, active in lamps:
             cv2.circle(canvas, center, 24, on_color if active else off_color, thickness=-1)
-
         ped_walk = phase == "pedestrian_green"
         ped_clear = phase == "pedestrian_flashing"
         cv2.rectangle(canvas, (1148, 218), (1262, 340), (18, 20, 23), thickness=-1)

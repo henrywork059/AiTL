@@ -21,6 +21,9 @@ ENDPOINTS = [
     "/api/traffic/history?minutes=1&limit=10",
     "/api/traffic/tracks",
     "/api/traffic/flow?minutes=1&limit=10",
+    "/api/traffic/signal-rules",
+    "/api/traffic/signal-status",
+    "/api/traffic/signal-rules/history?limit=10",
     "/api/settings/runtime",
     "/api/logs/recent?limit=5",
     "/api/camera/status",
@@ -49,7 +52,6 @@ def fetch_json(path: str) -> dict:
     return json.loads(raw)
 
 
-
 def fetch_text(path: str) -> tuple[str, dict[str, str]]:
     with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=10) as response:
         raw = response.read().decode("utf-8")
@@ -61,7 +63,6 @@ def main() -> int:
     failures: list[str] = []
     observed_versions: dict[str, str] = {}
     expected_version = read_expected_version()
-
     print("AI Traffic Light backend smoke test")
     print(f"Base URL: {BASE_URL}")
     print(f"Expected project version: {expected_version}")
@@ -74,12 +75,10 @@ def main() -> int:
             request_id = payload.get("meta", {}).get("request_id")
             status = "PASS" if ok and request_id else "FAIL"
             print(f"[{status}] {endpoint}")
-
             if not ok:
                 failures.append(f"{endpoint}: API envelope ok=false")
             if not request_id:
                 failures.append(f"{endpoint}: missing meta.request_id")
-
             if endpoint in VERSION_ENDPOINTS and ok:
                 version = payload.get("data", {}).get("version")
                 if not isinstance(version, str) or not version:
@@ -88,39 +87,39 @@ def main() -> int:
                     observed_versions[endpoint] = version
                     if version != expected_version:
                         failures.append(f"{endpoint}: version={version!r}, expected {expected_version!r}")
+            if endpoint == "/api/traffic/signal-rules" and ok:
+                data = payload.get("data", {})
+                if data.get("schema_version") != 1 or data.get("active_profile") not in data.get("profiles", {}):
+                    failures.append("signal-rules: invalid schema/profile response")
+            if endpoint == "/api/traffic/signal-status" and ok:
+                data = payload.get("data", {})
+                if not data.get("prototype_only") or data.get("mode") not in {"fixed", "adaptive", "test"}:
+                    failures.append("signal-status: missing prototype/mode contract")
         except urllib.error.URLError as exc:
             print(f"[FAIL] {endpoint} -> {exc}")
             failures.append(f"{endpoint}: {exc}")
-        except Exception as exc:  # noqa: BLE001 - smoke test should report all failures.
+        except Exception as exc:
             print(f"[FAIL] {endpoint} -> {exc}")
             failures.append(f"{endpoint}: {exc}")
 
     if len(set(observed_versions.values())) > 1:
         failures.append(f"version endpoints disagree: {observed_versions}")
 
-    try:
-        csv_text, csv_headers = fetch_text("/api/traffic/history/export.csv?minutes=1&limit=10")
-        csv_ok = csv_text.startswith("recorded_at_ms,") and bool(csv_headers.get("x-request-id"))
-        print(f"[{'PASS' if csv_ok else 'FAIL'}] /api/traffic/history/export.csv")
-        if not csv_text.startswith("recorded_at_ms,"):
-            failures.append("traffic history CSV export: missing expected header row")
-        if not csv_headers.get("x-request-id"):
-            failures.append("traffic history CSV export: missing X-Request-ID")
-    except Exception as exc:  # noqa: BLE001 - smoke test should report all failures.
-        print(f"[FAIL] /api/traffic/history/export.csv -> {exc}")
-        failures.append(f"traffic history CSV export: {exc}")
-
-    try:
-        flow_csv, flow_headers = fetch_text("/api/traffic/flow/export.csv?minutes=1&limit=10")
-        flow_ok = flow_csv.startswith("event_id,") and bool(flow_headers.get("x-request-id"))
-        print(f"[{'PASS' if flow_ok else 'FAIL'}] /api/traffic/flow/export.csv")
-        if not flow_csv.startswith("event_id,"):
-            failures.append("traffic flow CSV export: missing expected header row")
-        if not flow_headers.get("x-request-id"):
-            failures.append("traffic flow CSV export: missing X-Request-ID")
-    except Exception as exc:  # noqa: BLE001 - smoke test should report all failures.
-        print(f"[FAIL] /api/traffic/flow/export.csv -> {exc}")
-        failures.append(f"traffic flow CSV export: {exc}")
+    for path, prefix, label in [
+        ("/api/traffic/history/export.csv?minutes=1&limit=10", "recorded_at_ms,", "traffic history CSV"),
+        ("/api/traffic/flow/export.csv?minutes=1&limit=10", "event_id,", "traffic flow CSV"),
+    ]:
+        try:
+            csv_text, headers = fetch_text(path)
+            ok = csv_text.startswith(prefix) and bool(headers.get("x-request-id"))
+            print(f"[{'PASS' if ok else 'FAIL'}] {path.split('?')[0]}")
+            if not csv_text.startswith(prefix):
+                failures.append(f"{label}: missing expected header row")
+            if not headers.get("x-request-id"):
+                failures.append(f"{label}: missing X-Request-ID")
+        except Exception as exc:
+            print(f"[FAIL] {path.split('?')[0]} -> {exc}")
+            failures.append(f"{label}: {exc}")
 
     print()
     if failures:
@@ -128,10 +127,7 @@ def main() -> int:
         for failure in failures:
             print(f"- {failure}")
         return 1
-
-    print(
-        f"Smoke test passed for {expected_version}. Core V022 occupancy/tracking/flow APIs, request IDs, and version surfaces responded consistently."
-    )
+    print(f"Smoke test passed for {expected_version}. Core occupancy/tracking/flow/signal-rule APIs, request IDs, and version surfaces responded consistently.")
     return 0
 
 

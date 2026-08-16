@@ -1,5 +1,21 @@
 # Changelog
 
+## 0_2_3 — Configurable adaptive signal rules
+
+- Promoted the owner-confirmed passed baseline to V022 / `0_2_2` and created V023 / `0_2_3` as the new candidate.
+- Replaced the simulator's hard-coded signal-duration sequence with a persistent user-configurable simulation policy while preserving the protected phase order.
+- Added editable min/base/max timing for vehicle green, vehicle yellow, both all-red clearances, pedestrian WALK, and pedestrian CLEAR plus a maximum-cycle bound.
+- Added Fixed, Adaptive, and Test modes, dry-run evaluation, and Normal / Pedestrian Priority / Vehicle Priority / Accessibility profiles.
+- Added bounded structured rules for crossing occupancy/slow crossing, pedestrian queue/max wait, low vehicle demand, vehicle queue/max wait, mobility assistance, and fallen-person incident test input.
+- Added priority arbitration, persistence/hysteresis, cooldown/retrigger protection, short-term demand memory, stale-data fallback, pending demand, minimum-service clamps, and bounded phase/cycle timing.
+- Added explicit Test-mode accessibility/incident inputs without claiming unsupported live wheelchair/fall detection.
+- Added simulated all-red incident hold, explicit clear/recovery, and transient adaptive-state reset separate from saved configuration.
+- Added non-mutating rule previews and persistent runtime signal-decision history under `outputs/signal_rules/` with explicit history clearing.
+- Expanded Traffic Logic into Live Decision, Normal Timing, Adaptive Rules, Safety & Test, and Decision History tabs with live active/suppressed/inactive/unavailable rule explanations.
+- Added signal policy/status/config/test/preview/history APIs using the existing request-ID/envelope conventions.
+- Kept V022 tracking/flow, V021 occupancy, dataset/training/inference/model management, zones, settings/logs, and the prototype-only safety boundary intact.
+- Physical/public-road traffic control remains disabled.
+
 ## 0_2_2 — Cross-frame tracking and flow analytics
 
 - Added a lightweight class-aware centroid/IoU tracker that assigns stable prototype `track_id` values across consecutive detection frames and deduplicates repeated processing of the same source frame.
@@ -162,7 +178,6 @@
 
 - Added coding standards for small, debuggable modules.
 - Added backend logging/error-code infrastructure.
-- Added API response envelope helpers and exception handling.
 - Added frontend API/debug logging helpers.
 - Refactored placeholder backend routes into smaller route/core/service modules.
 - Added documentation for API contracts, debugging, logging, and error-code ranges.

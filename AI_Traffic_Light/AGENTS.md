@@ -18,10 +18,10 @@ Always inspect the current GitHub `main` branch before producing a patch when th
 
 At the time of this file update:
 
-- current candidate: V022 / `0_2_2`;
-- previous version: V021 / `0_2_1`;
-- owner-confirmed passed baseline: V017 / `0_1_7`;
-- the owner explicitly requested V022 as the next candidate even though V021 was not separately promoted; V022 remains a candidate until the owner explicitly confirms its acceptance checks.
+- current candidate: V023 / `0_2_3`;
+- previous version: V022 / `0_2_2`;
+- owner-confirmed passed baseline: V022 / `0_2_2`;
+- the owner explicitly accepted V022 before requesting the V023 configurable adaptive signal-rules patch.
 
 Rules:
 
@@ -45,24 +45,9 @@ notes
 
 AiTL is a local/student-scale computer-vision and traffic-light simulation prototype.
 
-Allowed scope includes:
+Allowed scope includes receiver/simulated camera frames, local detection/inference, dataset capture/review/manual labeling, local model training, editable traffic zones/counting lines, tracking/analytics, user-defined **simulated** signal timing/rules, simulation-only phase recommendations, and classroom/model-junction experiments.
 
-- receiver or simulated camera frames;
-- local detection/inference;
-- dataset capture/review/manual labeling;
-- local model training;
-- editable traffic zones and zone counts;
-- simulated traffic-phase recommendations and GUI signal visualization;
-- classroom/model-junction experimentation.
-
-Do not implement, document, or imply:
-
-- direct control of public-road traffic signals;
-- connections to public traffic-signal cabinets/controllers;
-- bypassing safety interlocks;
-- autonomous deployment claims based on prototype detections.
-
-Traffic outputs remain simulation/recommendation/display outputs only.
+Do not implement, document, or imply direct control of public-road traffic signals, connections to public traffic-signal cabinets/controllers, bypassing safety interlocks, or production autonomous signal authority. Traffic outputs remain simulation/recommendation/display outputs only.
 
 ## 4. Architecture rules
 
@@ -78,9 +63,9 @@ app/models.py     Pydantic request/response models
 app/core/         envelopes, errors, logging, middleware, shared app metadata
 ```
 
-Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging.
+Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
 
-Project release metadata for backend surfaces comes from root `VERSION` through `app/core/project_version.py`. Do not add literal release versions back into backend health/smoke/template/app wiring. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`; keep that shared mirror synchronized with root `VERSION` and do not duplicate literals across pages/API fixtures.
+Signal policy ownership for V023 belongs in `app/services/signal_rules.py`. The camera simulator consumes the resulting protected simulated phase; routes must not implement rule/arbitration logic.
 
 ### Frontend
 
@@ -97,52 +82,29 @@ src/types/           app-specific type modules
 src/constants/       navigation/function metadata
 ```
 
-Do not turn `App.tsx` into a business-logic container. Prefer extracting cohesive logic/components instead of growing unrelated responsibilities in one file.
+Do not turn `App.tsx` into a business-logic container. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`.
 
 ## 5. API contract is stable unless the task changes it
 
 JSON success:
 
 ```json
-{
-  "ok": true,
-  "data": {},
-  "meta": {"request_id": "..."}
-}
+{"ok": true, "data": {}, "meta": {"request_id": "..."}}
 ```
 
 JSON error:
 
 ```json
-{
-  "ok": false,
-  "error": {
-    "code": "...",
-    "message": "...",
-    "details": {}
-  },
-  "meta": {"request_id": "..."}
-}
+{"ok": false, "error": {"code": "...", "message": "...", "details": {}}, "meta": {"request_id": "..."}}
 ```
 
-Binary image responses must include `X-Request-ID`.
-
-When an API changes, update `docs/API_CONTRACTS.md`. When stable error behavior changes, update `docs/ERROR_CODES.md` and the central backend error-code definitions together.
+Binary/image/CSV responses must preserve `X-Request-ID`. Update `docs/API_CONTRACTS.md` when an endpoint changes and synchronize stable error docs/definitions when new stable errors are introduced.
 
 ## 6. Runtime data is not patch content
 
-Local working copies may contain valuable untracked/runtime data:
+Local working copies may contain valuable untracked/runtime data including `datasets/`, `outputs/`, trained `*.pt` files, manual labels, runtime zones/settings/signal rules, traffic history/flow/signal-decision history, `.venv/`, `node_modules/`, `dist/`, and caches.
 
-- `datasets/` captures and labels;
-- `outputs/` training runs;
-- trained `*.pt` models;
-- local runtime settings/zones;
-- `outputs/traffic_history/` occupancy analytics history;
-- virtual environments and frontend dependencies/builds.
-
-Never use destructive cleanup commands such as `git clean -fd` on the user's working project. Do not overwrite or delete runtime data unless the user explicitly asks for that exact data operation.
-
-Never package these in a source patch:
+Never use destructive cleanup commands such as `git clean -fd`. Never package:
 
 ```text
 datasets/
@@ -157,93 +119,33 @@ __pycache__/
 
 ## 7. Change strategy
 
-Before editing:
+Before editing, confirm version state, identify the smallest responsible modules, inspect tests/contracts, and decide whether the work fixes the current candidate or creates a new release.
 
-1. Confirm current version state.
-2. Identify the smallest files/responsibilities involved.
-3. Inspect existing tests and contracts.
-4. Decide whether this is a fix to the current candidate or a new release.
+Preserve existing behavior outside the task. Keep original-image coordinates canonical. Keep sampled occupancy separate from track-derived flow. Keep `counting_region` and `counting_line` analytics-only unless explicitly changed.
 
-While editing:
+For V023 signal logic:
 
-- preserve existing working behavior unless the task explicitly changes it;
-- prefer small helper modules over duplicated constants/logic;
-- avoid speculative framework rewrites;
-- avoid mixing unrelated cleanup into a feature patch;
-- keep filesystem writes atomic/rollback-aware where data integrity matters;
-- keep original-image coordinates as canonical CV data; scale only in presentation layers;
-- keep sampled occupancy and track-derived flow as separate metrics; only describe a passage as unique when it comes from a recorded track/counting-line event;
-- keep `counting_region` and `counting_line` analytics-only unless the owner explicitly changes the simulation decision design;
-- document assumptions that materially affect later agents.
-
-Optimization means reducing duplication, unclear ownership, accidental coupling, and validation gaps. It does not mean rewriting working code for style alone.
+- user rules may alter bounded **simulated phase durations**, not arbitrary physical control outputs;
+- the protected phase order remains vehicle green → vehicle yellow → all-red → pedestrian WALK → pedestrian CLEAR → all-red;
+- protected minimum timing, per-phase maximums, maximum-cycle limits, cooldowns, hysteresis/demand memory, stale-data fallback, and incident recovery must remain deterministic;
+- Fixed mode uses configured normal timing; Adaptive mode may apply live observation rules; Test mode may additionally use explicit manual accessibility/incident inputs;
+- do not claim wheelchair/mobility or fall detection unless a compatible perception source actually exists.
 
 ## 8. Testing evidence must be precise
 
-Run the relevant checks available in the environment. Typical validation includes:
+Run relevant checks available in the environment, typically Python compile, backend service/unit/regression tests, live API smoke when practical, `scripts/check_structure.py`, frontend `npm run typecheck`/`npm run build`, `git diff --check`, version scans, runtime-file exclusion scans, and patch ZIP validation.
 
-```text
-python -m compileall
-backend service/unit tests
-live API smoke tests when backend can run
-existing regression tests
-python scripts/check_structure.py
-npm run typecheck
-npm run build
-git diff --check
-stale-version scan
-patch exclusion scan
-ZIP integrity/structure check
-```
-
-Report three categories separately:
-
-1. **Actually run here** — commands genuinely executed in the agent environment.
-2. **Targeted/synthetic checks** — isolated checks that do not equal a full local regression run.
-3. **Owner/local checks still required** — hardware/UI/runtime checks the agent could not perform.
-
-Never call a version “passed” based on category 1 or 2. Owner acceptance is separate.
+Report separately: actually run here; targeted/synthetic checks; owner/local checks still required. Automated validation never promotes a candidate.
 
 ## 9. Documentation requirements
 
-For each patch, keep current-state documentation synchronized. At minimum review/update as applicable:
-
-- `VERSION`
-- `CHANGELOG.md`
-- `README.md`
-- affected app README(s)
-- `docs/PATCH_<version>.md`
-- `docs/LOCAL_TESTING.md`
-- `docs/TEST_READY_CHECKLIST.md`
-- `docs/PC_STUDIO_FUNCTION_LIST.md`
-- `docs/API_CONTRACTS.md` if APIs changed
-- `docs/ERROR_CODES.md` if stable errors changed
-- current roadmap/layout/start/versioning/agent docs when their wording is stale
-
-Historical changelog/patch documents may intentionally contain old versions. Do not “clean” history during stale-version scans.
+For each patch review/update as applicable: `VERSION`, `CHANGELOG.md`, `README.md`, affected app READMEs, `docs/PATCH_<version>.md`, `docs/LOCAL_TESTING.md`, `docs/TEST_READY_CHECKLIST.md`, `docs/PC_STUDIO_FUNCTION_LIST.md`, API/error docs, roadmap, and current agent/workflow docs. Do not rewrite historical patch/changelog content incorrectly.
 
 ## 10. Patch packaging and handoff
 
-Create a **changed-files-only** ZIP. Every member path must begin with:
+Create a **changed-files-only** ZIP. Every member path must begin with `AI_Traffic_Light/`. Run `scripts/validate_patch_zip.py`, compare the ZIP manifest with the intended change manifest, and provide ZIP/manifest SHA-256 values.
 
-```text
-AI_Traffic_Light/...
-```
-
-Run `scripts/validate_patch_zip.py` on the finished archive. The validator checks path safety, exclusions, and ZIP integrity; compare the manifest against the actual change set to prove changed-files-only scope.
-
-Handoff must include:
-
-- patch ZIP;
-- exact changed-files manifest;
-- SHA-256;
-- implementation summary;
-- limitations;
-- tests actually run;
-- local tests still required;
-- exact acceptance checks.
-
-The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is not sufficient.
+Handoff must include implementation summary, limitations, tests actually run, tests not run, and exact owner acceptance checks. The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is insufficient.
 
 ## 11. Local update safety after GitHub upload
 
@@ -254,15 +156,8 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
 git status --short
 ```
 
-Review untracked files before pulling. Preserve datasets, training outputs, models, labels, and runtime files. Then use a fast-forward-only pull when safe:
-
-```powershell
-git pull --ff-only origin main
-Get-Content .\AI_Traffic_Light\VERSION
-```
-
-Do not invent cleanup steps to force the pull.
+Review local/untracked files before pulling. Preserve datasets, training outputs, models, labels, occupancy/flow/signal-decision history, signal-rule configuration, and runtime settings. Then use `git pull --ff-only origin main` when safe. Do not invent cleanup steps to force a pull.
 
 ## 12. When uncertain
 
-Choose the smallest safe interpretation that preserves the current accepted behavior and candidate state. State the assumption in the patch note rather than silently broadening scope.
+Choose the smallest safe interpretation that preserves the current accepted behavior and candidate state. State material assumptions in the patch note rather than silently broadening scope.

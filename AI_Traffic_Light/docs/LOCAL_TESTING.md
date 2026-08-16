@@ -1,10 +1,10 @@
-# Local Testing Notes (V022)
+# Local Testing Notes (V023)
 
-V022 / `0_2_2` is the current candidate, explicitly requested after V021 / `0_2_1`. V021 is the previous candidate and was not separately promoted; the owner-confirmed passed baseline remains V017 / `0_1_7`. Automated checks do not promote V022.
+V023 / `0_2_3` is the current candidate. V022 / `0_2_2` is the owner-confirmed passed baseline. Automated checks do not promote V023.
 
-## 1. Update safely
+## 1. Safe update
 
-Stop the backend/frontend first. From the repository root:
+Stop backend/frontend. From the repository root:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
@@ -13,17 +13,17 @@ git pull --ff-only origin main
 Get-Content .\AI_Traffic_Light\VERSION
 ```
 
-Expected release fields:
+Expected:
 
 ```text
-version: 0_2_2
-previous_version: 0_2_1
-passed_baseline: 0_1_7
+version: 0_2_3
+previous_version: 0_2_2
+passed_baseline: 0_2_2
 ```
 
-Do not run `git clean -fd`. Preserve untracked datasets, captures, labels, models, occupancy history, flow history, settings, and other runtime data.
+Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, and all analytics histories.
 
-## 2. Backend environment and compilation
+## 2. Backend compile/structure/regression
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
@@ -32,16 +32,8 @@ $py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
 & $py -m pip install -r ".\apps\pc-studio\backend\requirements-training.txt"
 & $py -m compileall ".\apps\pc-studio\backend\app" ".\scripts"
 & $py ".\scripts\check_structure.py"
-```
 
-## 3. Backend service/regression tests
-
-Run all non-live test scripts so V022 is checked together with inherited camera, dataset, training, inference, settings, model, traffic, and simulation behavior:
-
-```powershell
-$tests = Get-ChildItem ".\scripts\test_*.py" |
-    Where-Object { $_.Name -ne "test_backend_smoke.py" }
-
+$tests = Get-ChildItem ".\scripts\test_*.py" | Where-Object { $_.Name -ne "test_backend_smoke.py" }
 foreach ($test in $tests) {
     Write-Host "`n===== RUNNING $($test.Name) =====" -ForegroundColor Cyan
     & $py $test.FullName
@@ -49,15 +41,23 @@ foreach ($test in $tests) {
 }
 ```
 
-V022-specific focused scripts include:
+V023-specific focused script:
 
 ```powershell
-& $py ".\scripts\test_object_tracking_flow.py"
-& $py ".\scripts\test_traffic_history_service.py"
-& $py ".\scripts\test_zone_traffic_services.py"
+& $py ".\scripts\test_signal_rules_service.py"
 ```
 
-## 4. Start backend and run non-destructive live smoke
+## 3. Frontend
+
+```powershell
+Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
+npm ci
+npm run typecheck
+npm run build
+npm run dev
+```
+
+## 4. Backend + live smoke
 
 Backend terminal:
 
@@ -74,70 +74,41 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\apps\pc-studio\backend\.venv\Scripts\python.exe .\scripts\test_backend_smoke.py
 ```
 
-The smoke test checks standard request IDs/envelopes, version agreement, occupancy history, tracking status, flow query, occupancy CSV, and flow CSV. It does not clear runtime histories.
+## 5. V023 manual signal-rule checks
 
-## 5. Frontend validation
+1. Confirm visible version is `0_2_3` and `passed_baseline` is `0_2_2`.
+2. Start Simulation and open Traffic Logic.
+3. Watch a full default cycle and confirm protected order: vehicle green → yellow → all-red → WALK → CLEAR → all-red.
+4. Normal Timing: change a base duration, Save, and verify the next/current protected phase uses the saved timing without rapidly skipping phases.
+5. Navigate away/restart backend; verify saved signal rules persist.
+6. Try invalid timing (`yellow min` below protected lower bound or min > base/max); Save must fail without replacing saved valid config.
+7. Fixed mode: adaptive observations/rules do not change configured normal timing.
+8. Adaptive mode + loaded model/zones: heavy vehicle queue can extend vehicle green after persistence delay, bounded by max/cycle limits.
+9. Heavy/long-wait pedestrian demand can reduce vehicle green, never below configured minimum or time already served.
+10. Let observations become unavailable/stale; verify status explains fallback and normal configured timing is used.
+11. Confirm short detection dropouts do not immediately erase demand and one-frame spikes do not immediately trigger persistent rules.
+12. Confirm cooldown prevents the same adjustment from being repeatedly added every poll.
+13. Confirm rule list distinguishes active, suppressed, inactive, and unavailable states with reasons.
+14. Test mode: manual waiting pedestrian/vehicle counts affect rules; switching out of Test mode removes manual-only mobility/incident sources.
+15. Mobility assistance is clearly labelled Test/manual unless a compatible perception source exists.
+16. Trigger Person fallen / incident in Test mode; signal becomes simulated all-red and synthetic vehicles do not proceed.
+17. Clear Incident; controller resumes from a protected phase with a fresh timer rather than skipping through elapsed phases.
+18. Reset Adaptive State clears pending/cooldown/hysteresis/incident runtime state without deleting saved rules.
+19. Use preview buttons; results change without changing the active simulator state.
+20. Enable dry-run and verify rule evaluation remains visible while adaptive adjustments do not alter active duration.
+21. Decision History records phase/rule/config/reset/incident events; Clear History removes only `outputs/signal_rules/` history.
+22. Clear signal history does not delete occupancy/flow history, captures, labels, zones, settings, models, or training data.
+23. Recheck Simulation pause: scene and signal clock stay frozen.
+24. Recheck V022 tracking/counting-line flow and V021 occupancy analytics.
+25. Recheck capture/delete/label/training/model/settings/logs inherited behavior.
+26. Confirm no feature connects to physical/public-road traffic-light control.
 
-```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
-npm ci
-npm run typecheck
-npm run build
-npm run dev
-```
-
-Open the Vite URL, normally `http://localhost:5173/`.
-
-## 6. V022 manual tracking/flow checks
-
-1. Confirm visible project/version surfaces report `0_2_2`.
-2. Start signal-aware Simulation and load a trained model that detects the synthetic people/vehicles.
-3. In Live AI, verify detections can show a `track_id`. Follow several objects for consecutive frames and confirm the ID is stable while the tracker keeps a match.
-4. In Zone Editor create a `counting_line`; click exactly two distinct points. Save, navigate away, return, and confirm it persists.
-5. Create at least two counting lines at different locations. Confirm they render as lines rather than polygons and remain analytics-only.
-6. Open Traffic Analytics → Flow / Tracks. Let simulation/inference run long enough for objects to cross the configured lines.
-7. Verify unique vehicle/person passage totals increase when tracked objects cross a line, not on every frame they remain visible.
-8. Repeatedly refresh/poll while a source frame is unchanged or simulation is paused. Confirm the same frame does not generate duplicate line events.
-9. Verify line direction values match the observed movement: left/right or top/bottom according to the track's dominant motion.
-10. Select an existing polygon region such as a pedestrian waiting/counting region. Verify entries/exits appear and exit events contain dwell time.
-11. For `pedestrian_waiting`, confirm the flow summary can show average prototype pedestrian wait duration after tracked people exit that zone.
-12. Switch Flow scope between all events, individual lines, and individual regions; verify summaries/charts/event rows follow the selected scope.
-13. Use the class filter and verify person/vehicle-class event results change appropriately.
-14. Export flow CSV and confirm event IDs, timestamps, track IDs, classes, event types, line/region IDs, direction, and dwell fields are represented.
-15. Use Clear flow after confirmation. Verify only `outputs/traffic_flow/` event history is cleared; occupancy history, captures, labels, zones, models, training runs, and settings remain intact.
-16. Switch back to Occupancy mode. Confirm V021 occupancy charts still represent sampled detections present at each timestamp and do not become unique passage counts.
-17. Restart the backend. Confirm persisted flow events still load but active track IDs begin a new tracking session; continuity across restart is intentionally not claimed.
-18. Stress the tracker with Busy simulation and note any ID loss/swap under occlusion as a prototype limitation rather than treating it as certified measurement accuracy.
-
-## 7. Inherited regression checks
-
-- Watch at least one complete V021 signal cycle: vehicles obey lanes/stop lines; pedestrians wait/use the zebra crossing; pause freezes scene/signal.
-- Recheck camera receiver/simulation density/pause.
-- Recheck camera-backed Zone Editor and Live AI saved-zone overlay/Show zones.
-- Recheck capture/delete/manual labels/managed dataset.
-- Recheck training convergence, patience early stopping, model registry/default/delete, confidence controls, Settings, and Logs.
-- Confirm detection/tracking/traffic outputs remain simulation/analytics information only and do not control physical public-road infrastructure.
-
-## 8. Repository/change hygiene
-
-From the complete Git repository:
+## 6. Repository/ZIP checks
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
-git status --short
 git diff --check
+git status --short
 ```
 
-Untracked `datasets/`, `outputs/`, trained models, labels, caches, and local runtime files are not source-patch failures. Do not delete runtime data just to obtain a clean `git status`.
-
-## 9. Patch ZIP validation
-
-From `AI_Traffic_Light`:
-
-```powershell
-python .\scripts\validate_patch_zip.py <path-to-v022-patch.zip>
-```
-
-Also compare the ZIP manifest with the intended changed-file list. The ZIP validator checks path/integrity/exclusion rules but cannot prove that every included source file actually changed.
-
-Only the owner can mark V022 passed after the required manual checks.
+From `AI_Traffic_Light`, validate the supplied ZIP with `python .\scripts\validate_patch_zip.py <zip>`. Compare its member list with the supplied manifest. Only explicit owner acceptance may promote V023.

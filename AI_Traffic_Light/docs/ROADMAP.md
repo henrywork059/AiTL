@@ -1,35 +1,29 @@
 # Roadmap
 
-## 0_2_2 — Cross-frame tracking and flow analytics candidate
+## 0_2_3 — Configurable adaptive signal rules candidate
 
-Status: V022 candidate, explicitly requested after V021. Previous candidate is `0_2_1`; owner-confirmed passed baseline remains `0_1_7` until explicit owner acceptance.
+Status: V023 candidate. Previous version and owner-confirmed passed baseline are V022 / `0_2_2`.
 
-Current candidate capabilities include:
+V023 adds a configurable adaptive signal simulation layer on top of the accepted V022 camera/dataset/training/inference/tracking/occupancy/flow baseline:
 
-- receiver/signal-aware simulation camera workflow;
-- persistent capture/review/manual-label lifecycle and managed YOLO dataset build;
-- local YOLO training with convergence monitoring and early stopping;
-- trained-model registry/loading/live inference;
-- camera-aligned persistent traffic zones and Live AI overlays;
-- V021 sampled whole-frame/region occupancy history and Traffic Analytics;
-- V022 frame-deduplicated cross-frame prototype track IDs;
-- analytics-only two-point `counting_line` geometry;
-- one directional passage event per track/counting-line pair;
-- tracked polygon-region entry/exit and completed dwell duration;
-- pedestrian waiting-zone dwell summary;
-- bounded persistent flow-event history, filters, minute buckets, CSV export, and explicit clearing;
-- signal-aware synthetic agents and simulation-only traffic recommendations;
-- persistent runtime settings/logs and hardened patch/version workflow.
+- editable normal signal phase timing with protected min/base/max values;
+- Fixed / Adaptive / Test modes and simple policy profiles;
+- bounded adaptive pedestrian/vehicle timing rules;
+- starvation-oriented maximum-wait rules, rule persistence/hysteresis, cooldowns, demand memory, stale-data fallback, and maximum-cycle bounds;
+- protected transition order/minimum service;
+- explicit manual accessibility/incident test inputs and all-red incident hold/recovery;
+- dry scenario preview, live rule arbitration explanation, and runtime decision history;
+- persistent user rule configuration excluded from source patches.
 
-## Next useful prototype directions after an accepted baseline
+## Next useful prototype directions after V023 acceptance
 
-- improve tracking robustness with optional motion prediction / stronger assignment and track confidence diagnostics;
-- add model evaluation/validation reporting, per-class precision/recall/mAP, confusion matrix, and model comparison;
-- add a configurable simulation scenario lab with arrival rates, signal timings, random seeds, and repeatable comparisons;
-- richer event/session annotations and experiment reports;
-- device-camera workflow completion;
-- model export/runtime packaging.
+- model evaluation / dataset quality: validation precision, recall, mAP50, mAP50-95, per-class metrics, confusion matrix, false-positive/false-negative review, dataset class distribution and quality warnings;
+- fixed-vs-adaptive repeatable A/B simulation using identical random seeds and wait/queue/service metrics;
+- signal-policy import/export and richer experiment/session reports;
+- stronger tracking/motion prediction and track-quality diagnostics;
+- optional compatible accessibility/incident perception research, clearly separated from manual Test inputs;
+- device-camera workflow completion and model export/runtime packaging.
 
 ## Explicitly outside scope
 
-Physical public-road traffic signal control remains outside the project. Detection, tracking, flow analytics, and phase outputs are prototype/simulation information only.
+Physical public-road traffic signal control remains outside the project. Detection, tracking, analytics, rule evaluation, timing changes, and phase outputs are prototype/simulation information only.

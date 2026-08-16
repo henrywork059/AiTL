@@ -69,6 +69,120 @@ export type RegionCount = {
   total: number;
 };
 
+export type SignalPhaseKey =
+  | "vehicle_green"
+  | "vehicle_yellow"
+  | "all_red_to_pedestrian"
+  | "pedestrian_green"
+  | "pedestrian_flashing"
+  | "all_red_to_vehicle";
+
+export type SignalPhaseTiming = {
+  base_seconds: number;
+  min_seconds: number;
+  max_seconds: number;
+};
+
+export type SignalRule = {
+  label: string;
+  enabled: boolean;
+  trigger: string;
+  threshold: number;
+  persistence_seconds: number;
+  action: "extend_current_phase" | "reduce_current_phase" | "hold_current_phase" | "request_next_phase" | "incident_hold";
+  adjustment_seconds: number;
+  target_phases: SignalPhaseKey[];
+  priority: number;
+  cooldown_seconds: number;
+};
+
+export type SignalProfile = {
+  description: string;
+  phases: Record<SignalPhaseKey, SignalPhaseTiming>;
+  max_cycle_seconds: number;
+  stale_data_seconds: number;
+  demand_memory_seconds: number;
+  rules: Record<string, SignalRule>;
+};
+
+export type SignalRulesConfig = {
+  schema_version: number;
+  mode: "fixed" | "adaptive" | "test";
+  dry_run: boolean;
+  active_profile: string;
+  profiles: Record<string, SignalProfile>;
+};
+
+export type SignalRuleStatus = {
+  rule_id: string;
+  label: string;
+  state: "active" | "inactive" | "suppressed" | "unavailable" | string;
+  reason: string;
+  priority: number;
+  trigger: string;
+  threshold: number;
+  stable_for_seconds: number;
+};
+
+export type SignalTestInputs = {
+  pedestrians_waiting: number;
+  pedestrians_crossing: number;
+  vehicles_waiting: number;
+  mobility_assistance: boolean;
+  incident_person_fallen: boolean;
+};
+
+export type SignalStatus = {
+  phase_key: string;
+  phase: "vehicle_green" | "vehicle_yellow" | "pedestrian_green" | "pedestrian_flashing" | "all_red";
+  base_duration_seconds: number;
+  effective_duration_seconds: number;
+  elapsed_seconds: number;
+  seconds_remaining: number;
+  next_phase_key: string;
+  next_phase: string;
+  vehicle_go: boolean;
+  pedestrian_walk: boolean;
+  pedestrian_clear: boolean;
+  mode: "fixed" | "adaptive" | "test";
+  dry_run: boolean;
+  active_profile: string;
+  base_cycle_seconds: number;
+  max_cycle_seconds: number;
+  data_fresh: boolean;
+  fallback_reason: string | null;
+  pending_request: string | null;
+  incident_hold: boolean;
+  active_rules: string[];
+  rule_status: SignalRuleStatus[];
+  observations: Record<string, unknown>;
+  test_inputs: SignalTestInputs;
+  prototype_only: boolean;
+};
+
+export type SignalRulesPreview = {
+  phase_key: SignalPhaseKey;
+  phase: string;
+  base_duration_seconds: number;
+  effective_duration_seconds: number;
+  rules: { rule_id: string; label: string; state: string; reason: string }[];
+  would_enter_incident_hold: boolean;
+  prototype_only: boolean;
+};
+
+export type SignalDecisionEvent = {
+  timestamp_ms: number;
+  event_type: string;
+  details: Record<string, unknown>;
+};
+
+export type SignalDecisionHistory = {
+  events: SignalDecisionEvent[];
+  count: number;
+  history_path: string;
+  prototype_only: boolean;
+};
+
 export type TrafficState = {
   phase:
     | "vehicle_green"
@@ -94,6 +208,7 @@ export type TrafficState = {
   zone_counts?: Record<string, number>;
   region_counts?: Record<string, RegionCount>;
   tracking?: TrackingStatus;
+  signal_policy?: SignalStatus;
   prototype_only?: boolean;
 };
 
@@ -107,29 +222,10 @@ export type TrafficHistoryPoint = {
   decision: string;
 };
 
-export type TrafficRegionSummary = {
-  id: string;
-  label: string;
-  type: ZoneType | string;
-};
-
-export type TrafficPeak = {
-  count: number;
-  recorded_at_ms: number | null;
-};
-
-export type TrafficPhaseChange = {
-  recorded_at_ms: number;
-  from: string;
-  to: string;
-};
-
-export type TrafficBusiestRegion = {
-  id: string;
-  label: string;
-  type: string;
-  average_total: number;
-};
+export type TrafficRegionSummary = { id: string; label: string; type: ZoneType | string };
+export type TrafficPeak = { count: number; recorded_at_ms: number | null };
+export type TrafficPhaseChange = { recorded_at_ms: number; from: string; to: string };
+export type TrafficBusiestRegion = { id: string; label: string; type: string; average_total: number };
 
 export type TrafficHistorySummary = {
   sample_count: number;
@@ -150,11 +246,7 @@ export type TrafficHistory = {
   history_path: string;
   oldest_recorded_at_ms: number | null;
   newest_recorded_at_ms: number | null;
-  scope: {
-    region_id: string | null;
-    label: string;
-    type: string;
-  };
+  scope: { region_id: string | null; label: string; type: string };
   minutes: number;
   regions: TrafficRegionSummary[];
   points: TrafficHistoryPoint[];
@@ -172,7 +264,6 @@ export type TrafficHistoryClearResult = {
   oldest_recorded_at_ms: number | null;
   newest_recorded_at_ms: number | null;
 };
-
 
 export type TrafficFlowEvent = {
   event_id: string;
@@ -253,14 +344,7 @@ export type BackendHealth = {
 };
 
 export type SmokeCheckStatus = "pass" | "warn" | "fail";
-
-export type SmokeCheck = {
-  id: string;
-  label: string;
-  status: SmokeCheckStatus;
-  detail: string;
-};
-
+export type SmokeCheck = { id: string; label: string; status: SmokeCheckStatus; detail: string };
 export type SmokeStatus = {
   version: string;
   mode: string;
@@ -298,6 +382,14 @@ export type CameraStatus = {
   simulation_enabled: boolean;
   simulation_paused: boolean;
   simulation_density: SimulationDensity;
+  simulation_signal_phase?: string | null;
+  simulation_signal_seconds_remaining?: number | null;
+  simulation_signal_cycle_seconds?: number | null;
+  simulation_signal_vehicle_go?: boolean;
+  simulation_signal_pedestrian_walk?: boolean;
+  simulation_signal_mode?: string | null;
+  simulation_signal_profile?: string | null;
+  simulation_signal_active_rules?: string[];
   frame_available: boolean;
   streaming: boolean;
   active_source_id: string | null;
@@ -314,7 +406,6 @@ export type CameraStatus = {
 };
 
 export type CaptureQualityTag = "unreviewed" | "useful" | "bad";
-
 export type CaptureRecord = {
   capture_id: string;
   session_id: string;
@@ -344,30 +435,10 @@ export type DatasetStatus = {
   last_capture: CaptureRecord | null;
 };
 
-export type LabelClass = {
-  id: number;
-  name: string;
-  category: string;
-};
-
-export type DatasetLabelBox = {
-  class_id: number;
-  class_name: string;
-  box_xyxy: [number, number, number, number];
-};
-
-export type CaptureSummary = CaptureRecord & {
-  labeled: boolean;
-  label_count: number;
-  image_url: string;
-};
-
-export type DatasetCaptureList = {
-  captures: CaptureSummary[];
-  total: number;
-  classes: LabelClass[];
-};
-
+export type LabelClass = { id: number; name: string; category: string };
+export type DatasetLabelBox = { class_id: number; class_name: string; box_xyxy: [number, number, number, number] };
+export type CaptureSummary = CaptureRecord & { labeled: boolean; label_count: number; image_url: string };
+export type DatasetCaptureList = { captures: CaptureSummary[]; total: number; classes: LabelClass[] };
 export type CaptureDeleteResult = {
   capture_id: string;
   session_id: string;
@@ -376,7 +447,6 @@ export type CaptureDeleteResult = {
   cleanup_pending: boolean;
   training_dataset: TrainingDatasetStatus;
 };
-
 export type CaptureLabelDocument = {
   capture_id: string;
   session_id: string;

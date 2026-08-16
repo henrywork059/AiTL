@@ -10,6 +10,7 @@ from app.services.camera_frames import camera_frame_service
 from app.services.inference import inference_service
 from app.services.object_tracking import object_tracking_service
 from app.services.runtime_settings import runtime_settings_service
+from app.services.signal_rules import signal_rules_service
 from app.services.zones import REFERENCE_HEIGHT, REFERENCE_WIDTH, zone_service
 
 logger = get_logger(__name__)
@@ -25,7 +26,6 @@ VEHICLE_CLASSES = {"car", "bus", "truck", "motorcycle", "bicycle"}
 
 
 def validate_traffic_state(state: dict) -> None:
-    """Validate a traffic simulation state dictionary before returning it to the API."""
     phase = state.get("phase")
     if phase not in VALID_PHASES:
         raise AppError(
@@ -35,7 +35,6 @@ def validate_traffic_state(state: dict) -> None:
 
 
 def point_in_polygon(point: tuple[float, float], polygon: list[list[int]]) -> bool:
-    """Return whether a point is inside a polygon using ray casting."""
     x, y = point
     inside = False
     count = len(polygon)
@@ -78,9 +77,8 @@ def evaluate_traffic_state(
 ) -> dict[str, Any]:
     """Convert one detection frame and persisted zones into supervised prototype traffic metrics.
 
-    Counts here remain per-frame occupancy samples. V022 separately derives unique
-    passage/entry/exit events from cross-frame track IDs; occupancy is intentionally
-    preserved so the two metrics are never conflated.
+    Occupancy remains a per-frame metric. SignalRulesService consumes these observations
+    as bounded prototype demand inputs; V022 track-derived flow remains separate.
     """
     evaluated_at_ms = int(time() * 1000)
     region_counts = _empty_region_counts(zones)
@@ -130,7 +128,6 @@ def evaluate_traffic_state(
             continue
         if any(point_in_polygon(centre, zone["polygon"]) for zone in ignore_zones):
             continue
-
         class_name = str(detection.get("class_name", ""))
         group: str | None = None
         if class_name == "person":
@@ -139,16 +136,13 @@ def evaluate_traffic_state(
         elif class_name in VEHICLE_CLASSES:
             vehicles_total += 1
             group = "vehicles"
-
         if group is None:
             continue
-
         for zone in counting_zones:
             if point_in_polygon(centre, zone["polygon"]):
                 region = region_counts[zone["id"]]
                 region[group] += 1
                 region["total"] += 1
-
         if class_name == "person":
             crossing_matches = [zone for zone in crossing_zones if point_in_polygon(centre, zone["polygon"])]
             if crossing_matches:
@@ -167,7 +161,6 @@ def evaluate_traffic_state(
                 vehicles_waiting += 1
                 for zone in queue_matches:
                     zone_counts[zone["id"]] += 1
-
         for zone in analytics_zones:
             if point_in_polygon(centre, zone["polygon"]):
                 zone_counts[zone["id"]] += 1
@@ -216,21 +209,30 @@ def evaluate_traffic_state(
     return state
 
 
-def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
-    """Align displayed traffic phase with the signal that synthetic agents actually obey.
+def _feed_signal_observation(state: dict[str, Any]) -> None:
+    """Feed bounded demand observations to the adaptive simulator without coupling it to inference."""
+    signal_rules_service.observe(
+        {
+            "pedestrians_waiting": state.get("pedestrians_waiting", 0),
+            "pedestrians_crossing": state.get("pedestrians_crossing", 0),
+            "vehicles_waiting": state.get("vehicles_waiting", 0),
+            "source_frame_number": state.get("evaluated_frame_number"),
+            "source_timestamp_ms": state.get("source_timestamp_ms"),
+            "data_source": state.get("data_source"),
+        }
+    )
 
-    The detection-driven result is retained as recommendation metadata. This keeps
-    simulation motion deterministic and non-circular: rendering never depends on
-    inference, while the traffic layer can still explain what detections recommend.
-    """
+
+def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
     if not camera_frame_service.simulation_enabled:
         return state
-
+    _feed_signal_observation(state)
     signal = camera_frame_service.simulation_signal_state()
     recommendation_phase = state["phase"]
     recommendation_decision = state["decision"]
     recommendation_reason = state["decision_reason"]
     state = dict(state)
+    active_rule_text = ", ".join(signal.get("active_rules", [])) or "normal configured timing"
     state.update(
         {
             "recommended_phase": recommendation_phase,
@@ -240,11 +242,13 @@ def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
             "decision": "follow_simulation_signal",
             "decision_reason": (
                 f"Synthetic vehicles and pedestrians obey the active {signal['phase'].replace('_', ' ')} "
-                f"signal ({signal['seconds_remaining']:.1f}s remaining). Detection-based recommendation: "
+                f"signal ({signal['seconds_remaining']:.1f}s remaining). Policy: {signal.get('mode', 'fixed')} / "
+                f"{signal.get('active_profile', 'Normal')}; active rules: {active_rule_text}. Detection recommendation: "
                 f"{recommendation_phase.replace('_', ' ')} — {recommendation_reason}"
             ),
             "extension_seconds": int(round(float(signal["seconds_remaining"]))),
             "data_source": f"simulation_signal+{state.get('data_source', 'traffic_evaluation')}",
+            "signal_policy": signal,
         }
     )
     validate_traffic_state(state)
@@ -252,7 +256,6 @@ def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_live_traffic_state() -> dict[str, Any]:
-    """Run or reuse current inference and evaluate it against persisted zones for simulation-only logic."""
     zones = zone_service.zones()
     frame = camera_frame_service.latest_frame()
     if frame is None:
@@ -264,10 +267,7 @@ def get_live_traffic_state() -> dict[str, Any]:
         return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="model_not_loaded"))
     try:
         settings = runtime_settings_service.get()
-        detection_frame = inference_service.detect_frame(
-            frame,
-            confidence_threshold=float(settings["default_confidence"]),
-        )
+        detection_frame = inference_service.detect_frame(frame, confidence_threshold=float(settings["default_confidence"]))
         detection_frame = object_tracking_service.update(detection_frame, zones)
     except AppError as exc:
         if exc.code in {
@@ -287,6 +287,5 @@ def get_live_traffic_state() -> dict[str, Any]:
     return _apply_active_simulation_signal(evaluate_traffic_state(detection_frame, zones))
 
 
-# Backward-compatible name used by older smoke code and offline fixtures.
 def get_mock_traffic_state() -> dict[str, Any]:
     return get_live_traffic_state()

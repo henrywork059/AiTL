@@ -1,67 +1,43 @@
-# PC Studio Function List (V022 implemented highlights)
+# PC Studio Function List (V023 candidate highlights)
 
 ## Camera / simulation
 - receive JPEG/PNG device frames;
 - signal-aware synthetic scene with vehicle stop-line queues and pedestrian curb/WALK behavior;
-- Light / Normal / Busy density;
-- pause/resume synthetic motion and signal timing.
+- Light / Normal / Busy density and pause/resume;
+- V023 configurable protected simulated signal timing consumed by synthetic agents.
 
-## Dataset / training
-- capture latest frame with metadata;
-- delete capture image + metadata + saved labels;
-- manual bounding-box labeling;
-- managed YOLO train/validation build;
-- local Ultralytics training;
-- convergence plot and patience-based early stopping.
+## Signal rules / traffic simulation
+- edit six normal-operation phase base/min/max durations;
+- Fixed, Adaptive, and Test operating modes plus dry-run;
+- Normal / Pedestrian Priority / Vehicle Priority / Accessibility profiles;
+- adaptive rules for crossing occupancy, slow crossing, pedestrian demand/max wait, low vehicle demand, vehicle queue/max wait;
+- explicit Test-mode mobility/accessibility and fallen-person incident inputs without claiming unsupported live detection;
+- protected transition order and protected minimum service;
+- maximum phase/cycle limits, rule priorities, cooldown/retrigger protection, persistence/hysteresis, demand memory, and stale-data fallback;
+- incident simulated all-red hold, explicit clear, safe recovery, and runtime-state reset;
+- preview scenarios and live active/suppressed/inactive/unavailable rule explanations;
+- persistent runtime signal-decision history with explicit clearing.
 
-## Inference / models
-- discover/load/default/delete trained models;
-- live detections on receiver/simulation frames;
-- confidence and visibility controls;
-- saved zone/line overlays;
-- V022 class-aware cross-frame prototype track IDs shown beside Live AI detections.
+## Inference / zones / analytics
+- trained-model inference and V022 cross-frame prototype IDs;
+- camera-aligned waiting/crossing/queue/counting/ignore geometry;
+- sampled whole-frame/region occupancy history;
+- counting-line directional unique-passage events;
+- region entry/exit/dwell and pedestrian waiting dwell;
+- separate Occupancy and Flow / Tracks analytics with CSV exports.
 
-## Zones / traffic simulation
-- edit/persist camera-aligned waiting, crossing, queue, counting-region, ignore polygons;
-- create analytics-only `counting_line` geometry with exactly two distinct points;
-- count whole-frame and per-region pedestrian/vehicle occupancy;
-- simulation-only phase recommendations plus signal-aware simulator phase display.
-
-## Occupancy analytics
-- timestamped bounded occupancy history under `outputs/traffic_history/`;
-- whole-frame or polygon-region time series;
-- average/peak/busiest-region and phase-change summaries;
-- CSV export and explicit occupancy-history clear.
-
-## V022 tracking / flow analytics
-- frame-deduplicated stable prototype track IDs;
-- one unique directional passage event per track/counting-line pair;
-- `left_to_right`, `right_to_left`, `top_to_bottom`, `bottom_to_top` direction;
-- region entry/exit events;
-- completed region dwell duration;
-- average pedestrian waiting-zone dwell;
-- persistent bounded events under `outputs/traffic_flow/`;
-- time, line, region, and class filtering;
-- per-minute passage or region-event plots;
-- recent event table;
-- CSV export and explicit flow-history clear;
-- active tracking status API.
+## Dataset / training / model management
+- capture/delete/review/manual-label frames;
+- managed YOLO train/validation dataset;
+- local Ultralytics training, convergence and early stopping;
+- model registry/load/default/delete.
 
 ## System / development integrity
-- persistent runtime confidence/polling/training-patience/log-level settings;
-- recent backend logs with request IDs/error codes;
+- persistent runtime settings and recent logs;
 - canonical root `VERSION` metadata;
-- repository/version and patch-ZIP validation;
-- runtime datasets/models/occupancy history/flow events excluded from source patches.
+- runtime rule config/history, datasets, models, occupancy/flow history excluded from source patches;
+- repository/version and patch-ZIP validation.
 
-## Tracker limitation
+## Limitations / later
 
-The current tracker uses lightweight centroid/IoU association. It can lose or swap IDs during occlusion, large inter-frame motion, long detection gaps, or crowded same-class crossings. Unique passage therefore means a recorded track/counting-line event in this prototype, not certified traffic measurement.
-
-## Still later
-- stronger tracking/motion prediction and quality diagnostics;
-- model evaluation/validation reporting and model comparison;
-- configurable simulation scenario lab;
-- automatic labeling;
-- model export/runtime package;
-- physical public-road traffic control (explicitly outside scope).
+V023 signal behavior remains a supervised local simulation. Wheelchair/mobility and fall detection are not live perception capabilities unless a compatible future model/source supplies them. The tracker is lightweight and not certified measurement. Future directions include model evaluation/quality, policy A/B simulation benchmarking, rule import/export, stronger tracking, and richer experiment reports. Physical public-road traffic control is explicitly outside scope.

@@ -4,75 +4,67 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 
 ## Current candidate
 
-- `0_2_2` — candidate adding cross-frame object IDs, directional counting lines, unique passage events, region entry/exit/dwell analytics, and persistent flow-event history on top of V021.
-- Previous candidate: `0_2_1`.
-- Owner-confirmed passed baseline remains `0_1_7` until a newer candidate is explicitly accepted.
+- `0_2_3` — candidate adding configurable normal signal timings, bounded adaptive timing rules, profile/test/dry-run controls, rule explainability, and signal-decision history on top of V022.
+- Previous version: `0_2_2`.
+- Owner-confirmed passed baseline: `0_2_2`.
 
 ## Implemented prototype functions
 
-- receive or simulate camera frames
-- use a controllable synthetic traffic scene with top-to-bottom pedestrians and horizontal vehicle motion
-- choose light / normal / busy simulation density and pause/resume an inspection frame
-- run a stateful signal-aware junction simulation where vehicles queue at stop lines and pedestrians wait for WALK before using the zebra crossing
-- capture and persist dataset images
-- delete unwanted captures together with paired metadata and saved manual labels
-- manually label frames in the app
-- build a managed YOLO dataset
-- run local Ultralytics YOLO training
-- monitor per-epoch validation fitness / mAP convergence
-- stop training automatically when validation fitness stops improving for the configured patience window
-- discover, choose, default, and delete local trained models
-- run live inference overlays on receiver/simulation frames and assign prototype track IDs across consecutive frames
-- create, edit, persist, and reset traffic-zone polygons directly over the current camera/simulation feed
-- overlay saved zones on Live AI with reference-to-frame scaling
-- show the exact simulation signal obeyed by synthetic agents as a compact signal at the top-right of Live AI
-- count live detection centres inside configured zones
-- generate auditable simulation-only traffic phase recommendations from zone counts
-- count whole-frame detected pedestrians and vehicles per sampled frame
-- define multiple analytics-only counting regions and two-point counting lines in the existing Zone Editor
-- record bounded traffic occupancy history while the backend runs
-- plot whole-frame or region-specific pedestrian/vehicle occupancy over selectable time windows
-- export occupancy history to CSV, clear it explicitly, and inspect average/peak/busiest-region plus phase-change summaries
-- record unique directional passage events when a stable track crosses a counting line
-- record region entry/exit and completed dwell duration, including pedestrian waiting-zone dwell
-- persist/filter/plot/export track-derived flow events separately from sampled occupancy
-- persist active runtime settings
-- inspect real recent backend logs with request/error metadata
-- keep long model IDs and paths contained inside the Live AI model panel
+- receive or simulate camera frames;
+- run a stateful signal-aware synthetic junction where vehicles queue at stop lines and pedestrians wait for WALK before using the zebra crossing;
+- choose Light / Normal / Busy simulation density and pause/resume an inspection frame;
+- configure normal simulated phase min/base/max timings for vehicle green, yellow, both all-red clearances, pedestrian WALK, and pedestrian CLEAR;
+- run Fixed, Adaptive, or Test signal-policy modes with named profiles;
+- apply bounded adaptive rules for crossing occupancy/slow crossing, heavy pedestrian demand, pedestrian maximum wait, low vehicle demand, heavy vehicle queues, vehicle maximum wait, and Test-mode mobility/incident conditions;
+- use persistence, demand memory, cooldowns, priorities, per-phase caps, maximum-cycle limits, protected transitions, and stale-data fallback;
+- inspect active/suppressed/unavailable rules, pending demand, effective phase duration, and decision history;
+- preview rule scenarios without mutating the running controller and use explicit simulation-only accessibility/fall test inputs;
+- capture/delete/review/manual-label dataset images and build a managed YOLO dataset;
+- run local Ultralytics YOLO training with convergence monitoring and patience-based early stopping;
+- discover, choose, default, load, and delete trained models;
+- run live trained-model inference with confidence/visibility controls and prototype cross-frame track IDs;
+- create persistent camera-aligned traffic regions and two-point counting lines;
+- keep sampled occupancy analytics separate from track-derived passage/region flow events;
+- persist occupancy history, flow events, runtime settings, and inspect backend logs.
+
+## Signal-policy semantics
+
+The V023 controller starts from user-configured normal phase durations. Adaptive rules can extend or reduce the current simulated phase only within validated min/max bounds and the configured cycle cap. Yellow/all-red transition ordering remains protected; adaptive logic cannot jump directly between conflicting movement phases.
+
+If detection observations are stale/unavailable, Adaptive mode falls back to the saved normal timings. Short detection dropouts retain demand briefly, and rule persistence/cooldown prevents single-frame spikes or repeated per-poll extensions.
+
+`mobility_assistance` and `incident_person_fallen` are supported as explicit Test-mode inputs. The current detector is **not** claimed to identify wheelchairs, mobility aids, or falls unless a future compatible perception source is added.
+
+Signal-rule configuration is stored locally in `config/signal_rules.json`. Decision history is runtime data under `outputs/signal_rules/decision_history.jsonl`; both are excluded from source patch archives.
+
+## Analytics semantics
+
+- **Occupancy** — sampled counts showing detections currently present in a frame/region. Runtime data is under `outputs/traffic_history/`.
+- **Flow** — track-derived events. A unique passage is counted only when one stable prototype track crosses one configured `counting_line`; region entry/exit/dwell are separate event types under `outputs/traffic_flow/`.
+
+The tracker remains a lightweight class-aware centroid/IoU prototype and may lose/swap IDs under occlusion, abrupt movement, or crowded same-class scenes.
 
 ## Development integrity
 
-The root `VERSION` file is the canonical release-state record. Backend version surfaces load it through `apps/pc-studio/backend/app/core/project_version.py` rather than duplicating release strings. Frontend Dashboard/navigation/offline fallback surfaces reuse `apps/pc-studio/frontend/src/constants/projectVersion.ts`, which repository validation checks against root `VERSION`.
+The root `VERSION` file is authoritative. Backend release metadata is loaded through `apps/pc-studio/backend/app/core/project_version.py`; frontend release fallback/navigation uses `apps/pc-studio/frontend/src/constants/projectVersion.ts` and is checked by repository validation.
 
-Useful developer/agent entry points:
+Useful entry points:
 
-- `AGENTS.md` — mandatory repository rules and release gate
-- `docs/AI_AGENT_GUIDE.md` — detailed agent workflow
-- `docs/AI_AGENT_CHECKLIST.md` — concise execution checklist
-- `docs/CODE_STRUCTURE.md` — module ownership rules
-- `docs/DEVELOPMENT_WORKFLOW.md` — current incremental patch workflow
-- `docs/LOCAL_TESTING.md` — test commands and evidence expectations
-- `docs/TEST_READY_CHECKLIST.md` — owner acceptance checklist
-- `docs/VERSIONING.md` — candidate versus passed-baseline rules
+- `AGENTS.md`
+- `docs/AI_AGENT_GUIDE.md`
+- `docs/AI_AGENT_CHECKLIST.md`
+- `docs/LOCAL_TESTING.md`
+- `docs/TEST_READY_CHECKLIST.md`
+- `docs/API_CONTRACTS.md`
+- `docs/PATCH_0_2_3.md`
 
-Repository/packaging helpers:
+Repository helpers:
 
 ```powershell
 python .\scripts\check_structure.py
 python .\scripts\validate_patch_zip.py <patch.zip>
 ```
 
-The patch ZIP validator checks structural safety and exclusions. A changed-files-only manifest still needs to be compared against the actual intended source changes.
-
-## Analytics semantics
-
-V022 keeps two metrics deliberately separate:
-
-- **Occupancy** — V021-style sampled counts showing how many detections are present in a frame/region at a point in time. Runtime data is stored under `outputs/traffic_history/`.
-- **Flow** — V022 track-derived events. A unique passage is counted only when one stable prototype track crosses one configured `counting_line`; region entry/exit and dwell are separate event types stored under `outputs/traffic_flow/`.
-
-The tracker uses lightweight class-aware centroid/IoU matching. Heavy occlusion or crowded same-class motion can still lose/swap IDs, so flow remains prototype analytics rather than certified traffic measurement. Both runtime directories are excluded from source patches.
-
 ## Safety scope
 
-This project is for prototype, classroom, and simulation use only. Zone-aware traffic recommendations, detections, and the Live AI signal graphic are not connected to real public-road traffic infrastructure.
+AiTL is a local/student-scale prototype for simulation, classroom work, computer-vision experiments, and supervised testing. Signal rules, recommendations, detections, tracking, analytics, and GUI signal states are not connected to real public-road traffic infrastructure and must not be described as production-road control.

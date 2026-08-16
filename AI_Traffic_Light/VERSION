@@ -1,5 +1,5 @@
-version: 0_2_2
-status: cross-frame tracking and flow analytics candidate
-previous_version: 0_2_1
-passed_baseline: 0_1_7
-notes: V022 was explicitly requested by the owner as the next candidate after V021 even though V021 was not separately promoted. It adds frame-deduplicated class-aware cross-frame track IDs, two-point counting lines with one directional passage event per track/line, region entry/exit and dwell-time events including pedestrian waiting-zone dwell, persistent bounded flow-event history/CSV, and Flow / Tracks analytics while preserving V021 sampled occupancy analytics and signal-aware simulation. The tracker is a lightweight centroid/IoU prototype and may lose or swap IDs during heavy occlusion; unique passage counts therefore apply only to recorded counting-line events and remain prototype analytics. V021 is the previous candidate and owner-confirmed passed baseline remains V017 / 0_1_7. Physical public-road traffic control remains disabled.
+version: 0_2_3
+status: configurable adaptive signal rules candidate
+previous_version: 0_2_2
+passed_baseline: 0_2_2
+notes: V022 / 0_2_2 was explicitly owner-accepted before this patch. V023 adds persistent user-defined normal signal timings; Fixed, Adaptive, and Test modes; bounded rule-based duration extension/reduction; rule priority, persistence, cooldown, demand memory, stale-data fallback, protected transition/minimum-service constraints, manual accessibility/incident test inputs, dry-run previews, runtime decision history, and live rule explainability. Wheelchair/mobility and fall/incident conditions are not claimed as live detections without a compatible perception source. All signal behavior remains simulation/recommendation-only and physical public-road traffic control remains disabled.

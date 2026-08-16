@@ -1,33 +1,20 @@
-# PC Studio Backend — V022 candidate
+# PC Studio Backend — V023 candidate
 
 FastAPI backend for the local AI Traffic Light prototype.
 
 ## Working prototype functions
 
-- receive device JPEG/PNG frames and run the controllable synthetic camera;
-- persist captures, delete unwanted capture image/metadata/label sets, and build manual-label/managed YOLO datasets;
-- run optional local Ultralytics training with per-epoch convergence history and automatic early stopping;
-- discover, load, default, and delete trained `best.pt` models;
-- run trained-model inference on receiver/simulation frames and assign frame-deduplicated prototype track IDs;
-- generate persistent signal-aware synthetic vehicle/pedestrian motion with stop-line and crosswalk waiting behavior;
-- persist editable traffic zones used by the camera-aligned frontend editor and count live detection centres inside them;
-- return the active synthetic signal phase plus detection-driven recommendation metadata from current zone counts;
-- return whole-frame and per-region pedestrian/vehicle occupancy counts;
-- persist two-point counting lines and generate one directional passage event per tracked object/line;
-- record tracked polygon-region entry/exit and completed dwell duration, including pedestrian waiting-zone dwell;
-- record bounded detection-backed traffic occupancy history under `outputs/traffic_history/`;
-- expose occupancy history queries/CSV plus separate flow-event filters, per-minute buckets, CSV export, active-track status, and explicit flow clearing;
-- persist runtime confidence/polling/patience/log-level settings;
-- expose recent real backend log records with request IDs where available.
+- receive device JPEG/PNG frames and run the controllable signal-aware synthetic camera;
+- persist captures, deletion/labels, managed YOLO datasets, optional local training, trained-model registry, and live inference;
+- assign frame-deduplicated prototype track IDs and persist occupancy/flow analytics separately;
+- persist camera-aligned traffic regions and two-point counting lines;
+- configure validated simulated signal min/base/max timings and Fixed / Adaptive / Test policy modes;
+- evaluate bounded adaptive timing rules with priority ordering, persistence, cooldown, demand memory, stale-data fallback, protected phase order, and maximum-cycle limits;
+- expose live signal-policy status, rule health/arbitration, dry previews, Test-mode accessibility/incident inputs, incident clearing, adaptive-state reset, and decision-history APIs;
+- persist signal policy in `config/signal_rules.json` and runtime decision history in `outputs/signal_rules/decision_history.jsonl`.
 
-## Release metadata
+The current perception model is not claimed to detect wheelchairs/mobility aids or person-fall incidents. Those conditions are Test-mode inputs until a compatible detector is deliberately added.
 
-Root `AI_Traffic_Light/VERSION` is the canonical project release state. `app/core/project_version.py` validates and exposes that metadata to FastAPI app metadata, `/health`, smoke status, and template status so those surfaces do not carry independent hard-coded release strings.
-
-If required `VERSION` fields or underscore-formatted version values are invalid, backend startup/import fails clearly rather than silently reporting an inconsistent release.
-
-## Runtime data and safety
-
-Local datasets, occupancy/flow history records, runtime settings/zones, and trained models remain runtime data. Flow events live under `outputs/traffic_flow/` and are not source-patch content. Trained models stay under `outputs/training/` and are not part of source patches.
+Root `AI_Traffic_Light/VERSION` is the canonical release state. Runtime datasets, settings, signal policy, occupancy/flow/signal histories, and trained models are user/runtime data and are excluded from source patches.
 
 This backend is for prototype, simulation, classroom, and supervised testing only. It is not a public-road traffic controller.

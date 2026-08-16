@@ -1,5 +1,6 @@
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
-from typing import Literal
 
 
 class Detection(BaseModel):
@@ -59,6 +60,7 @@ class TrafficState(BaseModel):
     recommended_phase: str | None = None
     recommended_decision: str | None = None
     recommended_decision_reason: str | None = None
+    signal_policy: dict[str, Any] | None = None
     prototype_only: bool = True
 
 
@@ -101,6 +103,37 @@ class RuntimeSettingsRequest(BaseModel):
     live_poll_interval_ms: int = Field(default=500, ge=250, le=5000)
     training_patience: int = Field(default=5, ge=1, le=100)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
+
+class SignalRulesConfigRequest(BaseModel):
+    config: dict[str, Any]
+
+
+class SignalTestInputsRequest(BaseModel):
+    pedestrians_waiting: int | None = Field(default=None, ge=0, le=500)
+    pedestrians_crossing: int | None = Field(default=None, ge=0, le=500)
+    vehicles_waiting: int | None = Field(default=None, ge=0, le=500)
+    mobility_assistance: bool | None = None
+    incident_person_fallen: bool | None = None
+
+
+class SignalRulesPreviewRequest(BaseModel):
+    phase_key: Literal[
+        "vehicle_green",
+        "vehicle_yellow",
+        "all_red_to_pedestrian",
+        "pedestrian_green",
+        "pedestrian_flashing",
+        "all_red_to_vehicle",
+    ] = "vehicle_green"
+    pedestrians_waiting: int = Field(default=0, ge=0, le=500)
+    pedestrians_crossing: int = Field(default=0, ge=0, le=500)
+    vehicles_waiting: int = Field(default=0, ge=0, le=500)
+    pedestrian_wait_seconds: float = Field(default=0, ge=0, le=3600)
+    vehicle_wait_seconds: float = Field(default=0, ge=0, le=3600)
+    crossing_dwell_seconds: float = Field(default=0, ge=0, le=3600)
+    mobility_assistance: bool = False
+    incident_person_fallen: bool = False
 
 
 class InferenceLoadRequest(BaseModel):

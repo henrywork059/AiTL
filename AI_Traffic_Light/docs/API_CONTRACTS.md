@@ -1,16 +1,6 @@
 # API Contracts (current highlights)
 
-All JSON API responses use the standard envelope:
-
-```json
-{
-  "ok": true,
-  "data": {},
-  "meta": { "request_id": "..." }
-}
-```
-
-Errors use the documented `error` envelope. Binary/image and CSV responses include `X-Request-ID`.
+All JSON API responses use the standard success/error envelopes and `meta.request_id`. Binary/image/CSV responses preserve `X-Request-ID`.
 
 ## Camera
 
@@ -20,123 +10,124 @@ Errors use the documented `error` envelope. Binary/image and CSV responses inclu
 - `POST /api/camera/simulation/stop`
 - `POST /api/camera/simulation/settings`
 
-## Dataset capture lifecycle
+When simulation is active, camera status includes the active configurable signal phase/countdown, cycle length, vehicle/pedestrian go flags, signal mode/profile, and active adaptive-rule IDs. The values are simulation-only.
 
-- `GET /api/dataset/status`
-- `POST /api/dataset/captures`
-- `GET /api/dataset/captures`
-- `DELETE /api/dataset/captures/{capture_id}`
-- `GET /api/dataset/captures/{capture_id}/image`
-- `GET|PUT /api/dataset/captures/{capture_id}/labels`
-- `GET /api/dataset/training-dataset/status`
-- `POST /api/dataset/training-dataset`
+## Dataset / zones
 
-## Zones, counting regions, and counting lines
+Existing dataset capture/label/training-dataset endpoints are unchanged. Existing zone endpoints are unchanged. Supported zones remain `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, `counting_line`, and `ignore`; counting lines require two distinct points and remain analytics-only.
 
-- `GET /api/zones/active`
-  - returns the active zone set in the 1280×720 reference coordinate system.
-- `PUT /api/zones/active`
-  - replaces the complete active zone set after validation.
-  - supported types: `pedestrian_waiting`, `crossing`, `vehicle_queue`, `counting_region`, `counting_line`, `ignore`.
-- `POST /api/zones/reset`
-
-`counting_region` and `counting_line` are analytics-only and do not alter the simulation phase recommendation. Polygon types use 3-32 points; `counting_line` uses exactly two distinct points. Existing non-ignore polygon zones expose pedestrian/vehicle region occupancy and track entry/exit/dwell analytics.
-
-### Signal-aware simulation status fields
-
-When simulation mode is active, camera status/start/settings responses also include:
-
-- `simulation_signal_phase`: active phase obeyed by synthetic agents (`vehicle_green`, `vehicle_yellow`, `all_red`, `pedestrian_green`, or `pedestrian_flashing`);
-- `simulation_signal_seconds_remaining`: approximate seconds remaining in the active phase;
-- `simulation_signal_cycle_seconds`: total deterministic cycle length (`34.0`);
-- `simulation_signal_vehicle_go`: true only during vehicle green;
-- `simulation_signal_pedestrian_walk`: true only during pedestrian WALK.
-
-When receiver mode is active, phase/countdown/cycle fields are `null` and the boolean go/walk flags are false.
-
-## Traffic simulation state
-
-In simulation mode, `phase` is the active simulator signal that synthetic agents obey. The detection-driven phase/decision are retained as optional `recommended_phase`, `recommended_decision`, and `recommended_decision_reason` fields so the UI can compare the active safe simulation cycle with the CV recommendation without creating a circular dependency.
-
+## Traffic state
 
 - `GET /api/traffic/state`
-  - obtains/reuses the current trained-model detection frame when available;
-  - in receiver mode, returns the detection-driven simulation-only phase recommendation;
-  - in simulation mode, returns the exact active simulator signal as `phase` and preserves detection-driven output under `recommended_*`;
-  - returns whole-frame sampled occupancy as `pedestrians_total` and `vehicles_total`;
-  - returns `evaluated_at_ms`, source frame/timestamp metadata, `zone_counts`, and per-zone `region_counts`;
-  - `region_counts[zone_id]` has `{ "pedestrians": n, "vehicles": n, "total": n }`;
-  - no response is connected to physical public-road traffic infrastructure.
 
-Whole-frame and region counts remain per-frame occupancy observations. V022 separately assigns prototype track IDs and generates unique-passage events only when a track crosses a configured `counting_line`; do not sum occupancy samples and call them throughput.
+Returns current occupancy/zone counts and detection-driven recommendation data. In Simulation mode, `phase` reflects the exact simulated controller phase obeyed by synthetic agents; detection recommendation remains available under `recommended_*`. V023 additionally exposes `signal_policy` controller metadata when simulation mode is active.
 
-## Traffic history and analytics
+Occupancy remains sampled per-frame data. Track-derived flow remains separate.
 
-- `GET /api/traffic/history?minutes=15&limit=2000&region_id=<optional>`
-  - `minutes`: `0..360`; `0` means all retained samples.
-  - `limit`: `1..10000`.
-  - optional `region_id` selects one configured non-ignore polygon region; counting lines are excluded from occupancy scopes; omitted means whole frame.
-  - returns recording configuration, selected scope, available regions, ordered points, and summary statistics.
-  - each point includes recorded/source timestamps, source frame number, pedestrian occupancy, vehicle occupancy, phase, and decision.
-  - summary includes averages, peaks with timestamps, phase-change count/latest phase change, and busiest configured region.
-- `GET /api/traffic/history/export.csv?minutes=...&limit=...&region_id=...`
-  - exports the selected history scope as UTF-8 CSV.
-  - includes `X-Request-ID` and download filename headers.
+## V023 signal-rule configuration
+
+### `GET /api/traffic/signal-rules`
+
+Returns the persisted/effective signal-rule configuration. Top-level fields include:
+
+- `schema_version` (currently `1`)
+- `mode`: `fixed | adaptive | test`
+- `dry_run`: boolean
+- `active_profile`
+- `profiles`
+
+Each profile contains six protected phase entries with `base_seconds`, `min_seconds`, and `max_seconds`; controller limits such as `max_cycle_seconds`, `stale_data_seconds`, and `demand_memory_seconds`; and structured rules.
+
+Rules contain `enabled`, `trigger`, `threshold`, `persistence_seconds`, `action`, `adjustment_seconds`, `target_phases`, `priority`, and `cooldown_seconds`.
+
+### `PUT /api/traffic/signal-rules`
+
+Body:
+
+```json
+{"config": {"schema_version": 1, "mode": "adaptive", "dry_run": false, "active_profile": "Normal", "profiles": {}}}
+```
+
+The complete configuration is validated before atomic persistence. Protected phase minimums, min/base/max ordering, supported triggers/actions, cycle bounds, and profile/rule limits are enforced. Invalid policy data uses the central traffic-rule error path.
+
+Saving while a simulation is running preserves the current protected phase and restarts its timing window at the current simulation clock; it does not replay elapsed time from zero.
+
+### `POST /api/traffic/signal-rules/reset`
+
+Restores source-defined defaults. This changes saved policy configuration only; it does not delete traffic datasets/history/models.
+
+### `POST /api/traffic/signal-rules/runtime/reset`
+
+Clears transient demand memory, cooldown/application state, pending requests, and incident state without deleting saved configuration. When simulation is active, reset is anchored to the current simulation clock.
+
+### `POST /api/traffic/signal-rules/test-inputs`
+
+Body fields are optional:
+
+```json
+{
+  "pedestrians_waiting": 6,
+  "pedestrians_crossing": 1,
+  "vehicles_waiting": 8,
+  "mobility_assistance": false,
+  "incident_person_fallen": false
+}
+```
+
+These are explicit manual **Test-mode** inputs, not claims about live AI perception.
+
+### `POST /api/traffic/signal-rules/incident/clear`
+
+Clears the manual incident input/hold. Recovery resumes from the protected current phase with a fresh timing window rather than catching up through elapsed phases.
+
+### `POST /api/traffic/signal-rules/preview`
+
+Evaluates one scenario without mutating active simulator state. Supports `phase_key`, pedestrian/vehicle counts, optional wait/crossing duration values, mobility assistance, and incident input. Returns base/effective duration, per-rule statuses, and whether Test mode would enter incident hold.
+
+### `GET /api/traffic/signal-status`
+
+Returns controller state including:
+
+- active `phase` / `phase_key`
+- base/effective/elapsed/remaining seconds
+- next phase
+- Fixed/Adaptive/Test mode and dry-run flag
+- active profile
+- base/max cycle duration
+- freshness/fallback reason
+- pending request
+- incident hold flag
+- active rules and priority-ordered rule statuses
+- observations/test inputs
+- `prototype_only: true`
+
+When Simulation mode is off, this endpoint is a policy preview/status surface and does not represent physical signal output.
+
+### Signal decision history
+
+- `GET /api/traffic/signal-rules/history?limit=200`
+- `DELETE /api/traffic/signal-rules/history`
+
+Runtime audit data is stored under `outputs/signal_rules/decision_history.jsonl`. Clearing it does not clear occupancy history, flow history, zones, captures, labels, models, training output, settings, or saved signal rules.
+
+## Traffic occupancy / flow
+
+Existing V021/V022 endpoints remain:
+
+- `GET /api/traffic/history`
+- `GET /api/traffic/history/export.csv`
 - `DELETE /api/traffic/history`
-  - clears only persisted traffic-analytics history runtime data.
-  - does not delete captures, labels, zones, settings, trained models, or training runs.
-
-History is stored locally under `outputs/traffic_history/history.jsonl`, is runtime data, and is excluded from source patches. Default target sampling interval is 1000 ms and default retained capacity is 21,600 samples. Environment overrides are `AITL_TRAFFIC_HISTORY_INTERVAL_MS`, `AITL_TRAFFIC_HISTORY_MAX_SAMPLES`, and `AITL_TRAFFIC_HISTORY_PATH`.
-
-## Cross-frame tracking and flow analytics
-
-`GET /api/inference/detections` now enriches supported traffic classes (`person`, `car`, `bus`, `truck`, `motorcycle`, `bicycle`) with optional `track_id` and `track_age_frames`. Repeated processing of the same source frame is idempotent and cannot generate duplicate flow events.
-
 - `GET /api/traffic/tracks`
-  - returns current in-memory tracking status, active tracks, class counts, tracker session ID, and latest processed source frame.
-- `GET /api/traffic/flow?minutes=15&limit=10000&line_id=<optional>&region_id=<optional>&class_name=<optional>`
-  - `minutes`: `0..360`; `0` means all retained events.
-  - optional `line_id` filters a configured `counting_line`.
-  - optional `region_id` filters a configured polygon region.
-  - optional `class_name` filters one detected class.
-  - returns raw ordered events, per-minute buckets, configured lines/regions, persistence status, and summary metrics.
-  - `line_crossing` events include one of `left_to_right`, `right_to_left`, `top_to_bottom`, or `bottom_to_top`.
-  - each track is counted at most once per counting line in the current prototype session to suppress jitter double-counting.
-  - `region_entry`/`region_exit` events represent outside/inside transitions; completed exits include `dwell_ms`. Pedestrian exits from `pedestrian_waiting` regions contribute to average pedestrian-wait duration.
-- `GET /api/traffic/flow/export.csv?...`
-  - exports selected flow events as UTF-8 CSV with `X-Request-ID`.
+- `GET /api/traffic/flow`
+- `GET /api/traffic/flow/export.csv`
 - `DELETE /api/traffic/flow`
-  - clears only persisted flow-event history. It does not clear V021 occupancy history, zones, captures, labels, settings, models, or training runs.
 
-Flow events are stored under `outputs/traffic_flow/events.jsonl`, are runtime/user data, and are excluded from source patches. Default capacity is 50,000 events. Environment overrides: `AITL_TRAFFIC_FLOW_PATH` and `AITL_TRAFFIC_FLOW_MAX_EVENTS`.
+Occupancy is sampled occupancy. Unique passages are only recorded track/counting-line crossing events. The lightweight tracker may lose/swap IDs under occlusion/crowding.
 
-The V022 tracker is lightweight class-aware centroid/IoU matching. Heavy occlusion, abrupt motion, long detection gaps, or crowded same-class crossings can still lose/swap IDs; flow remains prototype analytics, not certified traffic measurement.
+## Training / inference / models / settings / logs
 
-## Training
+Existing endpoints remain unchanged, including training status/start, inference model load/unload/detections, model registry/default/delete, runtime settings, and recent logs.
 
-- `GET /api/training/status`
-- `POST /api/training/start`
+## Safety boundary
 
-## Inference
-
-- `GET /api/inference/status`
-- `POST /api/inference/load`
-- `POST /api/inference/load-latest`
-- `POST /api/inference/unload`
-- `GET /api/inference/detections?confidence=0.01..1.0`
-- `GET /api/inference/frame?source_id=...&frame_number=...`
-
-## Models
-
-- `GET /api/models`
-- `POST /api/models/default`
-- `DELETE /api/models/{model_id}`
-
-## Runtime settings
-
-- `GET /api/settings/runtime`
-- `PUT /api/settings/runtime`
-
-## Logs
-
-- `GET /api/logs/recent?limit=1..200`
+No API in V023 sends commands to physical/public-road traffic infrastructure. Signal rules affect the local simulator and simulation/recommendation displays only.

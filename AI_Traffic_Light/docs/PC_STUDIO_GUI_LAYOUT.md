@@ -1,52 +1,42 @@
-# PC Studio GUI Layout — V022 candidate
+# PC Studio GUI Layout — V023 candidate
 
-The established sidebar + page-content layout is retained. V022 extends existing Live AI, Zone Editor, Traffic Logic, and Traffic Analytics surfaces rather than adding another top-level page.
+The established sidebar + page-content layout is retained. V023 expands the existing **Traffic Logic** page instead of adding another top-level page.
 
-## Live AI
+## Traffic Logic tabs
 
-- camera/simulation image remains the canonical visual source;
-- trained-model boxes/labels remain optional;
-- supported traffic detections now show `track_id` beside class/confidence;
-- saved polygon zones remain overlaid;
-- two-point counting lines are drawn as dashed line overlays;
-- signal-aware simulation overlay remains synchronized to the synthetic agents.
+### Live Decision
+- active simulated phase/countdown and next phase;
+- base vs effective phase duration;
+- operating mode/profile, pending request and data freshness;
+- active rule count plus priority-ordered active/suppressed/inactive/unavailable explanations;
+- current pedestrian/vehicle demand, tracking context, decision-zone and per-region counts.
 
-## Zone Editor
+### Normal Timing
+- editable min/base/max timing for vehicle green, yellow, all-red-to-pedestrian, pedestrian WALK, pedestrian CLEAR, and all-red-to-vehicle;
+- maximum cycle duration, stale-observation timeout and short-term demand-memory window;
+- Save / Discard / Reset Defaults apply to persistent signal policy.
 
-Existing polygon types remain unchanged. New `counting_line` geometry:
+### Adaptive Rules
+- one card/row per structured rule;
+- enable/disable, threshold, stable-for/persistence, adjustment, cooldown and priority controls;
+- rule trigger/action/target phase remain visible so users can reason about arbitration.
 
-- choose `counting line` in Type;
-- click exactly two distinct points;
-- line uses the same 1280×720 reference coordinate system;
-- line is analytics-only and never changes simulated traffic phase logic.
+### Safety & Test
+- protected transition/minimum-service/fallback explanations;
+- explicit Test-mode manual pedestrian/vehicle counts;
+- mobility/accessibility and fallen-person incident inputs clearly marked as manual test sources;
+- Apply Test Inputs, Clear Incident and Reset Adaptive State;
+- non-mutating scenario preview buttons for vehicle queue, pedestrian demand/wait, slow crossing, mobility assistance and incident cases.
 
-`counting_region` remains a polygon and continues to provide occupancy analytics; V022 additionally derives entry/exit/dwell from tracked movement through polygon regions.
+### Decision History
+- runtime phase/rule/config/reset/incident audit events;
+- explicit history clear action;
+- identifies `outputs/signal_rules/decision_history.jsonl` as runtime data.
 
-## Traffic Logic
+## Existing V022 surfaces
 
-The current traffic state continues to display occupancy/decision information and now also surfaces active track counts. Counting-line flow remains analytics-only.
-
-## Traffic Analytics
-
-Two explicit modes prevent semantic mixing:
-
-### Occupancy
-- existing V021 whole-frame/region time series;
-- current/average/peak/busiest-region metrics;
-- phase-change context;
-- occupancy CSV and independent clear action.
-
-### Flow / Tracks
-- selectable all events, one counting line, or one polygon region;
-- optional class filter;
-- unique tracked vehicle/pedestrian passages per minute for line scopes;
-- entry/exit per minute for region scopes;
-- directional passage totals;
-- region entry/exit and dwell metrics;
-- pedestrian waiting-zone dwell;
-- recent event table;
-- flow CSV and independent clear action.
+Live AI keeps trained-model/track/zone overlays and the compact simulation signal. Zone Editor retains polygons plus two-point counting lines. Traffic Analytics retains separate Occupancy and Flow / Tracks modes.
 
 ## Safety presentation
 
-Tracking and flow are labelled as prototype analytics. No page implies direct physical/public-road traffic-light control.
+All signal timing/rule controls are described as simulator policy. No page implies direct physical/public-road traffic-light control. Mobility/fall conditions are not shown as live detections unless a compatible future perception source actually provides them.

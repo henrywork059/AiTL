@@ -13,6 +13,11 @@ import type {
   ModelRegistryStatus,
   RecentLog,
   RuntimeSettings,
+  SignalDecisionHistory,
+  SignalRulesConfig,
+  SignalRulesPreview,
+  SignalStatus,
+  SignalTestInputs,
   SimulationDensity,
   SmokeStatus,
   TrafficFlow,
@@ -35,13 +40,8 @@ export const API_BASE = typeof configuredApiBase === "string" && configuredApiBa
   ? configuredApiBase
   : "http://127.0.0.1:8000";
 
-type ZonesResponse = {
-  zones: Zone[];
-};
-
-type LogsResponse = {
-  logs: RecentLog[];
-};
+type ZonesResponse = { zones: Zone[] };
+type LogsResponse = { logs: RecentLog[] };
 
 const fallbackHealth: BackendHealth = {
   status: "fallback",
@@ -57,14 +57,7 @@ const fallbackSmokeStatus: SmokeStatus = {
   mode: "frontend_fallback",
   ready_for: ["frontend_layout_test"],
   not_ready_for: ["backend_features", "physical_traffic_light_control"],
-  checks: [
-    {
-      id: "frontend.fallback",
-      label: "Frontend fallback data",
-      status: "warn",
-      detail: "The backend did not respond, so only local fallback data is available.",
-    },
-  ],
+  checks: [{ id: "frontend.fallback", label: "Frontend fallback data", status: "warn", detail: "The backend did not respond, so only local fallback data is available." }],
   endpoints: ["/health", "/api/smoke/status", "/api/zones/active", "/api/traffic/state"],
   summary: {
     mock_frame_id: mockFrame.frame_id,
@@ -73,7 +66,6 @@ const fallbackSmokeStatus: SmokeStatus = {
     mock_traffic_phase: mockTrafficState.phase,
   },
 };
-
 
 const fallbackTrafficFlow: TrafficFlow = {
   recording: false,
@@ -158,12 +150,7 @@ const fallbackDatasetStatus: DatasetStatus = {
   last_capture: null,
 };
 
-const fallbackCaptureList: DatasetCaptureList = {
-  captures: [],
-  total: 0,
-  classes: [],
-};
-
+const fallbackCaptureList: DatasetCaptureList = { captures: [], total: 0, classes: [] };
 const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
   ready: false,
   stale: false,
@@ -178,7 +165,6 @@ const fallbackTrainingDatasetStatus: TrainingDatasetStatus = {
   classes: [],
   message: "Backend is offline, so the managed training dataset cannot be checked.",
 };
-
 const fallbackTrainingStatus: TrainingStatus = {
   training_available: false,
   backend: "ultralytics_yolo_optional",
@@ -197,17 +183,8 @@ const fallbackTrainingStatus: TrainingStatus = {
   install_command: "pip install -r requirements-training.txt",
   history: [],
   completed_epochs: 0,
-  early_stopping: {
-    enabled: true,
-    patience: 5,
-    epochs_without_improvement: 0,
-    best_epoch: null,
-    best_fitness: null,
-    converged: false,
-    stopped_early: false,
-  },
+  early_stopping: { enabled: true, patience: 5, epochs_without_improvement: 0, best_epoch: null, best_fitness: null, converged: false, stopped_early: false },
 };
-
 const fallbackInferenceStatus: InferenceStatus = {
   model_loaded: false,
   active_model_id: null,
@@ -227,21 +204,8 @@ const fallbackInferenceStatus: InferenceStatus = {
   default_confidence: 0.1,
   models: [],
 };
-
-const fallbackModelRegistryStatus: ModelRegistryStatus = {
-  default_model_id: null,
-  active_model_id: null,
-  total: 0,
-  models: [],
-};
-
-export const fallbackRuntimeSettings: RuntimeSettings = {
-  default_confidence: 0.10,
-  live_poll_interval_ms: 500,
-  training_patience: 5,
-  log_level: "INFO",
-};
-
+const fallbackModelRegistryStatus: ModelRegistryStatus = { default_model_id: null, active_model_id: null, total: 0, models: [] };
+export const fallbackRuntimeSettings: RuntimeSettings = { default_confidence: 0.10, live_poll_interval_ms: 500, training_patience: 5, log_level: "INFO" };
 const fallbackZoneStatus: ZoneStatus = {
   zones: mockZones,
   editable: false,
@@ -251,41 +215,55 @@ const fallbackZoneStatus: ZoneStatus = {
   config_path: "config/zones.json",
 };
 
-export async function fetchHealth(): Promise<BackendHealth> {
-  return requestJson<BackendHealth>(`${API_BASE}/health`, fallbackHealth);
-}
-
-export async function fetchSmokeStatus(): Promise<SmokeStatus> {
-  return requestJson<SmokeStatus>(`${API_BASE}/api/smoke/status`, fallbackSmokeStatus);
-}
-
-export async function fetchMockFrame(): Promise<DetectionFrame> {
-  return requestJson<DetectionFrame>(`${API_BASE}/api/mock/frame`, mockFrame);
-}
-
+export async function fetchHealth(): Promise<BackendHealth> { return requestJson<BackendHealth>(`${API_BASE}/health`, fallbackHealth); }
+export async function fetchSmokeStatus(): Promise<SmokeStatus> { return requestJson<SmokeStatus>(`${API_BASE}/api/smoke/status`, fallbackSmokeStatus); }
+export async function fetchMockFrame(): Promise<DetectionFrame> { return requestJson<DetectionFrame>(`${API_BASE}/api/mock/frame`, mockFrame); }
 export async function fetchMockZones(): Promise<Zone[]> {
   const data = await requestJson<ZonesResponse>(`${API_BASE}/api/mock/zones`, { zones: mockZones });
   return data.zones;
 }
-
-export async function fetchActiveZones(): Promise<ZoneStatus> {
-  return requestJson<ZoneStatus>(`${API_BASE}/api/zones/active`, fallbackZoneStatus);
-}
-
+export async function fetchActiveZones(): Promise<ZoneStatus> { return requestJson<ZoneStatus>(`${API_BASE}/api/zones/active`, fallbackZoneStatus); }
 export async function saveActiveZones(zones: Zone[]): Promise<ZoneStatus> {
-  return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/active`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ zones }),
+  return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/active`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zones }) });
+}
+export async function resetActiveZones(): Promise<ZoneStatus> { return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/reset`, { method: "POST" }); }
+export async function fetchTrafficState(): Promise<TrafficState> { return requestJson<TrafficState>(`${API_BASE}/api/traffic/state`, mockTrafficState); }
+
+export async function fetchSignalRules(): Promise<SignalRulesConfig> {
+  return requestJsonStrict<SignalRulesConfig>(`${API_BASE}/api/traffic/signal-rules`);
+}
+export async function saveSignalRules(config: SignalRulesConfig): Promise<SignalRulesConfig> {
+  return requestJsonStrict<SignalRulesConfig>(`${API_BASE}/api/traffic/signal-rules`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ config }),
   });
 }
-
-export async function resetActiveZones(): Promise<ZoneStatus> {
-  return requestJsonStrict<ZoneStatus>(`${API_BASE}/api/zones/reset`, { method: "POST" });
+export async function resetSignalRules(): Promise<SignalRulesConfig> {
+  return requestJsonStrict<SignalRulesConfig>(`${API_BASE}/api/traffic/signal-rules/reset`, { method: "POST" });
 }
-
-export async function fetchTrafficState(): Promise<TrafficState> {
-  return requestJson<TrafficState>(`${API_BASE}/api/traffic/state`, mockTrafficState);
+export async function resetSignalRulesRuntime(): Promise<SignalStatus> {
+  return requestJsonStrict<SignalStatus>(`${API_BASE}/api/traffic/signal-rules/runtime/reset`, { method: "POST" });
+}
+export async function fetchSignalStatus(): Promise<SignalStatus> {
+  return requestJsonStrict<SignalStatus>(`${API_BASE}/api/traffic/signal-status`);
+}
+export async function setSignalTestInputs(input: Partial<SignalTestInputs>): Promise<SignalTestInputs> {
+  return requestJsonStrict<SignalTestInputs>(`${API_BASE}/api/traffic/signal-rules/test-inputs`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+}
+export async function clearSignalIncident(): Promise<SignalTestInputs> {
+  return requestJsonStrict<SignalTestInputs>(`${API_BASE}/api/traffic/signal-rules/incident/clear`, { method: "POST" });
+}
+export async function previewSignalRules(input: Record<string, unknown>): Promise<SignalRulesPreview> {
+  return requestJsonStrict<SignalRulesPreview>(`${API_BASE}/api/traffic/signal-rules/preview`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+}
+export async function fetchSignalDecisionHistory(limit = 200): Promise<SignalDecisionHistory> {
+  return requestJsonStrict<SignalDecisionHistory>(`${API_BASE}/api/traffic/signal-rules/history?limit=${limit}`);
+}
+export async function clearSignalDecisionHistory(): Promise<{ cleared: boolean; removed_events: number; history_path: string }> {
+  return requestJsonStrict<{ cleared: boolean; removed_events: number; history_path: string }>(`${API_BASE}/api/traffic/signal-rules/history`, { method: "DELETE" });
 }
 
 export async function fetchTrafficHistory(minutes = 15, regionId: string | null = null): Promise<TrafficHistory> {
@@ -294,232 +272,83 @@ export async function fetchTrafficHistory(minutes = 15, regionId: string | null 
   return requestJson<TrafficHistory>(`${API_BASE}/api/traffic/history?${params.toString()}`, {
     ...fallbackTrafficHistory,
     minutes,
-    scope: regionId
-      ? { region_id: regionId, label: regionId, type: "counting_region" }
-      : fallbackTrafficHistory.scope,
+    scope: regionId ? { region_id: regionId, label: regionId, type: "counting_region" } : fallbackTrafficHistory.scope,
   });
 }
-
-export async function clearTrafficHistory(): Promise<TrafficHistoryClearResult> {
-  return requestJsonStrict<TrafficHistoryClearResult>(`${API_BASE}/api/traffic/history`, { method: "DELETE" });
-}
-
+export async function clearTrafficHistory(): Promise<TrafficHistoryClearResult> { return requestJsonStrict<TrafficHistoryClearResult>(`${API_BASE}/api/traffic/history`, { method: "DELETE" }); }
 export function trafficHistoryExportUrl(minutes = 15, regionId: string | null = null): string {
   const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
   if (regionId) params.set("region_id", regionId);
   return `${API_BASE}/api/traffic/history/export.csv?${params.toString()}`;
 }
-
-export async function fetchTrafficFlow(
-  minutes = 15,
-  lineId: string | null = null,
-  regionId: string | null = null,
-  className: string | null = null,
-): Promise<TrafficFlow> {
+export async function fetchTrafficFlow(minutes = 15, lineId: string | null = null, regionId: string | null = null, className: string | null = null): Promise<TrafficFlow> {
   const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
   if (lineId) params.set("line_id", lineId);
   if (regionId) params.set("region_id", regionId);
   if (className) params.set("class_name", className);
-  return requestJson<TrafficFlow>(`${API_BASE}/api/traffic/flow?${params.toString()}`, {
-    ...fallbackTrafficFlow,
-    minutes,
-    filters: { line_id: lineId, region_id: regionId, class_name: className },
-  });
+  return requestJson<TrafficFlow>(`${API_BASE}/api/traffic/flow?${params.toString()}`, { ...fallbackTrafficFlow, minutes, filters: { line_id: lineId, region_id: regionId, class_name: className } });
 }
-
-export async function clearTrafficFlow(): Promise<TrafficFlowClearResult> {
-  return requestJsonStrict<TrafficFlowClearResult>(`${API_BASE}/api/traffic/flow`, { method: "DELETE" });
-}
-
-export function trafficFlowExportUrl(
-  minutes = 15,
-  lineId: string | null = null,
-  regionId: string | null = null,
-  className: string | null = null,
-): string {
+export async function clearTrafficFlow(): Promise<TrafficFlowClearResult> { return requestJsonStrict<TrafficFlowClearResult>(`${API_BASE}/api/traffic/flow`, { method: "DELETE" }); }
+export function trafficFlowExportUrl(minutes = 15, lineId: string | null = null, regionId: string | null = null, className: string | null = null): string {
   const params = new URLSearchParams({ minutes: String(minutes), limit: "100000" });
   if (lineId) params.set("line_id", lineId);
   if (regionId) params.set("region_id", regionId);
   if (className) params.set("class_name", className);
   return `${API_BASE}/api/traffic/flow/export.csv?${params.toString()}`;
 }
-
 export async function fetchRecentLogs(limit = 100): Promise<RecentLog[]> {
-  const data = await requestJson<LogsResponse>(`${API_BASE}/api/logs/recent?limit=${limit}`, {
-    logs: [
-      {
-        timestamp: "frontend",
-        level: "warning",
-        code: "ATL-FE-FALLBACK-001",
-        scope: "api",
-        message: "Backend logs unavailable. Frontend fallback log is shown.",
-      },
-    ],
-  });
+  const data = await requestJson<LogsResponse>(`${API_BASE}/api/logs/recent?limit=${limit}`, { logs: [{ timestamp: "frontend", level: "warning", code: "ATL-FE-FALLBACK-001", scope: "api", message: "Backend logs unavailable. Frontend fallback log is shown." }] });
   return data.logs;
 }
-
-export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
-  return requestJson<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, fallbackRuntimeSettings);
-}
-
+export async function fetchRuntimeSettings(): Promise<RuntimeSettings> { return requestJson<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, fallbackRuntimeSettings); }
 export async function saveRuntimeSettings(settings: RuntimeSettings): Promise<RuntimeSettings> {
-  return requestJsonStrict<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(settings),
-  });
+  return requestJsonStrict<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
 }
-
-export async function fetchCameraStatus(): Promise<CameraStatus> {
-  return requestJson<CameraStatus>(`${API_BASE}/api/camera/status`, fallbackCameraStatus);
-}
-
+export async function fetchCameraStatus(): Promise<CameraStatus> { return requestJson<CameraStatus>(`${API_BASE}/api/camera/status`, fallbackCameraStatus); }
 export async function setCameraSimulation(enabled: boolean): Promise<CameraStatus> {
   const action = enabled ? "start" : "stop";
-  return requestJson<CameraStatus>(
-    `${API_BASE}/api/camera/simulation/${action}`,
-    fallbackCameraStatus,
-    { method: "POST" },
-  );
+  return requestJson<CameraStatus>(`${API_BASE}/api/camera/simulation/${action}`, fallbackCameraStatus, { method: "POST" });
 }
-
-export async function setCameraSimulationSettings(input: {
-  density?: SimulationDensity;
-  paused?: boolean;
-}): Promise<CameraStatus> {
-  return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+export async function setCameraSimulationSettings(input: { density?: SimulationDensity; paused?: boolean }): Promise<CameraStatus> {
+  return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
-
-export async function fetchDatasetStatus(): Promise<DatasetStatus> {
-  return requestJson<DatasetStatus>(`${API_BASE}/api/dataset/status`, fallbackDatasetStatus);
+export async function fetchDatasetStatus(): Promise<DatasetStatus> { return requestJson<DatasetStatus>(`${API_BASE}/api/dataset/status`, fallbackDatasetStatus); }
+export async function captureLatestFrame(input: { session_id: string; quality_tag: CaptureQualityTag; note: string }): Promise<CaptureRecord> {
+  return requestJsonStrict<CaptureRecord>(`${API_BASE}/api/dataset/captures`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
-
-export async function captureLatestFrame(input: {
-  session_id: string;
-  quality_tag: CaptureQualityTag;
-  note: string;
-}): Promise<CaptureRecord> {
-  return requestJsonStrict<CaptureRecord>(`${API_BASE}/api/dataset/captures`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-}
-
-export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> {
-  return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList);
-}
-
-export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> {
-  return requestJsonStrict<CaptureDeleteResult>(
-    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`,
-    { method: "DELETE" },
-  );
-}
-
-export function captureImageUrl(captureId: string): string {
-  return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`;
-}
-
-export async function fetchCaptureLabels(captureId: string): Promise<CaptureLabelDocument> {
-  return requestJsonStrict<CaptureLabelDocument>(
-    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`,
-  );
-}
-
+export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> { return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList); }
+export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> { return requestJsonStrict<CaptureDeleteResult>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`, { method: "DELETE" }); }
+export function captureImageUrl(captureId: string): string { return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`; }
+export async function fetchCaptureLabels(captureId: string): Promise<CaptureLabelDocument> { return requestJsonStrict<CaptureLabelDocument>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`); }
 export async function saveCaptureLabels(captureId: string, labels: DatasetLabelBox[]): Promise<CaptureLabelDocument> {
-  return requestJsonStrict<CaptureLabelDocument>(
-    `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        labels: labels.map((label) => ({ class_id: label.class_id, box_xyxy: label.box_xyxy })),
-      }),
-    },
-  );
+  return requestJsonStrict<CaptureLabelDocument>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels: labels.map((label) => ({ class_id: label.class_id, box_xyxy: label.box_xyxy })) }),
+  });
 }
-
-export async function fetchTrainingDatasetStatus(): Promise<TrainingDatasetStatus> {
-  return requestJson<TrainingDatasetStatus>(
-    `${API_BASE}/api/dataset/training-dataset/status`,
-    fallbackTrainingDatasetStatus,
-  );
-}
-
+export async function fetchTrainingDatasetStatus(): Promise<TrainingDatasetStatus> { return requestJson<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset/status`, fallbackTrainingDatasetStatus); }
 export async function buildTrainingDataset(validationFraction = 0.2): Promise<TrainingDatasetStatus> {
-  return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ validation_fraction: validationFraction }),
-  });
+  return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ validation_fraction: validationFraction }) });
 }
-
-export async function fetchTrainingStatus(): Promise<TrainingStatus> {
-  return requestJson<TrainingStatus>(`${API_BASE}/api/training/status`, fallbackTrainingStatus);
-}
-
+export async function fetchTrainingStatus(): Promise<TrainingStatus> { return requestJson<TrainingStatus>(`${API_BASE}/api/training/status`, fallbackTrainingStatus); }
 export async function startTraining(config: TrainingConfig): Promise<TrainingStatus> {
-  return requestJsonStrict<TrainingStatus>(`${API_BASE}/api/training/start`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
-  });
+  return requestJsonStrict<TrainingStatus>(`${API_BASE}/api/training/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) });
 }
-
-export async function fetchInferenceStatus(): Promise<InferenceStatus> {
-  return requestJson<InferenceStatus>(`${API_BASE}/api/inference/status`, fallbackInferenceStatus);
-}
-
-export async function loadLatestInferenceModel(): Promise<InferenceStatus> {
-  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load-latest`, { method: "POST" });
-}
-
+export async function fetchInferenceStatus(): Promise<InferenceStatus> { return requestJson<InferenceStatus>(`${API_BASE}/api/inference/status`, fallbackInferenceStatus); }
+export async function loadLatestInferenceModel(): Promise<InferenceStatus> { return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load-latest`, { method: "POST" }); }
 export async function loadInferenceModel(modelId: string | null): Promise<InferenceStatus> {
-  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model_id: modelId }),
-  });
+  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
 }
-
-export async function unloadInferenceModel(): Promise<InferenceStatus> {
-  return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/unload`, { method: "POST" });
-}
-
-export async function fetchModelRegistry(): Promise<ModelRegistryStatus> {
-  return requestJson<ModelRegistryStatus>(`${API_BASE}/api/models`, fallbackModelRegistryStatus);
-}
-
+export async function unloadInferenceModel(): Promise<InferenceStatus> { return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/unload`, { method: "POST" }); }
+export async function fetchModelRegistry(): Promise<ModelRegistryStatus> { return requestJson<ModelRegistryStatus>(`${API_BASE}/api/models`, fallbackModelRegistryStatus); }
 export async function setDefaultModel(modelId: string): Promise<ModelRegistryStatus> {
-  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/default`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model_id: modelId }),
-  });
+  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/default`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
 }
-
-export async function deleteModel(modelId: string): Promise<ModelRegistryStatus> {
-  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/${encodeURIComponent(modelId)}`, {
-    method: "DELETE",
-  });
-}
-
+export async function deleteModel(modelId: string): Promise<ModelRegistryStatus> { return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/${encodeURIComponent(modelId)}`, { method: "DELETE" }); }
 export async function fetchLiveDetections(confidenceThreshold = 0.1): Promise<DetectionFrame> {
   const params = new URLSearchParams({ confidence: String(confidenceThreshold) });
   return requestJsonStrict<DetectionFrame>(`${API_BASE}/api/inference/detections?${params.toString()}`);
 }
-
 export function inferredFrameUrl(sourceId: string, frameNumber: number, timestampMs: number): string {
-  const params = new URLSearchParams({
-    source_id: sourceId,
-    frame_number: String(frameNumber),
-    t: String(timestampMs),
-  });
+  const params = new URLSearchParams({ source_id: sourceId, frame_number: String(frameNumber), t: String(timestampMs) });
   return `${API_BASE}/api/inference/frame?${params.toString()}`;
 }
