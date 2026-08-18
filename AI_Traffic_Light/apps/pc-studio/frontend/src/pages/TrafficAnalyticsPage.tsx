@@ -93,8 +93,8 @@ export function TrafficAnalyticsPage() {
   async function clearCurrent() {
     const occupancy = mode === "occupancy";
     const prompt = occupancy
-      ? "Clear all stored traffic occupancy history? This does not remove flow events, captures, labels, zones, or trained models."
-      : "Clear all stored tracked flow events? This does not remove occupancy history, captures, labels, zones, or trained models.";
+      ? "Clear all stored occupancy samples? Flow events, captures, labels, zones, and models will not be changed."
+      : "Clear all stored tracked flow events? Occupancy history, captures, labels, zones, and models will not be changed.";
     if (!window.confirm(prompt)) return;
     setClearing(true);
     try {
@@ -113,12 +113,12 @@ export function TrafficAnalyticsPage() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Traffic analytics</h2>
-            <p className="placeholder-copy">Compare V021 sampled occupancy with V022 track-derived unique passages, direction, region entry/exit, and dwell time.</p>
+            <h2>Traffic measurements</h2>
+            <p className="placeholder-copy">Occupancy samples how many detected objects are present. Flow / Tracks records track-derived crossings and region events. Keep the two metrics separate when interpreting results.</p>
           </div>
           <div className="traffic-mode-tabs" role="group" aria-label="Traffic analytics mode">
             <button type="button" className={mode === "occupancy" ? "active" : ""} onClick={() => setMode("occupancy")}>Occupancy</button>
-            <button type="button" className={mode === "flow" ? "active" : ""} onClick={() => setMode("flow")}>Flow / tracks</button>
+            <button type="button" className={mode === "flow" ? "active" : ""} onClick={() => setMode("flow")}>Flow / Tracks</button>
           </div>
         </div>
 
@@ -130,7 +130,7 @@ export function TrafficAnalyticsPage() {
           </label>
 
           {mode === "occupancy" ? (
-            <label>Count scope
+            <label>Area
               <select value={regionId ?? ""} onChange={(event) => setRegionId(event.target.value || null)}>
                 <option value="">Whole frame</option>
                 {regionOptions.map((region) => <option key={region.id} value={region.id}>{region.label} ({region.type.split("_").join(" ")})</option>)}
@@ -138,7 +138,7 @@ export function TrafficAnalyticsPage() {
             </label>
           ) : (
             <>
-              <label>Flow scope
+              <label>Event scope
                 <select value={flowScope} onChange={(event) => setFlowScope(event.target.value)}>
                   <option value="">All tracked events</option>
                   {(flow?.lines ?? []).map((line) => <option key={`line:${line.id}`} value={`line:${line.id}`}>Line: {line.label}</option>)}
@@ -154,21 +154,21 @@ export function TrafficAnalyticsPage() {
           )}
 
           <div className="button-row wrap-row traffic-analytics-actions">
-            <button type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
+            <button className="primary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
             <button type="button" onClick={() => window.location.assign(mode === "occupancy" ? occupancyExportUrl : flowExportUrl)}>Export CSV</button>
-            <button type="button" onClick={() => void clearCurrent()} disabled={clearing}>{clearing ? "Clearing..." : mode === "occupancy" ? "Clear occupancy" : "Clear flow"}</button>
+            <button className="danger" type="button" onClick={() => void clearCurrent()} disabled={clearing}>{clearing ? "Clearing..." : mode === "occupancy" ? "Clear occupancy history" : "Clear flow history"}</button>
           </div>
         </div>
 
         {mode === "occupancy" ? (
           <>
             <TrafficHistoryChart points={history?.points ?? []} />
-            <p className="small-note">Scope: <strong>{selectedScope}</strong>. Occupancy remains a sampled per-frame metric. Do not sum these samples and call them throughput.</p>
+            <p className="small-note">Selected area: <strong>{selectedScope}</strong>. Occupancy is a sampled present-in-frame count; adding samples together does not produce throughput.</p>
           </>
         ) : (
           <>
             <TrafficFlowChart buckets={flow?.buckets ?? []} series={flowRegionId ? "regions" : "passages"} />
-            <p className="small-note">Unique passage counts come only from a stable track crossing a configured <strong>counting line</strong>. Each track is counted at most once per line in the current prototype session, reducing jitter/double-counting.</p>
+            <p className="small-note">A passage is counted when a stable prototype track crosses a configured counting line. Each track is counted at most once per line in the current session.</p>
           </>
         )}
         {error && <p className="error-message">{error}</p>}
@@ -177,8 +177,8 @@ export function TrafficAnalyticsPage() {
       {mode === "occupancy" ? (
         <>
           <div className="metric-grid traffic-analytics-metrics">
-            <div className="metric-card"><span>Current vehicles</span><strong>{latest?.vehicles ?? 0}</strong><small>{selectedScope}</small></div>
-            <div className="metric-card"><span>Current pedestrians</span><strong>{latest?.pedestrians ?? 0}</strong><small>{selectedScope}</small></div>
+            <div className="metric-card"><span>Vehicles now</span><strong>{latest?.vehicles ?? 0}</strong><small>{selectedScope}</small></div>
+            <div className="metric-card"><span>Pedestrians now</span><strong>{latest?.pedestrians ?? 0}</strong><small>{selectedScope}</small></div>
             <div className="metric-card"><span>Average vehicles</span><strong>{summary?.average_vehicles ?? 0}</strong><small>{summary?.sample_count ?? 0} samples</small></div>
             <div className="metric-card"><span>Average pedestrians</span><strong>{summary?.average_pedestrians ?? 0}</strong><small>{summary?.sample_count ?? 0} samples</small></div>
             <div className="metric-card"><span>Peak vehicles</span><strong>{summary?.peak_vehicles.count ?? 0}</strong><small>{timestampLabel(summary?.peak_vehicles.recorded_at_ms ?? null)}</small></div>
@@ -187,23 +187,23 @@ export function TrafficAnalyticsPage() {
 
           <div className="two-column-grid">
             <section className="panel">
-              <div className="panel-header"><h2>Region summary</h2><span className="status-pill">occupancy</span></div>
+              <div className="panel-header"><h2>Occupancy summary</h2><span className="status-pill muted">sampled counts</span></div>
               <div className="camera-status-list training-status-list">
-                <div><span>Configured count scopes</span><strong>{regionOptions.length}</strong></div>
+                <div><span>Configured regions</span><strong>{regionOptions.length}</strong></div>
                 <div><span>Stored samples</span><strong>{history?.stored_samples ?? 0}</strong></div>
-                <div><span>Retention cap</span><strong>{history?.max_samples ?? 0}</strong></div>
-                <div><span>Busiest region</span><strong>{summary?.busiest_region?.label ?? "not enough data"}</strong></div>
+                <div><span>Retention limit</span><strong>{history?.max_samples ?? 0}</strong></div>
+                <div><span>Highest average region</span><strong>{summary?.busiest_region?.label ?? "not enough data"}</strong></div>
               </div>
-              {summary?.busiest_region && <p className="small-note">Highest average combined occupancy: {summary.busiest_region.average_total} detected objects/sample.</p>}
+              {summary?.busiest_region && <p className="small-note">Average combined occupancy in that region: {summary.busiest_region.average_total} detected objects per sample.</p>}
             </section>
 
             <section className="panel">
-              <div className="panel-header"><h2>Simulation phase events</h2><span className="status-pill muted">context only</span></div>
+              <div className="panel-header"><h2>Signal-phase context</h2><span className="status-pill muted">simulation</span></div>
               <div className="camera-status-list training-status-list">
                 <div><span>Phase changes</span><strong>{summary?.phase_change_count ?? 0}</strong></div>
-                <div><span>Latest phase</span><strong>{latest?.phase?.split("_").join(" ") ?? "none"}</strong></div>
-                <div><span>Latest change</span><strong>{phaseChange ? `${phaseChange.from.replaceAll("_", " ")} → ${phaseChange.to.replaceAll("_", " ")}` : "none"}</strong></div>
-                <div><span>Change time</span><strong>{timestampLabel(phaseChange?.recorded_at_ms ?? null)}</strong></div>
+                <div><span>Current / latest phase</span><strong>{latest?.phase?.split("_").join(" ") ?? "none"}</strong></div>
+                <div><span>Latest transition</span><strong>{phaseChange ? `${phaseChange.from.replaceAll("_", " ")} → ${phaseChange.to.replaceAll("_", " ")}` : "none"}</strong></div>
+                <div><span>Transition time</span><strong>{timestampLabel(phaseChange?.recorded_at_ms ?? null)}</strong></div>
               </div>
             </section>
           </div>
@@ -211,43 +211,49 @@ export function TrafficAnalyticsPage() {
       ) : (
         <>
           <div className="metric-grid traffic-analytics-metrics">
-            <div className="metric-card"><span>Unique vehicle passages</span><strong>{flowSummary?.unique_vehicle_passages ?? 0}</strong><small>counting-line crossings</small></div>
-            <div className="metric-card"><span>Unique pedestrian passages</span><strong>{flowSummary?.unique_pedestrian_passages ?? 0}</strong><small>counting-line crossings</small></div>
+            <div className="metric-card"><span>Vehicle passages</span><strong>{flowSummary?.unique_vehicle_passages ?? 0}</strong><small>unique line crossings</small></div>
+            <div className="metric-card"><span>Pedestrian passages</span><strong>{flowSummary?.unique_pedestrian_passages ?? 0}</strong><small>unique line crossings</small></div>
             <div className="metric-card"><span>Region entries</span><strong>{flowSummary?.region_entries ?? 0}</strong><small>outside → inside</small></div>
             <div className="metric-card"><span>Region exits</span><strong>{flowSummary?.region_exits ?? 0}</strong><small>inside → outside</small></div>
             <div className="metric-card"><span>Average dwell</span><strong>{durationLabel(flowSummary?.average_dwell_ms)}</strong><small>completed region visits</small></div>
-            <div className="metric-card"><span>Pedestrian wait</span><strong>{durationLabel(flowSummary?.average_pedestrian_wait_ms)}</strong><small>pedestrian waiting zones</small></div>
+            <div className="metric-card"><span>Average pedestrian wait</span><strong>{durationLabel(flowSummary?.average_pedestrian_wait_ms)}</strong><small>pedestrian waiting zones</small></div>
           </div>
 
           <div className="two-column-grid">
             <section className="panel">
-              <div className="panel-header"><h2>Directional passages</h2><span className="status-pill">unique flow</span></div>
+              <div className="panel-header"><h2>Passage direction</h2><span className="status-pill status-secondary">tracked flow</span></div>
               <div className="camera-status-list training-status-list">
                 {Object.entries(flowSummary?.direction_counts ?? {}).length === 0
-                  ? <div><span>No line crossings yet</span><strong>0</strong></div>
+                  ? <div><span>No line crossings recorded</span><strong>0</strong></div>
                   : Object.entries(flowSummary?.direction_counts ?? {}).map(([direction, count]) => (
                     <div key={direction}><span>{direction.split("_").join(" ")}</span><strong>{count}</strong></div>
                   ))}
               </div>
-              <p className="small-note">Direction is derived from the dominant movement axis at the line crossing: left/right or top/bottom.</p>
+              <p className="small-note">Direction is derived from the dominant movement axis when the track crosses the configured line.</p>
             </section>
 
             <section className="panel">
-              <div className="panel-header"><h2>Flow storage</h2><span className="status-pill muted">runtime data</span></div>
+              <div className="panel-header"><h2>Flow-event storage</h2><span className="status-pill muted">runtime data</span></div>
               <div className="camera-status-list training-status-list">
                 <div><span>Stored events</span><strong>{flow?.stored_events ?? 0}</strong></div>
-                <div><span>Retention cap</span><strong>{flow?.max_events ?? 0}</strong></div>
-                <div><span>Unique event tracks</span><strong>{flowSummary?.unique_event_tracks ?? 0}</strong></div>
+                <div><span>Retention limit</span><strong>{flow?.max_events ?? 0}</strong></div>
+                <div><span>Tracks represented</span><strong>{flowSummary?.unique_event_tracks ?? 0}</strong></div>
                 <div><span>Latest event</span><strong>{timestampLabel(flow?.newest_event_at_ms ?? null)}</strong></div>
               </div>
-              <p className="small-note">Flow events persist under outputs/traffic_flow/ and are excluded from source patches.</p>
+              <p className="small-note">Flow events are runtime data under <code>outputs/traffic_flow/</code> and are excluded from source patches.</p>
             </section>
           </div>
 
           <section className="panel">
-            <div className="panel-header"><h2>Recent tracking events</h2><span className="status-pill">{recentFlowEvents.length} shown</span></div>
+            <div className="panel-header">
+              <div>
+                <h2>Recent tracked events</h2>
+                <p className="placeholder-copy">Most recent line crossings and region entry/exit/dwell events for the selected filters.</p>
+              </div>
+              <span className="status-pill muted">{recentFlowEvents.length} shown</span>
+            </div>
             {recentFlowEvents.length === 0 ? (
-              <p className="placeholder-copy">Draw a counting line or let tracked objects enter/exit configured regions to generate events.</p>
+              <p className="placeholder-copy">No matching events yet. Configure a counting line or region and allow tracked objects to cross or enter it.</p>
             ) : (
               <div className="traffic-event-table-wrap">
                 <table className="traffic-event-table">
@@ -272,8 +278,8 @@ export function TrafficAnalyticsPage() {
       )}
 
       <section className="panel">
-        <div className="panel-header"><h2>Configure analytics geometry</h2><span className="status-pill">Zone Editor</span></div>
-        <p className="placeholder-copy"><strong>Counting regions</strong> provide occupancy plus track entry/exit/dwell metrics. <strong>Counting lines</strong> use exactly two points and create directional unique-passage events when a tracked object crosses them. Both remain analytics-only and do not change simulated signal decisions.</p>
+        <div className="panel-header"><h2>Analytics geometry</h2><span className="status-pill status-info">Zone Editor</span></div>
+        <p className="placeholder-copy"><strong>Counting regions</strong> support occupancy and track entry/exit/dwell metrics. <strong>Counting lines</strong> use two points and create directional passage events. Both are analytics geometry and do not directly alter simulated signal timing.</p>
       </section>
       <FunctionChecklist area="Traffic analytics" />
     </div>

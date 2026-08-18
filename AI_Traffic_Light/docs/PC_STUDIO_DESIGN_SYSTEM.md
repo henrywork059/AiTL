@@ -1,240 +1,198 @@
-# PC Studio Design System — V023 candidate
+# PC Studio Design System — V024 candidate
 
-This document is the authoritative visual-style reference for the PC Studio frontend. Page documents such as `PC_STUDIO_GUI_LAYOUT.md` define information architecture; this document defines visual hierarchy, color roles, typography, spacing, elevation, interaction states, and accessibility behavior.
+This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
 ## Design intent
 
-PC Studio is a desktop engineering/prototype workbench. The interface should feel calm, precise, and platform-native rather than like a consumer AI assistant, promotional dashboard, or neon technology demo.
+PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-The design uses a restrained neutral foundation with one cool interaction family. Most of the screen is carried by background/surface/text values; color is reserved for interaction and genuine semantic state.
+## Reference basis
 
-### Principles
+The V024 refinement applies the role model in **Material Design 2 — The color system**:
 
-1. **Hierarchy before decoration.** Separation comes from typography, spacing, base/elevated surfaces, and borders before color or shadow.
-2. **Harmony through repetition.** The same tokens, radii, spacing steps, and interaction treatments repeat across pages.
-3. **Consistency of meaning.** A color role must keep the same meaning everywhere. Interaction color is not reused as a health/status color.
-4. **System adaptation.** The web UI follows the operating-system light/dark preference with `prefers-color-scheme`; there is no separate PC Studio appearance toggle.
-5. **Legibility first.** Text/background pairs target at least WCAG AA 4.5:1 for normal text; muted text is still designed to remain readable.
-6. **Color is supporting information.** Status text, labels, icons, borders, and written explanations remain present so color is never the only state cue.
-7. **Motion is optional.** Cosmetic transitions are short and are effectively disabled when the user requests reduced motion.
+- primary color identifies the application and the most important actions;
+- secondary color is selective and supports secondary emphasis;
+- background and surface roles carry most application area;
+- error is a semantic role, not a brand color;
+- readable foreground roles are defined for colored surfaces (the Material “on” concept);
+- color hierarchy must preserve legibility and should not be the only state cue.
 
-## Research basis
+The existing dark appearance also retains the Material dark-theme surface model: `#121212` at the base, with progressively lighter neutral elevated surfaces.
 
-The system is AiTL-specific; it does not copy the appearance of Apple, Figma, Material, or UX Pilot. Their guidance is used as design rationale:
+Supporting references used earlier in this design system remain Apple HIG, Figma color theory, and UX Pilot color-theory guidance. AiTL uses those references as design rationale; it does not copy their component libraries or product branding.
 
-- Apple Human Interface Guidelines — hierarchy, harmony, consistency, semantic/adaptive color, base/elevated dark surfaces, system appearance adaptation, and contrast guidance:
-  - https://developer.apple.com/design/human-interface-guidelines
-  - https://developer.apple.com/design/human-interface-guidelines/color
-  - https://developer.apple.com/design/human-interface-guidelines/dark-mode
-  - https://developer.apple.com/design/human-interface-guidelines/accessibility
-- UX Pilot color-theory guide — keep palettes tight, assign explicit roles, use tones for understated dashboard polish, reserve accent color for key emphasis, and check text contrast:
-  - https://uxpilot.ai/blogs/color-theory-in-web-design
-- Figma color-theory resource — use color harmony deliberately; a dominant/support/accent relationship is preferable to unrelated competing hues; tune saturation/value and preserve accessibility:
-  - https://www.figma.com/resource-library/what-is-color-theory/
-- Material Design 2 color system and dark-theme properties — primary/secondary/background/surface/error roles, “on” colors, a `#121212` dark baseline, lighter surfaces at higher elevation, light/desaturated dark-theme accents, and sparse color use:
-  - https://m2.material.io/design/color/the-color-system.html
-  - https://m2.material.io/design/color/dark-theme.html#properties
+## Color-role model
 
-## Palette model
+Most of the interface remains neutral. Color has a job.
 
-The palette is intentionally narrow:
+### Primary
 
-- **dominant:** neutral canvas/shell/surfaces;
-- **supporting:** neutral text/border/elevated layers;
-- **interaction accent:** one muted steel-blue family;
-- **semantic exceptions:** green, amber, and red only for success/warning/danger and the actual simulated signal lamps;
-- **visualization exceptions:** separate camera-overlay colors that do not leak into application chrome.
+Primary identifies navigation, links, focus, and the dominant action in a workflow.
 
-The often-cited 60/30/10 color heuristic is treated as a direction rather than a literal measurement: neutral surfaces occupy the overwhelming majority of the interface, supporting neutral layers provide hierarchy, and accent/semantic color remains sparse.
+Light appearance:
 
-## Appearance adaptation
+| Role | Value |
+| --- | --- |
+| Primary | `#315F9E` |
+| Primary hover | `#274F85` |
+| Primary active | `#1F426F` |
+| Primary surface | `#E8EEF7` |
+| On primary | `#FFFFFF` |
 
-`src/styles/tokens.css` defines the light appearance first and overrides role tokens inside:
+Dark appearance:
 
-```css
-@media (prefers-color-scheme: dark) { ... }
-```
+| Role | Value |
+| --- | --- |
+| Primary | `#90CAF9` |
+| Primary hover | `#BBDEFB` |
+| Primary active | `#64B5F6` |
+| Primary surface | `rgba(144, 202, 249, 0.12)` |
+| On primary | `#0D1B2A` |
 
-This follows the operating-system preference automatically. Do not add a separate app-specific light/dark switch unless the owner explicitly requests one.
+Use primary for:
 
-Dark appearance is not a simple inversion. It follows the Material 2 dark-theme surface model more directly:
+- active navigation;
+- the main action in a panel, such as **Save**, **Start**, **Refresh**, or **Apply**;
+- focus indication and links;
+- informational emphasis where a brand/interaction role is appropriate.
 
-- the application canvas and navigation shell use the `#121212` baseline;
-- raised surfaces become progressively lighter rather than relying on dark-theme shadows;
-- interaction color uses a light/desaturated Blue Grey tone instead of a saturated blue/cyan/purple accent;
-- light semantic tones appear only in small status/state regions;
-- foreground hierarchy uses off-white/gray on-surface roles rather than pure white everywhere.
+Do not use primary merely to make a panel more interesting.
 
-This creates depth through controlled luminance changes while leaving the overwhelming majority of the UI neutral.
+### Secondary
 
-## Source layout
+Secondary is deliberately sparse. It distinguishes selected/active secondary controls and continuous progress without competing with the main action.
+
+Light: `#00796B` with `#FFFFFF` on-secondary.
+Dark: `#80CBC4` with `#102522` on-secondary.
+
+Use secondary for:
+
+- checkbox/radio/range accent;
+- progress bars;
+- selected secondary states;
+- current-observation or active-rule emphasis where “success” would be misleading.
+
+Do not use secondary as a second general brand color across large surfaces.
+
+### Neutral surfaces
+
+Background, shell, panel, field, and raised-control colors are neutral. They carry almost all screen area.
+
+Light appearance uses a cool-neutral canvas (`#F5F6F8`) and white/elevated surfaces. Dark appearance retains:
+
+| Elevation role | Surface |
+| --- | --- |
+| 0dp canvas/shell | `#121212` |
+| 1dp normal panel | `#1E1E1E` |
+| 2dp raised control | `#232323` |
+| 4dp hover | `#272727` |
+| 8dp pressed/overlay | `#2E2E2E` |
+
+Dark depth comes primarily from controlled luminance differences rather than glow or large shadows.
+
+### Semantic colors
+
+Semantic colors communicate outcomes only:
+
+- success/healthy/confirmed: green;
+- warning/pending/fallback/unsaved: amber;
+- error/destructive: red;
+- neutral metadata/counts/context: neutral;
+- informational emphasis: primary/info role.
+
+A generic `.status-pill` is neutral. It must never default to green. Green is only applied by an explicit success/implemented state.
+
+Traffic-light red/amber/green remain separate scene tokens because they encode the simulated signal, not application health.
+
+## “On” colors and contrast
+
+Every saturated primary/secondary/error surface must use a corresponding readable foreground. Do not assume ordinary body text will remain readable when moved onto a colored background.
+
+Normal text targets WCAG AA contrast (at least 4.5:1). Color is never the only signal: text labels, state names, borders, and explanations remain visible.
+
+## Presentation hierarchy
+
+1. **Page title** — identifies the work area.
+2. **One-sentence page description** — describes current purpose, not release history.
+3. **Panel title** — names one task or data group.
+4. **Primary action** — one dominant action per immediate workflow where practical.
+5. **Secondary controls** — neutral or secondary-role styling.
+6. **Status** — semantic only when the status has semantic meaning.
+
+Panels remain neutral and compact. Avoid gradients, glass effects, neon glows, decorative purple/cyan AI styling, excessive pills, and unnecessary large-radius cards.
+
+## Control hierarchy
+
+- Default button: neutral action.
+- `.primary`: dominant workflow action.
+- `.secondary`: secondary emphasis/selective action.
+- `.danger`: destructive action and explicit destructive confirmation context.
+- Disabled controls reduce emphasis but remain readable.
+- `:focus-visible` must remain clearly visible in light and dark modes.
+
+Do not make every button primary. A panel with three equally saturated buttons has no hierarchy.
+
+## Status hierarchy
+
+Use status styling according to meaning:
+
+| Meaning | Treatment |
+| --- | --- |
+| Neutral metadata, count, local/runtime context | neutral pill |
+| Current selection/observation emphasis | secondary/info pill |
+| Healthy, available, completed | success pill |
+| Pending, fallback, stale, unsaved | warning pill |
+| Failed/error | error pill |
+
+A status word should be understandable without its color.
+
+## Interface writing standard
+
+V024 removes much of the historical/placeholder wording from the working UI. Visible product copy should follow these rules:
+
+1. **Describe the current task, not development history.** Avoid “V021/V022/V023” in normal page descriptions unless version history is genuinely the subject.
+2. **Lead with user meaning.** “Traffic measurements” is preferable to “Compare V021 sampled occupancy with V022…”
+3. **Use sentence case.** Reserve ALL CAPS for real identifiers/log levels.
+4. **Buttons use concise verbs.** Examples: `Refresh status`, `Save policy`, `Capture frame`, `Build dataset`, `Start training`.
+5. **Destructive actions name what is deleted.** Confirmation text states the affected files/state and whether the action is permanent.
+6. **Status text reports outcome/state.** Prefer `model running`, `rebuild required`, `observations current`, `fallback timing` over vague labels.
+7. **Explain technical distinctions where users can act on them.** Occupancy versus flow, active versus default model, and fixed versus adaptive timing should be stated near the relevant controls.
+8. **Remove obsolete setup language once a surface is working.** Do not show phrases such as “Confirm layout first” on test-ready working pages.
+9. **Keep the safety boundary precise, not noisy.** The app must clearly state that signal outputs are simulation-only and not connected to physical/public-road infrastructure, but this does not require repeating a long disclaimer in every card.
+10. **Do not overclaim perception.** Mobility assistance and fallen-person conditions remain explicit test inputs unless a compatible detector is actually implemented.
+
+## Source ownership
 
 ```text
 src/styles.css                 stable shared CSS entrypoint
-src/styles/tokens.css          authoritative role tokens + light/dark variants
-src/styles/base.css            document, typography, controls, focus/accessibility
-src/styles/layout.css          shell, page hierarchy, responsive grids
-src/styles/components.css      reusable panels/navigation/status/forms/tables/overlays
-src/pages/*.css                genuinely page-specific layout only
+src/styles/tokens.css          color/spacing/type/elevation roles
+src/styles/base.css            document, controls, action hierarchy, focus
+src/styles/layout.css          shell and layout grids
+src/styles/components.css      reusable panels/status/forms/tables/overlays
+src/pages/*.css                page-specific layout only
 ```
 
-`src/main.tsx` imports only `src/styles.css`. Pages may import page-specific CSS, but page CSS must consume shared tokens rather than define a second palette.
+Page CSS consumes shared tokens and must not create independent palettes.
 
-## Core role tokens
+## System adaptation and accessibility
 
-### Light appearance
+- Follow `prefers-color-scheme` for light/dark appearance.
+- Follow `prefers-contrast: more` where available.
+- Follow `prefers-reduced-motion: reduce`.
+- Preserve Windows/browser forced-color behavior.
+- Never lower normal-text contrast just to make the interface look softer.
+- Do not rely on red/green distinction alone.
 
-| Role | Token | Value |
-| --- | --- | --- |
-| Canvas | `--color-canvas` | `#f5f5f5` |
-| Shell | `--color-shell` | `#eeeeee` |
-| Surface | `--color-surface` | `#ffffff` |
-| Raised surface | `--color-surface-raised` | `#fafafa` |
-| Field | `--color-field` | `#ffffff` |
-| Primary text | `--color-text-primary` | `#212121` |
-| Secondary text | `--color-text-secondary` | `#616161` |
-| Muted text | `--color-text-muted` | `#757575` |
-| Interaction accent | `--color-accent` | `#455a64` (Blue Grey 700) |
-| Accent surface | `--color-accent-surface` | `#eceff1` |
-| Focus | `--color-focus` | `#546e7a` |
+## Review checklist for future patches
 
-### Dark appearance role mapping
+Before adding or changing UI:
 
-| Role | Token | Value |
-| --- | --- | --- |
-| Canvas / shell | `--color-canvas`, `--color-shell` | `#121212` (0dp) |
-| Surface / panel | `--color-surface` | `#1e1e1e` (1dp) |
-| Raised control | `--color-surface-raised` | `#232323` (2dp) |
-| Hover surface | `--color-control-hover` | `#272727` (4dp) |
-| Pressed / overlay surface | `--color-control-pressed`, `--color-surface-overlay` | `#2e2e2e` (8dp) |
-| Primary text | `--color-text-primary` | `#e0e0e0` |
-| Secondary text | `--color-text-secondary` | `#bdbdbd` |
-| Muted text | `--color-text-muted` | `#a0a0a0` |
-| Interaction accent | `--color-accent` | `#b0bec5` (Blue Grey 200) |
-| Accent hover | `--color-accent-hover` | `#cfd8dc` (Blue Grey 100) |
-| Accent active | `--color-accent-active` | `#90a4ae` (Blue Grey 300) |
-| Focus | `--color-focus` | `#cfd8dc` |
-
-
-## Material dark surface ramp
-
-Material 2's dark-theme model treats elevation as a luminance change: a neutral dark base receives progressively stronger light overlays as a surface rises. PC Studio encodes the commonly used 0/1/2/4/8dp levels as explicit tokens so components do not invent arbitrary dark grays.
-
-| Conceptual elevation | Token | Surface |
-| --- | --- | --- |
-| 0dp / canvas | `--color-dark-surface-0` | `#121212` |
-| 1dp / standard panel | `--color-dark-surface-1` | `#1e1e1e` |
-| 2dp / raised control | `--color-dark-surface-2` | `#232323` |
-| 4dp / hover emphasis | `--color-dark-surface-4` | `#272727` |
-| 8dp / pressed/overlay emphasis | `--color-dark-surface-8` | `#2e2e2e` |
-
-These tokens are an elevation vocabulary, not five interchangeable decorative grays. Normal desktop panels use the 1dp role; ordinary buttons use 2dp; hover/pressed feedback may move upward through the ramp. Dark panels deliberately have no default shadow because the surface-lightness difference already carries depth.
-
-## Dark-theme color usage
-
-- Large surfaces remain neutral. Do not fill major panels, page backgrounds, or navigation regions with the interaction color.
-- Primary interaction uses the light/desaturated Blue Grey family so links, focus, selection, and active controls remain visible without producing high-chroma vibration against dark gray.
-- Semantic green/amber/red/info tones are light enough to remain readable but are paired with approximately 10% tinted surfaces rather than large opaque blocks.
-- Camera and traffic-signal visualization colors remain separate because those colors encode scene objects and simulated signal meaning, not application chrome.
-- Text should not default to pure `#ffffff`; the high-emphasis role is `#e0e0e0`, with lower-emphasis roles stepping down through `#bdbdbd` and `#a0a0a0`.
-
-## Semantic colors
-
-Semantic color is not decorative:
-
-- `--color-success`: healthy/implemented/successful;
-- `--color-warning`: warning/pending/suppressed;
-- `--color-danger`: failed/error/destructive;
-- `--color-info`: code, endpoint, or informational emphasis;
-- `--color-accent`: navigation, selection, focus, links, and active controls.
-
-Traffic signal red/amber/green have their own scene tokens because those hues describe the simulated signal itself rather than general application state.
-
-## Contrast targets
-
-Normal text should meet at least 4.5:1 against its intended surface. On the dark 1dp panel (`#1e1e1e`), the current primary (`#e0e0e0`), secondary (`#bdbdbd`), and muted (`#a0a0a0`) roles all remain above that target. The dark base is also intentionally far below the light foreground values so the hierarchy remains readable across the defined elevation ramp.
-
-Do not lower contrast to create a “soft” aesthetic. If visual hierarchy needs to recede, change weight, size, spacing, or surface role before making text difficult to read.
-
-The CSS also responds to `prefers-contrast: more` by strengthening borders and promoting muted text toward the secondary-text role.
-
-## Typography
-
-Use the platform stack:
-
-```text
-Segoe UI Variable Text → Segoe UI → system-ui → -apple-system
-```
-
-This avoids an unnecessary branded webfont and makes the Windows desktop development environment feel native. Technical identifiers use Cascadia Code when available, then the system monospace fallback chain.
-
-Hierarchy:
-
-- page title: 26px, semibold;
-- panel title: 16px;
-- subsection heading: 14px;
-- body/control text: system default;
-- metadata/status: 11–12px.
-
-No hero typography is used inside the application shell.
-
-## Spacing, shape, and elevation
-
-Use the 4px rhythm: 4, 8, 12, 16, 20, 24, and 32px.
-
-Corner radii remain compact:
-
-- 4px for small geometry/progress tracks;
-- 6px for controls and small containers;
-- 8px for panels/media frames;
-- pill geometry only for compact statuses or inherently circular/pill controls.
-
-Use borders and surface-value changes for depth. Panel shadow is deliberately minimal. Do not introduce decorative glow, backdrop blur, glass effects, or large floating-card shadows.
-
-## Navigation and controls
-
-- Sidebar navigation is neutral by default.
-- Active navigation uses a subtle accent-tinted surface plus a 2px accent edge; it does not become a saturated tile.
-- Traffic Logic tabs use an underline/edge rather than filled rounded chips.
-- Buttons are neutral by default; do not make every button a saturated primary CTA.
-- Links, selection controls, checkboxes/radios/ranges, focus rings, and selected navigation share the interaction accent family.
-- Hover and pressed states use nearby tones of the same role rather than introducing new hues.
-
-## Status and visualization
-
-Status badges may use semantic color because their purpose is state communication. They must also include readable words such as `active`, `warning`, `failed`, or equivalent contextual text.
-
-Camera overlays are an exception to the application palette because they must stay legible over arbitrary imagery. Overlay labels remain high-contrast white-on-dark even when the rest of the application is in light appearance.
-
-## Accessibility behavior
-
-- `:focus-visible` uses a clear 2px focus outline.
-- `prefers-reduced-motion: reduce` effectively removes nonessential transitions/animations.
-- `prefers-contrast: more` increases border/text differentiation.
-- `forced-colors: active` is not blocked by custom forced-color overrides.
-- Do not encode state by color alone.
-- Test both system light and dark appearances before accepting a visual patch.
-
-## Avoid
-
-- decorative full-page gradients;
-- purple/cyan neon “AI” styling;
-- glow effects and animated technology decoration;
-- glassmorphism/backdrop blur as a default surface treatment;
-- multiple unrelated accent hues competing for attention;
-- page-local hard-coded UI colors when a role token exists;
-- arbitrary dark grays that bypass the shared Material-derived elevation ramp;
-- oversized card radii and excessive pill controls;
-- low-contrast gray text used only to appear sophisticated;
-- app-specific appearance controls that fight the operating-system preference.
-
-## Change rules for future patches
-
-1. Reuse an existing semantic/role token before creating a new value.
-2. New shared tokens must describe a reusable role, not a one-page color preference.
-3. Page CSS should be structural and consume the shared palette.
-4. Keep neutral surfaces dominant and interaction color sparse; in dark appearance use the defined elevation ramp rather than shadows or arbitrary surface colors.
-5. Preserve semantic meanings of success/warning/danger/accent.
-6. Validate light mode, dark mode, keyboard focus, and reduced-motion behavior for visual changes.
-7. Run frontend typecheck/build and `scripts/check_structure.py` after design-system changes.
-8. Visual polish must not imply production/public-road traffic-control capability; AiTL remains a simulation/recommendation prototype.
+- Is there exactly one clear primary action for the immediate task?
+- Is secondary color used selectively rather than decoratively?
+- Are neutral badges neutral?
+- Are success/warning/error colors semantically accurate?
+- Does every colored surface have a readable foreground?
+- Does the copy describe the current capability instead of its development history?
+- Are destructive effects explicit?
+- Are light and dark appearances both usable?
+- Does the page remain clearly a simulation/engineering tool rather than a promotional AI dashboard?

@@ -38,11 +38,12 @@ textarea {
 }
 
 button {
-  padding: 9px 13px;
+  min-height: 36px;
+  padding: 8px 12px;
   background: var(--color-surface-raised);
   cursor: pointer;
   font-weight: 600;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
 button:hover:not(:disabled) {
@@ -54,15 +55,67 @@ button:active:not(:disabled) {
   background: var(--color-control-pressed);
 }
 
+button.primary,
+.button.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+button.primary:hover:not(:disabled),
+.button.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+button.primary:active:not(:disabled),
+.button.primary:active:not(:disabled) {
+  background: var(--color-primary-active);
+  border-color: var(--color-primary-active);
+}
+
+button.secondary,
+.button.secondary {
+  background: var(--color-secondary-surface);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+
+button.secondary:hover:not(:disabled),
+.button.secondary:hover:not(:disabled) {
+  background: var(--color-secondary);
+  color: var(--color-on-secondary);
+}
+
+button.danger,
+.button.danger {
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+button.danger:hover:not(:disabled),
+.button.danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+}
+
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.52;
 }
 
 input,
 select,
 textarea {
   padding: 8px 10px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-border-strong);
 }
 
 input::placeholder,
@@ -73,7 +126,7 @@ textarea::placeholder {
 input[type="checkbox"],
 input[type="radio"],
 input[type="range"] {
-  accent-color: var(--color-accent);
+  accent-color: var(--color-secondary);
 }
 
 button:focus-visible,
@@ -86,11 +139,11 @@ a:focus-visible {
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--color-primary);
 }
 
 a:hover {
-  color: var(--color-accent-hover);
+  color: var(--color-primary-hover);
 }
 
 h1,
@@ -108,8 +161,9 @@ h1 {
 }
 
 h2 {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.35;
+  font-weight: 650;
 }
 
 h3 {

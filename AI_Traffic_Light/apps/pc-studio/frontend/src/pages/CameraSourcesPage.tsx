@@ -25,11 +25,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     : status.simulation_enabled
       ? status.simulation_paused
         ? "simulation paused"
-        : "simulation active"
+        : "simulation running"
       : status.frame_available
         ? status.stale
           ? "frame stale"
-          : "device frame received"
+          : "device frame live"
         : "waiting for device";
 
   return (
@@ -38,10 +38,10 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
         <section className="panel camera-preview-panel">
           <div className="panel-header">
             <div>
-              <h2>Latest camera frame</h2>
-              <p className="placeholder-copy">The preview updates automatically when a device uploads a new image.</p>
+              <h2>Camera input</h2>
+              <p className="placeholder-copy">Shows the newest frame accepted by the backend. Use the built-in simulation when camera hardware is unavailable.</p>
             </div>
-            <span className={`status-pill ${status?.stale ? "status-planned" : ""}`}>{statusLabel}</span>
+            <span className={`status-pill ${status?.stale ? "status-planned" : status?.frame_available ? "status-implemented" : ""}`}>{statusLabel}</span>
           </div>
 
           <div className="camera-frame-wrapper">
@@ -53,19 +53,20 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               />
             ) : (
               <div className="camera-empty-state">
-                <strong>Waiting for the first image</strong>
-                <p>Start simulation mode now, or upload a JPEG/PNG from the future camera node.</p>
+                <strong>No frame available</strong>
+                <p>Start the local simulation or send a JPEG/PNG frame from a configured camera node.</p>
               </div>
             )}
           </div>
 
           <div className="button-row">
             <button
+              className="primary"
               onClick={() => onSimulationChange(!status?.simulation_enabled)}
               disabled={changingMode || !status}
             >
               {changingMode
-                ? "Changing mode..."
+                ? "Changing source..."
                 : status?.simulation_enabled
                   ? "Stop simulation"
                   : "Start simulation"}
@@ -77,23 +78,23 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
 
         <aside className="side-column">
           <section className="panel compact-panel">
-            <div className="panel-header"><h2>Receiver status</h2></div>
+            <div className="panel-header"><h2>Input status</h2></div>
             <div className="camera-status-list">
               <div><span>Mode</span><strong>{status?.mode ?? "checking"}</strong></div>
               <div><span>Source</span><strong>{status?.active_source_id ?? "none"}</strong></div>
               <div><span>Resolution</span><strong>{status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : "unknown"}</strong></div>
-              <div><span>Last update</span><strong>{formatAge(status?.age_ms ?? null)}</strong></div>
-              <div><span>Frame</span><strong>#{status?.frame_number ?? 0}</strong></div>
-              <div><span>Sim density</span><strong>{status?.simulation_density ?? "normal"}</strong></div>
-              <div><span>Sim scene</span><strong>{status?.simulation_paused ? "paused" : "moving"}</strong></div>
+              <div><span>Frame age</span><strong>{formatAge(status?.age_ms ?? null)}</strong></div>
+              <div><span>Frame number</span><strong>#{status?.frame_number ?? 0}</strong></div>
+              <div><span>Simulation density</span><strong>{status?.simulation_density ?? "normal"}</strong></div>
+              <div><span>Simulation motion</span><strong>{status?.simulation_paused ? "paused" : "running"}</strong></div>
             </div>
           </section>
 
           <section className="panel compact-panel">
-            <div className="panel-header"><h2>Future device upload</h2></div>
-            <p className="placeholder-copy">Send a raw JPEG or PNG body to the PC backend:</p>
+            <div className="panel-header"><h2>Camera-node upload</h2><span className="status-pill muted">local API</span></div>
+            <p className="placeholder-copy">Camera devices can post a raw JPEG or PNG body to the backend receiver.</p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/frame?source_id=esp_cam_01</code>
-            <p className="small-note">Header: Content-Type: image/jpeg or image/png · Maximum: 8 MiB</p>
+            <p className="small-note">Content-Type: image/jpeg or image/png · Maximum payload: 8 MiB.</p>
           </section>
         </aside>
       </div>

@@ -68,3 +68,29 @@ The live trained-model detection loop already self-schedules after each request 
 ## Runtime data
 
 Do not package or overwrite local `datasets/`, `outputs/`, trained `*.pt`, labels, runtime zones/settings/signal rules, analytics histories, `.venv/`, `node_modules/`, `dist/`, or caches.
+
+## One-command Windows helper
+
+V024 also includes `scripts/update_test_run.ps1` for the normal local Windows workflow. From `AI_Traffic_Light` run:
+
+```powershell
+.\scripts\update_test_run.ps1
+```
+
+It verifies the local `main` branch has no tracked edits, performs a safe `git pull --ff-only origin main`, reloads the newly pulled copy of itself, synchronizes backend/frontend dependencies, runs Python compile/structure/backend regressions, frontend typecheck/build, and `git diff --check`, then starts the backend, waits for `/health`, runs the live backend smoke automatically, starts the frontend on strict port 5173, waits for it to respond, and opens the app. It never runs `git clean` or deletes runtime data. Use `-SkipUpdate` or `-SkipTests` only when deliberately rerunning part of the workflow.
+## Material color hierarchy and interface-copy refinement
+
+V024 also refines PC Studio presentation without changing application behavior. The supplied Material 2 color-system guidance is applied as a role model rather than as a component-library conversion.
+
+- Added explicit primary/on-primary and secondary/on-secondary roles.
+- Primary blue identifies active navigation, links/focus, and dominant workflow actions.
+- Secondary teal is intentionally sparse and is used for selected secondary state/progress rather than general decoration.
+- Background, shell, panel, and field surfaces remain neutral and carry most screen area.
+- Generic status pills are neutral; green/amber/red are now reserved for explicit success/warning/error meaning.
+- The Material-derived dark `#121212` base and neutral elevation ramp are preserved.
+- Added primary/secondary/danger button hierarchy and stronger tinted message containers.
+- Rewrote working-page descriptions, panel titles, action labels, empty states, destructive confirmations, and explanatory notes to describe current behavior rather than historical version milestones or placeholder/setup language.
+- Removed stale presentation copy such as `Confirm layout first`, old version-coded page descriptions, and the Live AI `0_2_0` note.
+- Safety copy remains explicit that signal output is simulation-only; no live wheelchair/fall detection is claimed.
+
+No endpoint, schema, signal algorithm, model format, or runtime-data format changes are introduced by this presentation refinement.

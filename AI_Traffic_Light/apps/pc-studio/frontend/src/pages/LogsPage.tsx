@@ -32,20 +32,20 @@ export function LogsPage({ logs, apiState, onLogsChange }: Props) {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Recent backend logs</h2>
-            <p className="placeholder-copy">Actual bounded in-memory backend log records. API state: {apiState.message}</p>
+            <h2>Backend event log</h2>
+            <p className="placeholder-copy">Latest bounded in-memory backend records. Connection: {apiState.message}</p>
           </div>
-          <button onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh logs"}</button>
+          <button className="primary" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
         </div>
         <div className="log-list">
-          {logs.length === 0 ? <p className="placeholder-copy">No backend log records have been captured yet.</p> : logs.map((log, index) => (
+          {logs.length === 0 ? <p className="placeholder-copy">No backend events are available yet.</p> : logs.map((log, index) => (
             <article className="log-row" key={`${log.timestamp}-${log.code}-${index}`}>
               <span className={`status-pill log-level-${log.level}`}>{log.level}</span>
               <code>{log.code}</code>
               <strong>{log.scope ?? "app"}</strong>
               <div>
                 <p>{log.message}</p>
-                <span className="small-note">{log.timestamp ?? "unknown time"}{log.request_id ? ` · ${log.request_id}` : ""}</span>
+                <span className="small-note">{log.timestamp ?? "unknown time"}{log.request_id ? ` · request ${log.request_id}` : ""}</span>
               </div>
             </article>
           ))}

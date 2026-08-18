@@ -59,7 +59,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     setLabel("New Zone");
     setZoneType("counting_region");
     setPoints([]);
-    setMessage("Click the reference canvas to draw a polygon, or choose counting line and add exactly two points.");
+    setMessage("Create a polygon by clicking the frame. Counting lines use exactly two points.");
     setError(null);
   }
 
@@ -81,8 +81,8 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     const validGeometry = zoneType === "counting_line" ? points.length === 2 : points.length >= 3;
     if (!cleanLabel || !validGeometry) {
       setError(zoneType === "counting_line"
-        ? "Give the counting line a label and exactly two points."
-        : "Give the zone a label and at least three polygon points.");
+        ? "Enter a label and define exactly two line points."
+        : "Enter a label and define at least three polygon points.");
       return;
     }
     if (zoneType === "counting_line" && points[0][0] === points[1][0] && points[0][1] === points[1][1]) {
@@ -98,7 +98,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       ? current.map((zone) => zone.id === selectedId ? next : zone)
       : [...current, next]);
     setSelectedId(cleanId);
-    setMessage("Draft applied locally. Use Save zones to persist it.");
+    setMessage("Draft applied locally. Save zones to write the complete configuration.");
     setError(null);
   }
 
@@ -111,7 +111,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     setZones(remaining);
     if (remaining[0]) selectZone(remaining[0]);
     else newZone();
-    setMessage("Zone removed locally. Use Save zones to persist the change.");
+    setMessage("Zone removed from the draft. Save zones to persist the change.");
   }
 
   async function persistZones() {
@@ -130,7 +130,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
   }
 
   async function restoreDefaults() {
-    if (!window.confirm("Replace the current zone configuration with the built-in simulation reference zones?")) return;
+    if (!window.confirm("Replace the current zone configuration with the built-in reference zones?")) return;
     setSaving(true);
     setError(null);
     try {
@@ -138,7 +138,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       setStatus(next);
       setZones(next.zones);
       if (next.zones[0]) selectZone(next.zones[0]);
-      setMessage("Reference zones restored and persisted.");
+      setMessage("Reference zones restored.");
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Default zones could not be restored.");
     } finally {
@@ -156,10 +156,12 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
         <section className="panel zone-canvas-panel">
           <div className="panel-header">
             <div>
-              <h2>Camera-aligned zone editor</h2>
-              <p className="placeholder-copy">Draw traffic decision zones or analytics-only counting regions directly over the current receiver or simulation camera feed.</p>
+              <h2>Zones & counting geometry</h2>
+              <p className="placeholder-copy">Draw geometry against the current frame. Decision zones support signal analysis; counting regions and lines provide analytics.</p>
             </div>
-            <span className="status-pill">{cameraStatus?.frame_available ? `${cameraStatus.origin ?? "camera"} frame ${cameraStatus.frame_number}` : "no camera frame"}</span>
+            <span className={`status-pill ${cameraStatus?.frame_available ? "status-implemented" : "status-planned"}`}>
+              {cameraStatus?.frame_available ? `${cameraStatus.origin ?? "camera"} · frame ${cameraStatus.frame_number}` : "frame required"}
+            </span>
           </div>
 
           <svg className="zone-editor-canvas" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} onClick={canvasClick} role="img" aria-label="Editable traffic zone reference canvas">
@@ -177,7 +179,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
               <>
                 <rect x="0" y="0" width={WIDTH} height={HEIGHT} className="zone-camera-empty" />
                 <text x={WIDTH / 2} y={HEIGHT / 2} textAnchor="middle" className="zone-camera-empty-text">
-                  Start simulation or provide a camera frame to align zones.
+                  Start simulation or provide a camera frame before aligning zones.
                 </text>
               </>
             )}
@@ -200,14 +202,14 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
             {points.length >= 2 && <polyline points={points.map(([x, y]) => `${x},${y}`).join(" ")} className="zone-draft-line" />}
             {points.map(([x, y], index) => <circle key={`${x}-${y}-${index}`} cx={x} cy={y} r="9" className="zone-draft-point" />)}
           </svg>
-          <p className="small-note">The camera image is mapped into the 1280 × 720 reference coordinates. <strong>Counting regions</strong> provide occupancy/entry/dwell analytics. <strong>Counting lines</strong> use exactly two points and generate one unique directional passage event per tracked object. Neither changes simulated traffic-phase rules.</p>
+          <p className="small-note">Coordinates are stored in the 1280 × 720 reference frame. Counting regions produce occupancy and entry/exit/dwell events; counting lines produce directional passage events. Analytics geometry does not change the simulated signal policy.</p>
         </section>
 
         <aside className="side-column">
           <section className="panel compact-panel zone-editor-form">
-            <div className="panel-header"><h2>Zone draft</h2><button type="button" onClick={newZone}>New zone</button></div>
+            <div className="panel-header"><h2>Geometry draft</h2><button type="button" onClick={newZone}>New</button></div>
             <label>Zone ID<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} /></label>
-            <label>Label<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
+            <label>Display label<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
             <label>Type
               <select value={zoneType} onChange={(event) => {
                 const nextType = event.target.value as ZoneType;
@@ -218,19 +220,19 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
               </select>
             </label>
             <div className="camera-status-list training-status-list">
-              <div><span>Points</span><strong>{points.length}</strong></div>
+              <div><span>Draft points</span><strong>{points.length}</strong></div>
               <div><span>Selected</span><strong>{selectedZone?.id ?? "new draft"}</strong></div>
             </div>
             <div className="button-row wrap-row">
               <button type="button" onClick={() => setPoints((current) => current.slice(0, -1))} disabled={points.length === 0}>Undo point</button>
-              <button type="button" onClick={() => setPoints([])} disabled={points.length === 0}>Clear</button>
-              <button type="button" onClick={applyDraft}>Apply draft</button>
-              <button type="button" onClick={deleteDraft}>Delete</button>
+              <button type="button" onClick={() => setPoints([])} disabled={points.length === 0}>Clear points</button>
+              <button className="primary" type="button" onClick={applyDraft}>Apply draft</button>
+              <button className="danger" type="button" onClick={deleteDraft}>Remove draft</button>
             </div>
           </section>
 
           <section className="panel compact-panel">
-            <div className="panel-header"><h2>Configured zones</h2><span>{zones.length}</span></div>
+            <div className="panel-header"><h2>Saved configuration</h2><span className="status-pill muted">{zones.length} zones</span></div>
             <div className="zone-selector-list">
               {zones.map((zone) => (
                 <button type="button" key={zone.id} className={zone.id === selectedId ? "active" : ""} onClick={() => selectZone(zone)}>
@@ -239,8 +241,8 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
               ))}
             </div>
             <div className="button-row wrap-row">
-              <button type="button" onClick={() => void persistZones()} disabled={saving || !status?.editable}>{saving ? "Saving..." : "Save zones"}</button>
-              <button type="button" onClick={() => void restoreDefaults()} disabled={saving || !status?.editable}>Reset defaults</button>
+              <button className="primary" type="button" onClick={() => void persistZones()} disabled={saving || !status?.editable}>{saving ? "Saving..." : "Save zones"}</button>
+              <button type="button" onClick={() => void restoreDefaults()} disabled={saving || !status?.editable}>Restore defaults</button>
             </div>
             {message && <p className="success-message">{message}</p>}
             {error && <p className="error-message">{error}</p>}

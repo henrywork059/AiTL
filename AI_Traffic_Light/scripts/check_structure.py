@@ -57,6 +57,8 @@ REQUIRED_PATHS = (
     "scripts/validate_patch_zip.py",
     "scripts/test_atomic_json_store.py",
     "scripts/test_frontend_polling_structure.py",
+    "scripts/update_test_run.ps1",
+    "scripts/test_update_test_run_script.py",
     "scripts/test_object_tracking_flow.py",
     "scripts/test_signal_rules_service.py",
 )
@@ -207,6 +209,10 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
             "--color-canvas",
             "--color-surface",
             "--color-text-primary",
+            "--color-primary",
+            "--color-on-primary",
+            "--color-secondary",
+            "--color-on-secondary",
             "--color-accent",
             "--color-success",
             "--color-warning",
@@ -232,6 +238,29 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
             add_error(errors, "Traffic Logic page CSS must consume shared color tokens instead of page-local hex colors.")
 
 
+
+
+def validate_frontend_presentation_copy(root: Path, errors: list[str]) -> None:
+    stale_text = {
+        "apps/pc-studio/frontend/src/layout/AppShell.tsx": ("Confirm layout first",),
+        "apps/pc-studio/frontend/src/pages/DashboardPage.tsx": ("traffic analytics + counting regions candidate",),
+        "apps/pc-studio/frontend/src/pages/LiveAiPage.tsx": ("in 0_2_0",),
+    }
+    for relative_path, forbidden_phrases in stale_text.items():
+        path = root / relative_path
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        for phrase in forbidden_phrases:
+            if phrase in content:
+                add_error(errors, f"Frontend working-page copy contains stale development text in {relative_path}: {phrase!r}")
+
+    components = root / "apps/pc-studio/frontend/src/styles/components.css"
+    if components.exists():
+        content = components.read_text(encoding="utf-8")
+        neutral_marker = ".status-pill,"
+        if neutral_marker not in content or "background: var(--color-surface-muted);" not in content:
+            add_error(errors, "Generic status pills must remain neutral; semantic status colors require explicit status classes.")
 
 def validate_atomic_json_persistence(root: Path, errors: list[str]) -> None:
     helper = root / "apps/pc-studio/backend/app/core/json_store.py"
@@ -282,6 +311,7 @@ def main() -> int:
     validate_backend_version_source(root, errors)
     validate_frontend_version_surfaces(root, fields.get("version", ""), errors)
     validate_frontend_style_system(root, errors)
+    validate_frontend_presentation_copy(root, errors)
     validate_atomic_json_persistence(root, errors)
     validate_frontend_polling(root, errors)
     if errors:

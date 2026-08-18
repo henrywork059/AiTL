@@ -2,6 +2,11 @@
 
 ## 0_2_4 — Maintenance hardening and polling optimization
 
+- Refined PC Studio presentation using Material role-based color semantics: neutral surfaces dominate, primary blue identifies navigation/main actions, secondary teal is sparse for selection/progress, and generic badges are neutral instead of implicitly green.
+- Reworked visible UI copy across Dashboard, Camera Sources, Live AI, Zones, Analytics, Dataset, Training, Models, Settings, Logs, navigation, and capability panels to describe current tasks/states rather than old version history or placeholder language.
+- Added explicit primary/secondary/on-color roles, semantic action/button hierarchy, clearer destructive treatment, and copy/style guardrails while preserving the Material `#121212` dark surface ramp and system light/dark adaptation.
+- Added and hardened `scripts/update_test_run.ps1`: it protects tracked local work, requires `main` for automatic update, fast-forwards from `origin/main`, reloads the pulled runner, synchronizes dependencies, runs backend/frontend validation plus live smoke after health readiness, and launches PC Studio on strict known ports without deleting runtime data.
+
 - Created V024 / `0_2_4` at the owner's explicit request while keeping owner-confirmed `passed_baseline: 0_2_2`; V023 was not implicitly promoted.
 - Added shared `app/core/json_store.py` atomic JSON persistence using a unique same-directory temporary file, flush/fsync, and `os.replace`, with cleanup on failure.
 - Migrated runtime settings, editable zones, and model-registry metadata to the shared JSON persistence helper without changing their API envelopes or stable error codes.

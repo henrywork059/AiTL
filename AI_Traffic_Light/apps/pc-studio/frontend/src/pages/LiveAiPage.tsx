@@ -119,7 +119,7 @@ export function LiveAiPage({
 
   const deleteSelected = useCallback(async () => {
     if (!selectedModelId) return;
-    if (!window.confirm(`Delete trained model ${selectedModelId}? This removes the whole run folder under outputs/training.`)) {
+    if (!window.confirm(`Permanently delete trained run ${selectedModelId}? This removes its directory under outputs/training.`)) {
       return;
     }
     setDeletingModel(true);
@@ -248,8 +248,8 @@ export function LiveAiPage({
   }, [displayedDetections.length, onDetectionCountChange]);
 
   const modeLabel = hasCameraFrame
-    ? inferenceStatus?.model_loaded ? "trained model live" : "camera / model idle"
-    : "fallback scene";
+    ? inferenceStatus?.model_loaded ? "model running" : "model idle"
+    : "fallback view";
 
   function toggleClass(className: string) {
     setEnabledClasses((current) => current.includes(className)
@@ -262,18 +262,18 @@ export function LiveAiPage({
       <section className="panel live-panel">
         <div className="panel-header">
           <div>
-            <h2>Live detection canvas</h2>
+            <h2>Live inference</h2>
             <p className="placeholder-copy">
               {hasCameraFrame
-                ? "Current receiver/simulation frame with trained YOLO detections overlaid in original image coordinates."
-                : "No camera frame is available, so the local fallback scene remains visible."}
+                ? "Runs the loaded local model on the current camera/simulation frame. Detections use original-image coordinates."
+                : "No camera frame is available. The fallback scene is shown only to keep the interface inspectable."}
             </p>
           </div>
           <div className="button-row">
             <span className={`status-pill ${inferenceStatus?.model_loaded ? "status-implemented" : "status-planned"}`}>
               {modeLabel}
             </span>
-            <button onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
+            <button className="primary" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh context"}</button>
           </div>
         </div>
 
@@ -291,30 +291,30 @@ export function LiveAiPage({
           ) : mockFrame ? (
             <LiveView frame={mockFrame} detections={mockDetections} zones={showZones ? zones : []} />
           ) : (
-            <p>Loading view...</p>
+            <p>Waiting for view data...</p>
           )}
           <LiveTrafficSignalOverlay traffic={traffic} />
         </div>
 
         <div className="live-inference-meta wrap-row">
-          <span>Camera: <strong>{cameraStatus?.active_source_id ?? "none"}</strong></span>
-          <span>Frame: <strong>{inferenceStatus?.last_frame_number ?? cameraStatus?.frame_number ?? 0}</strong></span>
-          <span>Raw detections: <strong>{rawLiveDetections.length}</strong></span>
-          <span>Visible detections: <strong>{displayedDetections.length}</strong></span>
-          <span>Model: <strong>{inferenceStatus?.active_model_id ?? "not loaded"}</strong></span>
+          <span>Source <strong>{cameraStatus?.active_source_id ?? "none"}</strong></span>
+          <span>Frame <strong>{inferenceStatus?.last_frame_number ?? cameraStatus?.frame_number ?? 0}</strong></span>
+          <span>Detected <strong>{rawLiveDetections.length}</strong></span>
+          <span>Visible <strong>{displayedDetections.length}</strong></span>
+          <span>Model <strong>{inferenceStatus?.active_model_id ?? "not loaded"}</strong></span>
         </div>
 
         {hasCameraFrame && (
           <div className="live-visibility-tools">
             <div className="button-row wrap-row">
-              <label className="inline-toggle"><input type="checkbox" checked={showBoxes} onChange={(event) => setShowBoxes(event.target.checked)} /> Show boxes</label>
-              <label className="inline-toggle"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Show labels</label>
-              <label className="inline-toggle"><input type="checkbox" checked={showZones} onChange={(event) => setShowZones(event.target.checked)} /> Show zones</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showBoxes} onChange={(event) => setShowBoxes(event.target.checked)} /> Boxes</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Labels</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showZones} onChange={(event) => setShowZones(event.target.checked)} /> Zones</label>
             </div>
             <div className="class-filter-group">
               <strong>Visible classes</strong>
               {liveClassOptions.length === 0 ? (
-                <span className="small-note">No returned classes for the current frame.</span>
+                <span className="small-note">No classes were returned for the current frame.</span>
               ) : (
                 <div className="button-row wrap-row">
                   {liveClassOptions.map((className) => (
@@ -352,14 +352,17 @@ export function LiveAiPage({
         />
         {traffic && <TrafficLight traffic={traffic} />}
         {traffic && <StatusPanel traffic={traffic} />}
-        <p className="small-note">The compact signal overlay and traffic decision cards use zone-aware simulation state in 0_2_0; they remain disconnected from physical traffic signals.</p>
+        <p className="small-note">The signal overlay and decision cards show simulation state only. They do not send commands to physical traffic infrastructure.</p>
         <ZonePanel zones={zones} />
       </aside>
 
       <section className="panel bottom-panel full-span">
         <div className="panel-header">
-          <h2>{hasCameraFrame ? "Live trained-model detections" : "Fallback detection result table"}</h2>
-          <span>{displayedDetections.length} visible</span>
+          <div>
+            <h2>{hasCameraFrame ? "Detection results" : "Fallback detections"}</h2>
+            <p className="placeholder-copy">Results after the current confidence and class visibility filters.</p>
+          </div>
+          <span className="status-pill muted">{displayedDetections.length} visible</span>
         </div>
         <DetectionTable detections={displayedDetections} />
       </section>

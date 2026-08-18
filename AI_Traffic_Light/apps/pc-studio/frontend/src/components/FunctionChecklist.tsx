@@ -7,7 +7,7 @@ type Props = {
 };
 
 function statusText(item: FunctionItem) {
-  if (item.status === "implemented") return "implemented";
+  if (item.status === "implemented") return "available";
   if (item.status === "later") return "later";
   if (item.status === "planned") return "planned";
   return "placeholder";
@@ -19,8 +19,11 @@ export function FunctionChecklist({ area, limit }: Props) {
   return (
     <section className="panel">
       <div className="panel-header">
-        <h2>{area ? `${area} functions` : "Function confirmation list"}</h2>
-        <span>{items.length} items</span>
+        <div>
+          <h2>{area ? `${area} capabilities` : "Prototype capabilities"}</h2>
+          <p className="placeholder-copy">Current implementation status for this area.</p>
+        </div>
+        <span className="status-pill muted">{items.length} items</span>
       </div>
       <div className="function-list">
         {items.map((item) => (

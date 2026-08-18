@@ -34,7 +34,8 @@ Prototype traffic-light project with a FastAPI backend and React/Vite PC Studio 
 - Shared `app/core/json_store.py` atomically replaces runtime-settings, zone, and model-registry JSON using unique same-directory temporary files.
 - Zone writes and model-registry transitions are synchronized inside their services.
 - Top-level camera-status and Live AI traffic/zone refreshes use reusable serial polling so one slow request cannot overlap the next scheduled poll from the same loop.
-- API endpoints, stable error codes, signal-rule semantics, dataset/model formats, and the V023 design system are unchanged.
+- API endpoints, stable error codes, signal-rule semantics, and dataset/model formats are unchanged.
+- PC Studio presentation is refined with role-based primary/secondary/surface/on-color semantics and clearer current-task copy; this is a presentation-only change.
 
 ## Signal-policy semantics
 

@@ -2,7 +2,7 @@
 
 React/Vite GUI for the AI Traffic Light PC Studio prototype.
 
-Visual styling is governed by `docs/PC_STUDIO_DESIGN_SYSTEM.md` and the role-token files under `src/styles/`. The interface follows the operating-system light/dark preference, uses neutral layered surfaces with one restrained interaction accent, and reserves red/amber/green for semantic/simulated-signal meaning rather than decorative "AI" styling.
+Visual styling is governed by `docs/PC_STUDIO_DESIGN_SYSTEM.md` and role tokens under `src/styles/`. V024 uses a Material-inspired role hierarchy rather than a generic dashboard palette: neutral surfaces dominate, primary blue identifies navigation/main actions, secondary teal is selective for progress/selection, and success/warning/error colors are semantic only.
 
 
 ## V024 polling hardening
@@ -26,7 +26,9 @@ Mobility assistance and fall/incident controls are explicit simulation/test inpu
 
 Shared presentation is isolated under `src/styles/` and documented in `docs/PC_STUDIO_DESIGN_SYSTEM.md`. `src/styles.css` is the stable import entrypoint. Pages may keep small page-specific CSS files for layout/behavior, but they should consume shared design tokens instead of defining independent palettes.
 
-The current visual system is system-adaptive. Light mode uses quiet neutral layers; dark mode follows the Material 2 dark-surface model with a `#121212` base and progressively lighter elevated surfaces. Interaction uses a desaturated Blue Grey family, while semantic/simulated-signal colors remain sparse. Decorative gradient/glass/neon AI styling is intentionally excluded.
+The visual system follows the operating-system appearance. Dark mode retains the Material 2 `#121212` base with progressively lighter elevated surfaces. Primary/secondary controls have explicit readable on-colors, generic badges are neutral, and traffic-signal colors remain separate from application state. Decorative gradient/glass/neon AI styling is intentionally excluded.
+
+Visible interface copy follows the same design discipline: describe the current task/state, use concise action verbs, make destructive effects explicit, avoid stale release-history language on normal working pages, and state the simulation-only boundary precisely.
 
 Run:
 

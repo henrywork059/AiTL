@@ -12,7 +12,7 @@ type Props = {
 };
 
 function statusClass(status: string) {
-  if (status === "pass" || status === "connected") return "status-pill";
+  if (status === "pass" || status === "connected") return "status-pill status-implemented";
   if (status === "warn" || status === "fallback" || status === "checking") return "status-pill status-planned";
   return "status-pill status-error";
 }
@@ -26,20 +26,20 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Project stage", value: version, note: "traffic analytics + counting regions candidate" },
+          { label: "Release", value: version, note: "current candidate" },
           { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
-          { label: "Smoke checks", value: `${passCount} pass`, note: `${warnCount} warnings` },
-          { label: "Analytics", value: "history + regions", note: "sampled occupancy over time" },
+          { label: "Validation", value: `${passCount} passed`, note: warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "no smoke warnings" },
+          { label: "Operating scope", value: "local prototype", note: "simulation, vision, datasets, analytics" },
         ]}
       />
 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Local prototype status</h2>
+            <h2>System overview</h2>
             <p className="placeholder-copy">{apiState.message}</p>
           </div>
-          <button onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh live APIs"}</button>
+          <button className="primary" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh status"}</button>
         </div>
         <div className="smoke-grid">
           {(smokeStatus?.checks ?? []).map((check) => (
@@ -57,17 +57,17 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <section className="panel">
-          <div className="panel-header"><h2>Working prototype functions</h2><span className="status-pill">test-ready</span></div>
+          <div className="panel-header"><h2>Available now</h2><span className="status-pill status-implemented">test-ready</span></div>
           <ul className="check-list">
             {(smokeStatus?.ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>
         </section>
         <section className="panel">
-          <div className="panel-header"><h2>Explicit boundaries</h2><span className="status-pill status-planned">not enabled</span></div>
+          <div className="panel-header"><h2>Not available / out of scope</h2><span className="status-pill muted">bounded scope</span></div>
           <ul className="check-list">
             {(smokeStatus?.not_ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>
-          <p className="small-note">Zone-aware traffic decisions are simulation-only and remain disconnected from physical traffic infrastructure.</p>
+          <p className="small-note">Signal decisions and timing changes are confined to the software simulation. PC Studio does not connect to physical public-road signal infrastructure.</p>
         </section>
       </div>
       <FunctionChecklist limit={10} />

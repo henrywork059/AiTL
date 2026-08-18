@@ -17,7 +17,7 @@ export function AppShell({ activePage, onPageChange, children }: Props) {
         <div className="brand-block">
           <div className="eyebrow">{APP_VERSION_LABEL}</div>
           <h1>AI Traffic Light</h1>
-          <p>PC Studio App</p>
+          <p>Simulation & vision workbench</p>
         </div>
 
         <nav className="side-nav" aria-label="PC Studio pages">
@@ -41,12 +41,12 @@ export function AppShell({ activePage, onPageChange, children }: Props) {
 
       <div className="content-frame">
         <header className="page-header">
-          <div>
-            <div className="eyebrow">{page.status} page</div>
+          <div className="section-intro">
+            <div className="eyebrow">{page.status}</div>
             <h1>{page.label}</h1>
             <p>{page.description}</p>
           </div>
-          <span className="status-pill">Confirm layout first</span>
+          <span className="status-pill muted">Local simulation only</span>
         </header>
         {children}
       </div>

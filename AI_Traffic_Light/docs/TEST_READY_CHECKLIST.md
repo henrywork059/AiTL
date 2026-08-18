@@ -4,6 +4,8 @@ V024 / `0_2_4` is the current candidate. V023 / `0_2_3` is the previous candidat
 
 ## Release / packaging
 
+- The Windows helper `scripts/update_test_run.ps1` must pass `scripts/test_update_test_run_script.py`, refuse tracked local edits/non-main updates, reload itself after pull, and run the live smoke only after backend health is ready.
+
 1. `VERSION` reports `version: 0_2_4`, `previous_version: 0_2_3`, `passed_baseline: 0_2_2`, and candidate status.
 2. `check_structure.py`, Python compilation, backend regression tests, frontend typecheck/build, live smoke, and `git diff --check` pass locally.
 3. Patch ZIP is changed-files-only, all members start `AI_Traffic_Light/`, validator passes, and no runtime/generated/model files are present.
@@ -18,6 +20,20 @@ V024 / `0_2_4` is the current candidate. V023 / `0_2_3` is the previous candidat
 8. Model-registry discovery/default/delete/metadata transitions are synchronized by a re-entrant lock.
 9. App-level camera-status and Live AI traffic/zone polling use `useSerialPolling`, not raw `setInterval`.
 10. A slow migrated poll cannot overlap another request from the same polling loop, and leaving the relevant page cancels future schedules.
+
+
+## V024 presentation / interface copy
+
+- Neutral application surfaces remain dominant in both light and dark appearance.
+- Primary blue is used for active navigation, links/focus, and dominant workflow actions; it is not used as a decorative panel fill.
+- Secondary teal is sparse and used for selected secondary state/progress.
+- Generic status/count/context pills are neutral; success/warning/error colors are applied only when those meanings are true.
+- Dark mode preserves the Material-derived `#121212` base and neutral elevation ramp.
+- Primary/secondary colored controls use explicit readable on-color roles.
+- Working page descriptions and panel labels describe current tasks/state rather than old V021/V022/V023 implementation history.
+- `Confirm layout first` and stale Live AI `0_2_0` presentation text are absent.
+- Destructive actions use explicit destructive styling/copy and confirmations explain what is removed.
+- Copy remains precise about occupancy vs. flow, active vs. default model, and simulation-only signal behavior.
 
 ## Inherited V023 signal behavior
 

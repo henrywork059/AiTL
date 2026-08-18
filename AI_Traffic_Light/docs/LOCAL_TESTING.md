@@ -2,6 +2,17 @@
 
 V024 / `0_2_4` is the current candidate. V023 / `0_2_3` is the previous candidate; V022 / `0_2_2` remains the owner-confirmed passed baseline because V023 was not explicitly accepted. Automated checks do not promote V024.
 
+## Quick Windows workflow
+
+For the normal update → test → run path, V024 includes:
+
+```powershell
+Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
+.\scripts\update_test_run.ps1
+```
+
+The helper checks that you are on `main` with no tracked local edits, uses `git pull --ff-only`, reloads the pulled script, synchronizes dependencies, runs backend regressions plus frontend typecheck/build and `git diff --check`, starts the backend, waits for health, runs live smoke automatically, then starts the frontend on strict port 5173 and opens the app. It does not clean or delete runtime data. The detailed/manual checks below remain the acceptance authority.
+
 ## 1. Safe update
 
 Stop backend/frontend. From the repository root:
@@ -120,6 +131,22 @@ Then run the inherited V023 functional checks:
 29. Recheck V022 tracking/counting-line flow and V021 occupancy analytics.
 30. Recheck capture/delete/label/training/model/settings/logs inherited behavior.
 31. Confirm no feature connects to physical/public-road traffic-light control.
+
+
+## V024 presentation and copy checks
+
+After the automated runner opens PC Studio, inspect both Windows light and dark appearance:
+
+1. Active navigation and primary workflow buttons use the primary blue role; neutral panels remain neutral.
+2. Progress/selected secondary emphasis uses teal sparingly; it does not become a second page-wide theme color.
+3. Generic metadata/count badges are neutral. Green means healthy/completed, amber means attention/fallback/unsaved, and red means error/destructive.
+4. Dark mode keeps the neutral `#121212` base with progressively lighter elevated surfaces; no neon/glass/gradient treatment appears.
+5. Dashboard, Cameras, Live AI, Zones, Traffic Analytics, Dataset Capture/Review, Training, Models, Settings, and Logs use concise current-task wording rather than old release-history descriptions.
+6. No working page shows `Confirm layout first`, stale `0_2_0` UI copy, or similar development-placeholder wording.
+7. Destructive actions such as capture/model/history deletion are visually distinct and the confirmation text states what will be removed.
+8. Keyboard Tab produces a visible focus ring; text remains readable in light and dark appearances.
+9. Occupancy versus flow, active versus default model, and runtime/configuration distinctions remain clear in nearby copy.
+10. Signal-related text continues to state simulation-only scope and does not claim live mobility/fall detection.
 
 ## 6. Repository/ZIP checks
 

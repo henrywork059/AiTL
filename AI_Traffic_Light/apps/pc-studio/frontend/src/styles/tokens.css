@@ -1,53 +1,69 @@
 :root {
   color-scheme: light dark;
 
-  /* Native/system typography keeps the workbench visually platform-aligned. */
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  /* Light appearance: quiet Material-neutral layers. */
-  --color-canvas: #f5f5f5;
-  --color-shell: #eeeeee;
+  /* Neutral application layers. */
+  --color-canvas: #f5f6f8;
+  --color-shell: #eef0f3;
   --color-surface: #ffffff;
-  --color-surface-raised: #fafafa;
-  --color-surface-muted: #f5f5f5;
-  --color-surface-overlay: #eeeeee;
+  --color-surface-raised: #fafbfc;
+  --color-surface-muted: #f3f5f7;
+  --color-surface-overlay: #eceff2;
   --color-field: #ffffff;
-  --color-media: #0b0e0c;
-  --color-control-hover: #eeeeee;
-  --color-control-pressed: #e0e0e0;
+  --color-media: #0b0d10;
+  --color-control-hover: #eef2f6;
+  --color-control-pressed: #e2e7ed;
 
-  /* Borders create most light-theme depth. */
-  --color-border-subtle: #e0e0e0;
-  --color-border-default: #bdbdbd;
-  --color-border-strong: #757575;
+  --color-border-subtle: #e0e4e8;
+  --color-border-default: #c5cbd2;
+  --color-border-strong: #7b848e;
 
-  /* “On surface” text roles. */
-  --color-text-primary: #212121;
-  --color-text-secondary: #616161;
-  --color-text-muted: #757575;
-  --color-text-disabled: #9e9e9e;
-  --color-text-inverse: #f5f5f5;
+  /* Material-style "on surface" hierarchy. */
+  --color-text-primary: #202124;
+  --color-text-secondary: #50565e;
+  --color-text-muted: #6d747d;
+  --color-text-disabled: #9aa0a6;
+  --color-text-inverse: #ffffff;
 
-  /* One Blue Grey interaction family; semantic colors are not decoration. */
-  --color-accent: #455a64;
-  --color-accent-hover: #37474f;
-  --color-accent-active: #263238;
-  --color-accent-surface: #eceff1;
-  --color-focus: #546e7a;
-  --color-selection: #cfd8dc;
+  /*
+   * Product colors:
+   * primary = main actions/navigation;
+   * secondary = selective controls/progress;
+   * neither is used as a generic status color.
+   */
+  --color-primary: #315f9e;
+  --color-primary-hover: #274f85;
+  --color-primary-active: #1f426f;
+  --color-primary-surface: #e8eef7;
+  --color-on-primary: #ffffff;
 
-  /* Semantic state colors. */
-  --color-success: #3e6f48;
-  --color-success-surface: #e9f2ea;
-  --color-warning: #85621f;
-  --color-warning-surface: #f4ebd7;
-  --color-danger: #a1453f;
-  --color-danger-surface: #f6e5e3;
-  --color-info: #3b6680;
-  --color-info-surface: #e5eef3;
+  --color-secondary: #00796b;
+  --color-secondary-hover: #00695c;
+  --color-secondary-active: #00574c;
+  --color-secondary-surface: #e0f2f1;
+  --color-on-secondary: #ffffff;
 
-  /* Camera / SVG scene colors stay legible regardless of app appearance. */
+  /* Compatibility aliases for existing components. */
+  --color-accent: var(--color-primary);
+  --color-accent-hover: var(--color-primary-hover);
+  --color-accent-active: var(--color-primary-active);
+  --color-accent-surface: var(--color-primary-surface);
+  --color-focus: var(--color-primary);
+  --color-selection: #cbdaf0;
+
+  /* Semantic state colors are reserved for meaning. */
+  --color-success: #2e7d32;
+  --color-success-surface: #e8f5e9;
+  --color-warning: #8a5d00;
+  --color-warning-surface: #fff4d6;
+  --color-danger: #b3261e;
+  --color-danger-surface: #fce8e6;
+  --color-info: #315f9e;
+  --color-info-surface: #e8eef7;
+
+  /* Camera / SVG scene colors remain independent of the application theme. */
   --color-scene-sky: #1b1f1d;
   --color-scene-road: #2a302c;
   --color-overlay-label: #ffffff;
@@ -67,7 +83,6 @@
   --color-signal-off: #2a2f2c;
   --color-signal-lamp-border: rgba(255, 255, 255, 0.18);
 
-  /* 4px spacing rhythm. */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -76,22 +91,20 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  /* Compact desktop geometry. */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-pill: 999px;
   --border-width: 1px;
 
-  --shadow-panel: 0 1px 2px rgba(28, 34, 30, 0.08);
+  --shadow-panel: 0 1px 2px rgba(27, 31, 36, 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     /*
-     * Material 2 dark-theme surface ramp.
-     * Base #121212 plus progressively stronger white elevation overlays:
-     * 0dp 0%, 1dp 5%, 2dp 7%, 4dp 9%, 8dp 12%.
+     * Material 2 dark-theme elevation ramp:
+     * base #121212 plus progressively lighter surfaces.
      */
     --color-dark-surface-0: #121212;
     --color-dark-surface-1: #1e1e1e;
@@ -110,27 +123,36 @@
     --color-control-hover: var(--color-dark-surface-4);
     --color-control-pressed: var(--color-dark-surface-8);
 
-    /* Material-like on-surface hierarchy: high, medium, then disabled emphasis. */
-    --color-text-primary: #e0e0e0;
-    --color-text-secondary: #bdbdbd;
-    --color-text-muted: #a0a0a0;
-    --color-text-disabled: #6d6d6d;
+    --color-text-primary: #e8eaed;
+    --color-text-secondary: #bdc1c6;
+    --color-text-muted: #9aa0a6;
+    --color-text-disabled: #6f7378;
     --color-text-inverse: #121212;
 
-    /* Low-opacity on-surface strokes replace heavy dark-theme borders. */
     --color-border-subtle: rgba(255, 255, 255, 0.08);
-    --color-border-default: rgba(255, 255, 255, 0.14);
-    --color-border-strong: rgba(255, 255, 255, 0.32);
+    --color-border-default: rgba(255, 255, 255, 0.16);
+    --color-border-strong: rgba(255, 255, 255, 0.36);
 
-    /* Material Blue Grey 200 family: light/desaturated on dark surfaces. */
-    --color-accent: #b0bec5;
-    --color-accent-hover: #cfd8dc;
-    --color-accent-active: #90a4ae;
-    --color-accent-surface: rgba(176, 190, 197, 0.12);
-    --color-focus: #cfd8dc;
-    --color-selection: rgba(176, 190, 197, 0.22);
+    /* Lighter variants preserve legibility on dark surfaces. */
+    --color-primary: #90caf9;
+    --color-primary-hover: #bbdefb;
+    --color-primary-active: #64b5f6;
+    --color-primary-surface: rgba(144, 202, 249, 0.12);
+    --color-on-primary: #0d1b2a;
 
-    /* Light semantic tones are sparse accents, not large background fills. */
+    --color-secondary: #80cbc4;
+    --color-secondary-hover: #b2dfdb;
+    --color-secondary-active: #4db6ac;
+    --color-secondary-surface: rgba(128, 203, 196, 0.12);
+    --color-on-secondary: #0d1b2a;
+
+    --color-accent: var(--color-primary);
+    --color-accent-hover: var(--color-primary-hover);
+    --color-accent-active: var(--color-primary-active);
+    --color-accent-surface: var(--color-primary-surface);
+    --color-focus: var(--color-primary);
+    --color-selection: rgba(144, 202, 249, 0.24);
+
     --color-success: #a5d6a7;
     --color-success-surface: rgba(165, 214, 167, 0.10);
     --color-warning: #ffe082;
@@ -140,7 +162,6 @@
     --color-info: #90caf9;
     --color-info-surface: rgba(144, 202, 249, 0.10);
 
-    /* Dark-theme depth comes from surface lightness, not floating shadows. */
     --shadow-panel: none;
   }
 }

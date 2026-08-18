@@ -4,23 +4,23 @@ import { PROJECT_VERSION_LABEL } from "./projectVersion";
 export const APP_VERSION_LABEL = PROJECT_VERSION_LABEL;
 
 export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
-  dashboard: { id: "dashboard", label: "Dashboard", shortLabel: "Dashboard", description: "Current project version, smoke checks, implemented functions, and explicit prototype boundaries.", status: "test-ready" },
-  live_ai: { id: "live_ai", label: "Live AI View", shortLabel: "Live AI", description: "Preview receiver or simulation frames with trained-model detections, persisted zone overlays, and a compact simulated traffic signal.", status: "test-ready" },
-  camera_sources: { id: "camera_sources", label: "Camera Sources", shortLabel: "Cameras", description: "Receive device frames or run the controllable PC traffic simulation with density and pause controls.", status: "test-ready" },
-  zone_editor: { id: "zone_editor", label: "Zone Editor", shortLabel: "Zones", description: "Create, edit, persist, and reset traffic or analytics counting regions directly over the current camera/simulation feed.", status: "test-ready" },
-  traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Evaluate live trained-model detections against configured zones and show simulation-only phase recommendations.", status: "test-ready" },
-  traffic_analytics: { id: "traffic_analytics", label: "Traffic Analytics", shortLabel: "Analytics", description: "Plot sampled pedestrian/vehicle occupancy over time, inspect region-specific trends, summaries, phase events, and CSV exports.", status: "test-ready" },
-  dataset_capture: { id: "dataset_capture", label: "Dataset Capture", shortLabel: "Capture", description: "Persist receiver or simulation images with paired metadata and quality tags, and delete unwanted captures.", status: "test-ready" },
-  dataset_review: { id: "dataset_review", label: "Dataset Review", shortLabel: "Review / Label", description: "Browse or delete saved frames, draw manual bounding boxes, and build the managed YOLO training dataset.", status: "test-ready" },
-  train_export: { id: "train_export", label: "Train / Export", shortLabel: "Train", description: "Run local YOLO training with convergence monitoring and automatic early stopping; export remains planned.", status: "test-ready" },
-  model_registry: { id: "model_registry", label: "Model Registry", shortLabel: "Models", description: "Review local trained models, set a default model, load a chosen model, and delete outdated runs.", status: "test-ready" },
-  settings: { id: "settings", label: "Settings", shortLabel: "Settings", description: "Persist active viewer, training, inference, and backend logging preferences.", status: "test-ready" },
-  logs: { id: "logs", label: "Logs & Errors", shortLabel: "Logs", description: "Inspect recent real backend logs, error codes, request IDs, and module scope.", status: "test-ready" },
+  dashboard: { id: "dashboard", label: "Dashboard", shortLabel: "Dashboard", description: "System health, release state, validation checks, and the capabilities available in this local prototype.", status: "test-ready" },
+  live_ai: { id: "live_ai", label: "Live AI", shortLabel: "Live AI", description: "Run the selected local detection model on camera or simulation frames and inspect detections, zones, tracks, and simulated signal context.", status: "test-ready" },
+  camera_sources: { id: "camera_sources", label: "Camera Sources", shortLabel: "Cameras", description: "Use the built-in traffic simulation or receive JPEG/PNG frames from a camera node on the local network.", status: "test-ready" },
+  zone_editor: { id: "zone_editor", label: "Zone Editor", shortLabel: "Zones", description: "Define traffic decision zones, analytics regions, and counting lines directly against the current camera reference frame.", status: "test-ready" },
+  traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Configure the simulated signal policy, inspect the live phase decision, test bounded adaptive rules, and review decision history.", status: "test-ready" },
+  traffic_analytics: { id: "traffic_analytics", label: "Traffic Analytics", shortLabel: "Analytics", description: "Inspect sampled occupancy separately from tracked flow events, with time filters, summaries, charts, and CSV export.", status: "test-ready" },
+  dataset_capture: { id: "dataset_capture", label: "Dataset Capture", shortLabel: "Capture", description: "Save the current camera or simulation frame with session metadata, a quality tag, and an optional note.", status: "test-ready" },
+  dataset_review: { id: "dataset_review", label: "Dataset Review", shortLabel: "Review / Label", description: "Review captured images, draw manual bounding boxes, remove unsuitable captures, and build the managed YOLO dataset.", status: "test-ready" },
+  train_export: { id: "train_export", label: "Train / Export", shortLabel: "Train", description: "Run local YOLO training, monitor validation convergence, and use patience-based early stopping. Runtime export remains planned.", status: "test-ready" },
+  model_registry: { id: "model_registry", label: "Model Registry", shortLabel: "Models", description: "Inspect local training runs, load a model for inference, choose the default model, or remove an obsolete run.", status: "test-ready" },
+  settings: { id: "settings", label: "Settings", shortLabel: "Settings", description: "Configure persisted inference, polling, training, and logging defaults used by PC Studio.", status: "test-ready" },
+  logs: { id: "logs", label: "Logs & Errors", shortLabel: "Logs", description: "Inspect recent backend events with severity, module scope, stable error code, and request ID context.", status: "test-ready" },
 };
 
 export const APP_SECTIONS: AppSection[] = [
   { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources] },
-  { id: "traffic", label: "Traffic setup & analytics", pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics] },
-  { id: "data", label: "Data & model", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry] },
+  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics] },
+  { id: "data", label: "Data & models", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry] },
   { id: "system", label: "System", pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs] },
 ];

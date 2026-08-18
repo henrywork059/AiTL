@@ -108,8 +108,8 @@ export function DatasetReviewPage() {
       setLabels(saved.labels);
       setDirty(false);
       setMessage(saved.labels.length === 0
-        ? "Reviewed negative saved: this frame is labeled with zero objects."
-        : `Saved ${saved.labels.length} bounding-box label${saved.labels.length === 1 ? "" : "s"}.`);
+        ? "Review saved as a negative example with zero objects."
+        : `Saved ${saved.labels.length} bounding box${saved.labels.length === 1 ? "" : "es"}.`);
       await Promise.all([refreshCaptures(selectedCapture.capture_id), refreshTrainingDataset()]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Labels could not be saved.");
@@ -120,8 +120,8 @@ export function DatasetReviewPage() {
 
   async function deleteSelectedCapture() {
     if (!selectedCapture) return;
-    if (dirty && !window.confirm("This frame has unsaved label changes. Delete the captured image and discard those changes?")) return;
-    if (!window.confirm(`Delete captured image ${selectedCapture.capture_id}? The image, metadata, and saved manual labels will be permanently removed.`)) return;
+    if (dirty && !window.confirm("This image has unsaved label changes. Delete the capture and discard those edits?")) return;
+    if (!window.confirm(`Permanently delete capture ${selectedCapture.capture_id}? The image, metadata, and saved manual labels will be removed.`)) return;
     setDeleting(true);
     setError(null);
     setMessage(null);
@@ -133,7 +133,7 @@ export function DatasetReviewPage() {
       setTrainingDataset(result.training_dataset);
       await refreshCaptures(null);
       setMessage(result.training_dataset.stale
-        ? `Deleted ${result.capture_id}. The managed YOLO dataset is now stale and should be rebuilt.`
+        ? `Deleted ${result.capture_id}. Rebuild the managed YOLO dataset before the next training run.`
         : `Deleted ${result.capture_id}.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Captured image could not be deleted.");
@@ -149,7 +149,7 @@ export function DatasetReviewPage() {
     try {
       const status = await buildTrainingDataset(0.2);
       setTrainingDataset(status);
-      setMessage(`Built ${status.train_count} training and ${status.val_count} validation frames at ${status.dataset_yaml}.`);
+      setMessage(`Managed dataset ready: ${status.train_count} train / ${status.val_count} validation frames.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Training dataset could not be built.");
     } finally {
@@ -163,29 +163,30 @@ export function DatasetReviewPage() {
         <aside className="panel capture-browser-panel">
           <div className="panel-header">
             <div>
-              <h2>Captured frames</h2>
-              <p className="placeholder-copy">{captures.length} saved frame{captures.length === 1 ? "" : "s"}</p>
+              <h2>Captured images</h2>
+              <p className="placeholder-copy">Select an image to review or label.</p>
             </div>
-            <button onClick={() => void refreshCaptures(selectedCaptureId)} disabled={loading || deleting}>Refresh</button>
+            <span className="status-pill muted">{captures.length} saved</span>
           </div>
+          <button onClick={() => void refreshCaptures(selectedCaptureId)} disabled={loading || deleting}>Refresh list</button>
           <div className="capture-browser-list">
             {captures.map((capture) => (
               <button
                 key={capture.capture_id}
                 className={`capture-browser-item ${capture.capture_id === selectedCaptureId ? "active" : ""}`}
                 onClick={() => {
-                  if (dirty && !window.confirm("Discard unsaved label changes and switch frames?")) return;
+                  if (dirty && !window.confirm("Discard unsaved label changes and switch images?")) return;
                   setSelectedCaptureId(capture.capture_id);
                   setMessage(null);
                 }}
               >
                 <strong>{capture.session_id}</strong>
                 <span>{capture.quality_tag} · {capture.origin}</span>
-                <span>{capture.labeled ? `${capture.label_count} boxes · reviewed` : "unreviewed"}</span>
+                <span>{capture.labeled ? `${capture.label_count} boxes · reviewed` : "not reviewed"}</span>
               </button>
             ))}
             {!loading && captures.length === 0 && (
-              <p className="small-note">No captures yet. Save at least two frames in Dataset Capture before labeling.</p>
+              <p className="small-note">No captures yet. Save at least two usable frames before building a train/validation dataset.</p>
             )}
           </div>
         </aside>
@@ -193,11 +194,11 @@ export function DatasetReviewPage() {
         <main className="panel labeling-workspace">
           <div className="panel-header">
             <div>
-              <h2>Manual bounding-box labels</h2>
-              <p className="placeholder-copy">Drag on the saved image to add a box for the selected class.</p>
+              <h2>Annotation workspace</h2>
+              <p className="placeholder-copy">Choose a class, then drag on the saved image to draw a bounding box.</p>
             </div>
-            <span className={`status-pill ${labelDocument?.reviewed ? "" : "status-planned"}`}>
-              {labelDocument?.reviewed ? "reviewed" : "unreviewed"}
+            <span className={`status-pill ${labelDocument?.reviewed ? "status-implemented" : "status-planned"}`}>
+              {labelDocument?.reviewed ? "reviewed" : "not reviewed"}
             </span>
           </div>
 
@@ -211,9 +212,9 @@ export function DatasetReviewPage() {
                 </label>
                 <div className="label-toolbar-actions">
                   <button onClick={() => updateLabels([])} disabled={labels.length === 0 || deleting}>Clear boxes</button>
-                  <button onClick={() => void saveLabels()} disabled={saving || deleting}>{saving ? "Saving..." : "Save labels"}</button>
-                  <button onClick={() => void deleteSelectedCapture()} disabled={saving || deleting}>
-                    {deleting ? "Deleting..." : "Delete captured image"}
+                  <button className="primary" onClick={() => void saveLabels()} disabled={saving || deleting}>{saving ? "Saving..." : "Save review"}</button>
+                  <button className="danger" onClick={() => void deleteSelectedCapture()} disabled={saving || deleting}>
+                    {deleting ? "Deleting..." : "Delete capture"}
                   </button>
                 </div>
               </div>
@@ -227,7 +228,7 @@ export function DatasetReviewPage() {
                 onChange={updateLabels}
               />
               <p className="small-note">
-                Deleting a capture also removes its metadata and saved manual labels. If that capture was included in the managed YOLO build, the dataset becomes stale until rebuilt.
+                Saving zero boxes marks this as a reviewed negative example. Deleting a capture also removes its metadata and saved labels.
               </p>
               <div className="saved-label-list">
                 {labels.map((label, index) => (
@@ -236,13 +237,13 @@ export function DatasetReviewPage() {
                     <button onClick={() => updateLabels(labels.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>
                   </div>
                 ))}
-                {labels.length === 0 && <p className="small-note">No boxes on this frame.</p>}
+                {labels.length === 0 && <p className="small-note">No boxes on this image.</p>}
               </div>
             </>
           ) : (
-            <div className="label-empty-state">Select or capture a frame to start manual labeling.</div>
+            <div className="label-empty-state">Select a captured image to begin review.</div>
           )}
-          {dirty && <p className="small-note">Unsaved label changes.</p>}
+          {dirty && <p className="warning-box">This image has unsaved label changes.</p>}
           {message && <p className="success-message">{message}</p>}
           {error && <p className="error-message">{error}</p>}
         </main>
@@ -251,10 +252,10 @@ export function DatasetReviewPage() {
       <section className="panel managed-dataset-panel">
         <div className="panel-header">
           <div>
-            <h2>Managed YOLO training dataset</h2>
-            <p className="placeholder-copy">Builds the default <code>datasets/yolo/data.yaml</code> used by Train / Export.</p>
+            <h2>Managed YOLO dataset</h2>
+            <p className="placeholder-copy">Builds the default <code>datasets/yolo/data.yaml</code> used by the training page from reviewed, eligible captures.</p>
           </div>
-          <span className={`status-pill ${trainingDataset?.ready ? "" : "status-planned"}`}>
+          <span className={`status-pill ${trainingDataset?.ready ? "status-implemented" : trainingDataset?.stale ? "status-planned" : ""}`}>
             {trainingDataset?.ready ? "ready" : trainingDataset?.stale ? "rebuild required" : "not built"}
           </span>
         </div>
@@ -265,8 +266,8 @@ export function DatasetReviewPage() {
           <div><span>Train / Val</span><strong>{trainingDataset?.train_count ?? 0} / {trainingDataset?.val_count ?? 0}</strong></div>
         </div>
         <p className="small-note">{trainingDataset?.message ?? "Checking managed dataset status..."}</p>
-        <button onClick={() => void buildDataset()} disabled={building || (trainingDataset?.eligible_frame_count ?? 0) < 2}>
-          {building ? "Building..." : trainingDataset?.ready ? "Rebuild training dataset" : "Build training dataset"}
+        <button className="primary" onClick={() => void buildDataset()} disabled={building || (trainingDataset?.eligible_frame_count ?? 0) < 2}>
+          {building ? "Building..." : trainingDataset?.ready ? "Rebuild managed dataset" : "Build managed dataset"}
         </button>
       </section>
 
