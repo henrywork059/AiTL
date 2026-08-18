@@ -119,3 +119,12 @@ The V024 repair:
 - extends `scripts/test_update_test_run_script.py` to reject line-leading `elif (` and require the expected `elseif (` branch.
 
 No backend, frontend application, API, dataset, signal-rule, or runtime-data behavior changes are introduced by this repair.
+
+## Same-candidate simulation frame presentation refinement
+
+Owner review of the Live AI simulation frame found two scene overlays visually oversized: the top-left simulation metadata banner and the right-side pedestrian signal display. This V024 refinement reduces both without changing the signal logic, traffic-agent behavior, or API contracts.
+
+Changes:
+- shrink the top-left simulation status banner, tighten its line spacing, and keep the frame/paused state on the same compact summary row;
+- reduce the traffic-signal housing and the pedestrian WAIT/WALK/CLEAR panel so the right lane and crossing remain more visible;
+- add `scripts/test_simulation_frame_layout.py` to confirm the compact metadata panel and smaller pedestrian signal leave more scene area exposed.

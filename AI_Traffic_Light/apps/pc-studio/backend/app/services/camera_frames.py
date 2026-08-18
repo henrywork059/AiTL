@@ -544,38 +544,37 @@ class CameraFrameService:
                 stride=stride_sign if index % 2 == 0 else -stride_sign,
             )
         self._draw_signal_heads(canvas, signal)
-        cv2.rectangle(canvas, (24, 20), (720, 158), (14, 17, 20), thickness=-1)
-        cv2.putText(canvas, "PC CAMERA SIMULATION - SIGNAL AWARE", (46, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (126, 231, 135), 2)
+        cv2.rectangle(canvas, (24, 20), (564, 126), (14, 17, 20), thickness=-1)
+        cv2.putText(canvas, "PC CAMERA SIMULATION - SIGNAL AWARE", (42, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (126, 231, 135), 2)
         cv2.putText(
             canvas,
             f"density: {self._simulation_density}   pedestrians: {len(self._pedestrians)}   vehicles: {len(self._vehicles)}",
-            (46, 82),
+            (42, 72),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.50,
+            0.42,
             (217, 221, 224),
             1,
         )
         cv2.putText(
             canvas,
             f"signal: {signal['phase'].replace('_', ' ')}   {signal['seconds_remaining']:.1f}s",
-            (46, 108),
+            (42, 94),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.52,
+            0.44,
             (217, 221, 224),
             1,
         )
         rule_label = ", ".join(signal.get("active_rules", [])[:2]) or "normal timing"
+        state_label = "paused" if self._simulation_paused else f"frame {self._frame_counter}"
         cv2.putText(
             canvas,
-            f"policy: {signal.get('mode', 'fixed')} / {signal.get('active_profile', 'Normal')}   {rule_label}",
-            (46, 132),
+            f"policy: {signal.get('mode', 'fixed')} / {signal.get('active_profile', 'Normal')}   {rule_label}   {state_label}",
+            (42, 116),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.45,
+            0.38,
             (217, 221, 224),
             1,
         )
-        state_label = "PAUSED - inspection frame" if self._simulation_paused else f"frame {self._frame_counter}"
-        cv2.putText(canvas, state_label, (46, 153), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (217, 221, 224), 1)
         encoded_ok, encoded = cv2.imencode(".png", canvas)
         if not encoded_ok:
             raise AppError(
@@ -600,22 +599,26 @@ class CameraFrameService:
         red_on = phase not in {"vehicle_green", "vehicle_yellow"}
         amber_on = phase == "vehicle_yellow"
         green_on = phase == "vehicle_green"
-        housing_x, housing_y = 1060, 185
-        cv2.rectangle(canvas, (housing_x, housing_y), (housing_x + 78, housing_y + 222), (18, 20, 23), thickness=-1)
+        housing_x, housing_y = 1084, 206
+        housing_width, housing_height = 66, 186
+        cv2.rectangle(canvas, (housing_x, housing_y), (housing_x + housing_width, housing_y + housing_height), (18, 20, 23), thickness=-1)
         lamps = [
-            ((housing_x + 39, housing_y + 42), (35, 35, 120), (70, 70, 255), red_on),
-            ((housing_x + 39, housing_y + 109), (35, 95, 110), (0, 205, 255), amber_on),
-            ((housing_x + 39, housing_y + 176), (35, 95, 35), (60, 220, 80), green_on),
+            ((housing_x + 33, housing_y + 34), (35, 35, 120), (70, 70, 255), red_on),
+            ((housing_x + 33, housing_y + 93), (35, 95, 110), (0, 205, 255), amber_on),
+            ((housing_x + 33, housing_y + 152), (35, 95, 35), (60, 220, 80), green_on),
         ]
         for center, off_color, on_color, active in lamps:
-            cv2.circle(canvas, center, 24, on_color if active else off_color, thickness=-1)
+            cv2.circle(canvas, center, 19, on_color if active else off_color, thickness=-1)
         ped_walk = phase == "pedestrian_green"
         ped_clear = phase == "pedestrian_flashing"
-        cv2.rectangle(canvas, (1148, 218), (1262, 340), (18, 20, 23), thickness=-1)
+        ped_x, ped_y = 1158, 228
+        ped_width, ped_height = 84, 92
+        cv2.rectangle(canvas, (ped_x, ped_y), (ped_x + ped_width, ped_y + ped_height), (18, 20, 23), thickness=-1)
         ped_text = "WALK" if ped_walk else "CLEAR" if ped_clear else "WAIT"
         ped_color = (70, 230, 90) if ped_walk else (0, 205, 255) if ped_clear else (70, 70, 255)
-        cv2.putText(canvas, "PED", (1179, 251), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 1)
-        cv2.putText(canvas, ped_text, (1158, 303), cv2.FONT_HERSHEY_SIMPLEX, 0.58, ped_color, 2)
+        cv2.putText(canvas, "PED", (ped_x + 20, ped_y + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (220, 220, 220), 1)
+        text_x = ped_x + 10 if ped_text == "CLEAR" else ped_x + 15
+        cv2.putText(canvas, ped_text, (text_x, ped_y + 63), cv2.FONT_HERSHEY_SIMPLEX, 0.48, ped_color, 2)
 
 
 camera_frame_service = CameraFrameService()

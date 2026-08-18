@@ -2,6 +2,8 @@
 
 ## 0_2_4 — Maintenance hardening and polling optimization
 
+- Refined the signal-aware simulator presentation by shrinking the top-left metadata banner and the right-side pedestrian signal display so more of the synthetic roadway remains visible in Live AI and Camera views.
+
 - Same-candidate Windows runner repair: replace an invalid Python-style `elif` with PowerShell `elseif` after the frontend/build checks, and extend the runner regression to reject that syntax error before handoff.
 
 - Same-candidate Windows atomic-write repair: serialize the final `os.replace` step and retry bounded transient `PermissionError` sharing violations; keep 32-writer concurrency coverage and add a deterministic retry-path regression.
