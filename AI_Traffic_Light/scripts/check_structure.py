@@ -266,7 +266,7 @@ def validate_atomic_json_persistence(root: Path, errors: list[str]) -> None:
     helper = root / "apps/pc-studio/backend/app/core/json_store.py"
     if helper.exists():
         helper_text = helper.read_text(encoding="utf-8")
-        for required in ("tempfile.mkstemp", "os.fsync", "os.replace"):
+        for required in ("tempfile.mkstemp", "os.fsync", "os.replace", "_REPLACE_LOCK", "PermissionError", "time.sleep"):
             if required not in helper_text:
                 add_error(errors, f"Atomic JSON helper is missing required operation: {required}")
 

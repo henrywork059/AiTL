@@ -94,3 +94,18 @@ V024 also refines PC Studio presentation without changing application behavior. 
 - Safety copy remains explicit that signal output is simulation-only; no live wheelchair/fall detection is claimed.
 
 No endpoint, schema, signal algorithm, model format, or runtime-data format changes are introduced by this presentation refinement.
+## Same-candidate Windows atomic-write repair
+
+Owner testing on Windows exposed a transient `PermissionError` at the final `os.replace()` step while the atomic-store regression intentionally issued many concurrent writes to one destination. Unique temporary names prevented temp-file collisions, but Windows can still reject simultaneous replacement of the same destination.
+
+The V024 repair keeps unique same-directory temporary files and fsync, then:
+
+- serializes only the final atomic replacement step with an in-process `RLock`;
+- retries a small bounded sequence of transient `PermissionError` failures before surfacing a persistent permission problem;
+- preserves the previous destination if serialization/write/replacement ultimately fails;
+- retains the 32-writer concurrency regression;
+- adds a deterministic simulated transient-Windows-sharing regression so the retry path is exercised on all platforms;
+- extends `check_structure.py` so the replacement lock/retry safeguards cannot be silently removed.
+
+No API, schema, signal-policy, dataset/model format, frontend behavior, or version-state changes are introduced. This remains V024 / `0_2_4` candidate with `passed_baseline: 0_2_2`.
+

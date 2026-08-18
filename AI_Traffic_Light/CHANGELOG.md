@@ -2,6 +2,7 @@
 
 ## 0_2_4 — Maintenance hardening and polling optimization
 
+- Same-candidate Windows atomic-write repair: serialize the final `os.replace` step and retry bounded transient `PermissionError` sharing violations; keep 32-writer concurrency coverage and add a deterministic retry-path regression.
 - Refined PC Studio presentation using Material role-based color semantics: neutral surfaces dominate, primary blue identifies navigation/main actions, secondary teal is sparse for selection/progress, and generic badges are neutral instead of implicitly green.
 - Reworked visible UI copy across Dashboard, Camera Sources, Live AI, Zones, Analytics, Dataset, Training, Models, Settings, Logs, navigation, and capability panels to describe current tasks/states rather than old version history or placeholder language.
 - Added explicit primary/secondary/on-color roles, semantic action/button hierarchy, clearer destructive treatment, and copy/style guardrails while preserving the Material `#121212` dark surface ramp and system light/dark adaptation.
