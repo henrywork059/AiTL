@@ -2,6 +2,8 @@
 
 ## 0_2_4 — Maintenance hardening and polling optimization
 
+- Same-candidate Windows runner repair: replace an invalid Python-style `elif` with PowerShell `elseif` after the frontend/build checks, and extend the runner regression to reject that syntax error before handoff.
+
 - Same-candidate Windows atomic-write repair: serialize the final `os.replace` step and retry bounded transient `PermissionError` sharing violations; keep 32-writer concurrency coverage and add a deterministic retry-path regression.
 - Refined PC Studio presentation using Material role-based color semantics: neutral surfaces dominate, primary blue identifies navigation/main actions, secondary teal is sparse for selection/progress, and generic badges are neutral instead of implicitly green.
 - Reworked visible UI copy across Dashboard, Camera Sources, Live AI, Zones, Analytics, Dataset, Training, Models, Settings, Logs, navigation, and capability panels to describe current tasks/states rather than old version history or placeholder language.

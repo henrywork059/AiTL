@@ -162,7 +162,7 @@ if (-not $SkipTests) {
         Pop-Location
     }
 }
-elif (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
+elseif (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
     Push-Location $frontendDir
     try {
         Run-Step "Frontend dependencies" { npm ci }

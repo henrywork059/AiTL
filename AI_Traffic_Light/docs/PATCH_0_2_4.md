@@ -109,3 +109,13 @@ The V024 repair keeps unique same-directory temporary files and fsync, then:
 
 No API, schema, signal-policy, dataset/model format, frontend behavior, or version-state changes are introduced. This remains V024 / `0_2_4` candidate with `passed_baseline: 0_2_2`.
 
+## Same-candidate Windows runner syntax repair
+
+Owner-local V024 validation exposed a PowerShell syntax error after all backend regressions and frontend typecheck/build had passed: the helper used Python-style `elif` for the `-SkipTests` dependency branch. PowerShell requires `elseif`.
+
+The V024 repair:
+- replaces `elif` with `elseif`;
+- keeps the existing `-SkipTests` behavior unchanged;
+- extends `scripts/test_update_test_run_script.py` to reject line-leading `elif (` and require the expected `elseif (` branch.
+
+No backend, frontend application, API, dataset, signal-rule, or runtime-data behavior changes are introduced by this repair.

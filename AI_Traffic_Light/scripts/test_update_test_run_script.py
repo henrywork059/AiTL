@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PROJECT_ROOT / "scripts" / "update_test_run.ps1"
@@ -20,10 +21,13 @@ def main() -> int:
     assert "test_backend_smoke.py" in text
     assert "--strictPort" in text
     assert "Start-Sleep -Seconds 2" not in text
+    assert not re.search(r"(?m)^\s*elif\s*\(", text), "PowerShell runner must use elseif, not elif"
+    assert re.search(r"(?m)^\s*elseif\s*\(", text), "PowerShell runner should retain the SkipTests dependency branch"
 
     print("[PASS] update/test/run helper protects tracked work and only fast-forwards main")
     print("[PASS] pulled runner reloads itself before testing the newly updated code")
     print("[PASS] dependency refresh, automatic live smoke, readiness waits, and strict ports are enforced")
+    print("[PASS] PowerShell control-flow syntax uses elseif and rejects Python-style elif")
     print("[PASS] helper never uses destructive git clean")
     return 0
 
