@@ -2,26 +2,37 @@
 
 This folder contains camera-node code and instructions.
 
-The initial project treats the camera device as a **frame sender only**.
+The camera device is a **frame sender only**. The PC remains responsible for AI inference, detection/segmentation, training, GUI, dataset persistence, analytics, and traffic-light simulation/recommendation logic.
 
-The PC does:
+## Implemented camera node
 
-- AI inference
-- detection/segmentation
-- training
-- GUI
-- data saving
+`esp32-cam/` now contains a working PlatformIO sender for the common AI Thinker ESP32-CAM layout.
 
-The camera device does:
+Its data path is:
 
-- Wi-Fi connection
-- camera capture
-- MJPEG/JPEG stream
+```text
+ESP32-CAM captures JPEG
+→ Wi-Fi
+→ HTTP POST raw JPEG
+→ PC Studio /api/camera/frame?source_id=<camera_id>
+```
 
-## Recommended first hardware options
+The firmware includes Wi-Fi reconnect, camera reinitialization attempts, bounded HTTP timeouts, serial diagnostics, and a local `/status` endpoint.
 
-1. Webcam connected directly to PC.
-2. Phone/IP camera stream.
-3. ESP32-CAM MJPEG stream.
+See:
 
-Use webcam/video first. Add ESP32-CAM after the PC app works.
+```text
+apps/device-camera/esp32-cam/README.md
+```
+
+for configuration, wiring, flashing, and acceptance checks.
+
+## Other possible camera sources
+
+- Webcam connected directly to the PC.
+- Phone/IP camera integration in a future receiver path.
+- Additional ESP camera nodes after PC Studio gains per-source frame retention/routing.
+
+## Important project rule
+
+Do not move heavy training/inference onto the ESP camera node. Do not use this prototype as a public-road traffic controller.
