@@ -1,17 +1,15 @@
-# Local Testing Notes (V024)
+# Local Testing Notes (V025)
 
-V024 / `0_2_4` is the current candidate. V023 / `0_2_3` is the previous candidate; V022 / `0_2_2` remains the owner-confirmed passed baseline because V023 was not explicitly accepted. Automated checks do not promote V024.
+V025 / `0_2_5` is the current candidate. V024 / `0_2_4` is the previous version and is now the owner-confirmed passed baseline. Automated checks do not promote V025.
 
 ## Quick Windows workflow
-
-For the normal update → test → run path, V024 includes:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\scripts\update_test_run.ps1
 ```
 
-The helper checks that you are on `main` with no tracked local edits, uses `git pull --ff-only`, reloads the pulled script, synchronizes dependencies, runs backend regressions plus frontend typecheck/build and `git diff --check`, starts the backend, waits for health, runs live smoke automatically, then starts the frontend on strict port 5173 and opens the app. It does not clean or delete runtime data. The detailed/manual checks below remain the acceptance authority.
+The V024 helper remains the normal update → test → run path: it protects tracked work, fast-forwards `main`, synchronizes dependencies, runs backend/frontend validation and live smoke, then launches PC Studio without deleting runtime data.
 
 ## 1. Safe update
 
@@ -27,12 +25,12 @@ Get-Content .\AI_Traffic_Light\VERSION
 Expected:
 
 ```text
-version: 0_2_4
-previous_version: 0_2_3
-passed_baseline: 0_2_2
+version: 0_2_5
+previous_version: 0_2_4
+passed_baseline: 0_2_4
 ```
 
-Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, and all analytics histories.
+Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, occupancy/flow/signal history, and `outputs/simulation_experiments/`.
 
 ## 2. Backend compile/structure/regression
 
@@ -52,21 +50,16 @@ foreach ($test in $tests) {
 }
 ```
 
-V024-focused maintenance scripts:
+V025-focused regressions:
 
 ```powershell
-& $py ".\scripts\test_atomic_json_store.py"
-& $py ".\scripts\test_frontend_polling_structure.py"
-& $py ".\scripts\test_runtime_settings_logs.py"
-& $py ".\scripts\test_zone_traffic_services.py"
-& $py ".\scripts\test_model_registry_service.py"
+& $py ".\scripts\test_signal_scenarios.py"
+& $py ".\scripts\test_simulation_experiments.py"
 ```
 
-V023 signal-rule regression retained:
+`test_signal_scenarios.py` verifies zone/class conditions, ALL matching, rank arbitration, unavailable-zone fallback, observed values, bounded phase adjustment, and preview behavior. `test_simulation_experiments.py` verifies same-seed repeatability, Fixed/Adaptive mode separation, adaptive scenario activity including zone-based scenarios, telemetry invariants, stored-run list/get/delete, and CSV export.
 
-```powershell
-& $py ".\scripts\test_signal_rules_service.py"
-```
+Retain the V024/V023 regressions including `test_atomic_json_store.py`, `test_frontend_polling_structure.py`, `test_signal_rules_service.py`, camera/simulation tests, tracking/flow tests, dataset/training/model tests, and all other `scripts/test_*.py` tests.
 
 ## 3. Frontend
 
@@ -95,60 +88,49 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\apps\pc-studio\backend\.venv\Scripts\python.exe .\scripts\test_backend_smoke.py
 ```
 
-## 5. V024 manual maintenance + inherited signal-rule checks
+## 5. V025 ranked scenario acceptance
 
+1. Confirm visible version is `0_2_5`, previous version is `0_2_4`, and `passed_baseline` is `0_2_4`.
+2. Open Traffic → **Traffic Logic**. Confirm tabs are Live Decision / Signal Timing / Scenario Rules / Test & Safety / History.
+3. In Scenario Rules, create a scenario using **Zone / class count**: choose a vehicle queue zone, class `car`, comparison `>`, threshold `2`, rank `1`, action Extend current phase by `4s`, target Vehicle green, requested service Vehicle. Save.
+4. Make the live/simulation observation satisfy the condition. Live Decision should show the scenario as the winner and show the observed car count beside the condition.
+5. Create a second simultaneously true scenario at rank `2`. Confirm rank `1` wins and rank `2` says it was suppressed by the higher-ranked winner.
+6. Swap the ranks, Save, and confirm the other scenario wins. Rank `1` is always highest; duplicate saved ranks are rejected so arbitration remains unambiguous.
+7. Edit the higher-ranked scenario to reference a nonexistent/deleted zone. Confirm it becomes **unavailable** and does not block the next eligible scenario.
+8. Add a two-condition scenario. In ALL mode, both conditions must match. In ANY mode, either matching condition is enough.
+9. Confirm persistence prevents immediate one-frame activation and cooldown prevents repeated adjustment after application.
+10. Configure a triggered scenario whose target-phase checkboxes exclude the current phase. It should be suppressed for phase applicability and the next eligible scenario may win.
+11. Confirm Fixed mode executes no adaptive scenario, while Adaptive mode uses live observations. Test mode additionally permits the explicit mobility/fall flags.
+12. Confirm Signal Timing still rejects invalid protected minimum/order values and scenario actions never jump directly between conflicting movement phases.
+13. Use Test & Safety preview/current observation and confirm preview does not mutate the running controller.
+14. Confirm History records scenario application details including scenario id/label/rank/action and phase timing change.
+15. Restart backend and confirm saved scenario definitions persist in `config/signal_rules.json`. An older V023/V024 config without `scenarios` should load through migration rather than fail.
+16. Confirm zone/class counts are described as per-frame observations, not throughput.
 
-1. Confirm visible version is `0_2_4`, previous version is `0_2_3`, and `passed_baseline` is `0_2_2`.
-2. Save Settings, restart backend, and confirm the values persist.
-3. Save/reset zones and confirm geometry persists; successful operations should not leave shared fixed `.tmp` files.
-4. Set/refresh a default model and confirm registry metadata persists. Only test model deletion with a disposable run you intend to remove.
-5. Keep Camera Sources / Live AI open during normal use; App-level camera/live-context polling should continue without stacked request bursts if one backend response is slow.
-6. Navigate away from Live AI and confirm those page-dependent top-level polls stop.
+## 6. V025 Simulation Lab acceptance
 
-Then run the inherited V023 functional checks:
-7. Start Simulation and open Traffic Logic.
-8. Watch a full default cycle and confirm protected order: vehicle green → yellow → all-red → WALK → CLEAR → all-red.
-9. Normal Timing: change a base duration, Save, and verify the next/current protected phase uses the saved timing without rapidly skipping phases.
-10. Navigate away/restart backend; verify saved signal rules persist.
-11. Try invalid timing (`yellow min` below protected lower bound or min > base/max); Save must fail without replacing saved valid config.
-12. Fixed mode: adaptive observations/rules do not change configured normal timing.
-13. Adaptive mode + loaded model/zones: heavy vehicle queue can extend vehicle green after persistence delay, bounded by max/cycle limits.
-14. Heavy/long-wait pedestrian demand can reduce vehicle green, never below configured minimum or time already served.
-15. Let observations become unavailable/stale; verify status explains fallback and normal configured timing is used.
-16. Confirm short detection dropouts do not immediately erase demand and one-frame spikes do not immediately trigger persistent rules.
-17. Confirm cooldown prevents the same adjustment from being repeatedly added every poll.
-18. Confirm rule list distinguishes active, suppressed, inactive, and unavailable states with reasons.
-19. Test mode: manual waiting pedestrian/vehicle counts affect rules; switching out of Test mode removes manual-only mobility/incident sources.
-20. Mobility assistance is clearly labelled Test/manual unless a compatible perception source exists.
-21. Trigger Person fallen / incident in Test mode; signal becomes simulated all-red and synthetic vehicles do not proceed.
-22. Clear Incident; controller resumes from a protected phase with a fresh timer rather than skipping through elapsed phases.
-23. Reset Adaptive State clears pending/cooldown/hysteresis/incident runtime state without deleting saved rules.
-24. Use preview buttons; results change without changing the active simulator state.
-25. Enable dry-run and verify rule evaluation remains visible while adaptive adjustments do not alter active duration.
-26. Decision History records phase/rule/config/reset/incident events; Clear History removes only `outputs/signal_rules/` history.
-27. Clear signal history does not delete occupancy/flow history, captures, labels, zones, settings, models, or training data.
-28. Recheck Simulation pause: scene and signal clock stay frozen.
-29. Recheck V022 tracking/counting-line flow and V021 occupancy analytics.
-30. Recheck capture/delete/label/training/model/settings/logs inherited behavior.
-31. Confirm no feature connects to physical/public-road traffic-light control.
+1. Open Traffic → **Simulation Lab**.
+2. At a normal desktop window size, confirm setup controls, stored-run controls, tabs, and the selected data panel stay inside one workspace page. The page must not render all metric groups as a long vertical dashboard.
+3. Confirm setup controls include Density, Duration, Signal profile, Seed, Sample interval, optional Run label, and Run comparison.
+4. Start/observe the normal Camera Sources simulation, note its current scene/phase, then run a Simulation Lab comparison. Confirm the live simulation is not reset or switched.
+5. Run Normal profile / Normal density / 300 seconds / seed `25025` twice. Values inside Fixed, Adaptive, and Comparison should repeat for identical configuration even though run IDs/timestamps differ.
+6. Create/save a zone-based scenario whose condition can occur in the synthetic junction, then run Simulation Lab. Confirm the stored experiment scenario metadata includes the zone snapshot and Adaptive scenario-application telemetry can include that scenario.
+7. Summary: confirm compact cards show Fixed, Adaptive, and percent/absolute change with preferred-direction semantics.
+8. Waiting & queues: confirm average/median/p95/max wait, queue average/p95/peak, queue-seconds, queue-active percentage, and simultaneous queue time are available.
+9. Throughput: confirm total and per-minute vehicle/pedestrian service, combined service rate, and vehicle passages per green minute.
+10. Signal behavior: confirm phase utilization, transitions/cycles, clearance time, adaptive scenario application counts, timing extension/reduction totals, and conflict-overlap diagnostic.
+11. Raw samples: switch Fixed/Adaptive toggle; change 25/50/100 row selection; use Previous/Next. The table should stay internally scrollable/paginated instead of growing the page.
+12. Stored run dropdown: select an older result and confirm all tabs update to that run.
+13. Export CSV and confirm aligned `fixed_*` and `adaptive_*` queue/service/phase/scenario columns exist (compatibility field names may still use `active_rules`).
+14. Restart PC Studio/backend and confirm stored experiment JSON is still selectable.
+15. Delete one disposable run. Confirm only that experiment result is removed; occupancy/flow history, signal scenario config/history, captures, zones, settings, models, and training data remain.
+16. Confirm the page describes experiment data as local simulation results, not proof of general/public-road performance or safety.
 
+## 7. Inherited functional checks
 
-## V024 presentation and copy checks
+Re-run representative V024 acceptance checks: persistence, zone/model registry synchronization, serial polling, protected signal phase order, camera simulation behavior, occupancy vs flow separation, tracking/counting lines, capture/delete/label/training/models/settings/logs. Also re-run `test_signal_rules_service.py` to confirm the migrated default scenarios preserve inherited V023 controller behavior. Confirm no feature connects to physical/public-road traffic-light control.
 
-After the automated runner opens PC Studio, inspect both Windows light and dark appearance:
-
-1. Active navigation and primary workflow buttons use the primary blue role; neutral panels remain neutral.
-2. Progress/selected secondary emphasis uses teal sparingly; it does not become a second page-wide theme color.
-3. Generic metadata/count badges are neutral. Green means healthy/completed, amber means attention/fallback/unsaved, and red means error/destructive.
-4. Dark mode keeps the neutral `#121212` base with progressively lighter elevated surfaces; no neon/glass/gradient treatment appears.
-5. Dashboard, Cameras, Live AI, Zones, Traffic Analytics, Dataset Capture/Review, Training, Models, Settings, and Logs use concise current-task wording rather than old release-history descriptions.
-6. No working page shows `Confirm layout first`, stale `0_2_0` UI copy, or similar development-placeholder wording.
-7. Destructive actions such as capture/model/history deletion are visually distinct and the confirmation text states what will be removed.
-8. Keyboard Tab produces a visible focus ring; text remains readable in light and dark appearances.
-9. Occupancy versus flow, active versus default model, and runtime/configuration distinctions remain clear in nearby copy.
-10. Signal-related text continues to state simulation-only scope and does not claim live mobility/fall detection.
-
-## 6. Repository/ZIP checks
+## 8. Repository/ZIP checks
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
@@ -156,4 +138,4 @@ git diff --check
 git status --short
 ```
 
-From `AI_Traffic_Light`, validate the supplied ZIP with `python .\scripts\validate_patch_zip.py <zip>`. Compare its member list with the supplied manifest. Only explicit owner acceptance may promote V024.
+From `AI_Traffic_Light`, validate the supplied ZIP with `python .\scripts\validate_patch_zip.py <zip>` and compare its member list with the supplied manifest. Only explicit owner acceptance may promote V025.

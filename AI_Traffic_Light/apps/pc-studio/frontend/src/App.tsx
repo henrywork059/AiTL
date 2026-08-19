@@ -22,6 +22,7 @@ import { LiveAiPage } from "./pages/LiveAiPage";
 import { LogsPage } from "./pages/LogsPage";
 import { ModelRegistryPage } from "./pages/ModelRegistryPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SimulationLabPage } from "./pages/SimulationLabPage";
 import { TrafficAnalyticsPage } from "./pages/TrafficAnalyticsPage";
 import { TrafficLogicPage } from "./pages/TrafficLogicPage";
 import { TrainExportPage } from "./pages/TrainExportPage";
@@ -196,6 +197,8 @@ export default function App() {
         return <TrafficLogicPage />;
       case "traffic_analytics":
         return <TrafficAnalyticsPage />;
+      case "simulation_lab":
+        return <SimulationLabPage />;
       case "dataset_capture":
         return <DatasetCapturePage cameraStatus={cameraStatus} />;
       case "dataset_review":

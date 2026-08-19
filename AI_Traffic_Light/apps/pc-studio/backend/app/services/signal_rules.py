@@ -11,6 +11,7 @@ from typing import Any
 
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
+from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +39,7 @@ PROTECTED_MINIMUMS = {
 }
 ALLOWED_MODES = {"fixed", "adaptive", "test"}
 ALLOWED_ACTIONS = {"extend_current_phase", "reduce_current_phase", "hold_current_phase", "request_next_phase", "incident_hold"}
-ALLOWED_TRIGGERS = {
+ALLOWED_LEGACY_TRIGGERS = {
     "pedestrians_crossing",
     "crossing_dwell_seconds",
     "pedestrians_waiting",
@@ -49,9 +50,180 @@ ALLOWED_TRIGGERS = {
     "mobility_assistance",
     "incident_person_fallen",
 }
+ALLOWED_CONDITION_SOURCES = {"metric", "zone_class_count"}
+ALLOWED_OPERATORS = {"gt", "gte", "lt", "lte", "eq"}
+ALLOWED_MATCH = {"all", "any"}
+ALLOWED_REQUEST_SERVICES = {None, "pedestrian", "vehicle"}
+ALLOWED_METRICS = {
+    "pedestrians_crossing",
+    "crossing_dwell_seconds",
+    "pedestrians_waiting",
+    "pedestrian_wait_seconds",
+    "vehicles_waiting",
+    "vehicle_wait_seconds",
+    "mobility_assistance",
+    "incident_person_fallen",
+}
+TEST_ONLY_METRICS = {"mobility_assistance", "incident_person_fallen"}
+
+
+def _legacy_rule_to_conditions(rule: dict[str, Any]) -> list[dict[str, Any]]:
+    trigger = str(rule.get("trigger", ""))
+    threshold = float(rule.get("threshold", 0.0) or 0.0)
+    if trigger == "low_vehicle_demand":
+        return [
+            {"source": "metric", "metric": "vehicles_waiting", "operator": "lte", "threshold": threshold},
+            {"source": "metric", "metric": "pedestrians_waiting", "operator": "gt", "threshold": 0.0},
+        ]
+    if trigger in TEST_ONLY_METRICS:
+        return [{"source": "metric", "metric": trigger, "operator": "eq", "threshold": 1.0}]
+    return [{"source": "metric", "metric": trigger, "operator": "gte", "threshold": threshold}]
+
+
+def _legacy_rules_to_scenarios(rules: dict[str, Any]) -> list[dict[str, Any]]:
+    ordered = sorted(rules.items(), key=lambda item: (-int(item[1].get("priority", 0)), item[0]))
+    scenarios: list[dict[str, Any]] = []
+    for index, (rule_id, rule) in enumerate(ordered, start=1):
+        trigger = str(rule.get("trigger", ""))
+        request_service: str | None = None
+        if trigger in {"pedestrians_waiting", "pedestrian_wait_seconds", "low_vehicle_demand"}:
+            request_service = "pedestrian"
+        elif trigger in {"vehicles_waiting", "vehicle_wait_seconds"}:
+            request_service = "vehicle"
+        scenarios.append(
+            {
+                "id": rule_id,
+                "label": str(rule.get("label") or rule_id.replace("_", " ").title()),
+                "enabled": bool(rule.get("enabled", True)),
+                "rank": index * 10,
+                "match": "all",
+                "conditions": _legacy_rule_to_conditions(rule),
+                "persistence_seconds": float(rule.get("persistence_seconds", 0.0) or 0.0),
+                "cooldown_seconds": float(rule.get("cooldown_seconds", 0.0) or 0.0),
+                "action": {
+                    "type": str(rule.get("action", "hold_current_phase")),
+                    "adjustment_seconds": float(rule.get("adjustment_seconds", 0.0) or 0.0),
+                    "target_phases": list(rule.get("target_phases", PHASE_KEYS)),
+                    "request_service": request_service,
+                },
+            }
+        )
+    return scenarios
+
+
+DEFAULT_RULES: dict[str, Any] = {
+    "crossing_occupied": {
+        "label": "Pedestrian still crossing",
+        "enabled": True,
+        "trigger": "pedestrians_crossing",
+        "threshold": 1.0,
+        "persistence_seconds": 0.5,
+        "action": "hold_current_phase",
+        "adjustment_seconds": 3.0,
+        "target_phases": ["pedestrian_flashing"],
+        "priority": 100,
+        "cooldown_seconds": 0.0,
+    },
+    "mobility_assistance": {
+        "label": "Mobility / accessibility assistance",
+        "enabled": True,
+        "trigger": "mobility_assistance",
+        "threshold": 1.0,
+        "persistence_seconds": 0.0,
+        "action": "extend_current_phase",
+        "adjustment_seconds": 6.0,
+        "target_phases": ["pedestrian_green", "pedestrian_flashing"],
+        "priority": 95,
+        "cooldown_seconds": 0.0,
+    },
+    "slow_pedestrian": {
+        "label": "Slow / extended pedestrian crossing",
+        "enabled": True,
+        "trigger": "crossing_dwell_seconds",
+        "threshold": 5.0,
+        "persistence_seconds": 1.0,
+        "action": "extend_current_phase",
+        "adjustment_seconds": 4.0,
+        "target_phases": ["pedestrian_flashing"],
+        "priority": 90,
+        "cooldown_seconds": 0.0,
+    },
+    "max_pedestrian_wait": {
+        "label": "Maximum pedestrian waiting time",
+        "enabled": True,
+        "trigger": "pedestrian_wait_seconds",
+        "threshold": 30.0,
+        "persistence_seconds": 1.0,
+        "action": "reduce_current_phase",
+        "adjustment_seconds": 4.0,
+        "target_phases": ["vehicle_green"],
+        "priority": 85,
+        "cooldown_seconds": 12.0,
+    },
+    "heavy_pedestrian_demand": {
+        "label": "Heavy pedestrian demand",
+        "enabled": True,
+        "trigger": "pedestrians_waiting",
+        "threshold": 5.0,
+        "persistence_seconds": 2.0,
+        "action": "reduce_current_phase",
+        "adjustment_seconds": 3.0,
+        "target_phases": ["vehicle_green"],
+        "priority": 80,
+        "cooldown_seconds": 10.0,
+    },
+    "low_vehicle_demand": {
+        "label": "Low vehicle demand with pedestrian request",
+        "enabled": True,
+        "trigger": "low_vehicle_demand",
+        "threshold": 1.0,
+        "persistence_seconds": 2.0,
+        "action": "reduce_current_phase",
+        "adjustment_seconds": 2.0,
+        "target_phases": ["vehicle_green"],
+        "priority": 75,
+        "cooldown_seconds": 10.0,
+    },
+    "max_vehicle_wait": {
+        "label": "Maximum vehicle waiting time",
+        "enabled": True,
+        "trigger": "vehicle_wait_seconds",
+        "threshold": 45.0,
+        "persistence_seconds": 1.0,
+        "action": "extend_current_phase",
+        "adjustment_seconds": 5.0,
+        "target_phases": ["vehicle_green"],
+        "priority": 70,
+        "cooldown_seconds": 12.0,
+    },
+    "heavy_vehicle_queue": {
+        "label": "Heavy vehicle queue",
+        "enabled": True,
+        "trigger": "vehicles_waiting",
+        "threshold": 6.0,
+        "persistence_seconds": 2.0,
+        "action": "extend_current_phase",
+        "adjustment_seconds": 5.0,
+        "target_phases": ["vehicle_green"],
+        "priority": 60,
+        "cooldown_seconds": 10.0,
+    },
+    "incident_person_fallen": {
+        "label": "Person fallen / incident",
+        "enabled": True,
+        "trigger": "incident_person_fallen",
+        "threshold": 1.0,
+        "persistence_seconds": 0.0,
+        "action": "incident_hold",
+        "adjustment_seconds": 0.0,
+        "target_phases": list(PHASE_KEYS),
+        "priority": 1000,
+        "cooldown_seconds": 0.0,
+    },
+}
 
 DEFAULT_PROFILE: dict[str, Any] = {
-    "description": "Balanced adaptive classroom/prototype signal policy.",
+    "description": "Balanced scenario-driven classroom/prototype signal policy.",
     "phases": {
         "vehicle_green": {"base_seconds": 12.0, "min_seconds": 8.0, "max_seconds": 30.0},
         "vehicle_yellow": {"base_seconds": 3.0, "min_seconds": 2.0, "max_seconds": 5.0},
@@ -63,116 +235,8 @@ DEFAULT_PROFILE: dict[str, Any] = {
     "max_cycle_seconds": 90.0,
     "stale_data_seconds": 4.0,
     "demand_memory_seconds": 3.0,
-    "rules": {
-        "crossing_occupied": {
-            "label": "Pedestrian still crossing",
-            "enabled": True,
-            "trigger": "pedestrians_crossing",
-            "threshold": 1.0,
-            "persistence_seconds": 0.5,
-            "action": "hold_current_phase",
-            "adjustment_seconds": 3.0,
-            "target_phases": ["pedestrian_flashing"],
-            "priority": 100,
-            "cooldown_seconds": 0.0,
-        },
-        "mobility_assistance": {
-            "label": "Mobility / accessibility assistance",
-            "enabled": True,
-            "trigger": "mobility_assistance",
-            "threshold": 1.0,
-            "persistence_seconds": 0.0,
-            "action": "extend_current_phase",
-            "adjustment_seconds": 6.0,
-            "target_phases": ["pedestrian_green", "pedestrian_flashing"],
-            "priority": 95,
-            "cooldown_seconds": 0.0,
-        },
-        "slow_pedestrian": {
-            "label": "Slow / extended pedestrian crossing",
-            "enabled": True,
-            "trigger": "crossing_dwell_seconds",
-            "threshold": 5.0,
-            "persistence_seconds": 1.0,
-            "action": "extend_current_phase",
-            "adjustment_seconds": 4.0,
-            "target_phases": ["pedestrian_flashing"],
-            "priority": 90,
-            "cooldown_seconds": 0.0,
-        },
-        "max_pedestrian_wait": {
-            "label": "Maximum pedestrian waiting time",
-            "enabled": True,
-            "trigger": "pedestrian_wait_seconds",
-            "threshold": 30.0,
-            "persistence_seconds": 1.0,
-            "action": "reduce_current_phase",
-            "adjustment_seconds": 4.0,
-            "target_phases": ["vehicle_green"],
-            "priority": 85,
-            "cooldown_seconds": 12.0,
-        },
-        "heavy_pedestrian_demand": {
-            "label": "Heavy pedestrian demand",
-            "enabled": True,
-            "trigger": "pedestrians_waiting",
-            "threshold": 5.0,
-            "persistence_seconds": 2.0,
-            "action": "reduce_current_phase",
-            "adjustment_seconds": 3.0,
-            "target_phases": ["vehicle_green"],
-            "priority": 80,
-            "cooldown_seconds": 10.0,
-        },
-        "low_vehicle_demand": {
-            "label": "Low vehicle demand with pedestrian request",
-            "enabled": True,
-            "trigger": "low_vehicle_demand",
-            "threshold": 1.0,
-            "persistence_seconds": 2.0,
-            "action": "reduce_current_phase",
-            "adjustment_seconds": 2.0,
-            "target_phases": ["vehicle_green"],
-            "priority": 75,
-            "cooldown_seconds": 10.0,
-        },
-        "max_vehicle_wait": {
-            "label": "Maximum vehicle waiting time",
-            "enabled": True,
-            "trigger": "vehicle_wait_seconds",
-            "threshold": 45.0,
-            "persistence_seconds": 1.0,
-            "action": "extend_current_phase",
-            "adjustment_seconds": 5.0,
-            "target_phases": ["vehicle_green"],
-            "priority": 70,
-            "cooldown_seconds": 12.0,
-        },
-        "heavy_vehicle_queue": {
-            "label": "Heavy vehicle queue",
-            "enabled": True,
-            "trigger": "vehicles_waiting",
-            "threshold": 6.0,
-            "persistence_seconds": 2.0,
-            "action": "extend_current_phase",
-            "adjustment_seconds": 5.0,
-            "target_phases": ["vehicle_green"],
-            "priority": 60,
-            "cooldown_seconds": 10.0,
-        },
-        "incident_person_fallen": {
-            "label": "Person fallen / incident",
-            "enabled": True,
-            "trigger": "incident_person_fallen",
-            "threshold": 1.0,
-            "persistence_seconds": 0.0,
-            "action": "incident_hold",
-            "adjustment_seconds": 0.0,
-            "target_phases": list(PHASE_KEYS),
-            "priority": 1000,
-            "cooldown_seconds": 0.0,
-        },
-    },
+    "rules": deepcopy(DEFAULT_RULES),
+    "scenarios": _legacy_rules_to_scenarios(DEFAULT_RULES),
 }
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -182,18 +246,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "active_profile": "Normal",
     "profiles": {
         "Normal": deepcopy(DEFAULT_PROFILE),
-        "Pedestrian Priority": {
-            **deepcopy(DEFAULT_PROFILE),
-            "description": "Prototype preset that serves pedestrian demand sooner.",
-        },
-        "Vehicle Priority": {
-            **deepcopy(DEFAULT_PROFILE),
-            "description": "Prototype preset that permits a larger bounded vehicle-green response.",
-        },
-        "Accessibility": {
-            **deepcopy(DEFAULT_PROFILE),
-            "description": "Prototype preset emphasizing extended pedestrian service and mobility assistance.",
-        },
+        "Pedestrian Priority": {**deepcopy(DEFAULT_PROFILE), "description": "Prototype preset that serves pedestrian demand sooner."},
+        "Vehicle Priority": {**deepcopy(DEFAULT_PROFILE), "description": "Prototype preset that permits a larger bounded vehicle-green response."},
+        "Accessibility": {**deepcopy(DEFAULT_PROFILE), "description": "Prototype preset emphasizing extended pedestrian service and mobility assistance."},
     },
 }
 DEFAULT_CONFIG["profiles"]["Pedestrian Priority"]["rules"]["heavy_pedestrian_demand"]["threshold"] = 3.0
@@ -202,6 +257,8 @@ DEFAULT_CONFIG["profiles"]["Vehicle Priority"]["phases"]["vehicle_green"]["max_s
 DEFAULT_CONFIG["profiles"]["Vehicle Priority"]["rules"]["heavy_vehicle_queue"]["adjustment_seconds"] = 7.0
 DEFAULT_CONFIG["profiles"]["Accessibility"]["rules"]["mobility_assistance"]["adjustment_seconds"] = 9.0
 DEFAULT_CONFIG["profiles"]["Accessibility"]["phases"]["pedestrian_flashing"]["max_seconds"] = 24.0
+for _profile in DEFAULT_CONFIG["profiles"].values():
+    _profile["scenarios"] = _legacy_rules_to_scenarios(_profile["rules"])
 
 
 @dataclass
@@ -211,8 +268,20 @@ class _DemandMemory:
     last_count: int = 0
 
 
+def _compare(operator: str, value: float, threshold: float) -> bool:
+    if operator == "gt":
+        return value > threshold
+    if operator == "gte":
+        return value >= threshold
+    if operator == "lt":
+        return value < threshold
+    if operator == "lte":
+        return value <= threshold
+    return abs(value - threshold) <= 1e-9
+
+
 class SignalRulesService:
-    """Persist and evaluate bounded signal-timing rules for the local simulation only."""
+    """Persist and evaluate ranked user-defined signal scenarios for local simulation only."""
 
     def __init__(self, *, config_path: Path | None = None, history_path: Path | None = None) -> None:
         configured_path = os.environ.get("AITL_SIGNAL_RULES")
@@ -230,6 +299,8 @@ class SignalRulesService:
         self._rule_last_applied_clock: dict[str, float] = {}
         self._last_rule_status: list[dict[str, Any]] = []
         self._last_active_rules: list[str] = []
+        self._winning_scenario_id: str | None = None
+        self._winning_scenario_label: str | None = None
         self._pending_request: str | None = None
         self._incident_hold = False
         self._resume_after_incident = False
@@ -261,35 +332,33 @@ class SignalRulesService:
         validated = self._validate_config(payload)
         try:
             with self._lock:
-                self._config_path.parent.mkdir(parents=True, exist_ok=True)
-                temporary = self._config_path.with_suffix(".tmp")
-                temporary.write_text(json.dumps(validated, indent=2) + "\n", encoding="utf-8")
-                temporary.replace(self._config_path)
+                write_json_atomic(self._config_path, validated)
                 self._config_cache = validated
                 if validated["mode"] != "test":
-                    # Manual accessibility/incident inputs are Test-mode sources only.
                     self._test_inputs["mobility_assistance"] = False
                     self._test_inputs["incident_person_fallen"] = False
                     self._incident_hold = False
                     self._resume_after_incident = False
-                # Apply new policy values at the next simulator clock without replaying
-                # elapsed time from zero. Preserve the current protected phase while
-                # restarting its timing window under the saved configuration.
                 self._applied_rule_ids.clear()
                 self._rule_condition_since.clear()
                 self._rule_last_applied_clock.clear()
                 self._last_rule_status = []
                 self._last_active_rules = []
+                self._winning_scenario_id = None
+                self._winning_scenario_label = None
                 self._pending_request = None
                 self._reinitialize_pending = True
-                self._record_event_locked("config_saved", {"active_profile": validated["active_profile"], "mode": validated["mode"]})
+                self._record_event_locked(
+                    "config_saved",
+                    {
+                        "active_profile": validated["active_profile"],
+                        "mode": validated["mode"],
+                        "scenario_count": len(validated["profiles"][validated["active_profile"]]["scenarios"]),
+                    },
+                )
         except OSError as exc:
-            logger.exception("Signal-rule configuration save failed")
-            raise AppError(
-                ErrorCode.SETTINGS_WRITE_FAILED,
-                "Failed to save the signal-rule configuration.",
-                status_code=500,
-            ) from exc
+            logger.exception("Signal scenario configuration save failed")
+            raise AppError(ErrorCode.SETTINGS_WRITE_FAILED, "Failed to save the signal scenario configuration.", status_code=500) from exc
         return deepcopy(validated)
 
     def reset_config(self) -> dict[str, Any]:
@@ -306,17 +375,13 @@ class SignalRulesService:
             for key in ("mobility_assistance", "incident_person_fallen"):
                 if key in payload and payload[key] is not None:
                     self._test_inputs[key] = bool(payload[key])
-            config = self._load_config_locked()
-            if self._test_inputs["incident_person_fallen"] and config["mode"] == "test" and not self._incident_hold:
-                self._incident_hold = True
-                self._record_event_locked("incident_hold_started", {"source": "manual_test_input"})
             return deepcopy(self._test_inputs)
 
     def clear_incident(self) -> dict[str, Any]:
         with self._lock:
             self._test_inputs["incident_person_fallen"] = False
             if self._incident_hold:
-                self._record_event_locked("incident_hold_cleared", {"source": "manual_test_input"})
+                self._record_event_locked("incident_hold_cleared", {"source": "scenario_or_manual_test_input"})
             was_held = self._incident_hold
             self._incident_hold = False
             self._resume_after_incident = was_held
@@ -336,6 +401,8 @@ class SignalRulesService:
         self._rule_last_applied_clock.clear()
         self._last_rule_status = []
         self._last_active_rules = []
+        self._winning_scenario_id = None
+        self._winning_scenario_label = None
         self._pending_request = None
         self._incident_hold = False
         self._resume_after_incident = False
@@ -350,10 +417,14 @@ class SignalRulesService:
     def observe(self, observation: dict[str, Any]) -> None:
         now = time.monotonic()
         with self._lock:
+            zone_class_counts = observation.get("zone_class_counts", {})
+            if not isinstance(zone_class_counts, dict):
+                zone_class_counts = {}
             self._last_observation = {
                 "pedestrians_waiting": max(0, int(observation.get("pedestrians_waiting", 0) or 0)),
                 "pedestrians_crossing": max(0, int(observation.get("pedestrians_crossing", 0) or 0)),
                 "vehicles_waiting": max(0, int(observation.get("vehicles_waiting", 0) or 0)),
+                "zone_class_counts": deepcopy(zone_class_counts),
                 "source_frame_number": observation.get("source_frame_number"),
                 "source_timestamp_ms": observation.get("source_timestamp_ms"),
                 "data_source": observation.get("data_source"),
@@ -394,44 +465,37 @@ class SignalRulesService:
             phase_key = str(payload.get("phase_key") or PHASE_SEQUENCE[self._phase_index][0])
             if phase_key not in PHASE_KEYS:
                 raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "preview phase_key is invalid.", status_code=422)
-            observations = {
+            values = {
                 "pedestrians_waiting": max(0, int(payload.get("pedestrians_waiting", 0) or 0)),
                 "pedestrians_crossing": max(0, int(payload.get("pedestrians_crossing", 0) or 0)),
                 "vehicles_waiting": max(0, int(payload.get("vehicles_waiting", 0) or 0)),
-                "mobility_assistance": bool(payload.get("mobility_assistance", False)),
-                "incident_person_fallen": bool(payload.get("incident_person_fallen", False)),
                 "pedestrian_wait_seconds": max(0.0, float(payload.get("pedestrian_wait_seconds", 0.0) or 0.0)),
                 "vehicle_wait_seconds": max(0.0, float(payload.get("vehicle_wait_seconds", 0.0) or 0.0)),
                 "crossing_dwell_seconds": max(0.0, float(payload.get("crossing_dwell_seconds", 0.0) or 0.0)),
+                "mobility_assistance": bool(payload.get("mobility_assistance", False)),
+                "incident_person_fallen": bool(payload.get("incident_person_fallen", False)),
+                "zone_class_counts": deepcopy(payload.get("zone_class_counts", {})) if isinstance(payload.get("zone_class_counts", {}), dict) else {},
             }
             phase = profile["phases"][phase_key]
             effective = float(phase["base_seconds"])
-            statuses: list[dict[str, Any]] = []
-            for rule_id, rule in sorted(profile["rules"].items(), key=lambda item: int(item[1]["priority"]), reverse=True):
-                condition = self._rule_condition_for_values(rule, observations)
-                state = "active" if condition and phase_key in rule["target_phases"] else "inactive"
-                reason = "trigger matched" if condition else "trigger did not match"
-                if rule["trigger"] in {"mobility_assistance", "incident_person_fallen"} and config["mode"] != "test":
-                    state = "unavailable"
-                    reason = "manual/simulation test source only; no compatible live detector is configured"
-                elif condition and phase_key not in rule["target_phases"]:
-                    state = "suppressed"
-                    reason = f"not applicable during {phase_key}"
-                if state == "active" and rule["action"] in {"extend_current_phase", "reduce_current_phase"}:
-                    adjustment = float(rule["adjustment_seconds"])
-                    if rule["action"] == "reduce_current_phase":
-                        effective -= adjustment
-                    else:
-                        effective += adjustment
-                    effective = min(float(phase["max_seconds"]), max(float(phase["min_seconds"]), effective))
-                statuses.append({"rule_id": rule_id, "label": rule["label"], "state": state, "reason": reason})
+            statuses, winner = self._evaluate_scenario_candidates_locked(config, profile, phase_key, values, clock=0.0, fresh=True, mutate=False)
+            if winner:
+                action = winner["action"]
+                adjustment = float(action["adjustment_seconds"])
+                if action["type"] == "extend_current_phase":
+                    effective += adjustment
+                elif action["type"] in {"reduce_current_phase", "request_next_phase"}:
+                    effective -= adjustment if action["type"] == "reduce_current_phase" else effective
+                effective = min(float(phase["max_seconds"]), max(float(phase["min_seconds"]), effective))
             return {
                 "phase_key": phase_key,
                 "phase": dict(PHASE_SEQUENCE)[phase_key],
                 "base_duration_seconds": float(phase["base_seconds"]),
                 "effective_duration_seconds": round(effective, 1),
+                "winning_scenario_id": winner["id"] if winner else None,
                 "rules": statuses,
-                "would_enter_incident_hold": bool(observations["incident_person_fallen"] and config["mode"] == "test"),
+                "scenarios": statuses,
+                "would_enter_incident_hold": bool(winner and winner["action"]["type"] == "incident_hold"),
                 "prototype_only": True,
             }
 
@@ -458,7 +522,7 @@ class SignalRulesService:
             self._config_cache = self._validate_config(self.defaults())
             return self._config_cache
         try:
-            raw = json.loads(self._config_path.read_text(encoding="utf-8"))
+            raw = read_json(self._config_path)
         except (OSError, json.JSONDecodeError) as exc:
             raise AppError(ErrorCode.SETTINGS_READ_FAILED, "Failed to read the signal-rule configuration.", status_code=500) from exc
         self._config_cache = self._validate_config(raw)
@@ -482,6 +546,7 @@ class SignalRulesService:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "active_profile must identify an existing profile.", status_code=422)
         if len(profiles) > 20:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "A maximum of 20 signal profiles is supported.", status_code=422)
+
         normalized_profiles: dict[str, Any] = {}
         for profile_name, raw_profile in profiles.items():
             if not isinstance(profile_name, str) or not 1 <= len(profile_name.strip()) <= 64:
@@ -521,20 +586,21 @@ class SignalRulesService:
             memory = float(raw_profile.get("demand_memory_seconds", 3.0))
             if max_cycle < base_cycle or max_cycle > 300.0 or not 1.0 <= stale <= 30.0 or not 0.0 <= memory <= 30.0:
                 raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Profile {profile_name} controller limits are invalid.", status_code=422)
-            rules = raw_profile.get("rules")
-            if not isinstance(rules, dict) or not rules:
-                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Profile {profile_name} must define at least one rule.", status_code=422)
+
+            rules = raw_profile.get("rules", {})
             normalized_rules: dict[str, Any] = {}
+            if not isinstance(rules, dict):
+                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Profile {profile_name} legacy rules must be an object.", status_code=422)
             for rule_id, raw_rule in rules.items():
                 if not isinstance(rule_id, str) or not 1 <= len(rule_id) <= 64 or not isinstance(raw_rule, dict):
-                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Rule identifiers are invalid.", status_code=422)
+                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Legacy rule identifiers are invalid.", status_code=422)
                 trigger = str(raw_rule.get("trigger", ""))
                 action = str(raw_rule.get("action", ""))
                 targets = raw_rule.get("target_phases", [])
-                if trigger not in ALLOWED_TRIGGERS or action not in ALLOWED_ACTIONS:
-                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Rule {rule_id} trigger/action is invalid.", status_code=422)
+                if trigger not in ALLOWED_LEGACY_TRIGGERS or action not in ALLOWED_ACTIONS:
+                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Legacy rule {rule_id} trigger/action is invalid.", status_code=422)
                 if not isinstance(targets, list) or not targets or any(target not in PHASE_KEYS for target in targets):
-                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Rule {rule_id} target phases are invalid.", status_code=422)
+                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Legacy rule {rule_id} target phases are invalid.", status_code=422)
                 try:
                     threshold = float(raw_rule.get("threshold", 1.0))
                     persistence = float(raw_rule.get("persistence_seconds", 0.0))
@@ -542,9 +608,9 @@ class SignalRulesService:
                     priority = int(raw_rule.get("priority", 0))
                     cooldown = float(raw_rule.get("cooldown_seconds", 0.0))
                 except (TypeError, ValueError) as exc:
-                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Rule {rule_id} numeric values are invalid.", status_code=422) from exc
+                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Legacy rule {rule_id} numeric values are invalid.", status_code=422) from exc
                 if threshold < 0 or persistence < 0 or adjustment < 0 or adjustment > 60.0 or cooldown < 0 or not 0 <= priority <= 10000:
-                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Rule {rule_id} values are outside supported limits.", status_code=422)
+                    raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Legacy rule {rule_id} values are outside supported limits.", status_code=422)
                 normalized_rules[rule_id] = {
                     "label": str(raw_rule.get("label") or rule_id.replace("_", " ").title())[:120],
                     "enabled": bool(raw_rule.get("enabled", True)),
@@ -557,6 +623,27 @@ class SignalRulesService:
                     "priority": priority,
                     "cooldown_seconds": round(cooldown, 1),
                 }
+
+            raw_scenarios = raw_profile.get("scenarios")
+            if raw_scenarios is None:
+                raw_scenarios = _legacy_rules_to_scenarios(normalized_rules)
+            if not isinstance(raw_scenarios, list) or len(raw_scenarios) > 64:
+                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Profile {profile_name} scenarios must be a list with at most 64 entries.", status_code=422)
+            normalized_scenarios: list[dict[str, Any]] = []
+            seen_ids: set[str] = set()
+            seen_ranks: set[int] = set()
+            for raw_scenario in raw_scenarios:
+                scenario = cls._validate_scenario(raw_scenario, seen_ids)
+                rank = int(scenario["rank"])
+                if rank in seen_ranks:
+                    raise AppError(
+                        ErrorCode.TRAFFIC_RULE_INVALID,
+                        f"Profile {profile_name} has duplicate scenario rank {rank}; ranks must be unique so arbitration has one unambiguous top scenario.",
+                        status_code=422,
+                    )
+                seen_ranks.add(rank)
+                normalized_scenarios.append(scenario)
+
             normalized_profiles[profile_name.strip()] = {
                 "description": str(raw_profile.get("description", ""))[:300],
                 "phases": normalized_phases,
@@ -564,10 +651,110 @@ class SignalRulesService:
                 "stale_data_seconds": round(stale, 1),
                 "demand_memory_seconds": round(memory, 1),
                 "rules": normalized_rules,
+                "scenarios": normalized_scenarios,
             }
         config["profiles"] = normalized_profiles
         config["active_profile"] = active_profile
         return config
+
+    @classmethod
+    def _validate_scenario(cls, raw: Any, seen_ids: set[str]) -> dict[str, Any]:
+        if not isinstance(raw, dict):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Each signal scenario must be an object.", status_code=422)
+        scenario_id = str(raw.get("id", "")).strip()
+        if not 1 <= len(scenario_id) <= 64 or not all(char.isalnum() or char in "._-" for char in scenario_id):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Scenario id must contain 1-64 letters, numbers, dots, dashes, or underscores.", status_code=422)
+        if scenario_id in seen_ids:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Duplicate scenario id: {scenario_id}", status_code=422)
+        seen_ids.add(scenario_id)
+        try:
+            rank = int(raw.get("rank", 100))
+            persistence = float(raw.get("persistence_seconds", 0.0) or 0.0)
+            cooldown = float(raw.get("cooldown_seconds", 0.0) or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} timing/rank values are invalid.", status_code=422) from exc
+        if not 1 <= rank <= 10000 or not 0.0 <= persistence <= 120.0 or not 0.0 <= cooldown <= 600.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} rank/persistence/cooldown is outside supported limits.", status_code=422)
+        match = str(raw.get("match", "all"))
+        if match not in ALLOWED_MATCH:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} match must be all or any.", status_code=422)
+        conditions = raw.get("conditions")
+        if not isinstance(conditions, list) or not 1 <= len(conditions) <= 8:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} must define 1-8 conditions.", status_code=422)
+        normalized_conditions = [cls._validate_condition(scenario_id, condition) for condition in conditions]
+        action = cls._validate_action(scenario_id, raw.get("action"))
+        return {
+            "id": scenario_id,
+            "label": str(raw.get("label") or scenario_id.replace("_", " ").title())[:120],
+            "enabled": bool(raw.get("enabled", True)),
+            "rank": rank,
+            "match": match,
+            "conditions": normalized_conditions,
+            "persistence_seconds": round(persistence, 2),
+            "cooldown_seconds": round(cooldown, 1),
+            "action": action,
+        }
+
+    @classmethod
+    def _validate_condition(cls, scenario_id: str, raw: Any) -> dict[str, Any]:
+        if not isinstance(raw, dict):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} condition must be an object.", status_code=422)
+        source = str(raw.get("source", "metric"))
+        operator = str(raw.get("operator", "gte"))
+        if source not in ALLOWED_CONDITION_SOURCES or operator not in ALLOWED_OPERATORS:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} condition source/operator is invalid.", status_code=422)
+        try:
+            threshold = float(raw.get("threshold", 0.0) or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} condition threshold is invalid.", status_code=422) from exc
+        if not -100000.0 <= threshold <= 100000.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} condition threshold is outside supported limits.", status_code=422)
+        if source == "metric":
+            metric = str(raw.get("metric", ""))
+            if metric not in ALLOWED_METRICS:
+                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} metric condition is invalid.", status_code=422)
+            return {"source": source, "metric": metric, "operator": operator, "threshold": round(threshold, 2)}
+        zone_id = str(raw.get("zone_id", "")).strip()
+        class_name = str(raw.get("class_name", "")).strip()
+        if not 1 <= len(zone_id) <= 64 or not 1 <= len(class_name) <= 64:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} zone/class condition requires zone_id and class_name.", status_code=422)
+        return {
+            "source": source,
+            "zone_id": zone_id,
+            "class_name": class_name,
+            "operator": operator,
+            "threshold": round(threshold, 2),
+        }
+
+    @classmethod
+    def _validate_action(cls, scenario_id: str, raw: Any) -> dict[str, Any]:
+        if not isinstance(raw, dict):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} action must be an object.", status_code=422)
+        action_type = str(raw.get("type", "hold_current_phase"))
+        if action_type not in ALLOWED_ACTIONS:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} action type is invalid.", status_code=422)
+        try:
+            adjustment = float(raw.get("adjustment_seconds", 0.0) or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} adjustment is invalid.", status_code=422) from exc
+        if not 0.0 <= adjustment <= 60.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} adjustment must be between 0 and 60 seconds.", status_code=422)
+        targets = raw.get("target_phases", [])
+        if not isinstance(targets, list) or not targets or any(target not in PHASE_KEYS for target in targets):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} target phases are invalid.", status_code=422)
+        request_service = raw.get("request_service")
+        if request_service == "":
+            request_service = None
+        if request_service not in ALLOWED_REQUEST_SERVICES:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} request_service is invalid.", status_code=422)
+        if action_type == "request_next_phase" and request_service is None:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} request_next_phase requires pedestrian or vehicle service.", status_code=422)
+        return {
+            "type": action_type,
+            "adjustment_seconds": round(adjustment, 1),
+            "target_phases": list(dict.fromkeys(targets)),
+            "request_service": request_service,
+        }
 
     def _active_profile_locked(self, config: dict[str, Any]) -> dict[str, Any]:
         return config["profiles"][config["active_profile"]]
@@ -582,16 +769,13 @@ class SignalRulesService:
         self._phase_duration_seconds = self._phase_base_seconds
         self._applied_rule_ids.clear()
         self._last_active_rules = []
+        self._winning_scenario_id = None
+        self._winning_scenario_label = None
 
     def _advance_phase_locked(self, clock: float) -> None:
-        # The normal simulator clock is monotonic. Tests and explicit simulation
-        # resets may intentionally seek it backwards; rebuild transient controller
-        # state from cycle start so protected phases still map deterministically to
-        # the requested clock instead of retaining a phase from the future.
         if clock + 1e-9 < self._last_clock_s:
             self._reset_runtime_locked(0.0)
         self._last_clock_s = clock
-
         if self._reinitialize_pending:
             self._reinitialize_pending = False
             self._cycle_started_clock = clock
@@ -631,10 +815,11 @@ class SignalRulesService:
                 return max(1, memory.last_count)
             return 0
 
-        base = dict(self._last_observation)
+        base = deepcopy(self._last_observation)
         base.setdefault("pedestrians_waiting", 0)
         base.setdefault("pedestrians_crossing", 0)
         base.setdefault("vehicles_waiting", 0)
+        base.setdefault("zone_class_counts", {})
         base["pedestrians_waiting"] = memory_count(self._pedestrian_wait, int(base["pedestrians_waiting"]))
         base["pedestrians_crossing"] = memory_count(self._crossing, int(base["pedestrians_crossing"]))
         base["vehicles_waiting"] = memory_count(self._vehicle_wait, int(base["vehicles_waiting"]))
@@ -658,147 +843,236 @@ class SignalRulesService:
             return max(0.0, now - memory.first_seen_monotonic)
         return 0.0
 
-    @staticmethod
-    def _rule_condition_for_values(rule: dict[str, Any], values: dict[str, Any]) -> bool:
-        trigger = rule["trigger"]
-        threshold = float(rule["threshold"])
-        if trigger == "low_vehicle_demand":
-            return int(values.get("vehicles_waiting", 0)) <= threshold and int(values.get("pedestrians_waiting", 0)) > 0
-        if trigger in {"mobility_assistance", "incident_person_fallen"}:
-            return bool(values.get(trigger, False))
-        return float(values.get(trigger, 0.0) or 0.0) >= threshold
+    def _condition_value_locked(self, config: dict[str, Any], condition: dict[str, Any], values: dict[str, Any]) -> tuple[bool, float, str]:
+        if condition["source"] == "metric":
+            metric = condition["metric"]
+            if metric in TEST_ONLY_METRICS and config["mode"] != "test":
+                return False, 0.0, "manual/simulation Test-mode source only"
+            raw = values.get(metric, 0)
+            value = 1.0 if raw is True else 0.0 if raw is False else float(raw or 0.0)
+            return True, value, metric.replace("_", " ")
+        zone_counts = values.get("zone_class_counts", {})
+        if not isinstance(zone_counts, dict) or condition["zone_id"] not in zone_counts:
+            return False, 0.0, f"zone {condition['zone_id']} is not present in the current observation"
+        class_counts = zone_counts.get(condition["zone_id"], {})
+        if not isinstance(class_counts, dict):
+            class_counts = {}
+        class_name = condition["class_name"]
+        if class_name == "*":
+            value = float(sum(max(0, int(item or 0)) for item in class_counts.values()))
+            label = f"all classes in {condition['zone_id']}"
+        else:
+            value = float(max(0, int(class_counts.get(class_name, 0) or 0)))
+            label = f"{class_name} in {condition['zone_id']}"
+        return True, value, label
+
+    def _scenario_match_locked(self, config: dict[str, Any], scenario: dict[str, Any], values: dict[str, Any]) -> tuple[bool, bool, list[dict[str, Any]], str]:
+        details: list[dict[str, Any]] = []
+        available_results: list[bool] = []
+        unavailable = 0
+        for condition in scenario["conditions"]:
+            available, value, label = self._condition_value_locked(config, condition, values)
+            matched = available and _compare(condition["operator"], value, float(condition["threshold"]))
+            details.append(
+                {
+                    "source": condition["source"],
+                    "label": label,
+                    "operator": condition["operator"],
+                    "threshold": condition["threshold"],
+                    "observed": round(value, 2),
+                    "matched": matched,
+                    "available": available,
+                }
+            )
+            if available:
+                available_results.append(matched)
+            else:
+                unavailable += 1
+        if scenario["match"] == "all":
+            if unavailable:
+                return False, False, details, "one or more required conditions are unavailable"
+            matched = all(available_results)
+        else:
+            matched = any(available_results)
+            if not matched and unavailable and not available_results:
+                return False, False, details, "all scenario conditions are unavailable"
+        return True, matched, details, "conditions matched" if matched else "conditions did not match"
+
+    def _evaluate_scenario_candidates_locked(
+        self,
+        config: dict[str, Any],
+        profile: dict[str, Any],
+        phase_key: str,
+        values: dict[str, Any],
+        *,
+        clock: float,
+        fresh: bool,
+        mutate: bool,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        statuses: list[dict[str, Any]] = []
+        candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for scenario in sorted(profile["scenarios"], key=lambda item: (int(item["rank"]), str(item["id"]))):
+            state = "inactive"
+            reason = "conditions did not match"
+            condition_details: list[dict[str, Any]] = []
+            condition_matched = False
+            eligible = False
+            if not scenario["enabled"]:
+                reason = "scenario disabled"
+                self._rule_condition_since.pop(scenario["id"], None) if mutate else None
+            elif config["mode"] == "fixed":
+                state = "suppressed"
+                reason = "Fixed mode does not execute adaptive scenarios"
+            elif not fresh:
+                state = "suppressed"
+                reason = "adaptive observations are stale or unavailable"
+            else:
+                available, condition_matched, condition_details, reason = self._scenario_match_locked(config, scenario, values)
+                if not available:
+                    state = "unavailable"
+                elif condition_matched:
+                    if mutate:
+                        since = self._rule_condition_since.setdefault(scenario["id"], clock)
+                    else:
+                        since = clock - float(scenario["persistence_seconds"])
+                    stable_for = max(0.0, clock - since)
+                    persistence = float(scenario["persistence_seconds"])
+                    if stable_for + 1e-9 < persistence:
+                        state = "inactive"
+                        reason = f"condition stabilizing ({stable_for:.1f}/{persistence:.1f}s)"
+                    elif phase_key not in scenario["action"]["target_phases"]:
+                        state = "suppressed"
+                        reason = f"triggered, but action is not enabled during {phase_key}"
+                    elif scenario["id"] in self._applied_rule_ids:
+                        state = "triggered"
+                        reason = "already applied for the current phase; remains the ranked active scenario"
+                        eligible = True
+                    else:
+                        last = self._rule_last_applied_clock.get(scenario["id"])
+                        cooldown = float(scenario["cooldown_seconds"])
+                        if last is not None and clock - last < cooldown and scenario["action"]["type"] != "hold_current_phase":
+                            state = "suppressed"
+                            reason = f"cooldown active ({cooldown - (clock - last):.1f}s remaining)"
+                        else:
+                            state = "triggered"
+                            reason = "triggered and eligible for rank arbitration"
+                            eligible = True
+                elif mutate:
+                    self._rule_condition_since.pop(scenario["id"], None)
+            status = {
+                "scenario_id": scenario["id"],
+                "rule_id": scenario["id"],
+                "label": scenario["label"],
+                "rank": scenario["rank"],
+                "priority": 10001 - int(scenario["rank"]),
+                "state": state,
+                "reason": reason,
+                "trigger": "scenario",
+                "threshold": None,
+                "stable_for_seconds": round(max(0.0, clock - self._rule_condition_since.get(scenario["id"], clock)), 1) if mutate else 0.0,
+                "condition_match": scenario["match"],
+                "conditions": condition_details,
+                "action": deepcopy(scenario["action"]),
+                "eligible": eligible,
+                "matched": condition_matched,
+            }
+            statuses.append(status)
+            if eligible:
+                candidates.append((scenario, status))
+        winner = candidates[0][0] if candidates else None
+        winner_id = winner["id"] if winner else None
+        for _, status in candidates:
+            if status["scenario_id"] == winner_id:
+                status["state"] = "winner"
+                status["reason"] = "highest-ranked eligible triggered scenario"
+            else:
+                status["state"] = "suppressed"
+                status["reason"] = f"higher-ranked scenario {winner_id} won arbitration"
+        return statuses, winner
 
     def _evaluate_rules_locked(self, clock: float, *, apply: bool) -> None:
         config = self._load_config_locked()
         profile = self._active_profile_locked(config)
         phase_key = PHASE_SEQUENCE[self._phase_index][0]
         values, fresh, fallback_reason = self._observation_values_locked(profile)
-        statuses: list[dict[str, Any]] = []
-        active_rule_ids: list[str] = []
         if config["mode"] == "fixed":
             fresh = False
             fallback_reason = "Fixed mode uses the configured normal timings only."
-        sorted_rules = sorted(profile["rules"].items(), key=lambda item: int(item[1]["priority"]), reverse=True)
-        elapsed = max(0.0, clock - self._phase_started_clock)
-        phase_limits = profile["phases"][phase_key]
-        for rule_id, rule in sorted_rules:
-            state = "inactive"
-            reason = "trigger did not match"
-            available = True
-            if not rule["enabled"]:
-                state, reason = "inactive", "rule disabled"
-                available = False
-            elif rule["trigger"] in {"mobility_assistance", "incident_person_fallen"} and config["mode"] != "test":
-                state, reason = "unavailable", "manual/simulation test source only; no compatible live detector is configured"
-                available = False
-            elif config["mode"] == "fixed":
-                state, reason = "suppressed", "fixed mode"
-                available = False
-            elif not fresh:
-                state, reason = "suppressed", fallback_reason or "stale observations"
-                available = False
-            condition = self._rule_condition_for_values(rule, values) if available else False
-            if condition:
-                since = self._rule_condition_since.setdefault(rule_id, clock)
-            else:
-                self._rule_condition_since.pop(rule_id, None)
-                since = clock
-            stable_for = max(0.0, clock - since)
-            persistence = float(rule["persistence_seconds"])
-            if available and rule_id in self._applied_rule_ids:
-                state = "active"
-                reason = "applied for the current phase; bounded timing effect is retained"
-                active_rule_ids.append(rule_id)
-            elif available and condition and stable_for < persistence:
-                state = "inactive"
-                reason = f"condition stabilizing ({stable_for:.1f}/{persistence:.1f}s)"
-            elif available and condition and phase_key not in rule["target_phases"]:
-                state = "suppressed"
-                reason = f"trigger matched but rule does not apply during {phase_key}"
-                if rule["action"] in {"request_next_phase", "reduce_current_phase"} and rule["trigger"] in {"pedestrians_waiting", "pedestrian_wait_seconds", "low_vehicle_demand"}:
-                    self._pending_request = "pedestrian"
-            elif available and condition:
-                cooldown = float(rule["cooldown_seconds"])
-                last = self._rule_last_applied_clock.get(rule_id)
-                if last is not None and clock - last < cooldown and rule["action"] != "hold_current_phase":
-                    state = "suppressed"
-                    reason = f"cooldown active ({cooldown - (clock - last):.1f}s remaining)"
-                else:
-                    state = "active"
-                    reason = "trigger matched"
-                    active_rule_ids.append(rule_id)
-                    if apply and not config["dry_run"]:
-                        self._apply_rule_locked(rule_id, rule, clock, elapsed, phase_limits, profile, phase_key)
-            statuses.append({
-                "rule_id": rule_id,
-                "label": rule["label"],
-                "state": state,
-                "reason": reason,
-                "priority": rule["priority"],
-                "trigger": rule["trigger"],
-                "threshold": rule["threshold"],
-                "stable_for_seconds": round(stable_for, 1),
-            })
+        statuses, winner = self._evaluate_scenario_candidates_locked(config, profile, phase_key, values, clock=clock, fresh=fresh, mutate=True)
         self._last_rule_status = statuses
-        self._last_active_rules = active_rule_ids
+        self._winning_scenario_id = winner["id"] if winner else None
+        self._winning_scenario_label = winner["label"] if winner else None
+        self._last_active_rules = [winner["id"]] if winner else []
+        if winner and apply and not config["dry_run"]:
+            elapsed = max(0.0, clock - self._phase_started_clock)
+            phase_limits = profile["phases"][phase_key]
+            self._apply_scenario_locked(winner, clock, elapsed, phase_limits, profile, phase_key)
+        if not fresh and fallback_reason:
+            self._winning_scenario_id = None
+            self._winning_scenario_label = None
+            self._last_active_rules = []
 
     def _cycle_phase_cap_locked(self, profile: dict[str, Any], phase_key: str) -> float:
-        """Return the largest current-phase duration that still leaves base service for later phases."""
         index = next(i for i, (key, _) in enumerate(PHASE_SEQUENCE) if key == phase_key)
         elapsed_before_phase = max(0.0, self._phase_started_clock - self._cycle_started_clock)
         later_base = sum(float(profile["phases"][key]["base_seconds"]) for key, _ in PHASE_SEQUENCE[index + 1 :])
         remaining_for_current = float(profile["max_cycle_seconds"]) - elapsed_before_phase - later_base
         return max(float(profile["phases"][phase_key]["min_seconds"]), remaining_for_current)
 
-    def _apply_rule_locked(
+    def _apply_scenario_locked(
         self,
-        rule_id: str,
-        rule: dict[str, Any],
+        scenario: dict[str, Any],
         clock: float,
         elapsed: float,
         phase_limits: dict[str, Any],
         profile: dict[str, Any],
         phase_key: str,
     ) -> None:
-        action = rule["action"]
-        adjustment = float(rule["adjustment_seconds"])
+        scenario_id = scenario["id"]
+        action = scenario["action"]
+        action_type = action["type"]
+        adjustment = float(action["adjustment_seconds"])
         previous = self._phase_duration_seconds
-        if action == "incident_hold":
+        if action["request_service"]:
+            self._pending_request = action["request_service"]
+        if action_type == "incident_hold":
             if not self._incident_hold:
                 self._incident_hold = True
-                self._record_event_locked("incident_hold_started", {"rule_id": rule_id})
+                self._record_event_locked("incident_hold_started", {"scenario_id": scenario_id})
+            self._rule_last_applied_clock[scenario_id] = clock
             return
-        if action == "hold_current_phase":
+        if action_type != "hold_current_phase" and scenario_id in self._applied_rule_ids:
+            return
+        if action_type == "hold_current_phase":
             reserve = adjustment
             if self._phase_duration_seconds - elapsed < reserve:
                 phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
                 self._phase_duration_seconds = min(phase_cap, max(self._phase_duration_seconds, elapsed + reserve))
-            if self._phase_duration_seconds > previous + 0.05:
-                self._record_rule_applied_locked(rule_id, previous, self._phase_duration_seconds, clock)
-            return
-        if rule_id in self._applied_rule_ids:
-            return
-        if action == "extend_current_phase":
+        elif action_type == "extend_current_phase":
             self._phase_duration_seconds += adjustment
-        elif action == "reduce_current_phase":
+        elif action_type == "reduce_current_phase":
             self._phase_duration_seconds -= adjustment
-            self._pending_request = "pedestrian" if rule["trigger"] in {"pedestrians_waiting", "pedestrian_wait_seconds", "low_vehicle_demand"} else self._pending_request
-        elif action == "request_next_phase":
-            self._pending_request = "pedestrian" if rule["trigger"] in {"pedestrians_waiting", "pedestrian_wait_seconds"} else "vehicle"
+        elif action_type == "request_next_phase":
+            # Request service sooner while still traversing the protected sequence.
+            self._phase_duration_seconds = elapsed + 0.2
         phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
         self._phase_duration_seconds = max(float(phase_limits["min_seconds"]), min(phase_cap, self._phase_duration_seconds))
-        # Never shorten a phase below time already served plus a small transition margin.
         self._phase_duration_seconds = max(self._phase_duration_seconds, elapsed + 0.2)
-        self._applied_rule_ids.add(rule_id)
-        self._rule_last_applied_clock[rule_id] = clock
-        if abs(self._phase_duration_seconds - previous) > 0.05 or action == "request_next_phase":
-            self._record_rule_applied_locked(rule_id, previous, self._phase_duration_seconds, clock)
+        self._rule_last_applied_clock[scenario_id] = clock
+        if action_type != "hold_current_phase":
+            self._applied_rule_ids.add(scenario_id)
+        if abs(self._phase_duration_seconds - previous) > 0.05 or action_type == "request_next_phase":
+            self._record_scenario_applied_locked(scenario, previous, self._phase_duration_seconds, clock)
 
-    def _record_rule_applied_locked(self, rule_id: str, previous: float, effective: float, clock: float) -> None:
+    def _record_scenario_applied_locked(self, scenario: dict[str, Any], previous: float, effective: float, clock: float) -> None:
         self._record_event_locked(
             "rule_applied",
             {
-                "rule_id": rule_id,
+                "rule_id": scenario["id"],
+                "scenario_id": scenario["id"],
+                "scenario_label": scenario["label"],
+                "rank": scenario["rank"],
+                "action": scenario["action"]["type"],
                 "phase_key": PHASE_SEQUENCE[self._phase_index][0],
                 "previous_duration_seconds": round(previous, 1),
                 "effective_duration_seconds": round(effective, 1),
@@ -841,19 +1115,19 @@ class SignalRulesService:
             "fallback_reason": fallback_reason,
             "pending_request": self._pending_request,
             "incident_hold": self._incident_hold,
+            "winning_scenario_id": self._winning_scenario_id,
+            "winning_scenario_label": self._winning_scenario_label,
             "active_rules": list(self._last_active_rules),
+            "active_scenarios": list(self._last_active_rules),
             "rule_status": deepcopy(self._last_rule_status),
+            "scenario_status": deepcopy(self._last_rule_status),
             "observations": deepcopy(values),
             "test_inputs": deepcopy(self._test_inputs),
             "prototype_only": True,
         }
 
     def _record_event_locked(self, event_type: str, details: dict[str, Any]) -> None:
-        event = {
-            "timestamp_ms": int(time.time() * 1000),
-            "event_type": event_type,
-            "details": details,
-        }
+        event = {"timestamp_ms": int(time.time() * 1000), "event_type": event_type, "details": details}
         try:
             self._history_path.parent.mkdir(parents=True, exist_ok=True)
             with self._history_path.open("a", encoding="utf-8") as handle:

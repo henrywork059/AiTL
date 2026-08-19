@@ -1,5 +1,5 @@
-version: 0_2_4
-status: maintenance hardening and polling optimization candidate
-previous_version: 0_2_3
-passed_baseline: 0_2_2
-notes: The owner explicitly requested V024 before explicitly accepting V023, so the owner-confirmed passed baseline remains V022 / 0_2_2. V024 centralizes atomic JSON persistence, closes zone/model-registry synchronization gaps, replaces overlapping top-level polling with serial scheduling, hardens the Windows update/test/run workflow, and refines PC Studio presentation around Material role-based primary/secondary/surface/on-color semantics with clearer current-state UI copy. Adaptive simulation behavior and API contracts remain unchanged; physical/public-road traffic control remains disabled.
+version: 0_2_5
+status: ranked signal scenarios and simulation telemetry candidate
+previous_version: 0_2_4
+passed_baseline: 0_2_4
+notes: The owner explicitly accepted/promoted V024 / 0_2_4, so it is the owner-confirmed passed baseline while V025 remains the current unaccepted candidate. V025 adds editable ranked signal scenarios whose conditions can use controller metrics or detected class counts inside configured zones; only the highest-ranked eligible triggered scenario executes each evaluation within protected phase/timing bounds. V025 also retains the isolated deterministic Fixed-vs-Adaptive Simulation Lab, now supplying configured zone/class observations to scenario-based benchmarks, with richer wait, queue, throughput, signal-use, scenario-application, clearance, and conflict-overlap telemetry plus compact tabbed presentation. Physical/public-road traffic control remains disabled.

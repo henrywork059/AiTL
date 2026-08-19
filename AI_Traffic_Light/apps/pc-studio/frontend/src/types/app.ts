@@ -5,6 +5,7 @@ export type AppPageId =
   | "zone_editor"
   | "traffic_logic"
   | "traffic_analytics"
+  | "simulation_lab"
   | "dataset_capture"
   | "dataset_review"
   | "train_export"

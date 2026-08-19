@@ -69,19 +69,36 @@ def _empty_region_counts(zones: list[dict[str, Any]]) -> dict[str, dict[str, int
     }
 
 
+def _empty_zone_class_counts(zones: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Expose every countable zone even when its current class counts are zero.
+
+    Scenario rules use a missing zone id to distinguish a deleted/unavailable
+    zone from an existing zone whose observed count is currently zero.
+    """
+
+    return {
+        zone["id"]: {}
+        for zone in zones
+        if zone.get("type") not in {"ignore", "counting_line"}
+    }
+
+
 def evaluate_traffic_state(
     detection_frame: dict[str, Any] | None,
     zones: list[dict[str, Any]],
     *,
     source: str = "live_zone_evaluation",
 ) -> dict[str, Any]:
-    """Convert one detection frame and persisted zones into supervised prototype traffic metrics.
+    """Convert one detection frame and persisted zones into prototype traffic metrics.
 
-    Occupancy remains a per-frame metric. SignalRulesService consumes these observations
-    as bounded prototype demand inputs; V022 track-derived flow remains separate.
+    Occupancy remains per-frame data. ``zone_class_counts`` is an observation
+    surface for ranked user-defined signal scenarios; it does not change
+    analytics semantics and it is not itself a throughput metric.
     """
+
     evaluated_at_ms = int(time() * 1000)
     region_counts = _empty_region_counts(zones)
+    zone_class_counts = _empty_zone_class_counts(zones)
     zone_counts = {zone["id"]: 0 for zone in zones if zone.get("type") != "counting_line"}
 
     if detection_frame is None:
@@ -100,6 +117,7 @@ def evaluate_traffic_state(
             "source_timestamp_ms": None,
             "evaluated_frame_number": None,
             "zone_counts": zone_counts,
+            "zone_class_counts": zone_class_counts,
             "region_counts": region_counts,
             "tracking": object_tracking_service.status(),
             "prototype_only": True,
@@ -115,7 +133,7 @@ def evaluate_traffic_state(
     pedestrians_total = 0
     vehicles_total = 0
     ignore_zones = [zone for zone in zones if zone.get("type") == "ignore"]
-    counting_zones = [zone for zone in zones if zone.get("type") not in {"ignore", "counting_line"}]
+    countable_zones = [zone for zone in zones if zone.get("type") not in {"ignore", "counting_line"}]
     crossing_zones = [zone for zone in zones if zone.get("type") == "crossing"]
     waiting_zones = [zone for zone in zones if zone.get("type") == "pedestrian_waiting"]
     queue_zones = [zone for zone in zones if zone.get("type") == "vehicle_queue"]
@@ -128,7 +146,13 @@ def evaluate_traffic_state(
             continue
         if any(point_in_polygon(centre, zone["polygon"]) for zone in ignore_zones):
             continue
-        class_name = str(detection.get("class_name", ""))
+
+        class_name = str(detection.get("class_name", "")).strip() or "unknown"
+        for zone in countable_zones:
+            if point_in_polygon(centre, zone["polygon"]):
+                per_class = zone_class_counts[zone["id"]]
+                per_class[class_name] = per_class.get(class_name, 0) + 1
+
         group: str | None = None
         if class_name == "person":
             pedestrians_total += 1
@@ -137,12 +161,16 @@ def evaluate_traffic_state(
             vehicles_total += 1
             group = "vehicles"
         if group is None:
+            # Arbitrary detector classes remain available to scenario rules via
+            # zone_class_counts even when they are not traffic occupancy groups.
             continue
-        for zone in counting_zones:
+
+        for zone in countable_zones:
             if point_in_polygon(centre, zone["polygon"]):
                 region = region_counts[zone["id"]]
                 region[group] += 1
                 region["total"] += 1
+
         if class_name == "person":
             crossing_matches = [zone for zone in crossing_zones if point_in_polygon(centre, zone["polygon"])]
             if crossing_matches:
@@ -201,6 +229,7 @@ def evaluate_traffic_state(
         "source_timestamp_ms": detection_frame.get("timestamp_ms"),
         "evaluated_frame_number": detection_frame.get("source_frame_number"),
         "zone_counts": zone_counts,
+        "zone_class_counts": zone_class_counts,
         "region_counts": region_counts,
         "tracking": detection_frame.get("tracking") if isinstance(detection_frame.get("tracking"), dict) else object_tracking_service.status(),
         "prototype_only": True,
@@ -210,12 +239,12 @@ def evaluate_traffic_state(
 
 
 def _feed_signal_observation(state: dict[str, Any]) -> None:
-    """Feed bounded demand observations to the adaptive simulator without coupling it to inference."""
     signal_rules_service.observe(
         {
             "pedestrians_waiting": state.get("pedestrians_waiting", 0),
             "pedestrians_crossing": state.get("pedestrians_crossing", 0),
             "vehicles_waiting": state.get("vehicles_waiting", 0),
+            "zone_class_counts": state.get("zone_class_counts", {}),
             "source_frame_number": state.get("evaluated_frame_number"),
             "source_timestamp_ms": state.get("source_timestamp_ms"),
             "data_source": state.get("data_source"),
@@ -232,7 +261,7 @@ def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
     recommendation_decision = state["decision"]
     recommendation_reason = state["decision_reason"]
     state = dict(state)
-    active_rule_text = ", ".join(signal.get("active_rules", [])) or "normal configured timing"
+    active_scenario = signal.get("winning_scenario_label") or "normal configured timing"
     state.update(
         {
             "recommended_phase": recommendation_phase,
@@ -243,7 +272,7 @@ def _apply_active_simulation_signal(state: dict[str, Any]) -> dict[str, Any]:
             "decision_reason": (
                 f"Synthetic vehicles and pedestrians obey the active {signal['phase'].replace('_', ' ')} "
                 f"signal ({signal['seconds_remaining']:.1f}s remaining). Policy: {signal.get('mode', 'fixed')} / "
-                f"{signal.get('active_profile', 'Normal')}; active rules: {active_rule_text}. Detection recommendation: "
+                f"{signal.get('active_profile', 'Normal')}; ranked scenario: {active_scenario}. Detection recommendation: "
                 f"{recommendation_phase.replace('_', ' ')} — {recommendation_reason}"
             ),
             "extension_seconds": int(round(float(signal["seconds_remaining"]))),
@@ -276,13 +305,8 @@ def get_live_traffic_state() -> dict[str, Any]:
             ErrorCode.INFERENCE_FAILED,
             ErrorCode.INFERENCE_RESULT_INVALID,
         }:
-            logger.warning(
-                "Traffic simulation could not obtain live detections",
-                extra={"error_code": exc.code.value},
-            )
-            return _apply_active_simulation_signal(
-                evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}")
-            )
+            logger.warning("Traffic simulation could not obtain live detections", extra={"error_code": exc.code.value})
+            return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}"))
         raise
     return _apply_active_simulation_signal(evaluate_traffic_state(detection_frame, zones))
 

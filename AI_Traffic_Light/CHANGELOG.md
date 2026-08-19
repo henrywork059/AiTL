@@ -1,5 +1,24 @@
 # Changelog
 
+## 0_2_5 — Ranked signal scenarios and simulation telemetry
+
+- Owner explicitly accepted/promoted V024 / `0_2_4`; V025 now records `passed_baseline: 0_2_4` while remaining the current unaccepted candidate.
+- Reworked Traffic Logic adaptive rules into editable ranked **scenarios**. Each scenario has an id/name, enable flag, rank (`1` highest), ALL/ANY condition matching, persistence/cooldown, bounded phase targets/action, and optional pedestrian/vehicle service request.
+- Added first-class zone/class conditions so a scenario can express cases such as `car > 5 in queue_a` or `person >= 3 in waiting_west`, including `*` for all detected classes in a configured polygon zone.
+- Extended traffic-state observations with `zone_class_counts`, preserving arbitrary detected class names for scenario evaluation while keeping occupancy and track-derived flow semantics separate.
+- Changed adaptive arbitration so multiple scenarios may trigger but only the highest-ranked **eligible** scenario executes per evaluation; disabled/stale/unavailable/current-phase-ineligible/cooldown scenarios are explained and do not block the next eligible scenario.
+- Migrates inherited V023 rule definitions into editable scenario definitions when an older saved config has no `scenarios` field, preserving default behavior and existing profile/timing data.
+- Kept protected phase order/minimums/max/cycle bounds and Test-mode incident/accessibility semantics; `request_next_phase` only requests earlier protected progression rather than directly jumping conflicting phases.
+- Rebuilt Traffic Logic as compact Live Decision / Signal Timing / Scenario Rules / Test & Safety / History tabs with zone/class selectors, rank controls, condition builders, action/phase selectors, winner explanations, and live observed values.
+- Added an isolated deterministic Simulation Lab that runs the selected saved signal profile in Fixed and Adaptive modes from the same requested density and seed without resetting the live Camera Sources simulation or live controller runtime.
+- Added richer experiment telemetry: vehicle/pedestrian wait count/average/median/p95/max/total, queue average/p95/peak/queue-seconds/active share, simultaneous queue time, vehicle/pedestrian/combined throughput, vehicle-green efficiency, phase utilization, clearance time/share, transitions/cycles, adaptive scenario applications, timing extensions/reductions, and a simulator conflict-overlap diagnostic.
+- Added bounded persistent experiment results under `outputs/simulation_experiments/`, stored-run list/get/delete operations, and aligned Fixed/Adaptive timeline CSV export with `X-Request-ID`.
+- Added `POST/GET /api/traffic/experiments`, `GET /api/traffic/experiments/{run_id}`, `GET /api/traffic/experiments/{run_id}/export.csv`, and `DELETE /api/traffic/experiments/{run_id}` with standard envelopes/request IDs.
+- Added stable experiment storage errors `ATL-TRAFFIC-010..012`.
+- Added a compact one-page Simulation Lab presentation with top-level run controls, stored-run dropdown, Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs, Fixed/Adaptive sample toggles, page-size selection, and pagination/internal scrolling so telemetry does not become one long dashboard.
+- Added focused ranked-scenario and deterministic experiment regression coverage. Simulation Lab now snapshots configured zones and supplies synthetic per-zone/per-class observations so zone-based scenarios can be exercised in isolated Adaptive runs. Existing V024 persistence/polling hardening, V022 tracking/flow, V021 occupancy, dataset/training/inference/model workflows, and prototype-only safety boundaries remain preserved.
+- Physical/public-road traffic control remains disabled; experiment results are local synthetic benchmark data only.
+
 ## 0_2_4 — Maintenance hardening and polling optimization
 
 - Refined the signal-aware simulator presentation by shrinking the top-left metadata banner and the right-side pedestrian signal display so more of the synthetic roadway remains visible in Live AI and Camera views.
@@ -117,7 +136,7 @@
 - Added a larger, varied synthetic population with deterministic scene randomization for positions, speeds, sizes, and counts.
 - Added Light / Normal / Busy simulation density presets.
 - Added Pause / Resume scene controls so one synthetic frame can be frozen for inspection or persistent dataset capture.
-- Added `POST /api/camera/simulation/settings` and extended camera status with simulation density/pause state using existing envelopes, request IDs, logging, Pydantic validation, and stable errors.
+- Added `POST /api/camera/simulation/settings` and extended camera status with simulation density/pause state using existing envelopes, request IDs, Pydantic validation, and stable errors.
 - Added `X-Request-ID` to the binary camera-frame response.
 - Added focused camera simulation service/API tests and updated V016 documentation, function status, and acceptance checks.
 - Preserved V015 model management, confidence/visibility controls, capture, labeling, managed YOLO training, and trained-model live inference.
@@ -138,7 +157,7 @@
 ## 0_1_4 — Trained-model live inference overlay
 
 - Replaced the inference placeholder with a real Ultralytics-backed service that discovers local `outputs/training/*/weights/best.pt` files and loads the newest run.
-- Added model status, load-latest, unload, live-detection, and exact inferred-source-frame endpoints using the existing API envelope/request-ID conventions.
+- Added model status, load-latest, unload, live-detection, and exact inferred-source-frame endpoints using the existing request-ID/envelope conventions.
 - Runs the loaded trained model on the newest receiver or simulation frame and returns class, confidence, and original-image `xyxy` coordinates.
 - Caches inference per camera frame so repeated frontend polls do not rerun the same frame.
 - Keeps the exact source image used for each detection result so frontend overlays stay aligned even while simulation frames continue moving.

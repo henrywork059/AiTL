@@ -55,6 +55,7 @@ class TrafficState(BaseModel):
     source_timestamp_ms: int | None = None
     evaluated_frame_number: int | None = None
     zone_counts: dict[str, int] = Field(default_factory=dict)
+    zone_class_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
     region_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
     tracking: dict = Field(default_factory=dict)
     recommended_phase: str | None = None
@@ -134,6 +135,16 @@ class SignalRulesPreviewRequest(BaseModel):
     crossing_dwell_seconds: float = Field(default=0, ge=0, le=3600)
     mobility_assistance: bool = False
     incident_person_fallen: bool = False
+    zone_class_counts: dict[str, dict[str, int]] = Field(default_factory=dict)
+
+
+class SimulationExperimentRunRequest(BaseModel):
+    duration_seconds: int = Field(default=300, ge=30, le=1800)
+    density: Literal["light", "normal", "busy"] = "normal"
+    seed: int = Field(default=25025, ge=0, le=2_147_483_647)
+    sample_interval_seconds: int = Field(default=1, ge=1, le=10)
+    profile: str | None = Field(default=None, min_length=1, max_length=64)
+    label: str = Field(default="", max_length=80)
 
 
 class InferenceLoadRequest(BaseModel):

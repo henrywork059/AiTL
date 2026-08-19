@@ -8,8 +8,9 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   live_ai: { id: "live_ai", label: "Live AI", shortLabel: "Live AI", description: "Run the selected local detection model on camera or simulation frames and inspect detections, zones, tracks, and simulated signal context.", status: "test-ready" },
   camera_sources: { id: "camera_sources", label: "Camera Sources", shortLabel: "Cameras", description: "Use the built-in traffic simulation or receive JPEG/PNG frames from a camera node on the local network.", status: "test-ready" },
   zone_editor: { id: "zone_editor", label: "Zone Editor", shortLabel: "Zones", description: "Define traffic decision zones, analytics regions, and counting lines directly against the current camera reference frame.", status: "test-ready" },
-  traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Configure the simulated signal policy, inspect the live phase decision, test bounded adaptive rules, and review decision history.", status: "test-ready" },
+  traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Define ranked traffic scenarios from metrics or class counts in zones, configure protected timing, inspect the winning signal response, and review decision history.", status: "test-ready" },
   traffic_analytics: { id: "traffic_analytics", label: "Traffic Analytics", shortLabel: "Analytics", description: "Inspect sampled occupancy separately from tracked flow events, with time filters, summaries, charts, and CSV export.", status: "test-ready" },
+  simulation_lab: { id: "simulation_lab", label: "Simulation Lab", shortLabel: "Experiments", description: "Run repeatable seeded Fixed-vs-Adaptive comparisons and inspect waiting, queue, throughput, signal-use, rule, and diagnostic telemetry in one workspace.", status: "test-ready" },
   dataset_capture: { id: "dataset_capture", label: "Dataset Capture", shortLabel: "Capture", description: "Save the current camera or simulation frame with session metadata, a quality tag, and an optional note.", status: "test-ready" },
   dataset_review: { id: "dataset_review", label: "Dataset Review", shortLabel: "Review / Label", description: "Review captured images, draw manual bounding boxes, remove unsuitable captures, and build the managed YOLO dataset.", status: "test-ready" },
   train_export: { id: "train_export", label: "Train / Export", shortLabel: "Train", description: "Run local YOLO training, monitor validation convergence, and use patience-based early stopping. Runtime export remains planned.", status: "test-ready" },
@@ -20,7 +21,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
 
 export const APP_SECTIONS: AppSection[] = [
   { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources] },
-  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics] },
+  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
   { id: "data", label: "Data & models", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry] },
   { id: "system", label: "System", pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs] },
 ];

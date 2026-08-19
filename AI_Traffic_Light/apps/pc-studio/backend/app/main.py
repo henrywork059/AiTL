@@ -15,6 +15,7 @@ from app.core.middleware import RequestContextMiddleware
 from app.core.project_version import PROJECT_VERSION
 from app.routes.camera import router as camera_router
 from app.routes.dataset import router as dataset_router
+from app.routes.experiments import router as experiments_router
 from app.routes.health import router as health_router
 from app.routes.inference import router as inference_router
 from app.routes.logs import router as logs_router
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(inference_router, prefix="/api/inference", tags=["inference"])
     app.include_router(zones_router, prefix="/api/zones", tags=["zones"])
     app.include_router(traffic_router, prefix="/api/traffic", tags=["traffic"])
+    app.include_router(experiments_router, prefix="/api/traffic", tags=["traffic experiments"])
     app.include_router(dataset_router, prefix="/api/dataset", tags=["dataset"])
     app.include_router(training_router, prefix="/api/training", tags=["training"])
     app.include_router(models_router, prefix="/api/models", tags=["models"])

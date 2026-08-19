@@ -18,10 +18,10 @@ Always inspect the current GitHub `main` branch before producing a patch when th
 
 At the time of this file update:
 
-- current candidate: V024 / `0_2_4`;
-- previous version: V023 / `0_2_3`;
-- owner-confirmed passed baseline: V022 / `0_2_2`;
-- the owner explicitly requested V024 before explicitly accepting V023, so V023 is not silently promoted.
+- current candidate: V025 / `0_2_5`;
+- previous version: V024 / `0_2_4`;
+- owner-confirmed passed baseline: V024 / `0_2_4`;
+- the owner explicitly accepted/promoted V024 after V025 was prepared; V025 remains an unaccepted candidate until separately accepted.
 
 Rules:
 
@@ -45,7 +45,7 @@ notes
 
 AiTL is a local/student-scale computer-vision and traffic-light simulation prototype.
 
-Allowed scope includes receiver/simulated camera frames, local detection/inference, dataset capture/review/manual labeling, local model training, editable traffic zones/counting lines, tracking/analytics, user-defined **simulated** signal timing/rules, simulation-only phase recommendations, and classroom/model-junction experiments.
+Allowed scope includes receiver/simulated camera frames, local detection/inference, dataset capture/review/manual labeling, local model training, editable traffic zones/counting lines, tracking/analytics, user-defined **simulated** signal timing and ranked scenario rules, repeatable synthetic Fixed-vs-Adaptive experiments, simulation-only phase recommendations, and classroom/model-junction experiments.
 
 Do not implement, document, or imply direct control of public-road traffic signals, connections to public traffic-signal cabinets/controllers, bypassing safety interlocks, or production autonomous signal authority. Traffic outputs remain simulation/recommendation/display outputs only.
 
@@ -65,7 +65,7 @@ app/core/         envelopes, errors, logging, middleware, version metadata, shar
 
 Use the central `ErrorCode`/`AppError` mechanisms. Preserve request IDs and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`. Shared replace-style JSON persistence for migrated services belongs in `app/core/json_store.py`; services retain domain validation, locks, logging, and stable error translation.
 
-Signal policy ownership for V023+ belongs in `app/services/signal_rules.py`. The camera simulator consumes the resulting protected simulated phase; routes must not implement rule/arbitration logic.
+Signal policy ownership belongs in `app/services/signal_rules.py`. V025 scenario conditions may use controller metrics or per-zone/per-class observations, but routes must not implement condition evaluation, rank arbitration, or phase adjustment. Exactly one eligible ranked scenario wins each controller evaluation. The camera simulator consumes the resulting protected simulated phase. V025 experiment comparisons belong in `app/services/simulation_experiments.py` and must remain isolated from the live camera/controller runtime.
 
 ### Frontend
 
@@ -83,7 +83,9 @@ src/types/           app-specific type modules
 src/constants/       navigation/function metadata
 ```
 
-Do not turn `App.tsx` into a business-logic container. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`. V024 App-level camera/live-context polling must remain non-overlapping; prefer the shared serial polling helper rather than async `setInterval` loops.
+Do not turn `App.tsx` into a business-logic container. Frontend release fallbacks/navigation use `src/constants/projectVersion.ts`. V024+ App-level camera/live-context polling must remain non-overlapping; prefer the shared serial polling helper rather than async `setInterval` loops.
+
+V025 Simulation Lab should keep its dense telemetry grouped behind tabs/panels/filters rather than rendering all data in one long scrolling dashboard. Raw timeline data should remain paginated or otherwise bounded.
 
 ## 5. API contract is stable unless the task changes it
 
@@ -103,7 +105,7 @@ Binary/image/CSV responses must preserve `X-Request-ID`. Update `docs/API_CONTRA
 
 ## 6. Runtime data is not patch content
 
-Local working copies may contain valuable untracked/runtime data including `datasets/`, `outputs/`, trained `*.pt` files, manual labels, runtime zones/settings/signal rules, traffic history/flow/signal-decision history, `.venv/`, `node_modules/`, `dist/`, and caches.
+Local working copies may contain valuable untracked/runtime data including `datasets/`, `outputs/`, trained `*.pt` files, manual labels, runtime zones/settings/signal rules, traffic history/flow/signal-decision history, simulation experiment results, `.venv/`, `node_modules/`, `dist/`, and caches.
 
 Never use destructive cleanup commands such as `git clean -fd`. Never package:
 
@@ -122,14 +124,18 @@ __pycache__/
 
 Before editing, confirm version state, identify the smallest responsible modules, inspect tests/contracts, and decide whether the work fixes the current candidate or creates a new release.
 
-Preserve existing behavior outside the task. Keep original-image coordinates canonical. Keep sampled occupancy separate from track-derived flow. Keep `counting_region` and `counting_line` analytics-only unless explicitly changed.
+Preserve existing behavior outside the task. Keep original-image coordinates canonical. Keep sampled occupancy separate from track-derived flow. Keep V025 synthetic experiment telemetry separate from live occupancy/flow history. Keep `counting_region` and `counting_line` analytics-only unless explicitly changed.
 
-For V023+ signal logic:
+For V025 signal logic:
 
-- user rules may alter bounded **simulated phase durations**, not arbitrary physical control outputs;
+- users define ranked scenarios. A scenario can match controller metrics or detected class counts inside a specific configured polygon zone;
+- scenarios can combine up to the supported condition limit with explicit ALL/ANY matching;
+- rank `1` is highest. Multiple scenarios may be triggered, but only the highest-ranked **eligible** scenario executes in one arbitration evaluation; unavailable/current-phase-ineligible/cooldown scenarios do not block the next eligible scenario;
+- scenario actions may alter bounded **simulated phase durations** or request protected service sooner, not arbitrary physical control outputs;
 - the protected phase order remains vehicle green → vehicle yellow → all-red → pedestrian WALK → pedestrian CLEAR → all-red;
-- protected minimum timing, per-phase maximums, maximum-cycle limits, cooldowns, hysteresis/demand memory, stale-data fallback, and incident recovery must remain deterministic;
-- Fixed mode uses configured normal timing; Adaptive mode may apply live observation rules; Test mode may additionally use explicit manual accessibility/incident inputs;
+- protected minimum timing, per-phase maximums, maximum-cycle limits, persistence, cooldowns, demand memory, stale-data fallback, and incident recovery must remain deterministic;
+- Fixed mode uses configured normal timing; Adaptive mode may execute live-observation scenarios; Test mode may additionally use explicit manual accessibility/incident inputs;
+- zone/class conditions operate on per-frame detector class counts and must not be described as throughput; counting lines remain analytics-only;
 - do not claim wheelchair/mobility or fall detection unless a compatible perception source actually exists.
 
 ## 8. Testing evidence must be precise
@@ -157,7 +163,7 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
 git status --short
 ```
 
-Review local/untracked files before pulling. Preserve datasets, training outputs, models, labels, occupancy/flow/signal-decision history, signal-rule configuration, and runtime settings. Then use `git pull --ff-only origin main` when safe. Do not invent cleanup steps to force a pull.
+Review local/untracked files before pulling. Preserve datasets, training outputs, models, labels, occupancy/flow/signal-decision/experiment history, signal-rule configuration, and runtime settings. Then use `git pull --ff-only origin main` when safe. Do not invent cleanup steps to force a pull.
 
 ## 12. When uncertain
 

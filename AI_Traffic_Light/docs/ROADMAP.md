@@ -1,41 +1,44 @@
 # Roadmap
 
-## 0_2_4 — Maintenance hardening and polling optimization candidate
+## 0_2_5 — Ranked signal scenarios and simulation telemetry candidate
 
-Status: V024 candidate. Previous candidate is V023 / `0_2_3`; owner-confirmed passed baseline remains V022 / `0_2_2` because V023 was not explicitly accepted.
+Status: V025 candidate. Previous version is V024 / `0_2_4`, which is the owner-confirmed passed baseline. V025 remains unaccepted until the owner explicitly promotes it.
 
-V024 hardens the existing prototype without changing its user-facing signal semantics:
+V025 now combines the signal-policy and experiment layers:
 
-- shared atomic JSON replacement for runtime settings, zones, and model-registry metadata;
-- synchronized zone writes and model-registry state transitions;
-- reusable non-overlapping App-level camera/live-context polling;
-- architecture/regression guards for those maintenance boundaries;
-- preservation of the V023 design system and adaptive-signal behavior.
+- editable ranked scenarios with rank `1` highest;
+- controller-metric and zone/class-count conditions;
+- ALL/ANY multi-condition matching;
+- one-winner eligible arbitration with explicit suppressed/unavailable reasons;
+- bounded scenario actions with persistence, cooldown, protected phase targets and optional requested service;
+- compatibility migration from older V023/V024 predefined rules into editable scenarios;
+- live `zone_class_counts` observations separate from occupancy/flow semantics;
+- isolated Fixed-vs-Adaptive Simulation Lab using the same selected profile, density, duration and seed;
+- zone snapshot + synthetic zone/class counts in experiments so zone-based scenarios can be benchmarked;
+- wait/queue/throughput/signal/scenario/diagnostic telemetry;
+- bounded persisted experiment history and aligned CSV export;
+- compact one-page Traffic Logic and Simulation Lab presentation using tabs, panels, dropdowns, toggles, pagination and internal scrolling.
 
-### Inherited V023 adaptive simulation layer
+## Inherited V024/V022/V021 layers
 
-V023 introduced:
+V024 provides atomic persistence hardening, synchronized zone/model-registry transitions, serial App-level polling, Windows update/test/run hardening, and the Material-derived PC Studio presentation system.
 
-- editable normal signal phase timing with protected min/base/max values;
-- Fixed / Adaptive / Test modes and simple policy profiles;
-- bounded adaptive pedestrian/vehicle timing rules;
-- starvation-oriented maximum-wait rules, rule persistence/hysteresis, cooldowns, demand memory, stale-data fallback, and maximum-cycle bounds;
-- protected transition order/minimum service;
-- explicit manual accessibility/incident test inputs and all-red incident hold/recovery;
-- dry scenario preview, live rule arbitration explanation, and runtime decision history;
-- persistent user rule configuration excluded from source patches.
+V022 provides cross-frame prototype tracking/counting-line flow. V021 provides sampled occupancy analytics. These remain distinct from V025 scenario observations and experiment telemetry.
 
-## Next useful prototype directions after V024 acceptance
+## Next useful prototype directions after V025 acceptance
 
+- **scenario import/export and reusable templates** so ranked scenario sets can be saved, shared, cloned and restored without editing JSON;
+- **richer scenario condition sources** such as track-derived direction/entry/dwell events, only where semantics remain clear and deduplicated;
+- **scenario diagnostics** showing activation frequency, time-as-winner, suppressed-by-higher-rank counts, cooldown suppression counts and zone-missing warnings across a session;
+- model evaluation / dataset quality: validation precision, recall, mAP50, mAP50-95, per-class metrics, confusion matrix, false-positive/false-negative review, dataset class distribution and quality warnings;
+- experiment/session reports with richer charts and scenario/policy snapshots;
+- expand experiment demand generators beyond the current closed synthetic population, including explicit arrival-rate scenarios while preserving deterministic A/B inputs;
+- stronger tracking/motion prediction and track-quality diagnostics;
 - continue consolidating page-specific periodic polling where serial scheduling provides measurable benefit;
 - pin/automate frontend dependency updates instead of indefinitely relying on broad `latest` declarations;
-- model evaluation / dataset quality: validation precision, recall, mAP50, mAP50-95, per-class metrics, confusion matrix, false-positive/false-negative review, dataset class distribution and quality warnings;
-- fixed-vs-adaptive repeatable A/B simulation using identical random seeds and wait/queue/service metrics;
-- signal-policy import/export and richer experiment/session reports;
-- stronger tracking/motion prediction and track-quality diagnostics;
 - optional compatible accessibility/incident perception research, clearly separated from manual Test inputs;
 - device-camera workflow completion and model export/runtime packaging.
 
 ## Explicitly outside scope
 
-Physical public-road traffic signal control remains outside the project. Detection, tracking, analytics, rule evaluation, timing changes, and phase outputs are prototype/simulation information only.
+Physical public-road traffic signal control remains outside the project. Detection, tracking, analytics, experiment results, scenario evaluation, timing changes, and phase outputs are prototype/simulation information only.

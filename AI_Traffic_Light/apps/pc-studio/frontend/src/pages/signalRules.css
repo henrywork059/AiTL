@@ -1,177 +1,457 @@
+.signal-rules-page {
+  min-width: 0;
+}
+
 .signal-policy-toolbar {
-  display: grid;
-  gap: var(--space-3);
+  position: sticky;
+  top: 0;
+  z-index: 6;
 }
 
 .signal-toolbar-actions,
-.signal-config-bar {
+.signal-config-bar,
+.signal-tabs,
+.signal-section-heading,
+.scenario-editor-header,
+.scenario-phase-targets,
+.scenario-live-detail > div {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
+}
+
+.signal-toolbar-actions {
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .signal-tabs {
-  display: flex;
-  gap: var(--space-1);
-  flex-wrap: wrap;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
   border-bottom: var(--border-width) solid var(--color-border-subtle);
-  padding-bottom: 0;
 }
 
 .signal-tab {
+  flex: 0 0 auto;
   border: 0;
   border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--color-text-muted);
   border-radius: 0;
-  padding: 8px 10px;
-  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
 }
 
-.signal-tab:hover:not(:disabled) {
-  background: var(--color-surface-raised);
-  border-color: transparent;
-  color: var(--color-text-primary);
+.signal-tab:hover {
+  background: var(--color-control-hover);
 }
 
 .signal-tab.active {
-  background: transparent;
-  border-color: var(--color-primary);
   color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.signal-config-bar {
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
 }
 
 .signal-config-bar label,
-.signal-limit-grid label,
-.signal-rule-fields label,
-.signal-test-grid label {
+.scenario-form-grid label,
+.scenario-condition-row label,
+.scenario-guard-grid label {
   display: grid;
-  gap: 5px;
+  gap: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.86rem;
 }
 
 .signal-config-bar select,
-.signal-config-bar input,
-.signal-timing-row input,
-.signal-limit-grid input,
-.signal-rule-fields input,
-.signal-test-grid input {
-  min-width: 90px;
+.signal-config-bar input:not([type="checkbox"]) {
+  min-width: 142px;
 }
 
-.inline-check {
-  display: flex !important;
-  align-items: center;
-  gap: 7px !important;
-}
-
-.signal-timing-table {
+.signal-tab-body {
   display: grid;
-  gap: 0;
-  margin-top: var(--space-3);
-  border: var(--border-width) solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  gap: var(--space-4);
 }
 
-.signal-timing-row {
-  display: grid;
-  grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(90px, 1fr));
-  gap: 10px;
-  align-items: center;
-  padding: 9px 10px;
-  border-bottom: var(--border-width) solid var(--color-border-subtle);
-  background: var(--color-surface-raised);
+.signal-live-metrics {
+  margin-bottom: var(--space-4);
 }
 
-.signal-timing-row:last-child {
-  border-bottom: 0;
-}
-
-.signal-timing-row.header {
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.signal-limit-grid,
-.signal-rule-fields,
-.signal-test-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-3);
-  margin-top: 14px;
-}
-
-.signal-rule-editor-list,
-.signal-rule-status-list,
-.signal-history-list {
+.scenario-arbitration-list,
+.scenario-condition-list,
+.button-stack {
   display: grid;
   gap: var(--space-2);
 }
 
-.signal-rule-editor {
+.scenario-arbitration-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   background: var(--color-surface-raised);
-  padding: var(--space-3);
 }
 
-.signal-rule-editor-head,
-.signal-rule-status {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
+.scenario-arbitration-item.winner {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary-surface);
 }
 
-.signal-rule-status {
-  border-left: 3px solid var(--color-border-default);
-  border-bottom: var(--border-width) solid var(--color-border-subtle);
-  padding: 9px 10px;
-  background: var(--color-surface-raised);
+.scenario-rank-badge,
+.scenario-list-rank,
+.scenario-condition-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
 }
 
-.signal-rule-status:last-child {
-  border-bottom: 0;
+.scenario-arbitration-copy,
+.scenario-list-copy {
+  min-width: 0;
 }
 
-.signal-rule-status p {
+.scenario-arbitration-copy p,
+.scenario-list-copy small,
+.scenario-editor-header p,
+.scenario-section-heading p,
+.scenario-live-detail p {
   margin: var(--space-1) 0 0;
-}
-
-.signal-rule-active {
-  border-left-color: var(--color-secondary);
-}
-
-.signal-rule-suppressed {
-  border-left-color: var(--color-warning);
-}
-
-.signal-rule-unavailable {
-  border-left-color: var(--color-border-strong);
   color: var(--color-text-muted);
 }
 
-
-.signal-preview-result {
-  margin-top: 14px;
-  border-top: var(--border-width) solid var(--color-border-subtle);
-  padding-top: var(--space-3);
+.scenario-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
 }
 
-.wrap {
+.scenario-zone-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.scenario-zone-card > div:first-child {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.scenario-zone-card small {
+  color: var(--color-text-muted);
+}
+
+.scenario-zone-counts {
+  display: flex;
   flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-@media (max-width: 760px) {
-  .signal-timing-row {
-    grid-template-columns: 1fr 1fr;
+.scenario-zone-counts span {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.signal-timing-table-wrap,
+.scenario-history-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.signal-timing-table,
+.scenario-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.signal-timing-table th,
+.signal-timing-table td,
+.scenario-history-table th,
+.scenario-history-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.signal-timing-table th,
+.scenario-history-table th {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.signal-timing-table input {
+  width: 100%;
+  min-width: 90px;
+}
+
+.scenario-guard-grid,
+.scenario-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.scenario-workspace {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.75fr) minmax(0, 2.25fr);
+  gap: var(--space-4);
+  min-height: 520px;
+}
+
+.scenario-list-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  max-height: 68vh;
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.scenario-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.scenario-list-item:hover {
+  background: var(--color-control-hover);
+}
+
+.scenario-list-item.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+}
+
+.scenario-list-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.scenario-list-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scenario-editor {
+  min-width: 0;
+  max-height: 68vh;
+  overflow: auto;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.scenario-editor-header,
+.signal-section-heading,
+.scenario-section-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.scenario-editor-header h3,
+.scenario-editor-section h4,
+.scenario-section-heading h4 {
+  margin: 0;
+}
+
+.scenario-editor-section {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: var(--border-width) solid var(--color-border-subtle);
+}
+
+.scenario-editor-section:first-of-type {
+  border-top: 0;
+}
+
+.field-hint {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.scenario-enabled {
+  align-self: end;
+  min-height: 38px;
+}
+
+.scenario-condition-row {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 0.8fr) minmax(160px, 1.25fr) minmax(130px, 0.9fr) minmax(90px, 0.6fr) minmax(100px, 0.6fr) auto;
+  gap: var(--space-2);
+  align-items: end;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.scenario-condition-wide {
+  grid-column: span 2;
+}
+
+.scenario-remove-condition {
+  align-self: end;
+}
+
+.response-grid {
+  grid-template-columns: minmax(230px, 1.4fr) minmax(150px, 0.7fr) minmax(170px, 0.8fr);
+}
+
+.scenario-phase-targets {
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.scenario-phase-targets > span {
+  width: 100%;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.scenario-live-detail {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.scenario-live-detail > div {
+  justify-content: space-between;
+}
+
+.scenario-live-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.scenario-live-conditions span {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.scenario-live-conditions span.matched {
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.scenario-empty {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  min-height: 180px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.scenario-history-table {
+  min-width: 820px;
+}
+
+.scenario-history-table code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 1180px) {
+  .scenario-workspace {
+    grid-template-columns: 1fr;
   }
 
-  .signal-timing-row.header {
-    display: none;
+  .scenario-list-panel,
+  .scenario-editor {
+    max-height: none;
+  }
+
+  .scenario-list-panel {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .scenario-condition-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scenario-condition-index,
+  .scenario-remove-condition {
+    grid-column: auto;
+  }
+
+  .scenario-condition-wide {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .signal-policy-toolbar {
+    position: static;
+  }
+
+  .signal-config-bar,
+  .signal-toolbar-actions,
+  .scenario-editor-header,
+  .scenario-section-heading {
+    align-items: stretch;
+  }
+
+  .signal-config-bar,
+  .scenario-editor-header,
+  .scenario-section-heading,
+  .response-grid,
+  .scenario-condition-row {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-editor-header,
+  .scenario-section-heading {
+    display: grid;
+  }
+
+  .scenario-list-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .scenario-list-item > .status-pill {
+    grid-column: 2;
+    justify-self: start;
   }
 }

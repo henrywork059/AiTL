@@ -43,6 +43,9 @@ class ErrorCode(str, Enum):
     TRAFFIC_FLOW_READ_FAILED = "ATL-TRAFFIC-007"
     TRAFFIC_FLOW_WRITE_FAILED = "ATL-TRAFFIC-008"
     TRAFFIC_FLOW_CLEAR_FAILED = "ATL-TRAFFIC-009"
+    TRAFFIC_EXPERIMENT_READ_FAILED = "ATL-TRAFFIC-010"
+    TRAFFIC_EXPERIMENT_WRITE_FAILED = "ATL-TRAFFIC-011"
+    TRAFFIC_EXPERIMENT_DELETE_FAILED = "ATL-TRAFFIC-012"
 
     DATASET_WRITE_FAILED = "ATL-DATASET-001"
     DATASET_READ_FAILED = "ATL-DATASET-002"
@@ -95,6 +98,9 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TRAFFIC_FLOW_READ_FAILED: "Failed to read traffic flow events.",
     ErrorCode.TRAFFIC_FLOW_WRITE_FAILED: "Failed to write traffic flow events.",
     ErrorCode.TRAFFIC_FLOW_CLEAR_FAILED: "Failed to clear traffic flow events.",
+    ErrorCode.TRAFFIC_EXPERIMENT_READ_FAILED: "Failed to read simulation experiment data.",
+    ErrorCode.TRAFFIC_EXPERIMENT_WRITE_FAILED: "Failed to write simulation experiment data.",
+    ErrorCode.TRAFFIC_EXPERIMENT_DELETE_FAILED: "Failed to delete simulation experiment data.",
     ErrorCode.DATASET_WRITE_FAILED: "Failed to write dataset item.",
     ErrorCode.DATASET_READ_FAILED: "Failed to read dataset item.",
     ErrorCode.DATASET_ITEM_NOT_FOUND: "Dataset item was not found.",
