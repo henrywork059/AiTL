@@ -135,7 +135,7 @@ Confirm:
 10. Any vehicle-green extension stays within saved phase maximum and maximum-cycle bounds.
 11. Any non-vehicle progression request only shortens the current phase toward its configured minimum; phase order is not skipped.
 12. When local pedestrian demand is present during WALK/CLEAR, cooperation does not shorten that pedestrian phase and may record `protect_pedestrian_service`.
-13. Emergency priority remains inactive.
+13. In the retained V027 three-mode cooperation checks, emergency priority remains inactive; V029 emergency modes are tested separately below.
 
 Do **not** require Cooperative to beat Independent Adaptive on every metric. The acceptance condition is correct bounded neighbour-informed behavior and valid evidence, not guaranteed superiority.
 
@@ -222,4 +222,76 @@ Compare ZIP members with the supplied manifest. Only explicit owner acceptance m
 & $py .\scripts\test_pedestrian_aware_network_simulation.py
 ```
 
-Then run the inherited V027 network regression as well. For API acceptance, run one `POST /api/traffic/network-experiments` with a configured two-intersection link and confirm four modes share the same arrival fingerprint; `pedestrian_aware_cooperative` should contain pedestrian-awareness events/metrics and `comparisons.pedestrian_aware_cooperative_vs_cooperative`. Verify emergency priority remains false.
+Then run the inherited V027 network regression as well. For API acceptance, run one `POST /api/traffic/network-experiments` with a configured two-intersection link and confirm four modes share the same arrival fingerprint; `pedestrian_aware_cooperative` should contain pedestrian-awareness events/metrics and `comparisons.pedestrian_aware_cooperative_vs_cooperative`. Verify emergency priority remains false in the four retained pre-emergency modes; then run the V029 emergency checks below.
+
+## V029 focused emergency-priority network test
+
+Run from `AI_Traffic_Light/`:
+
+```powershell
+python .\scripts\test_network_simulation_experiments.py
+python .\scripts\test_pedestrian_aware_network_simulation.py
+python .\scripts\test_emergency_priority_network_simulation.py
+```
+
+The V029 focused regression must confirm:
+
+- the retained V027 cooperation and V028 pedestrian-aware regressions still pass;
+- the real emergency-priority method stays inside phase minimum/maximum/cycle bounds;
+- active simulated pedestrian crossing occupancy yields an explicit emergency-priority denial;
+- protected progression requests do not skip phase order;
+- one configured emergency event is identical in `emergency_baseline_cooperative` and `emergency_priority_cooperative`;
+- the emergency baseline reports `emergency_priority_active: false`;
+- the priority mode reports priority evaluations/grants and downstream preparation;
+- lifecycle evidence contains activation, source departure and downstream arrival, and contains clear/recovery when the event completes during the run;
+- same seed/config repeats all six mode results exactly except run metadata;
+- CSV contains emergency status/role/decision/action/ETA/applied columns.
+
+### API acceptance example
+
+Use a duration comfortably longer than the emergency activation time:
+
+```powershell
+$body = @{
+  duration_seconds = 180
+  density = "normal"
+  seed = 29029
+  sample_interval_seconds = 2
+  profile = $null
+  label = "V029 emergency acceptance"
+  link_id = "A_to_B"
+  transfer_share_percent = 70
+  cooperation_lookahead_seconds = 12
+  cooperation_max_extension_seconds = 5
+  cooperation_min_incoming_vehicles = 1
+  pedestrian_max_wait_seconds = 30
+  pedestrian_crossing_clearance_seconds = 6
+  pedestrian_clearance_reserve_seconds = 3
+  emergency_event_enabled = $true
+  emergency_event_at_seconds = 45
+  emergency_vehicle_type = "ambulance"
+  emergency_priority_lookahead_seconds = 20
+  emergency_priority_max_extension_seconds = 8
+} | ConvertTo-Json
+
+$run = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $body -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
+$run.data.scenario | ConvertTo-Json -Depth 12
+$run.data.emergency_baseline_cooperative.network_metrics.emergency | ConvertTo-Json -Depth 8
+$run.data.emergency_priority_cooperative.network_metrics.emergency | ConvertTo-Json -Depth 8
+$run.data.comparisons.emergency_priority_vs_emergency_baseline | ConvertTo-Json -Depth 12
+```
+
+Acceptance checks:
+
+1. `scenario.comparison` contains six modes in the documented order.
+2. The two emergency modes contain equal `emergency_event` objects.
+3. Event provenance is `simulated_configured_emergency_event`; `detector_claimed` is false and confidence is null.
+4. Baseline priority counts remain zero.
+5. Priority mode records grant/deny/defer events as applicable and downstream preparation before B arrival when inside lookahead.
+6. No timing event violates configured phase/cycle bounds or skips protected phase order.
+7. Active crossing denial can be reproduced by the focused regression even if the selected random API run does not naturally align the emergency with a crossing.
+8. If both matched emergency vehicles clear, the emergency comparison exposes available source/destination/total-travel deltas; otherwise it explicitly marks those deltas unavailable.
+9. Stored run read/list/delete/CSV remain functional.
+10. No live emergency recognition or public-road-control claim appears in the UI/API/docs.
+
+After focused checks, run the normal complete-repository validation including Python compilation, backend tests, live API smoke, frontend typecheck/build, `scripts/check_structure.py`, and `git diff --check`.

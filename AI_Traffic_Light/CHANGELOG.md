@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_2_9 — Simulated emergency-priority cooperative two-intersection simulation
+
+- Created V029 / `0_2_9` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V028 as the previous unaccepted candidate.
+- Preserved the four V028 network modes and added matched `emergency_baseline_cooperative` and `emergency_priority_cooperative` modes so emergency-priority effects are compared against the same seeded base demand and the same simulated emergency event.
+- Added a deterministic/configured emergency event with event/vehicle/type/source/destination/link identity, explicit simulation provenance, no detector-confidence claim, and lifecycle evidence for activation, source departure, downstream arrival, clear, and recovery.
+- Added bounded emergency priority that may extend current vehicle green within phase/cycle caps or request earlier protected progression only toward the current phase minimum. Active simulated pedestrian crossings deny the emergency timing change until clearance.
+- Added source priority, downstream preparation, destination priority, grant/deny/defer explanations, timing deltas, emergency wait/travel telemetry, lifecycle/priority event histories, and matched Emergency-priority-vs-Emergency-baseline comparison.
+- Extended network CSV with emergency status/role/decision/action/ETA/applied fields for all six modes.
+- Added request fields for emergency enable/time/type, downstream lookahead, and maximum green extension; no new stable error code was required.
+- Added focused V029 regression including direct protected-bound/emergency-crossing-guard tests while retaining V027 cooperation and V028 pedestrian-aware regressions.
+- Live emergency recognition, hardware/public-road pre-emption, cabinet integration, and safety-certification claims remain out of scope.
+
 ## 0_2_8 — Pedestrian-aware cooperative two-intersection simulation
 
 - Created V028 / `0_2_8` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V027 as the previous unaccepted candidate.

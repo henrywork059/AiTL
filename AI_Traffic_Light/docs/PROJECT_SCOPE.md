@@ -28,7 +28,9 @@ AiTL currently includes local prototype capability in these families:
 - isolated seeded Fixed-vs-Adaptive Simulation Lab telemetry;
 - persistent experiment/config/history tooling;
 - generic intersection/topology foundation and source-to-intersection identity;
-- deterministic two-intersection independent-controller network simulation with synthetic configured-link vehicle transfer;
+- deterministic two-intersection network simulation with synthetic configured-link vehicle transfer and bounded cooperation;
+- simulation-only pedestrian request/clearance protection;
+- simulation-only matched emergency-event baseline and bounded emergency priority with downstream preparation/recovery evidence;
 - structured live decision/explanation **foundation**.
 
 Exact candidate details belong in `START_HERE.md` and the current patch document.
@@ -54,21 +56,27 @@ Future strengthening includes multiple simultaneous links/intersections, richer 
 
 ## 4. Planned invention capability: emergency priority
 
-**Status: planned.**
+**Status: implemented in matched synthetic network experiment / planned live-evidence enhancement.**
 
-Initial implementation should use a simulated/configured emergency event unless a compatible real perception source is deliberately added.
+V029 implements the initial evidence-gated form that this scope required: an explicit simulated/configured emergency vehicle event, not inferred perception. Two matched emergency modes receive the same event so priority behavior can be compared against a no-priority baseline.
 
-Target event context includes:
+Current V029 event/evidence includes:
 
-- emergency/event ID;
-- vehicle/event type;
-- source intersection and approach/direction;
-- timestamp;
-- provenance/confidence where applicable;
-- active/cleared lifecycle;
-- downstream path/next intersection where simulated.
+- deterministic emergency event and vehicle IDs;
+- ambulance / fire-engine / police configured type;
+- source/destination intersection and approach plus selected link;
+- activation time and explicit simulation provenance;
+- `confidence: null` and `detector_claimed: false`;
+- activation, source-departure, downstream-arrival, clear and recovery lifecycle events;
+- protected grant/deny/defer decisions and reasons;
+- downstream preparation while the emergency vehicle is in the synthetic transfer pipeline;
+- emergency source/destination wait and end-to-end travel evidence.
 
-Priority must operate through protected transitions and include explicit grant/deny/recovery explanation. A detector class name or manual flag alone is not sufficient to claim end-to-end emergency priority.
+Priority may extend vehicle green or request earlier protected progression only inside existing phase minimum/maximum/cycle bounds. Active simulated pedestrian crossings block emergency timing changes until clearance.
+
+The claim must remain **simulation-only emergency priority**. V029 does not establish emergency recognition from a camera/model, live cross-camera emergency identity, hardware pre-emption, general emergency route orchestration, public-road performance, or safety. A detector class name or manual flag alone remains insufficient to claim live emergency priority.
+
+Future strengthening should focus on compatible perception provenance, confidence/uncertainty when an actual detector exists, multi-link route context, and compact evidence presentation—not on relabeling the current configured event as AI recognition.
 
 ## 5. Planned invention capability: pedestrian-aware control
 
@@ -83,7 +91,7 @@ Future strengthening should focus on live-evidence quality rather than re-implem
 - longest individual live waiting time only where tracking quality supports it;
 - robust live service-request reconstruction across camera/source changes;
 - calibrated crossing-clearance evidence rather than a fixed synthetic duration;
-- interaction with the planned emergency-priority lifecycle;
+- interaction with the V029 simulated emergency-priority lifecycle and any later live-evidence source;
 - compact frontend presentation of pedestrian-specific evidence.
 
 Per-frame person counts must not be described as unique pedestrian throughput.

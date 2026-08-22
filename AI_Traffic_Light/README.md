@@ -4,9 +4,9 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V028 / `0_2_8` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V027 is the previous version because the owner explicitly requested V028 before separately accepting V027. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. At this update, V029 / `0_2_9` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V028 is the previous version because the owner explicitly requested V029 before separately accepting V028. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
 
-V028 preserves the V027 Cooperative Adaptive baseline and adds a fourth Pedestrian-aware Cooperative mode. It tracks pedestrian request age and synthetic crossing occupancy, adds bounded starvation-prevention/service and crossing-clearance guards, and compares all four modes under the same seeded demand.
+V029 preserves the V028 four-mode network benchmark and adds matched Emergency Baseline Cooperative and Emergency-priority Cooperative modes. Both receive the same explicit simulated/configured emergency vehicle event; only the priority mode can request bounded protected timing changes, downstream preparation, and recovery evidence.
 
 ## Documentation entry points
 
@@ -19,7 +19,7 @@ V028 preserves the V027 Cooperative Adaptive baseline and adds a fourth Pedestri
 | Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
 | Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
 | API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_2_8.md`](docs/PATCH_0_2_8.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
+| Current candidate acceptance | [`docs/PATCH_0_2_9.md`](docs/PATCH_0_2_9.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
 | What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Implemented prototype functions
@@ -38,9 +38,10 @@ V028 preserves the V027 Cooperative Adaptive baseline and adds a fourth Pedestri
 - persistent experiment results and CSV export;
 - generic intersection/source identity and directed neighbour-link configuration;
 - deterministic two-intersection network experiments with synthetic configured-link vehicle transfer;
-- Fixed vs Independent Adaptive vs Cooperative Adaptive vs Pedestrian-aware Cooperative network comparison;
+- six-mode network evidence: Fixed, Independent Adaptive, Cooperative Adaptive, Pedestrian-aware Cooperative, matched Emergency Baseline Cooperative, and Emergency-priority Cooperative;
 - pedestrian request-age, synthetic crossing occupancy, starvation-prevention, service-session, and clearance-protection telemetry;
 - bounded downstream coordination using predicted synthetic upstream arrivals with protected pedestrian/timing guards;
+- explicit simulated emergency-event lifecycle, matched no-priority baseline, protected grant/deny/defer priority, downstream preparation, recovery, and emergency wait/travel telemetry;
 - structured live decision/explanation **foundation** with observation provenance.
 
 ## Important semantics
@@ -49,16 +50,16 @@ V028 preserves the V027 Cooperative Adaptive baseline and adds a fourth Pedestri
 - Flow is produced by prototype track/line/region events.
 - Zone/class counts are per-frame observations.
 - Simulation Lab data is synthetic experiment output, separate from live histories.
-- Live network links remain configuration metadata; V028 cooperation and pedestrian-aware service guards exist only inside the isolated synthetic network experiment. Transfer and predicted-arrival evidence are simulator-generated, not observed real traffic.
+- Live network links remain configuration metadata; V029 cooperation, pedestrian-aware service guards, and emergency priority exist only inside the isolated synthetic network experiment. Transfer/predicted-arrival/emergency evidence is simulator-generated, not observed real traffic or live emergency recognition.
 - Manual/synthetic events must remain labeled with their provenance.
 
 ## Planned invention capability areas
 
 The project scope explicitly includes:
 
-1. multi-intersection cooperation;
-2. emergency priority;
-3. stronger pedestrian-aware control;
+1. multi-intersection cooperation (two-intersection synthetic implementation, broader generalization planned);
+2. emergency priority (V029 synthetic/configured implementation, live evidence planned);
+3. pedestrian-aware control (V028 synthetic implementation, live-evidence strengthening planned);
 4. different vehicle classes;
 5. explainable decisions.
 

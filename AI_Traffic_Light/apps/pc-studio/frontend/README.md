@@ -99,3 +99,7 @@ Signal graphics, decisions, network context, experiments, and emergency/accessib
 ## V028 network note
 
 V028 adds backend/API/test-first pedestrian-aware cooperative network evidence. The existing PC Studio Simulation Lab UI remains the single-junction surface; no new network dashboard is added in this patch.
+
+## V029 network note
+
+V029 adds backend/API/test-first matched emergency baseline and emergency-priority cooperative evidence. The existing PC Studio Simulation Lab UI remains single-junction; no emergency-pre-emption or network-control dashboard is added. If a later UI exposes these results, it must label the emergency event as simulated/configured, show grant/deny/recovery provenance, and must not imply camera emergency recognition or physical signal control.

@@ -60,7 +60,7 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 
 37. V027 is described as isolated synthetic two-intersection cooperation, not general live N-intersection cooperation.
 38. Configured travel time is described as a simulation input, not a measured/learned road estimate.
-39. Emergency priority remains inactive.
+39. In the retained V027 Fixed/Adaptive/Cooperative modes, emergency priority remains inactive.
 40. No unsupported emergency/wheelchair/fall perception claim is introduced.
 41. Nothing controls or connects to physical/public-road traffic-signal infrastructure.
 42. Owner explicitly confirms V027 passed before `passed_baseline` changes.
@@ -79,5 +79,27 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 51. Neighbour coordination does not shorten pedestrian WALK/CLEAR while waiting or crossing demand is active.
 52. Pedestrian-aware vs Cooperative comparison includes pedestrian wait/queue/max-wait metrics.
 53. Four-mode CSV contains pedestrian-awareness evidence columns.
-54. Emergency priority remains inactive and no public-road control claim is introduced.
+54. In the retained V028 pre-emergency modes, emergency priority remains inactive and no public-road control claim is introduced.
 55. Full inherited regression, structure check, frontend typecheck/build and live smoke pass locally before owner acceptance.
+
+## V029 simulated emergency-priority acceptance
+
+56. `VERSION` reports `0_2_9`, previous `0_2_8`, passed baseline `0_2_4`, candidate status.
+57. `docs/PATCH_0_2_9.md` and a V029 changelog section exist.
+58. Retained V027 cooperation, retained V028 pedestrian-aware, and focused V029 emergency regressions pass.
+59. Current network `scenario.comparison` contains six documented modes.
+60. `emergency_baseline_cooperative` and `emergency_priority_cooperative` receive identical configured emergency event objects and the same seeded base arrival plan.
+61. Emergency event contains ID/type/vehicle/source/destination/link/activation fields with `simulated_configured_emergency_event` provenance, null confidence, and `detector_claimed: false`.
+62. Baseline emergency mode carries the event but reports emergency timing priority inactive/zero.
+63. Priority mode can record source priority, downstream preparation, and destination priority roles without creating a second phase state machine.
+64. Emergency priority may extend current vehicle green only within phase maximum, maximum-cycle cap, and emergency extension cap.
+65. Emergency protected progression reduces only the current phase toward its configured minimum and never skips protected phase order.
+66. Active simulated pedestrian crossing occupancy yields an explicit emergency priority denial until clearance.
+67. Emergency lifecycle evidence records activation, source departure, downstream arrival, and—when completed during the run—clear plus recovery.
+68. Emergency metrics expose event status, source/destination wait, total travel, priority evaluations/grants/denials/applications, downstream preparations, and timing seconds added/reduced.
+69. `comparisons.emergency_priority_vs_emergency_baseline` exists; emergency delay/travel deltas are available only when the event completes in both matched modes.
+70. Six-mode CSV includes emergency status/role/decision/action/ETA/applied columns and preserves `X-Request-ID`.
+71. Invalid event time/type/lookahead/extension inputs are rejected by request/service validation.
+72. V029 is described only as simulated/configured emergency priority; no live detector, hardware/public-road pre-emption, safety-interlock bypass, or safety-certification claim is introduced.
+73. Full inherited backend/frontend/structure/live-smoke/`git diff --check` validation passes locally before owner acceptance.
+74. Owner explicitly confirms V029 passed before `passed_baseline` changes.

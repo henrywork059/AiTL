@@ -51,8 +51,29 @@ PEDESTRIAN_RATES_PER_MINUTE = {
 VEHICLE_SERVICE_PER_SECOND = 0.9
 PEDESTRIAN_SERVICE_PER_SECOND = 1.6
 COOPERATION_SERVICE_BUFFER_SECONDS = 2.0
-PEDESTRIAN_AWARE_MODES = {"pedestrian_aware_cooperative"}
-COOPERATIVE_MODES = {"cooperative", "pedestrian_aware_cooperative"}
+PEDESTRIAN_AWARE_MODES = {
+    "pedestrian_aware_cooperative",
+    "emergency_baseline_cooperative",
+    "emergency_priority_cooperative",
+}
+COOPERATIVE_MODES = {
+    "cooperative",
+    "pedestrian_aware_cooperative",
+    "emergency_baseline_cooperative",
+    "emergency_priority_cooperative",
+}
+EMERGENCY_EVENT_MODES = {"emergency_baseline_cooperative", "emergency_priority_cooperative"}
+EMERGENCY_PRIORITY_MODES = {"emergency_priority_cooperative"}
+NETWORK_EXPERIMENT_MODES = (
+    "fixed",
+    "adaptive",
+    "cooperative",
+    "pedestrian_aware_cooperative",
+    "emergency_baseline_cooperative",
+    "emergency_priority_cooperative",
+)
+EMERGENCY_SERVICE_BUFFER_SECONDS = 2.0
+EMERGENCY_VEHICLE_TYPES = {"ambulance", "fire_engine", "police"}
 
 
 @dataclass
@@ -365,6 +386,142 @@ class _BenchmarkSignalRulesService(SignalRulesService):
             return result
 
 
+    def apply_emergency_priority(
+        self,
+        *,
+        clock_s: float,
+        emergency_active: bool,
+        emergency_event_id: str,
+        vehicle_type: str,
+        role: str,
+        eta_seconds: float | None,
+        lookahead_seconds: float,
+        max_extension_seconds: float,
+        local_pedestrians_waiting: int,
+        local_pedestrians_crossing: int,
+        intersection_id: str,
+        link_id: str,
+    ) -> dict[str, Any]:
+        """Apply one bounded simulation-only emergency priority request.
+
+        Emergency priority never skips the protected phase sequence. Vehicle
+        green may be extended inside saved phase/cycle caps. Other phases may
+        progress only toward their configured minimum. An active simulated
+        pedestrian crossing is a hard local guard: priority is denied until the
+        crossing can clear through the normal protected sequence.
+        """
+
+        eta = None if eta_seconds is None else max(0.0, float(eta_seconds))
+        result: dict[str, Any] = {
+            "applied": False,
+            "decision": "defer",
+            "action": "none",
+            "reason": "emergency priority is not active at this intersection",
+            "timing_delta_seconds": 0.0,
+            "eta_seconds": round(eta, 1) if eta is not None else None,
+        }
+        if not emergency_active:
+            return result
+        if eta is not None and eta > float(lookahead_seconds) + 1e-9:
+            result["reason"] = "emergency vehicle is outside the configured priority lookahead"
+            return result
+
+        with self._lock:
+            config = self._load_config_locked()
+            profile = self._active_profile_locked(config)
+            if self._incident_hold:
+                result.update(
+                    {
+                        "decision": "deny",
+                        "action": "deny_incident_hold",
+                        "reason": "existing incident hold blocks emergency timing priority",
+                    }
+                )
+                return result
+
+            phase_key, _phase = PHASE_SEQUENCE[self._phase_index]
+            elapsed = max(0.0, float(clock_s) - self._phase_started_clock)
+            phase_limits = profile["phases"][phase_key]
+            previous = float(self._phase_duration_seconds)
+            changed = False
+
+            if phase_key == "vehicle_green":
+                phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
+                emergency_cap = min(
+                    phase_cap,
+                    float(self._phase_base_seconds) + max(0.0, float(max_extension_seconds)),
+                )
+                target_duration = elapsed + (eta or 0.0) + EMERGENCY_SERVICE_BUFFER_SECONDS
+                self._phase_duration_seconds = max(previous, min(emergency_cap, target_duration))
+                changed = self._phase_duration_seconds > previous + 0.05
+                result.update(
+                    {
+                        "decision": "grant",
+                        "action": "extend_vehicle_green_for_emergency" if changed else "emergency_vehicle_green_ready",
+                        "reason": (
+                            "extended vehicle green within configured caps for the simulated emergency vehicle"
+                            if changed
+                            else "vehicle green is already available long enough for the simulated emergency request"
+                        ),
+                    }
+                )
+            elif phase_key in {"pedestrian_green", "pedestrian_flashing"} and int(local_pedestrians_crossing) > 0:
+                result.update(
+                    {
+                        "decision": "deny",
+                        "action": "deny_active_pedestrian_crossing",
+                        "reason": "active simulated pedestrian crossing must clear before emergency vehicle service can progress",
+                    }
+                )
+            else:
+                self._pending_request = "vehicle"
+                minimum = float(phase_limits["min_seconds"])
+                requested_duration = max(minimum, elapsed + 0.2)
+                self._phase_duration_seconds = min(previous, requested_duration)
+                changed = self._phase_duration_seconds < previous - 0.05
+                result.update(
+                    {
+                        "decision": "grant",
+                        "action": "request_protected_emergency_progression" if changed else "emergency_progression_pending",
+                        "reason": (
+                            "shortened only the current protected phase toward its configured minimum for the simulated emergency request"
+                            if changed
+                            else "emergency vehicle service is requested; protected progression cannot shorten the current phase further"
+                        ),
+                    }
+                )
+
+            delta = float(self._phase_duration_seconds) - previous
+            result.update(
+                {
+                    "applied": changed,
+                    "timing_delta_seconds": round(delta, 1),
+                    "phase_key": phase_key,
+                    "previous_duration_seconds": round(previous, 1),
+                    "effective_duration_seconds": round(float(self._phase_duration_seconds), 1),
+                }
+            )
+            if changed:
+                self._record_event_locked(
+                    "emergency_priority_applied",
+                    {
+                        "emergency_event_id": emergency_event_id,
+                        "vehicle_type": vehicle_type,
+                        "role": role,
+                        "intersection_id": intersection_id,
+                        "link_id": link_id,
+                        "action": result["action"],
+                        "phase_key": phase_key,
+                        "eta_seconds": result["eta_seconds"],
+                        "previous_duration_seconds": result["previous_duration_seconds"],
+                        "effective_duration_seconds": result["effective_duration_seconds"],
+                        "simulation_clock_seconds": round(float(clock_s), 1),
+                        "provenance": "simulated_configured_emergency_event",
+                    },
+                )
+            return result
+
+
 class _IntersectionRuntime:
     def __init__(
         self,
@@ -541,6 +698,38 @@ class _IntersectionRuntime:
             clearance_reserve_seconds=clearance_reserve_seconds,
             intersection_id=self.intersection_id,
             **context,
+        )
+
+    def apply_emergency_priority(
+        self,
+        *,
+        clock_s: float,
+        emergency_event: dict[str, Any],
+        role: str,
+        eta_seconds: float | None,
+        lookahead_seconds: float,
+        max_extension_seconds: float,
+        link_id: str,
+    ) -> dict[str, Any]:
+        if self.mode not in EMERGENCY_PRIORITY_MODES:
+            return {"applied": False, "decision": "defer", "action": "disabled", "reason": "emergency priority mode is not active"}
+        method = getattr(self.controller, "apply_emergency_priority", None)
+        if method is None:
+            return {"applied": False, "decision": "deny", "action": "unsupported", "reason": "controller does not support emergency priority"}
+        context = self.pedestrian_context(clock_s)
+        return method(
+            clock_s=clock_s,
+            emergency_active=True,
+            emergency_event_id=str(emergency_event.get("event_id") or "emergency"),
+            vehicle_type=str(emergency_event.get("vehicle_type") or "emergency"),
+            role=role,
+            eta_seconds=eta_seconds,
+            lookahead_seconds=lookahead_seconds,
+            max_extension_seconds=max_extension_seconds,
+            local_pedestrians_waiting=int(context["waiting_count"]),
+            local_pedestrians_crossing=int(context["crossing_count"]),
+            intersection_id=self.intersection_id,
+            link_id=link_id,
         )
 
     def advance_signal_metrics(self, signal: dict[str, Any], dt: float) -> None:
@@ -736,6 +925,9 @@ class _NetworkModeSimulation:
         pedestrian_max_wait_seconds: float = 30.0,
         pedestrian_crossing_clearance_seconds: float = 6.0,
         pedestrian_clearance_reserve_seconds: float = 3.0,
+        emergency_event: dict[str, Any] | None = None,
+        emergency_priority_lookahead_seconds: float = 20.0,
+        emergency_priority_max_extension_seconds: float = 8.0,
     ) -> None:
         self.mode = mode
         self.duration_seconds = duration_seconds
@@ -747,6 +939,9 @@ class _NetworkModeSimulation:
         self.pedestrian_max_wait_seconds = float(pedestrian_max_wait_seconds)
         self.pedestrian_crossing_clearance_seconds = float(pedestrian_crossing_clearance_seconds)
         self.pedestrian_clearance_reserve_seconds = float(pedestrian_clearance_reserve_seconds)
+        self.emergency_event = deepcopy(emergency_event) if emergency_event else None
+        self.emergency_priority_lookahead_seconds = float(emergency_priority_lookahead_seconds)
+        self.emergency_priority_max_extension_seconds = float(emergency_priority_max_extension_seconds)
         self.source_vehicle_arrivals = source_vehicle_arrivals
         self.destination_vehicle_arrivals = destination_vehicle_arrivals
         self.source_pedestrian_arrivals = source_pedestrian_arrivals
@@ -788,6 +983,26 @@ class _NetworkModeSimulation:
             "incoming_vehicle_count": 0,
             "earliest_arrival_eta_seconds": None,
             "action": "none",
+        }
+        self._emergency_injected = False
+        self._emergency_status = "scheduled" if self.emergency_event else "none"
+        self._emergency_source_departed_at_s: float | None = None
+        self._emergency_destination_arrived_at_s: float | None = None
+        self._emergency_cleared_at_s: float | None = None
+        self.emergency_priority_evaluations = 0
+        self.emergency_priority_grants = 0
+        self.emergency_priority_denials = 0
+        self.emergency_priority_applied = 0
+        self.emergency_downstream_preparations = 0
+        self.emergency_priority_seconds_added = 0.0
+        self.emergency_priority_seconds_reduced = 0.0
+        self.emergency_priority_events: list[dict[str, Any]] = []
+        self.emergency_lifecycle_events: list[dict[str, Any]] = []
+        self._latest_emergency_priority: dict[str, Any] = {
+            "active": False,
+            "status": self._emergency_status,
+            "action": "none",
+            "decision": "defer",
         }
         self._sample_at_s = 0.0
 
@@ -836,6 +1051,7 @@ class _NetworkModeSimulation:
             dt = min(STEP_SECONDS, self.duration_seconds - clock)
             self._inject_arrivals(clock)
             self._deliver_transfers(clock)
+            self._inject_emergency(clock)
             self.source.prune_crossings(clock)
             self.destination.prune_crossings(clock)
 
@@ -850,6 +1066,12 @@ class _NetworkModeSimulation:
                 self._evaluate_cooperation(clock, destination_signal)
                 # Re-read after a timing advisory so the served phase/remaining
                 # time reflect the bounded mutation performed by the controller.
+                destination_signal = self.destination.signal(clock)
+            if self.mode in EMERGENCY_PRIORITY_MODES:
+                self._evaluate_emergency_priority(clock, source_signal, destination_signal)
+                # Emergency priority is the last advisory layer, but still only
+                # mutates timing through protected minimum/maximum/cycle bounds.
+                source_signal = self.source.signal(clock)
                 destination_signal = self.destination.signal(clock)
             last_source_signal = source_signal
             last_destination_signal = destination_signal
@@ -874,6 +1096,8 @@ class _NetworkModeSimulation:
                         "scheduled_arrival_s": round(scheduled_arrival, 1),
                         "arrived_at_s": None,
                     }
+                    if self._is_emergency_vehicle(vehicle.vehicle_id):
+                        self._mark_emergency_source_departed(clock, scheduled_arrival)
 
             served_destination = self.destination.serve_vehicles(
                 clock_s=clock,
@@ -884,6 +1108,8 @@ class _NetworkModeSimulation:
                 if vehicle.origin == "transfer":
                     self.corridor_completed += 1
                     self.corridor_travel_times.append(max(0.0, clock - vehicle.network_started_at_s))
+                if self._is_emergency_vehicle(vehicle.vehicle_id):
+                    self._mark_emergency_cleared(clock)
 
             self.source.serve_pedestrians(
                 clock_s=clock,
@@ -1022,6 +1248,175 @@ class _NetworkModeSimulation:
         elif event["action"] == "protect_pedestrian_service":
             self.coordination_pedestrian_protections += 1
 
+    def _is_emergency_vehicle(self, vehicle_id: str) -> bool:
+        return bool(self.emergency_event) and str(vehicle_id) == str(self.emergency_event.get("vehicle_id"))
+
+    def _record_emergency_lifecycle(self, clock_s: float, event_type: str, **details: Any) -> None:
+        if not self.emergency_event:
+            return
+        self.emergency_lifecycle_events.append(
+            {
+                "emergency_event_id": str(self.emergency_event.get("event_id") or "emergency"),
+                "t": round(float(clock_s), 1),
+                "event_type": event_type,
+                "status": self._emergency_status,
+                "vehicle_type": self.emergency_event.get("vehicle_type"),
+                "source_intersection_id": self.source.intersection_id,
+                "destination_intersection_id": self.destination.intersection_id,
+                "link_id": str(self.link.get("id") or "link"),
+                "provenance": "simulated_configured_emergency_event",
+                **details,
+            }
+        )
+
+    def _inject_emergency(self, clock_s: float) -> None:
+        if self.mode not in EMERGENCY_EVENT_MODES or not self.emergency_event or self._emergency_injected:
+            return
+        active_at_s = float(self.emergency_event.get("active_at_s", 0.0) or 0.0)
+        if clock_s + 1e-9 < active_at_s:
+            return
+        event = _VehicleArrival(
+            at_s=active_at_s,
+            vehicle_id=str(self.emergency_event.get("vehicle_id") or "emergency_vehicle"),
+            class_name="emergency",
+            continues_to_destination=True,
+        )
+        self.source.enqueue_external_vehicle(event)
+        self._emergency_injected = True
+        self._emergency_status = "source_waiting"
+        self._latest_emergency_priority = {
+            "active": True,
+            "status": self._emergency_status,
+            "action": "emergency_event_activated",
+            "decision": "defer",
+        }
+        self._record_emergency_lifecycle(
+            clock_s,
+            "activated",
+            approach=self.emergency_event.get("source_approach"),
+        )
+
+    def _mark_emergency_source_departed(self, clock_s: float, scheduled_arrival_s: float) -> None:
+        if not self.emergency_event:
+            return
+        self._emergency_source_departed_at_s = float(clock_s)
+        self._emergency_status = "in_transit"
+        self._record_emergency_lifecycle(
+            clock_s,
+            "source_departed",
+            scheduled_destination_arrival_s=round(float(scheduled_arrival_s), 1),
+        )
+
+    def _mark_emergency_destination_arrived(self, clock_s: float) -> None:
+        if not self.emergency_event or self._emergency_status == "destination_waiting":
+            return
+        self._emergency_destination_arrived_at_s = float(clock_s)
+        self._emergency_status = "destination_waiting"
+        self._record_emergency_lifecycle(
+            clock_s,
+            "destination_arrived",
+            approach=self.emergency_event.get("destination_approach"),
+        )
+
+    def _mark_emergency_cleared(self, clock_s: float) -> None:
+        if not self.emergency_event or self._emergency_status == "cleared":
+            return
+        self._emergency_cleared_at_s = float(clock_s)
+        self._emergency_status = "cleared"
+        self._record_emergency_lifecycle(clock_s, "cleared", recovery="normal protected control resumed")
+        self._record_emergency_lifecycle(clock_s, "recovery", recovery="priority context removed")
+        self._latest_emergency_priority = {
+            "active": False,
+            "status": self._emergency_status,
+            "action": "recovery",
+            "decision": "grant",
+            "reason": "simulated emergency vehicle cleared the downstream intersection; normal protected control resumes",
+        }
+
+    def _emergency_priority_context(self, clock_s: float) -> tuple[_IntersectionRuntime | None, str, float | None]:
+        if not self.emergency_event:
+            return None, "inactive", None
+        vehicle_id = str(self.emergency_event.get("vehicle_id") or "")
+        if self._emergency_status == "source_waiting":
+            return self.source, "source_priority", 0.0
+        if self._emergency_status == "in_transit":
+            transfer = next((item for item in self.pipeline if item.vehicle.vehicle_id == vehicle_id), None)
+            if transfer is None:
+                return None, "in_transit", None
+            eta = max(0.0, float(transfer.arrive_at_s) - float(clock_s))
+            return self.destination, "downstream_preparation", eta
+        if self._emergency_status == "destination_waiting":
+            return self.destination, "destination_priority", 0.0
+        return None, self._emergency_status, None
+
+    def _evaluate_emergency_priority(
+        self,
+        clock_s: float,
+        source_signal: dict[str, Any],
+        destination_signal: dict[str, Any],
+    ) -> None:
+        if self.mode not in EMERGENCY_PRIORITY_MODES or not self.emergency_event:
+            return
+        runtime, role, eta = self._emergency_priority_context(clock_s)
+        if runtime is None:
+            return
+        if role == "downstream_preparation" and eta is not None and eta > self.emergency_priority_lookahead_seconds + 1e-9:
+            self._latest_emergency_priority = {
+                "active": True,
+                "status": self._emergency_status,
+                "role": role,
+                "decision": "defer",
+                "action": "outside_priority_lookahead",
+                "eta_seconds": round(eta, 1),
+                "reason": "simulated emergency vehicle has not yet entered the configured downstream priority lookahead",
+            }
+            return
+
+        self.emergency_priority_evaluations += 1
+        signal = source_signal if runtime is self.source else destination_signal
+        outcome = runtime.apply_emergency_priority(
+            clock_s=clock_s,
+            emergency_event=self.emergency_event,
+            role=role,
+            eta_seconds=eta,
+            lookahead_seconds=self.emergency_priority_lookahead_seconds,
+            max_extension_seconds=self.emergency_priority_max_extension_seconds,
+            link_id=str(self.link.get("id") or "link"),
+        )
+        event = {
+            "emergency_priority_id": f"emgprio_{runtime.intersection_id}_{int(round(clock_s * 1000.0))}",
+            "emergency_event_id": str(self.emergency_event.get("event_id") or "emergency"),
+            "t": round(clock_s, 1),
+            "role": role,
+            "intersection_id": runtime.intersection_id,
+            "link_id": str(self.link.get("id") or "link"),
+            "vehicle_type": self.emergency_event.get("vehicle_type"),
+            "provenance": "simulated_configured_emergency_event",
+            "phase_before": signal.get("phase"),
+            "phase_key_before": signal.get("phase_key"),
+            "eta_seconds": round(float(eta), 1) if eta is not None else None,
+            "decision": outcome.get("decision", "defer"),
+            "action": outcome.get("action", "none"),
+            "applied": bool(outcome.get("applied")),
+            "reason": outcome.get("reason"),
+            "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+        }
+        self._latest_emergency_priority = {"active": True, "status": self._emergency_status, **event}
+        self.emergency_priority_events.append(event)
+        if event["decision"] == "grant":
+            self.emergency_priority_grants += 1
+        elif event["decision"] == "deny":
+            self.emergency_priority_denials += 1
+        if role == "downstream_preparation":
+            self.emergency_downstream_preparations += 1
+        if event["applied"]:
+            self.emergency_priority_applied += 1
+            delta = event["timing_delta_seconds"]
+            if delta > 0:
+                self.emergency_priority_seconds_added += delta
+            elif delta < 0:
+                self.emergency_priority_seconds_reduced += abs(delta)
+
     def _inject_arrivals(self, clock_s: float) -> None:
         while (
             self._source_vehicle_index < len(self.source_vehicle_arrivals)
@@ -1058,6 +1453,8 @@ class _NetworkModeSimulation:
         for transfer in sorted(due, key=lambda item: (item.arrive_at_s, item.vehicle.vehicle_id)):
             self.destination.enqueue_transfer(transfer)
             self.transfers_arrived += 1
+            if self._is_emergency_vehicle(transfer.vehicle.vehicle_id):
+                self._mark_emergency_destination_arrived(transfer.arrive_at_s)
             event = self.transfer_events.get(transfer.vehicle.vehicle_id)
             if event is not None:
                 event["arrived_at_s"] = round(transfer.arrive_at_s, 1)
@@ -1099,6 +1496,9 @@ class _NetworkModeSimulation:
                 "pedestrian_awareness": (
                     deepcopy(self._latest_pedestrian_awareness) if self.mode in PEDESTRIAN_AWARE_MODES else None
                 ),
+                "emergency_priority": (
+                    deepcopy(self._latest_emergency_priority) if self.mode in EMERGENCY_EVENT_MODES else None
+                ),
             }
         )
 
@@ -1120,6 +1520,22 @@ class _NetworkModeSimulation:
             source + destination
             for source, destination in zip(self.source.pedestrian_queue_samples, self.destination.pedestrian_queue_samples)
         ]
+        emergency_active_at = float(self.emergency_event.get("active_at_s", 0.0)) if self.emergency_event else None
+        emergency_source_wait = (
+            max(0.0, self._emergency_source_departed_at_s - emergency_active_at)
+            if emergency_active_at is not None and self._emergency_source_departed_at_s is not None
+            else None
+        )
+        emergency_destination_wait = (
+            max(0.0, self._emergency_cleared_at_s - self._emergency_destination_arrived_at_s)
+            if self._emergency_cleared_at_s is not None and self._emergency_destination_arrived_at_s is not None
+            else None
+        )
+        emergency_total_travel = (
+            max(0.0, self._emergency_cleared_at_s - emergency_active_at)
+            if emergency_active_at is not None and self._emergency_cleared_at_s is not None
+            else None
+        )
         return {
             "mode": self.mode,
             "intersections": {
@@ -1180,27 +1596,60 @@ class _NetworkModeSimulation:
                     "max_extension_seconds": self.cooperation_max_extension_seconds,
                     "min_incoming_vehicles": self.cooperation_min_incoming_vehicles,
                 },
+                "emergency": {
+                    "event_present": self.emergency_event is not None,
+                    "status": self._emergency_status,
+                    "vehicle_type": self.emergency_event.get("vehicle_type") if self.emergency_event else None,
+                    "source_wait_seconds": round(emergency_source_wait, 2) if emergency_source_wait is not None else None,
+                    "destination_wait_seconds": round(emergency_destination_wait, 2) if emergency_destination_wait is not None else None,
+                    "total_travel_seconds": round(emergency_total_travel, 2) if emergency_total_travel is not None else None,
+                    "completed": self._emergency_status == "cleared",
+                    "priority_evaluations": self.emergency_priority_evaluations,
+                    "priority_grants": self.emergency_priority_grants,
+                    "priority_denials": self.emergency_priority_denials,
+                    "priority_timing_applied": self.emergency_priority_applied,
+                    "downstream_preparations": self.emergency_downstream_preparations,
+                    "timing_seconds_added": round(self.emergency_priority_seconds_added, 1),
+                    "timing_seconds_reduced": round(self.emergency_priority_seconds_reduced, 1),
+                    "lookahead_seconds": self.emergency_priority_lookahead_seconds,
+                    "max_extension_seconds": self.emergency_priority_max_extension_seconds,
+                },
             },
             "timeline": self.timeline,
             "transfer_events": [self.transfer_events[key] for key in sorted(self.transfer_events)],
             "coordination_events": self.coordination_events,
             "pedestrian_awareness_events": self.pedestrian_awareness_events,
+            "emergency_event": deepcopy(self.emergency_event) if self.emergency_event else None,
+            "emergency_lifecycle_events": self.emergency_lifecycle_events,
+            "emergency_priority_events": self.emergency_priority_events,
             "observation_provenance": "simulation",
             "transfer_provenance": "synthetic_network_simulation",
             "coordination_provenance": "synthetic_predicted_arrivals" if self.mode in COOPERATIVE_MODES else None,
             "pedestrian_awareness_provenance": (
                 "synthetic_pedestrian_demand" if self.mode in PEDESTRIAN_AWARE_MODES else None
             ),
+            "emergency_event_provenance": (
+                "simulated_configured_emergency_event" if self.mode in EMERGENCY_EVENT_MODES else None
+            ),
             "cooperative_control_active": self.mode in COOPERATIVE_MODES,
             "pedestrian_aware_control_active": self.mode in PEDESTRIAN_AWARE_MODES,
-            "emergency_priority_active": False,
+            "emergency_event_active": self.mode in EMERGENCY_EVENT_MODES and self.emergency_event is not None,
+            "emergency_priority_active": self.mode in EMERGENCY_PRIORITY_MODES and self.emergency_event is not None,
             "scope_note": (
-                "Two-intersection pedestrian-aware cooperative simulation with bounded local pedestrian service/clearance guards plus synthetic predicted-arrival coordination."
-                if self.mode in PEDESTRIAN_AWARE_MODES
+                "Two-intersection emergency-priority cooperative simulation using an explicit simulated/configured emergency event, bounded protected timing, pedestrian crossing guards, and downstream preparation."
+                if self.mode in EMERGENCY_PRIORITY_MODES
                 else (
-                    "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
-                    if self.mode in COOPERATIVE_MODES
-                    else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                    "Matched emergency-event baseline using the same simulated emergency vehicle without emergency timing priority."
+                    if self.mode in EMERGENCY_EVENT_MODES
+                    else (
+                        "Two-intersection pedestrian-aware cooperative simulation with bounded local pedestrian service/clearance guards plus synthetic predicted-arrival coordination."
+                        if self.mode in PEDESTRIAN_AWARE_MODES
+                        else (
+                            "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
+                            if self.mode in COOPERATIVE_MODES
+                            else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                        )
+                    )
                 )
             ),
         }
@@ -1241,6 +1690,11 @@ class NetworkSimulationExperimentService:
         pedestrian_max_wait_seconds: float = 30.0,
         pedestrian_crossing_clearance_seconds: float = 6.0,
         pedestrian_clearance_reserve_seconds: float = 3.0,
+        emergency_event_enabled: bool = True,
+        emergency_event_at_seconds: float = 15.0,
+        emergency_vehicle_type: str = "ambulance",
+        emergency_priority_lookahead_seconds: float = 20.0,
+        emergency_priority_max_extension_seconds: float = 8.0,
     ) -> dict[str, Any]:
         density = density.strip().lower()
         if density not in DENSITIES:
@@ -1263,6 +1717,19 @@ class NetworkSimulationExperimentService:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_crossing_clearance_seconds must be between 2 and 30.", status_code=422)
         if not 1.0 <= float(pedestrian_clearance_reserve_seconds) <= 15.0:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_clearance_reserve_seconds must be between 1 and 15.", status_code=422)
+        if emergency_event_enabled and not 0.0 <= float(emergency_event_at_seconds) < float(duration_seconds):
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "emergency_event_at_seconds must be within the experiment duration.", status_code=422)
+        emergency_vehicle_type = str(emergency_vehicle_type).strip().lower()
+        if emergency_vehicle_type not in EMERGENCY_VEHICLE_TYPES:
+            raise AppError(
+                ErrorCode.TRAFFIC_RULE_INVALID,
+                "emergency_vehicle_type must be ambulance, fire_engine, or police.",
+                status_code=422,
+            )
+        if not 1.0 <= float(emergency_priority_lookahead_seconds) <= 120.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "emergency_priority_lookahead_seconds must be between 1 and 120.", status_code=422)
+        if not 0.0 <= float(emergency_priority_max_extension_seconds) <= 30.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "emergency_priority_max_extension_seconds must be between 0 and 30.", status_code=422)
 
         network = deepcopy(self._network_provider())
         link, source_intersection, destination_intersection = self._resolve_pair(network, link_id)
@@ -1279,91 +1746,55 @@ class NetworkSimulationExperimentService:
             seed=int(seed),
             transfer_share_percent=int(transfer_share_percent),
         )
+        emergency_event = (
+            _emergency_event_plan(
+                seed=int(seed),
+                active_at_s=float(emergency_event_at_seconds),
+                vehicle_type=emergency_vehicle_type,
+                link=link,
+                source_intersection=source_intersection,
+                destination_intersection=destination_intersection,
+            )
+            if emergency_event_enabled
+            else None
+        )
 
         created_at_ms = int(time.time() * 1000)
         run_id = f"netexp_{created_at_ms}_{uuid.uuid4().hex[:8]}"
         with tempfile.TemporaryDirectory(prefix="aitl_network_experiment_") as temporary:
             temp_root = Path(temporary)
-            fixed = _NetworkModeSimulation(
-                mode="fixed",
-                duration_seconds=int(duration_seconds),
-                sample_interval_seconds=int(sample_interval_seconds),
-                source_intersection=source_intersection,
-                destination_intersection=destination_intersection,
-                link=link,
-                policy_config=policy,
-                profile_override=profile,
-                zone_types=zone_types,
-                temp_root=temp_root,
-                controller_factory=self._controller_factory,
-                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
-                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
-                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
-                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
-                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
-                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
-                **arrivals,
-            ).run()
-            adaptive = _NetworkModeSimulation(
-                mode="adaptive",
-                duration_seconds=int(duration_seconds),
-                sample_interval_seconds=int(sample_interval_seconds),
-                source_intersection=source_intersection,
-                destination_intersection=destination_intersection,
-                link=link,
-                policy_config=policy,
-                profile_override=profile,
-                zone_types=zone_types,
-                temp_root=temp_root,
-                controller_factory=self._controller_factory,
-                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
-                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
-                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
-                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
-                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
-                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
-                **arrivals,
-            ).run()
-            cooperative = _NetworkModeSimulation(
-                mode="cooperative",
-                duration_seconds=int(duration_seconds),
-                sample_interval_seconds=int(sample_interval_seconds),
-                source_intersection=source_intersection,
-                destination_intersection=destination_intersection,
-                link=link,
-                policy_config=policy,
-                profile_override=profile,
-                zone_types=zone_types,
-                temp_root=temp_root,
-                controller_factory=self._controller_factory,
-                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
-                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
-                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
-                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
-                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
-                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
-                **arrivals,
-            ).run()
-            pedestrian_aware_cooperative = _NetworkModeSimulation(
-                mode="pedestrian_aware_cooperative",
-                duration_seconds=int(duration_seconds),
-                sample_interval_seconds=int(sample_interval_seconds),
-                source_intersection=source_intersection,
-                destination_intersection=destination_intersection,
-                link=link,
-                policy_config=policy,
-                profile_override=profile,
-                zone_types=zone_types,
-                temp_root=temp_root,
-                controller_factory=self._controller_factory,
-                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
-                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
-                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
-                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
-                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
-                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
-                **arrivals,
-            ).run()
+
+            def run_mode(mode: str) -> dict[str, Any]:
+                return _NetworkModeSimulation(
+                    mode=mode,
+                    duration_seconds=int(duration_seconds),
+                    sample_interval_seconds=int(sample_interval_seconds),
+                    source_intersection=source_intersection,
+                    destination_intersection=destination_intersection,
+                    link=link,
+                    policy_config=policy,
+                    profile_override=profile,
+                    zone_types=zone_types,
+                    temp_root=temp_root,
+                    controller_factory=self._controller_factory,
+                    cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
+                    cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
+                    cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                    pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
+                    pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
+                    pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
+                    emergency_event=(deepcopy(emergency_event) if mode in EMERGENCY_EVENT_MODES else None),
+                    emergency_priority_lookahead_seconds=float(emergency_priority_lookahead_seconds),
+                    emergency_priority_max_extension_seconds=float(emergency_priority_max_extension_seconds),
+                    **arrivals,
+                ).run()
+
+            fixed = run_mode("fixed")
+            adaptive = run_mode("adaptive")
+            cooperative = run_mode("cooperative")
+            pedestrian_aware_cooperative = run_mode("pedestrian_aware_cooperative")
+            emergency_baseline_cooperative = run_mode("emergency_baseline_cooperative")
+            emergency_priority_cooperative = run_mode("emergency_priority_cooperative")
 
         adaptive_vs_fixed = _network_comparison(fixed, adaptive)
         cooperative_vs_fixed = _network_comparison(
@@ -1390,6 +1821,16 @@ class NetworkSimulationExperimentService:
             baseline_label="fixed",
             candidate_label="pedestrian_aware_cooperative",
         )
+        emergency_priority_vs_baseline = _network_comparison(
+            emergency_baseline_cooperative,
+            emergency_priority_cooperative,
+            baseline_label="emergency_baseline_cooperative",
+            candidate_label="emergency_priority_cooperative",
+        )
+        emergency_priority_vs_baseline["emergency"] = _emergency_comparison(
+            emergency_baseline_cooperative,
+            emergency_priority_cooperative,
+        )
         result = {
             "run_id": run_id,
             "created_at_ms": created_at_ms,
@@ -1414,18 +1855,37 @@ class NetworkSimulationExperimentService:
                     "min_incoming_vehicles": int(cooperation_min_incoming_vehicles),
                     "service_buffer_seconds": COOPERATION_SERVICE_BUFFER_SECONDS,
                 },
+                "emergency_priority": {
+                    "event_enabled": bool(emergency_event_enabled),
+                    "event": deepcopy(emergency_event),
+                    "lookahead_seconds": float(emergency_priority_lookahead_seconds),
+                    "max_extension_seconds": float(emergency_priority_max_extension_seconds),
+                    "service_buffer_seconds": EMERGENCY_SERVICE_BUFFER_SECONDS,
+                    "event_provenance": "simulated_configured_emergency_event",
+                    "detector_claimed": False,
+                },
                 "link": deepcopy(link),
                 "source_intersection": _intersection_snapshot(source_intersection),
                 "destination_intersection": _intersection_snapshot(destination_intersection),
-                "comparison": ["fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"],
+                "comparison": [
+                    "fixed",
+                    "adaptive",
+                    "cooperative",
+                    "pedestrian_aware_cooperative",
+                    "emergency_baseline_cooperative",
+                    "emergency_priority_cooperative",
+                ],
                 "arrival_plan": _arrival_plan_snapshot(arrivals),
                 "cooperative_control_active": True,
                 "pedestrian_aware_control_active": True,
+                "emergency_priority_active": bool(emergency_event_enabled),
             },
             "fixed": fixed,
             "adaptive": adaptive,
             "cooperative": cooperative,
             "pedestrian_aware_cooperative": pedestrian_aware_cooperative,
+            "emergency_baseline_cooperative": emergency_baseline_cooperative,
+            "emergency_priority_cooperative": emergency_priority_cooperative,
             "comparison": adaptive_vs_fixed,
             "comparisons": {
                 "adaptive_vs_fixed": adaptive_vs_fixed,
@@ -1433,12 +1893,13 @@ class NetworkSimulationExperimentService:
                 "cooperative_vs_adaptive": cooperative_vs_adaptive,
                 "pedestrian_aware_cooperative_vs_cooperative": pedestrian_aware_vs_cooperative,
                 "pedestrian_aware_cooperative_vs_fixed": pedestrian_aware_vs_fixed,
+                "emergency_priority_vs_emergency_baseline": emergency_priority_vs_baseline,
             },
             "prototype_only": True,
             "scope_note": (
-                "Controlled local two-intersection simulation benchmark only. Cooperative mode uses synthetic predicted arrivals "
-                "to request bounded downstream timing changes while preserving the protected phase sequence. V028 adds a fourth "
-                "pedestrian-aware cooperative mode with local maximum-wait service requests and synthetic crossing-clearance protection."
+                "Controlled local two-intersection simulation benchmark only. V029 adds matched simulated emergency-event baseline and "
+                "emergency-priority cooperative modes. Priority uses explicit configured/synthetic event provenance, protected phase bounds, "
+                "pedestrian crossing guards, downstream preparation and recovery evidence; it is not live emergency detection or public-road control."
             ),
         }
         self._write_run(result)
@@ -1470,6 +1931,7 @@ class NetworkSimulationExperimentService:
             "prototype_only": True,
             "cooperative_control_active": True,
             "pedestrian_aware_control_active": True,
+            "emergency_priority_active": True,
         }
 
     def get(self, run_id: str) -> dict[str, Any]:
@@ -1519,15 +1981,12 @@ class NetworkSimulationExperimentService:
 
     def export_csv(self, run_id: str) -> str:
         result = self.get(run_id)
-        timelines = {
-            mode: result.get(mode, {}).get("timeline", [])
-            for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative")
-        }
+        timelines = {mode: result.get(mode, {}).get("timeline", []) for mode in NETWORK_EXPERIMENT_MODES}
         rows = max((len(items) for items in timelines.values()), default=0)
         output = StringIO()
         writer = csv.writer(output, lineterminator="\n")
         header = ["t_seconds"]
-        for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"):
+        for mode in NETWORK_EXPERIMENT_MODES:
             header.extend(
                 [
                     f"{mode}_source_phase",
@@ -1556,6 +2015,12 @@ class NetworkSimulationExperimentService:
                     f"{mode}_pedestrian_awareness_destination_oldest_wait_seconds",
                     f"{mode}_pedestrian_awareness_destination_crossing_count",
                     f"{mode}_pedestrian_awareness_destination_applied",
+                    f"{mode}_emergency_status",
+                    f"{mode}_emergency_role",
+                    f"{mode}_emergency_decision",
+                    f"{mode}_emergency_action",
+                    f"{mode}_emergency_eta_seconds",
+                    f"{mode}_emergency_applied",
                 ]
             )
         writer.writerow(header)
@@ -1566,7 +2031,7 @@ class NetworkSimulationExperimentService:
             }
             t_value = next((sample.get("t") for sample in samples.values() if sample.get("t") is not None), "")
             row: list[Any] = [t_value]
-            for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"):
+            for mode in NETWORK_EXPERIMENT_MODES:
                 sample = samples[mode]
                 source = sample.get("source", {})
                 destination = sample.get("destination", {})
@@ -1574,6 +2039,7 @@ class NetworkSimulationExperimentService:
                 pedestrian_awareness = sample.get("pedestrian_awareness") if isinstance(sample.get("pedestrian_awareness"), dict) else {}
                 ped_source = pedestrian_awareness.get("source") if isinstance(pedestrian_awareness.get("source"), dict) else {}
                 ped_destination = pedestrian_awareness.get("destination") if isinstance(pedestrian_awareness.get("destination"), dict) else {}
+                emergency_priority = sample.get("emergency_priority") if isinstance(sample.get("emergency_priority"), dict) else {}
                 row.extend(
                     [
                         source.get("phase", ""),
@@ -1602,6 +2068,12 @@ class NetworkSimulationExperimentService:
                         ped_destination.get("oldest_wait_seconds", ""),
                         ped_destination.get("crossing_count", ""),
                         ped_destination.get("applied", ""),
+                        emergency_priority.get("status", ""),
+                        emergency_priority.get("role", ""),
+                        emergency_priority.get("decision", ""),
+                        emergency_priority.get("action", ""),
+                        emergency_priority.get("eta_seconds", ""),
+                        emergency_priority.get("applied", ""),
                     ]
                 )
             writer.writerow(row)
@@ -1683,6 +2155,10 @@ class NetworkSimulationExperimentService:
         pedestrian_awareness = comparisons.get("pedestrian_aware_cooperative_vs_cooperative") if isinstance(
             comparisons.get("pedestrian_aware_cooperative_vs_cooperative"), dict
         ) else {}
+        emergency_priority = comparisons.get("emergency_priority_vs_emergency_baseline") if isinstance(
+            comparisons.get("emergency_priority_vs_emergency_baseline"), dict
+        ) else {}
+        emergency_metrics = emergency_priority.get("emergency") if isinstance(emergency_priority.get("emergency"), dict) else {}
         return {
             "run_id": payload.get("run_id"),
             "created_at_ms": payload.get("created_at_ms"),
@@ -1698,8 +2174,40 @@ class NetworkSimulationExperimentService:
                 "pedestrian_aware_vs_cooperative_total_pedestrian_wait": pedestrian_awareness.get("total_pedestrian_wait"),
                 "pedestrian_aware_vs_cooperative_pedestrian_queue_average": pedestrian_awareness.get("total_pedestrian_queue_average"),
                 "pedestrian_aware_vs_cooperative_max_pedestrian_wait": pedestrian_awareness.get("max_observed_pedestrian_wait"),
+                "emergency_priority_total_travel": emergency_metrics.get("total_travel_seconds"),
+                "emergency_priority_source_wait": emergency_metrics.get("source_wait_seconds"),
+                "emergency_priority_downstream_preparations": emergency_metrics.get("downstream_preparations"),
             },
         }
+
+
+
+def _emergency_event_plan(
+    *,
+    seed: int,
+    active_at_s: float,
+    vehicle_type: str,
+    link: dict[str, Any],
+    source_intersection: dict[str, Any],
+    destination_intersection: dict[str, Any],
+) -> dict[str, Any]:
+    stamp = int(round(float(active_at_s) * 1000.0))
+    return {
+        "event_id": f"emergency_{int(seed)}_{stamp}",
+        "event_type": "emergency_vehicle_priority_request",
+        "vehicle_id": f"emergency_vehicle_{int(seed)}_{stamp}",
+        "vehicle_type": vehicle_type,
+        "class_name": "emergency",
+        "active_at_s": round(float(active_at_s), 3),
+        "source_intersection_id": source_intersection.get("id"),
+        "source_approach": link.get("source_approach"),
+        "destination_intersection_id": destination_intersection.get("id"),
+        "destination_approach": link.get("destination_approach"),
+        "link_id": link.get("id"),
+        "provenance": "simulated_configured_emergency_event",
+        "confidence": None,
+        "detector_claimed": False,
+    }
 
 
 def _arrival_plan(
@@ -1969,6 +2477,44 @@ def _network_comparison(
         "total_pedestrian_queue_average": delta("total_pedestrian_queue_average", lower_is_better=True),
         "total_pedestrian_queue_p95": delta("total_pedestrian_queue_p95", lower_is_better=True),
         "max_observed_pedestrian_wait": delta("max_observed_pedestrian_wait_seconds", lower_is_better=True),
+    }
+
+
+def _emergency_comparison(baseline: dict[str, Any], priority: dict[str, Any]) -> dict[str, Any]:
+    baseline_metrics = baseline.get("network_metrics", {}).get("emergency", {})
+    priority_metrics = priority.get("network_metrics", {}).get("emergency", {})
+
+    def optional_delta(key: str) -> dict[str, Any]:
+        baseline_value = baseline_metrics.get(key)
+        priority_value = priority_metrics.get(key)
+        if baseline_value is None or priority_value is None:
+            return {
+                "available": False,
+                "baseline": baseline_value,
+                "priority": priority_value,
+                "lower_is_better": True,
+                "note": "comparison unavailable unless the simulated emergency vehicle completes both matched runs",
+            }
+        payload = _delta(
+            float(baseline_value),
+            float(priority_value),
+            lower_is_better=True,
+            baseline_label="emergency_baseline_cooperative",
+            candidate_label="emergency_priority_cooperative",
+        )
+        payload["available"] = True
+        return payload
+
+    return {
+        "baseline_completed": bool(baseline_metrics.get("completed")),
+        "priority_completed": bool(priority_metrics.get("completed")),
+        "source_wait_seconds": optional_delta("source_wait_seconds"),
+        "destination_wait_seconds": optional_delta("destination_wait_seconds"),
+        "total_travel_seconds": optional_delta("total_travel_seconds"),
+        "priority_evaluations": priority_metrics.get("priority_evaluations", 0),
+        "priority_grants": priority_metrics.get("priority_grants", 0),
+        "priority_denials": priority_metrics.get("priority_denials", 0),
+        "downstream_preparations": priority_metrics.get("downstream_preparations", 0),
     }
 
 

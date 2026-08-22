@@ -33,11 +33,12 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - bounded persisted experiment history, reopen/delete, CSV export;
 - grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
 
-## V028 pedestrian-aware cooperative network experiment
+## V029 cooperative / pedestrian-aware / emergency-priority network experiment
 
 - API/test-first isolated network benchmark using one enabled directed configured link;
 - two simultaneously modeled intersections with separate signal-controller runtime;
-- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative modes receive the same deterministic exogenous demand plan;
+- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative preserve the V028 deterministic base-demand comparison;
+- V029 additionally runs matched Emergency Baseline Cooperative and Emergency-priority Cooperative modes with the same configured emergency vehicle/event;
 - selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
 - Cooperative Adaptive consumes predicted transfer arrivals inside a configurable lookahead;
 - bounded downstream vehicle-green extension respects saved phase maximum/cycle cap;
@@ -48,9 +49,9 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed, Cooperative vs Adaptive, plus Pedestrian-aware Cooperative vs Cooperative/Fixed;
 - pedestrian request age/lifecycle, service sessions, maximum observed wait, synthetic crossing occupancy, starvation-prevention and clearance-protection telemetry;
 - persistent `netexp_*` list/get/delete and aligned three-mode CSV export;
-- emergency priority remains inactive.
+- V029 emergency priority is active only in the isolated `emergency_priority_cooperative` simulator mode; the matched emergency baseline carries the same event without priority; live emergency recognition remains inactive.
 
-The current PC Studio Simulation Lab UI remains single-junction; V028 network/cooperation/pedestrian-aware experiments are backend/API/test-first.
+The current PC Studio Simulation Lab UI remains single-junction; V029 network/cooperation/pedestrian/emergency experiments are backend/API/test-first.
 
 ## Network / explanation foundation
 
@@ -61,7 +62,7 @@ The current PC Studio Simulation Lab UI remains single-junction; V028 network/co
 - enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
 - explicit inactive flags for cooperative control and emergency priority.
 
-Live configured links remain topology metadata. Synthetic transfer and bounded cooperation exist only inside the V028 isolated network experiment.
+Live configured links remain topology metadata. Synthetic transfer, bounded cooperation, pedestrian-awareness and emergency priority exist only inside the isolated network experiment.
 
 ## Inference / zones / analytics
 
@@ -92,11 +93,10 @@ Live configured links remain topology metadata. Synthetic transfer and bounded c
 
 See `PROJECT_SCOPE.md` / `ROADMAP.md`:
 
-- bounded multi-intersection cooperation using neighbour/arrival context;
-- emergency priority;
-- stronger pedestrian-aware control;
-- broader vehicle-class behavior;
-- persistent structured explainability.
+- generalize bounded cooperation beyond one selected two-intersection link;
+- broader vehicle-class behavior and class-aware evidence;
+- stronger persistent structured explainability across scenario/cooperation/pedestrian/emergency decisions;
+- compatible live-evidence provenance for pedestrian/emergency features only when an actual perception source exists.
 
 ## Limitations
 

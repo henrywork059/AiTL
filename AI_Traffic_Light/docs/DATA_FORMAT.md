@@ -183,7 +183,7 @@ Exact fields may be extended by the API model, but semantics remain:
 
 - explanation context does not control the signal;
 - neighbour context does not imply cooperation is active;
-- emergency context must state inactive/not implemented until an emergency feature exists;
+- live `decision_context.emergency_context` remains inactive unless the live path gains a compatible emergency source; V029 emergency evidence exists only inside the isolated network experiment and must not be projected into live perception;
 - the persisted signal-rule event history remains distinct from the live explanation projection.
 
 ## V027 network experiment transfer and cooperation format
@@ -335,3 +335,34 @@ Pedestrian-aware network events are synthetic experiment records, for example:
 ```
 
 When a synthetic pedestrian is served, V028 retains simulated crossing occupancy until `pedestrian_crossing_clearance_seconds` elapses. `crossing_count` is therefore simulator state, not live track-derived unique crossing throughput. Starvation-prevention and clearance actions remain bounded by the protected controller timing configuration.
+
+## V029 simulated emergency event and evidence
+
+The network experiment uses an explicit configured event object rather than a detector output:
+
+```json
+{
+  "event_id": "emergency_29029_45000",
+  "event_type": "emergency_vehicle_priority_request",
+  "vehicle_id": "emergency_vehicle_29029_45000",
+  "vehicle_type": "ambulance",
+  "class_name": "emergency",
+  "active_at_s": 45.0,
+  "source_intersection_id": "A",
+  "source_approach": "eastbound_out",
+  "destination_intersection_id": "B",
+  "destination_approach": "westbound_in",
+  "link_id": "A_to_B",
+  "provenance": "simulated_configured_emergency_event",
+  "confidence": null,
+  "detector_claimed": false
+}
+```
+
+The generic `class_name: emergency` is simulator state. `vehicle_type` is configured context, not an AI classification.
+
+Lifecycle records use `event_type` values such as `activated`, `source_departed`, `destination_arrived`, `cleared`, and `recovery`. Priority records contain role, intersection/link, phase before advisory, ETA, `decision: grant | deny | defer`, action, applied flag, reason, timing delta, and the same explicit simulation provenance.
+
+`network_metrics.emergency` records completion/status, source/destination wait, total simulated emergency travel time, priority evaluation/grant/denial/application counts, downstream preparation count, and timing seconds added/reduced. Wait/travel fields are `null` when the corresponding lifecycle point did not occur before the experiment ended.
+
+The matched baseline and priority modes receive the same emergency-event object. This is required for a policy comparison; do not compare a run with an emergency vehicle against a run without one and call the difference a priority effect.

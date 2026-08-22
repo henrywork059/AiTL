@@ -149,7 +149,7 @@ Runtime JSON is stored under `outputs/simulation_experiments/` and excluded from
 
 ### `POST /api/traffic/network-experiments`
 
-Runs one isolated three-mode comparison over one enabled directed network link:
+Runs one isolated multi-mode comparison over one enabled directed network link. V027 introduced three modes; V028/V029 extend the same endpoint while preserving those fields:
 
 ```json
 {
@@ -179,7 +179,7 @@ Rules:
 - the selected link must connect two enabled configured intersections;
 - a supplied `profile` overrides both intersection profiles and must exist in the saved signal config.
 
-The result preserves V026 compatibility and adds a third mode:
+The result preserves V026/V027 compatibility. Current V029 results include:
 
 - `fixed`;
 - `adaptive` = Independent Adaptive;
@@ -189,7 +189,7 @@ The result preserves V026 compatibility and adds a third mode:
 - `comparisons.cooperative_vs_fixed`;
 - `comparisons.cooperative_vs_adaptive`.
 
-`scenario.arrival_plan` contains deterministic exogenous-demand counts plus a SHA-256 fingerprint. All three modes receive the same external arrival plan. `scenario.cooperation` snapshots lookahead/max-extension/min-incoming settings.
+`scenario.arrival_plan` contains deterministic exogenous-demand counts plus a SHA-256 fingerprint. All modes receive the same base external arrival plan; the two V029 emergency modes additionally share one identical configured emergency event. `scenario.cooperation` snapshots lookahead/max-extension/min-incoming settings.
 
 Each mode contains per-intersection waiting/queue/throughput/signal metrics, network transfer/corridor telemetry, a bounded timeline, and synthetic transfer evidence. Cooperative mode additionally contains:
 
@@ -209,7 +209,7 @@ Network transfer, predicted arrivals, and cooperation are synthetic simulator ev
 - `GET /api/traffic/network-experiments?limit=50` — list compact `netexp_*` summaries.
 - `GET /api/traffic/network-experiments/{run_id}` — load one complete result.
 - `DELETE /api/traffic/network-experiments/{run_id}` — delete one stored network result.
-- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned Fixed / Adaptive / Cooperative source/destination queue/service/signal fields plus transfer and cooperation timeline fields; preserves `X-Request-ID`.
+- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned current-mode source/destination queue/service/signal fields plus transfer, cooperation, pedestrian-awareness, and V029 emergency timeline fields; preserves `X-Request-ID`.
 
 Network experiment JSON remains under ignored runtime `outputs/simulation_experiments/`. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
 
@@ -311,7 +311,7 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V027 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V029 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
 
 ## V028 pedestrian-aware network experiment request fields
 
@@ -326,3 +326,41 @@ No API in V027 sends commands to physical/public-road traffic infrastructure. Si
 ```
 
 Bounds are respectively 5–180 s, 2–30 s, and 1–15 s. The result keeps the V027 `fixed`, `adaptive`, and `cooperative` fields and adds `pedestrian_aware_cooperative`. `comparison` remains Adaptive-vs-Fixed for compatibility; `comparisons.pedestrian_aware_cooperative_vs_cooperative` isolates the V028 pedestrian-aware layer. Results include `pedestrian_awareness_events`, pedestrian-specific network metrics, and explicit `pedestrian_aware_control_active`/provenance flags.
+
+## V029 emergency-priority network experiment request fields
+
+`POST /api/traffic/network-experiments` additionally accepts:
+
+```json
+{
+  "emergency_event_enabled": true,
+  "emergency_event_at_seconds": 15.0,
+  "emergency_vehicle_type": "ambulance",
+  "emergency_priority_lookahead_seconds": 20.0,
+  "emergency_priority_max_extension_seconds": 8.0
+}
+```
+
+Rules:
+
+- if enabled, `emergency_event_at_seconds` must be `>= 0` and `< duration_seconds`;
+- `emergency_vehicle_type`: `ambulance | fire_engine | police`;
+- emergency downstream lookahead: 1–120 seconds;
+- emergency maximum vehicle-green extension: 0–30 seconds.
+
+Current `scenario.comparison` order is:
+
+1. `fixed`;
+2. `adaptive`;
+3. `cooperative`;
+4. `pedestrian_aware_cooperative`;
+5. `emergency_baseline_cooperative`;
+6. `emergency_priority_cooperative`.
+
+The two emergency modes receive the same explicit event and emergency vehicle. `emergency_baseline_cooperative` preserves pedestrian-aware cooperation but applies no emergency timing priority. `emergency_priority_cooperative` may extend current vehicle green inside saved bounds or request earlier protected progression by reducing only the current phase toward its configured minimum. Active simulated pedestrian crossings produce a priority denial until clearance; protected phase order is never skipped.
+
+Emergency results expose `emergency_event`, `emergency_lifecycle_events`, `emergency_priority_events`, `network_metrics.emergency`, explicit event/priority flags and `simulated_configured_emergency_event` provenance. `confidence` remains null and `detector_claimed` is false because V029 has no live emergency detector.
+
+`comparisons.emergency_priority_vs_emergency_baseline` is the matched policy comparison. It includes ordinary network metrics plus an `emergency` subobject for source wait, destination wait and total emergency travel time when the event completes in both runs.
+
+The CSV adds emergency status, role, grant/deny/defer decision, action, ETA and applied fields for each mode.

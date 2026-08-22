@@ -81,7 +81,7 @@ same seeded exogenous demand
 
 The coordinator does not replace `SignalRulesService`, does not reorder phases, and does not write a second signal policy. It may extend vehicle green only within saved phase/cycle caps or request earlier protected progression toward vehicle service. Active pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR.
 
-Live configured links remain **metadata**, not observed transfers. V027 transfer, predicted-arrival, and coordination events are synthetic simulator evidence. Emergency priority remains inactive.
+Live configured links remain **metadata**, not observed transfers. V027 transfer, predicted-arrival, and coordination events are synthetic simulator evidence. V029 emergency priority is likewise isolated synthetic experiment evidence, not live perception or hardware pre-emption.
 
 ## 4. Later cooperative-network generalization
 
@@ -140,8 +140,35 @@ Camera nodes capture/upload frames and expose simple device status/settings. Hea
 
 ## 9. Capability and safety boundaries
 
-See `PROJECT_SCOPE.md` for implemented/foundation/planned status. Multi-intersection cooperation and emergency priority require additional simulator/controller evidence. All signal phases/actions remain prototype/simulation outputs; public-road control is outside scope.
+See `PROJECT_SCOPE.md` for implemented/foundation/planned status. Multi-intersection cooperation now has bounded two-intersection simulator evidence; V029 adds simulation-only emergency-priority evidence. General N-intersection orchestration and live emergency perception still require additional architecture/evidence. All signal phases/actions remain prototype/simulation outputs; public-road control is outside scope.
 
 ## V028 pedestrian-aware network layer
 
 Inside `network_simulation_experiments.py`, V028 keeps four isolated benchmark modes. `pedestrian_aware_cooperative` reuses the same per-intersection controllers and V027 coordinator, while adding local pedestrian request-age and synthetic crossing state. A bounded guard can request earlier protected pedestrian service at the maximum-wait threshold or reserve additional WALK/CLEAR time for active synthetic crossings. Phase order and configured min/max/cycle limits remain controller-owned.
+
+## V029 emergency-priority network layer
+
+V029 adds two matched modes to the existing isolated network experiment:
+
+```text
+seeded base demand + same configured emergency event
+          |
+          +--> Emergency Baseline Cooperative
+          |      pedestrian-aware cooperation; emergency vehicle is ordinary demand
+          |
+          +--> Emergency-priority Cooperative
+                 same controllers/demand/event
+                 + source priority advisory
+                 + downstream preparation from transfer ETA
+                 + destination priority advisory
+                 + protected crossing denial guard
+                 + clear/recovery evidence
+```
+
+Emergency priority remains an advisory layer on the existing per-intersection `SignalRulesService` adapters. It does not create a parallel signal state machine. The controller remains owner of phase order, phase minimum/maximum durations, pending service requests, and maximum-cycle bounds.
+
+The network simulation owns the configured event lifecycle and synthetic vehicle transfer. It determines whether the emergency vehicle is waiting at A, in the A→B pipeline, waiting at B, or cleared, then supplies role/ETA context to the relevant controller.
+
+The priority layer is evaluated after pedestrian-awareness/cooperation advisories so emergency context can request the final bounded timing adjustment for that simulation step. It still cannot bypass protected limits; active simulated pedestrian crossing occupancy causes an explicit deny decision.
+
+This architecture is deliberately separate from the live camera path. No V029 service maps camera detections to emergency events, and no V029 route sends pre-emption commands to physical signal hardware.

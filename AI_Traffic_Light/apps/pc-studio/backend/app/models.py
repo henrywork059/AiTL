@@ -170,6 +170,11 @@ class NetworkSimulationExperimentRunRequest(BaseModel):
     pedestrian_max_wait_seconds: float = Field(default=30.0, ge=5.0, le=180.0)
     pedestrian_crossing_clearance_seconds: float = Field(default=6.0, ge=2.0, le=30.0)
     pedestrian_clearance_reserve_seconds: float = Field(default=3.0, ge=1.0, le=15.0)
+    emergency_event_enabled: bool = True
+    emergency_event_at_seconds: float = Field(default=15.0, ge=0.0, le=1800.0)
+    emergency_vehicle_type: Literal["ambulance", "fire_engine", "police"] = "ambulance"
+    emergency_priority_lookahead_seconds: float = Field(default=20.0, ge=1.0, le=120.0)
+    emergency_priority_max_extension_seconds: float = Field(default=8.0, ge=0.0, le=30.0)
 
 
 class InferenceLoadRequest(BaseModel):

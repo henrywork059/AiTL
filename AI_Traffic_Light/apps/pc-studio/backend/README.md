@@ -85,3 +85,7 @@ The backend produces local prototype detection, analytics, scenario, experiment,
 ## V028 pedestrian-aware network evidence
 
 The isolated network experiment now adds `pedestrian_aware_cooperative` beside Fixed, Adaptive and Cooperative. It tracks request age, service sessions, synthetic crossing occupancy and bounded starvation/clearance guards. These are simulator-only behaviors and do not change the live public-road safety boundary.
+
+## V029 emergency-priority network evidence
+
+`POST /api/traffic/network-experiments` now also produces matched `emergency_baseline_cooperative` and `emergency_priority_cooperative` results. The emergency event is a configured simulator input with explicit provenance, no detector claim, and lifecycle records. Priority remains bounded by the existing protected phase controller and active simulated pedestrian crossings can deny an emergency timing change. This feature does not connect to hardware pre-emption or public-road infrastructure.
