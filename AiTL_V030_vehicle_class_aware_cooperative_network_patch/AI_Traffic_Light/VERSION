@@ -1,0 +1,5 @@
+version: 0_3_0
+status: vehicle-class-aware cooperative two-intersection simulation candidate
+previous_version: 0_2_9
+passed_baseline: 0_2_4
+notes: The owner explicitly requested V030 while V029 had not been separately accepted, so V029 is the previous candidate and V024 / 0_2_4 remains the owner-confirmed passed baseline. V030 preserves the V029 cooperation, pedestrian-aware, and matched emergency-priority network evidence and adds explicit regular vehicle classes (car, bus, truck, motorcycle, bicycle, other), deterministic class-mix profiles, per-class arrival/service/wait/queue telemetry, and a seventh Class-aware Cooperative comparison mode. A configured regular class weight above 1.0 may request bounded vehicle-green extension or earlier protected vehicle service while active pedestrian WALK/CLEAR demand remains protected; weight 1.0 or disabled class priority does not alter timing. All class-rich demand is explicitly synthetic and is not claimed as live AI classification. Physical/public-road traffic control remains disabled.
