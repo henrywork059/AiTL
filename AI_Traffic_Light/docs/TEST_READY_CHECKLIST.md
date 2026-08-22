@@ -69,23 +69,42 @@ V025 / `0_2_5` is the current candidate. V024 / `0_2_4` is the previous version 
 48. Scenario page polling uses the serial polling helper rather than overlapping `setInterval` requests.
 49. Light/dark styling uses shared design-system tokens and no page-local hex/gradient treatment.
 
+## Same-candidate intersection/network foundation
+
+50. `GET /api/traffic/network` returns a generic schema with `intersection_main` default and `cooperative_control_active: false`.
+51. Network configuration supports more than two intersections without hard-coded A/B assumptions.
+52. Intersection ids and link ids are unique and validated.
+53. Source ids support the same simple camera-token character family, including numeric-leading ids, and one source id cannot be assigned to multiple intersections.
+54. Directed links require configured distinct source/destination intersections and valid approach labels/travel time.
+55. Invalid duplicate-source, missing-endpoint, self-link, malformed-id, collection-limit, or travel-time config returns `ATL-TRAFFIC-013` and does not replace the previous valid config.
+56. Valid network configuration persists atomically under ignored runtime `config/intersections.json` and survives backend restart.
+57. `GET /api/traffic/network/context` returns normalized inbound/outbound neighbour metadata and explicitly reports cooperation/emergency priority inactive.
+58. `GET /api/traffic/state` adds `intersection_id`, `observation_provenance`, `network_context`, and `decision_context` without changing existing traffic/signal fields.
+59. Simulation traffic state reports `observation_provenance: simulation`; live detector-backed receiver state reports `ai_detection`; unavailable perception does not masquerade as AI evidence.
+60. `decision_context` contains a deterministic decision id, category, source/intersection identity, active scenario/conditions when available, requested service, timing, pedestrian/vehicle context, neighbour context, and readable explanation.
+61. `decision_context.emergency_context.active` remains false and states that emergency recognition/pre-emption is not implemented.
+62. Configured links do not change signal phases, run a second controller, transfer agents, or predict arrivals in V025.
+63. `POST /api/traffic/network/reset` restores the default topology without deleting unrelated runtime data.
+
 ## Simulation Lab integration / repeatability
 
-50. Simulation Lab remains an isolated Fixed-vs-Adaptive experiment surface and does not reset the live camera/controller runtime.
-51. An experiment snapshots configured zones and generates synthetic per-zone/per-class observations for scenario evaluation.
-52. Identical density/profile/duration/seed/sample interval and zone/config snapshot produce repeatable Fixed/Adaptive/comparison telemetry apart from run metadata.
-53. Fixed experiment records zero adaptive scenario applications.
-54. A suitable zone-based scenario can appear in Adaptive scenario-application telemetry.
-55. Vehicle/pedestrian wait distributions, queue pressure, throughput, phase utilization, clearance, extension/reduction and conflict diagnostic remain available.
-56. Simulation Lab remains one grouped page with Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs and bounded raw-data pagination.
-57. Experiment persistence/list/get/delete/CSV remains under `outputs/simulation_experiments/`; deletion removes only that experiment.
+64. Simulation Lab remains an isolated Fixed-vs-Adaptive experiment surface and does not reset the live camera/controller runtime.
+65. An experiment snapshots configured zones and generates synthetic per-zone/per-class observations for scenario evaluation.
+66. Identical density/profile/duration/seed/sample interval and zone/config snapshot produce repeatable Fixed/Adaptive/comparison telemetry apart from run metadata.
+67. Fixed experiment records zero adaptive scenario applications.
+68. A suitable zone-based scenario can appear in Adaptive scenario-application telemetry.
+69. Vehicle/pedestrian wait distributions, queue pressure, throughput, phase utilization, clearance, extension/reduction and conflict diagnostic remain available.
+70. Simulation Lab remains one grouped page with Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs and bounded raw-data pagination.
+71. Experiment persistence/list/get/delete/CSV remains under `outputs/simulation_experiments/`; deletion removes only that experiment.
+72. The V025 network foundation does not silently convert Simulation Lab into a multi-intersection experiment.
 
 ## Inherited V024/V022/V021 regression / safety
 
-58. V024 atomic persistence, zone/model-registry synchronization and App-level serial polling remain intact.
-59. V022 tracking/counting-line flow and V021 occupancy remain separate and functional.
-60. Camera simulation/receiver, zones, capture/delete/labels, training, inference/model registry, settings and logs show no regression.
-61. Current YOLO is not claimed to detect wheelchairs/mobility assistance or falls.
-62. Experiment results are seeded synthetic simulation evidence only, not a claim Adaptive is universally better.
-63. Nothing in V025 controls or connects to physical/public-road traffic-signal infrastructure.
-64. Owner completes manual/UI checks and explicitly confirms V025 passed before `passed_baseline` changes.
+73. V024 atomic persistence, zone/model-registry synchronization and App-level serial polling remain intact.
+74. V022 tracking/counting-line flow and V021 occupancy remain separate and functional.
+75. Camera simulation/receiver, zones, capture/delete/labels, training, inference/model registry, settings and logs show no regression.
+76. Current YOLO is not claimed to detect wheelchairs/mobility assistance, falls, or emergency vehicles unless a compatible future model/source is added.
+77. Experiment results are seeded synthetic simulation evidence only, not a claim Adaptive is universally better.
+78. Network links are configured topology metadata, not measured traffic flow or proof of cooperation.
+79. Nothing in V025 controls or connects to physical/public-road traffic-signal infrastructure.
+80. Owner completes manual/UI/API checks and explicitly confirms V025 passed before `passed_baseline` changes.

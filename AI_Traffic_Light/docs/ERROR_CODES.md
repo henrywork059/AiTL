@@ -25,7 +25,7 @@ Stable project errors used by the current prototype APIs.
 - `ATL-ZONE-002` — requested zone/counting region/counting line not found
 - `ATL-ZONE-003` — zone save failed
 
-## Traffic / analytics / experiments
+## Traffic / analytics / experiments / network foundation
 
 - `ATL-TRAFFIC-001` — traffic state invalid
 - `ATL-TRAFFIC-002` — traffic signal/scenario configuration invalid (including scenario id/rank, condition source/operator/threshold, phase targets, actions, and timing bounds)
@@ -39,6 +39,9 @@ Stable project errors used by the current prototype APIs.
 - `ATL-TRAFFIC-010` — persisted simulation experiment read/not-found failure
 - `ATL-TRAFFIC-011` — simulation experiment write failed
 - `ATL-TRAFFIC-012` — simulation experiment delete failed
+- `ATL-TRAFFIC-013` — intersection/network configuration invalid or requested intersection not configured
+- `ATL-TRAFFIC-014` — intersection/network configuration read failed
+- `ATL-TRAFFIC-015` — intersection/network configuration write failed
 
 ## Models
 

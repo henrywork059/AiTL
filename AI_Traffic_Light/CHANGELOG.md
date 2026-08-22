@@ -3,6 +3,10 @@
 ## 0_2_5 — Ranked signal scenarios and simulation telemetry
 
 - Owner explicitly accepted/promoted V024 / `0_2_4`; V025 now records `passed_baseline: 0_2_4` while remaining the current unaccepted candidate.
+- Same-candidate network-foundation update: added persistent generic intersection/topology metadata, source-to-intersection resolution, directed neighbour links, and runtime `config/intersections.json` without promoting V025 or enabling cooperative control.
+- Added `GET/PUT /api/traffic/network`, `POST /api/traffic/network/reset`, and `GET /api/traffic/network/context` with standard envelopes/request IDs, atomic persistence, validation, and stable `ATL-TRAFFIC-013..015` errors.
+- Enriched `GET /api/traffic/state` with `intersection_id`, explicit observation provenance, configured neighbour context, and structured live `decision_context` including deterministic decision id, trigger category, winning scenario/observed conditions, requested service, timing, pedestrian/vehicle context, emergency-placeholder state, and readable explanation.
+- Kept the current live camera/tracker/controller runtime single-junction: topology links do not coordinate timings, transfer simulated agents, predict arrivals, or implement emergency priority; the API explicitly reports those capabilities inactive.
 - Reworked Traffic Logic adaptive rules into editable ranked **scenarios**. Each scenario has an id/name, enable flag, rank (`1` highest), ALL/ANY condition matching, persistence/cooldown, bounded phase targets/action, and optional pedestrian/vehicle service request.
 - Added first-class zone/class conditions so a scenario can express cases such as `car > 5 in queue_a` or `person >= 3 in waiting_west`, including `*` for all detected classes in a configured polygon zone.
 - Extended traffic-state observations with `zone_class_counts`, preserving arbitrary detected class names for scenario evaluation while keeping occupancy and track-derived flow semantics separate.

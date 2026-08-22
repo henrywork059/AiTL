@@ -30,7 +30,7 @@ previous_version: 0_2_4
 passed_baseline: 0_2_4
 ```
 
-Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, occupancy/flow/signal history, and `outputs/simulation_experiments/`.
+Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, `config/intersections.json`, occupancy/flow/signal history, and `outputs/simulation_experiments/`.
 
 ## 2. Backend compile/structure/regression
 
@@ -55,9 +55,12 @@ V025-focused regressions:
 ```powershell
 & $py ".\scripts\test_signal_scenarios.py"
 & $py ".\scripts\test_simulation_experiments.py"
+& $py ".\scripts\test_intersection_network.py"
 ```
 
 `test_signal_scenarios.py` verifies zone/class conditions, ALL matching, rank arbitration, unavailable-zone fallback, observed values, bounded phase adjustment, and preview behavior. `test_simulation_experiments.py` verifies same-seed repeatability, Fixed/Adaptive mode separation, adaptive scenario activity including zone-based scenarios, telemetry invariants, stored-run list/get/delete, and CSV export.
+
+`test_intersection_network.py` verifies generic three-intersection topology, directed neighbour context, source-id resolution, numeric-leading camera-source compatibility, atomic persistence, duplicate-source rejection, missing/self-link rejection, and structured live decision-context construction without enabling cooperation/emergency behavior.
 
 Retain the V024/V023 regressions including `test_atomic_json_store.py`, `test_frontend_polling_structure.py`, `test_signal_rules_service.py`, camera/simulation tests, tracking/flow tests, dataset/training/model tests, and all other `scripts/test_*.py` tests.
 
@@ -70,6 +73,8 @@ npm run typecheck
 npm run build
 npm run dev
 ```
+
+This same-candidate network foundation is backend/API-first; no new dedicated frontend network editor is expected in this patch.
 
 ## 4. Backend + live smoke
 
@@ -107,7 +112,69 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 15. Restart backend and confirm saved scenario definitions persist in `config/signal_rules.json`. An older V023/V024 config without `scenarios` should load through migration rather than fail.
 16. Confirm zone/class counts are described as per-frame observations, not throughput.
 
-## 6. V025 Simulation Lab acceptance
+## 6. Same-candidate intersection/network foundation acceptance
+
+The following examples use PowerShell's `Invoke-RestMethod`. Keep the backend running on port 8000.
+
+1. Read defaults:
+
+```powershell
+$network = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network"
+$network.data | ConvertTo-Json -Depth 8
+```
+
+Confirm `active_intersection_id` is `intersection_main`, one default intersection exists, links are empty, and `cooperative_control_active` is `false`.
+
+2. Save a generic three-intersection topology:
+
+```powershell
+$body = @{
+  config = @{
+    schema_version = 1
+    active_intersection_id = "intersection_a"
+    intersections = @(
+      @{ id="intersection_a"; label="Intersection A"; enabled=$true; source_ids=@("simulation_camera","camera_a"); zone_ids=@(); signal_profile="Normal" },
+      @{ id="intersection_b"; label="Intersection B"; enabled=$true; source_ids=@("camera_b"); zone_ids=@(); signal_profile="Normal" },
+      @{ id="intersection_c"; label="Intersection C"; enabled=$true; source_ids=@(); zone_ids=@(); signal_profile="Normal" }
+    )
+    links = @(
+      @{ id="a_to_b"; enabled=$true; source_intersection_id="intersection_a"; destination_intersection_id="intersection_b"; source_approach="eastbound"; destination_approach="westbound"; travel_time_seconds=12.5 },
+      @{ id="b_to_c"; enabled=$true; source_intersection_id="intersection_b"; destination_intersection_id="intersection_c"; source_approach="southbound"; destination_approach="northbound"; travel_time_seconds=18 }
+    )
+  }
+} | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Method Put -ContentType "application/json" -Body $body -Uri "http://127.0.0.1:8000/api/traffic/network"
+```
+
+Confirm three intersections are accepted; the schema is not hard-coded to exactly two.
+
+3. Read B's neighbour context:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network/context?intersection_id=intersection_b" | ConvertTo-Json -Depth 10
+```
+
+Confirm both A and C appear with inbound/outbound direction metadata and configured travel times.
+
+4. Negative tests: try assigning `camera_a` to two intersections, linking to a nonexistent node, and creating a self-link. Each should fail with `ATL-TRAFFIC-013` and should not replace the last valid config.
+
+5. Restart the backend and confirm the valid topology persists under `config/intersections.json`.
+
+6. Start Camera Sources simulation and query:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/state" | ConvertTo-Json -Depth 12
+```
+
+Confirm `intersection_id` resolves from `simulation_camera`, `observation_provenance` is `simulation`, and `network_context`/`decision_context` are present.
+
+7. Trigger a ranked scenario. Confirm `decision_context.scenario.id/label/conditions` reflects the current winner and observed values while existing Traffic Logic winner/timing behavior is unchanged.
+
+8. Confirm `decision_context.emergency_context.active` and `decision_context.cooperative_control_active` are both false. No network link should change another signal phase in V025.
+
+9. `POST /api/traffic/network/reset` should restore `intersection_main` without deleting zones, signal scenarios, captures, analytics, models, or Simulation Lab runs.
+
+## 7. V025 Simulation Lab acceptance
 
 1. Open Traffic → **Simulation Lab**.
 2. At a normal desktop window size, confirm setup controls, stored-run controls, tabs, and the selected data panel stay inside one workspace page. The page must not render all metric groups as a long vertical dashboard.
@@ -126,11 +193,11 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 15. Delete one disposable run. Confirm only that experiment result is removed; occupancy/flow history, signal scenario config/history, captures, zones, settings, models, and training data remain.
 16. Confirm the page describes experiment data as local simulation results, not proof of general/public-road performance or safety.
 
-## 7. Inherited functional checks
+## 8. Inherited functional checks
 
 Re-run representative V024 acceptance checks: persistence, zone/model registry synchronization, serial polling, protected signal phase order, camera simulation behavior, occupancy vs flow separation, tracking/counting lines, capture/delete/label/training/models/settings/logs. Also re-run `test_signal_rules_service.py` to confirm the migrated default scenarios preserve inherited V023 controller behavior. Confirm no feature connects to physical/public-road traffic-light control.
 
-## 8. Repository/ZIP checks
+## 9. Repository/ZIP checks
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"

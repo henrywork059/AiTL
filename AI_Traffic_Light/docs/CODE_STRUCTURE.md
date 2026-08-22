@@ -22,9 +22,18 @@ apps/pc-studio/backend/app/
 
 ### Persistence rule
 
-Services own schemas, validation, locks, logging, and stable error mapping. When a service needs replace-style JSON persistence, prefer `core/json_store.py` rather than duplicating temporary-file mechanics. The V024-migrated runtime-settings, zones, and model-registry services must not use one predictable shared `.tmp` path. A successful write presents a complete JSON document; a serialization/write failure must not replace the prior valid target.
+Services own schemas, validation, locks, logging, and stable error mapping. When a service needs replace-style JSON persistence, prefer `core/json_store.py` rather than duplicating temporary-file mechanics. The V024-migrated runtime-settings, zones, and model-registry services and the V025 intersection-network service use this shared atomic persistence path.
 
-Multi-step state transitions that can race inside one process need service-level synchronization. Zone save/read uses one lock; model-registry discovery/default/delete/metadata transitions use a re-entrant lock.
+Multi-step state transitions that can race inside one process need service-level synchronization. Zone save/read uses one lock; model-registry discovery/default/delete/metadata transitions use a re-entrant lock; intersection/network config validation/cache/persistence uses a re-entrant lock.
+
+### V025 network/explanation ownership
+
+- `services/intersection_network.py` owns generic intersection ids, source mappings, directed links, topology validation, and runtime `config/intersections.json` persistence.
+- `services/decision_context.py` is a non-controlling projection that turns current traffic/signal/network state into structured live explanation context.
+- `routes/traffic.py` may attach that service-owned context to `/api/traffic/state`, but it must not implement topology validation, signal arbitration, cooperation algorithms, or emergency pre-emption.
+- `services/signal_rules.py` remains the sole owner of ranked scenario arbitration and protected phase/timing behavior.
+
+The network foundation is configuration-only in V025. Do not silently create per-intersection signal authority or claim cooperative control from configured links alone.
 
 ## Frontend
 
@@ -50,6 +59,10 @@ Do not use `setInterval` for async work when a new tick can start before the pre
 ## CV / analytics invariants
 
 Canonical boxes use original-image coordinates; zones use the validated reference coordinates; display scaling is presentation-only. Occupancy remains per-frame. Unique passage comes only from stable track identity plus counting-line events.
+
+Network links are configuration metadata, not observed flow. A later multi-intersection simulator must use explicit transfer/arrival events rather than treating configured travel time as measured throughput.
+
+Observation provenance must not overclaim perception: simulated/manual events stay labeled as such; AI-derived labels are only what the active detector actually returns.
 
 ## Refactor heuristic
 

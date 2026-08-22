@@ -46,6 +46,9 @@ class ErrorCode(str, Enum):
     TRAFFIC_EXPERIMENT_READ_FAILED = "ATL-TRAFFIC-010"
     TRAFFIC_EXPERIMENT_WRITE_FAILED = "ATL-TRAFFIC-011"
     TRAFFIC_EXPERIMENT_DELETE_FAILED = "ATL-TRAFFIC-012"
+    TRAFFIC_NETWORK_INVALID = "ATL-TRAFFIC-013"
+    TRAFFIC_NETWORK_READ_FAILED = "ATL-TRAFFIC-014"
+    TRAFFIC_NETWORK_WRITE_FAILED = "ATL-TRAFFIC-015"
 
     DATASET_WRITE_FAILED = "ATL-DATASET-001"
     DATASET_READ_FAILED = "ATL-DATASET-002"
@@ -101,6 +104,9 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TRAFFIC_EXPERIMENT_READ_FAILED: "Failed to read simulation experiment data.",
     ErrorCode.TRAFFIC_EXPERIMENT_WRITE_FAILED: "Failed to write simulation experiment data.",
     ErrorCode.TRAFFIC_EXPERIMENT_DELETE_FAILED: "Failed to delete simulation experiment data.",
+    ErrorCode.TRAFFIC_NETWORK_INVALID: "Intersection network configuration is invalid.",
+    ErrorCode.TRAFFIC_NETWORK_READ_FAILED: "Failed to read intersection network configuration.",
+    ErrorCode.TRAFFIC_NETWORK_WRITE_FAILED: "Failed to write intersection network configuration.",
     ErrorCode.DATASET_WRITE_FAILED: "Failed to write dataset item.",
     ErrorCode.DATASET_READ_FAILED: "Failed to read dataset item.",
     ErrorCode.DATASET_ITEM_NOT_FOUND: "Dataset item was not found.",

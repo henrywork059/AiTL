@@ -2,8 +2,10 @@ from fastapi import APIRouter, Query, Request, Response
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
-from app.models import SignalRulesConfigRequest, SignalRulesPreviewRequest, SignalTestInputsRequest
+from app.models import IntersectionNetworkConfigRequest, SignalRulesConfigRequest, SignalRulesPreviewRequest, SignalTestInputsRequest
 from app.services.camera_frames import camera_frame_service
+from app.services.decision_context import build_decision_context
+from app.services.intersection_network import intersection_network_service
 from app.services.object_tracking import object_tracking_service
 from app.services.signal_rules import signal_rules_service
 from app.services.traffic_flow import traffic_flow_service
@@ -15,14 +17,48 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
+def _enrich_network_context(state: dict) -> dict:
+    frame = camera_frame_service.latest_frame()
+    source_id = frame.source_id if frame is not None else None
+    resolution = intersection_network_service.resolve_source(source_id)
+    enriched = dict(state)
+    signal = enriched.get("signal_policy") if isinstance(enriched.get("signal_policy"), dict) else {}
+    manual_test_active = bool(
+        signal.get("mode") == "test"
+        and isinstance(signal.get("test_inputs"), dict)
+        and any(
+            bool(signal["test_inputs"].get(key))
+            for key in ("mobility_assistance", "incident_person_fallen")
+        )
+    )
+    if camera_frame_service.simulation_enabled:
+        provenance = "simulation"
+    elif manual_test_active:
+        provenance = "manual_test"
+    elif enriched.get("source_timestamp_ms") is not None and not str(enriched.get("data_source", "")).startswith("inference_unavailable"):
+        provenance = "ai_detection"
+    else:
+        provenance = "unavailable"
+    enriched["intersection_id"] = resolution["intersection_id"]
+    enriched["observation_provenance"] = provenance
+    enriched["network_context"] = resolution["network_context"]
+    enriched["decision_context"] = build_decision_context(
+        enriched,
+        network_resolution=resolution,
+        simulation_enabled=camera_frame_service.simulation_enabled,
+    )
+    return enriched
+
+
 @router.get("/state")
 def traffic_state(request: Request) -> dict:
-    state = get_live_traffic_state()
+    state = _enrich_network_context(get_live_traffic_state())
     traffic_history_service.record_state(state)
     logger.info(
         "Traffic simulation state returned",
         extra={
             "request_id": request.state.request_id,
+            "intersection_id": state.get("intersection_id"),
             "phase": state.get("phase"),
             "decision": state.get("decision"),
             "frame_number": state.get("evaluated_frame_number"),
@@ -31,6 +67,50 @@ def traffic_state(request: Request) -> dict:
         },
     )
     return ok(state, request_id=request.state.request_id)
+
+
+@router.get("/network")
+def intersection_network(request: Request) -> dict:
+    data = intersection_network_service.get()
+    return ok(
+        {
+            **data,
+            "config_path": intersection_network_service.relative_config_path(),
+            "cooperative_control_active": False,
+            "prototype_only": True,
+        },
+        request_id=request.state.request_id,
+    )
+
+
+@router.put("/network")
+def save_intersection_network(payload: IntersectionNetworkConfigRequest, request: Request) -> dict:
+    data = intersection_network_service.save(payload.config)
+    logger.info(
+        "Intersection network configuration saved",
+        extra={
+            "request_id": request.state.request_id,
+            "active_intersection_id": data.get("active_intersection_id"),
+            "intersection_count": len(data.get("intersections", [])),
+            "link_count": len(data.get("links", [])),
+        },
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.post("/network/reset")
+def reset_intersection_network(request: Request) -> dict:
+    data = intersection_network_service.reset()
+    logger.info("Intersection network configuration reset", extra={"request_id": request.state.request_id})
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/network/context")
+def intersection_network_context(
+    request: Request,
+    intersection_id: str | None = Query(default=None, min_length=1, max_length=64),
+) -> dict:
+    return ok(intersection_network_service.context(intersection_id), request_id=request.state.request_id)
 
 
 @router.get("/history")

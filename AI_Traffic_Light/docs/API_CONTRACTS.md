@@ -22,7 +22,96 @@ Existing dataset capture/label/training-dataset endpoints are unchanged. Existin
 
 Returns current occupancy/zone counts, V025 per-zone/per-class observations, and detection-driven recommendation data. In Simulation mode, `phase` reflects the exact simulated controller phase obeyed by synthetic agents; detection recommendation remains available under `recommended_*`. `signal_policy` exposes controller/scenario metadata when simulation mode is active.
 
+This same-candidate network-foundation update also adds:
+
+- `intersection_id` — resolved from the current camera/source id or the configured active-intersection fallback;
+- `observation_provenance` — `ai_detection | simulation | manual_test | unavailable`;
+- `network_context` — the configured intersection plus inbound/outbound neighbour links;
+- `decision_context` — deterministic decision id, category, source/intersection identity, winning scenario and observed conditions when available, requested service, timing, pedestrian/vehicle context, explicit emergency-placeholder state, neighbour context, and a readable explanation.
+
+The decision context is a live explanation projection. Existing signal-rule history remains the persisted controller-event audit. `cooperative_control_active` is false in V025.
+
 Occupancy remains sampled per-frame data. Track-derived flow and V025 experiment telemetry remain separate.
+
+## V025 intersection/network foundation
+
+### `GET /api/traffic/network`
+
+Returns the normalized runtime network configuration plus `config_path`, `cooperative_control_active: false`, and `prototype_only: true`.
+
+Default configuration:
+
+```json
+{
+  "schema_version": 1,
+  "active_intersection_id": "intersection_main",
+  "intersections": [
+    {
+      "id": "intersection_main",
+      "label": "Main prototype junction",
+      "enabled": true,
+      "source_ids": ["simulation_camera"],
+      "zone_ids": [],
+      "signal_profile": "Normal"
+    }
+  ],
+  "links": []
+}
+```
+
+`intersections` is generic and does not assume exactly two nodes. Current limits are 1-16 intersections, up to 16 source ids and 64 zone ids per intersection, and up to 64 directed links. A source id may belong to only one intersection.
+
+A link contains:
+
+```json
+{
+  "id": "a_to_b",
+  "enabled": true,
+  "source_intersection_id": "intersection_a",
+  "destination_intersection_id": "intersection_b",
+  "source_approach": "eastbound",
+  "destination_approach": "westbound",
+  "travel_time_seconds": 12.5
+}
+```
+
+The travel-time field is configured prototype metadata; V025 does not yet predict arrivals or coordinate green windows from it.
+
+### `PUT /api/traffic/network`
+
+Body:
+
+```json
+{"config": {"schema_version": 1, "active_intersection_id": "intersection_a", "intersections": [], "links": []}}
+```
+
+The complete configuration is validated before atomic persistence to runtime `config/intersections.json`. Validation rejects duplicate intersection/link ids, source ids assigned to multiple intersections, missing link endpoints, self-links, malformed ids, excessive collection sizes, invalid profile/approach labels, and travel times outside 0.1-300 seconds.
+
+Stable errors:
+
+- `ATL-TRAFFIC-013` invalid network/intersection configuration;
+- `ATL-TRAFFIC-014` network configuration read failure;
+- `ATL-TRAFFIC-015` network configuration write failure.
+
+### `POST /api/traffic/network/reset`
+
+Restores the single default `intersection_main` topology. It does not reset signal rules, zones, datasets, models, analytics, or Simulation Lab results.
+
+### `GET /api/traffic/network/context`
+
+Optional query: `intersection_id`.
+
+Returns the selected/active intersection and normalized inbound/outbound neighbour links. The response explicitly reports:
+
+```json
+{
+  "cooperative_control_active": false,
+  "emergency_priority_active": false,
+  "prototype_only": true
+}
+```
+
+No V025 network endpoint changes signal timing at another intersection or sends physical traffic commands.
 
 ## V025 simulation experiments
 
@@ -43,9 +132,9 @@ Runs one isolated Fixed-vs-Adaptive comparison. Request body:
 
 Supported duration is 30-1800 seconds. Density is `light | normal | busy`. The profile must identify an existing saved signal profile. Test-mode incident/accessibility inputs are not part of this benchmark.
 
-The result contains `fixed`, `adaptive`, and `comparison` objects. Each mode records wait distributions, queues/queue-seconds/queue-active time, throughput/service rates, phase utilization, transitions/cycles, clearance time, scenario applications and timing adjustments, a simulator conflict-overlap diagnostic, and a sampled timeline. `comparison` provides Fixed/Adaptive values, absolute difference, percent change where defined, and whether Adaptive moved the metric in the preferred direction.
+The result contains `fixed`, `adaptive`, and `comparison` objects. Each mode records wait distributions, queues/queue-seconds/queue-active time, throughput/service rates, phase utilization, transitions/cycles, clearance time, scenario applications and timing adjustments, a simulator conflict-overlap diagnostic, and a sampled timeline.
 
-The benchmark uses an isolated controller/simulator instance, snapshots configured zones for synthetic zone/class conditions, and does not reset the live Camera Sources simulation or live signal-scenario runtime.
+The benchmark uses an isolated controller/simulator instance, snapshots configured zones for synthetic zone/class conditions, and does not reset the live Camera Sources simulation or live signal-scenario runtime. The same-candidate network foundation does not change this single-junction experiment model.
 
 ### Stored experiment runs
 
@@ -70,7 +159,7 @@ Returns the persisted/effective signal configuration. Top-level fields remain:
 
 Each profile keeps six protected phase entries with `base_seconds`, `min_seconds`, and `max_seconds`; `max_cycle_seconds`, `stale_data_seconds`, and `demand_memory_seconds`; compatibility `rules`; and V025 `scenarios`.
 
-A scenario has the following normalized shape:
+A scenario has the normalized shape:
 
 ```json
 {
@@ -99,12 +188,7 @@ A scenario has the following normalized shape:
 }
 ```
 
-Supported condition sources:
-
-- `metric` — one of the validated controller metrics;
-- `zone_class_count` — one class (or `*` for all classes) inside one configured polygon zone.
-
-Supported comparison operators are `gt`, `gte`, `lt`, `lte`, and `eq`. A scenario supports `match: all | any` and 1–8 conditions. Rank `1` is highest and saved ranks are unique within each profile.
+Supported condition sources are `metric` and `zone_class_count`; supported comparison operators are `gt`, `gte`, `lt`, `lte`, and `eq`. A scenario supports `match: all | any` and 1-8 conditions. Rank `1` is highest and saved ranks are unique within each profile.
 
 If an older saved profile has `rules` but no `scenarios`, V025 migrates the legacy rules into editable scenario definitions during validation. An explicitly present empty `scenarios` list remains empty and disables adaptive scenario actions for that profile.
 
@@ -116,7 +200,7 @@ Body remains:
 {"config": {"schema_version": 1, "mode": "adaptive", "dry_run": false, "active_profile": "Normal", "profiles": {}}}
 ```
 
-The complete configuration is validated before atomic persistence. Validation covers protected phase timing, scenario ids/ranks, condition sources/operators/thresholds, match mode, persistence/cooldown, action type, requested service, phase targets, profile limits, and maximum-cycle bounds. Invalid scenario configuration uses `ATL-TRAFFIC-002`.
+The complete configuration is validated before atomic persistence. Invalid scenario configuration uses `ATL-TRAFFIC-002`.
 
 Saving while simulation is running re-anchors the current protected phase at the next simulation-clock evaluation; it does not replay elapsed time from zero.
 
@@ -126,68 +210,18 @@ In Adaptive/Test mode, every enabled scenario is evaluated against the current o
 
 Actions are bounded to `extend_current_phase`, `reduce_current_phase`, `hold_current_phase`, `request_next_phase`, or `incident_hold`. `request_next_phase` requests earlier progression through the existing protected sequence and does not directly jump conflicting movement phases.
 
-### `POST /api/traffic/signal-rules/reset`
+### Other signal endpoints
 
-Restores source defaults, including default migrated/editable scenarios. Runtime datasets/models/analytics are unchanged.
-
-### `POST /api/traffic/signal-rules/runtime/reset`
-
-Clears transient condition-persistence, cooldown/application state, pending service, winner, and incident state without deleting saved configuration.
-
-### `POST /api/traffic/signal-rules/test-inputs`
-
-Optional body fields remain:
-
-```json
-{
-  "pedestrians_waiting": 6,
-  "pedestrians_crossing": 1,
-  "vehicles_waiting": 8,
-  "mobility_assistance": false,
-  "incident_person_fallen": false
-}
-```
-
-These are explicit manual **Test-mode** sources. They are not claims about live wheelchair/mobility/fall perception.
-
-### `POST /api/traffic/signal-rules/incident/clear`
-
-Clears the manual/scenario incident hold and resumes safely from a protected phase with a fresh timing window.
-
-### `POST /api/traffic/signal-rules/preview`
-
-Evaluates the current ranked scenarios without mutating runtime state. Existing metric fields remain accepted. V025 also accepts an optional `zone_class_counts` object when supplied by an internal/current-state caller. The result includes `winning_scenario_id`, scenario/rule status details, and effective phase duration.
-
-### `GET /api/traffic/signal-status`
-
-Returns existing phase/timing/mode/profile/freshness/pending/incident fields plus:
-
-- `winning_scenario_id`;
-- `winning_scenario_label`;
-- `active_scenarios` (compatibility `active_rules` remains);
-- `scenario_status` (compatibility `rule_status` remains).
-
-Each scenario status includes rank, state/reason, action metadata, eligibility/match flags, and observed condition values. States include `winner`, `triggered`, `suppressed`, `inactive`, and `unavailable`.
-
-### Traffic state observation extension
-
-`GET /api/traffic/state` includes `zone_class_counts`:
-
-```json
-{
-  "queue_east": {"car": 4, "bus": 1},
-  "waiting_west": {"person": 3}
-}
-```
-
-These are per-frame detector observations used by scenario conditions. They are not unique passage/throughput counts. Missing/deleted zones are distinguishable because existing countable zones are returned with an empty object when their current count is zero.
-
-### Signal decision history
-
+- `POST /api/traffic/signal-rules/reset`
+- `POST /api/traffic/signal-rules/runtime/reset`
+- `POST /api/traffic/signal-rules/test-inputs`
+- `POST /api/traffic/signal-rules/incident/clear`
+- `POST /api/traffic/signal-rules/preview`
+- `GET /api/traffic/signal-status`
 - `GET /api/traffic/signal-rules/history?limit=200`
 - `DELETE /api/traffic/signal-rules/history`
 
-Scenario adjustments retain the compatibility `rule_applied` event type for existing experiment/history readers and include `scenario_id`, scenario label, rank, action, protected phase, and previous/effective duration details. Runtime audit data remains under `outputs/signal_rules/decision_history.jsonl`.
+Manual `mobility_assistance` / `incident_person_fallen` values remain explicit Test-mode sources. They are not claims about live perception.
 
 ## Traffic occupancy / flow
 
@@ -209,4 +243,4 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V025 sends commands to physical/public-road traffic infrastructure. Signal scenarios and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V025 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.

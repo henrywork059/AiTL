@@ -62,6 +62,10 @@ class TrafficState(BaseModel):
     recommended_decision: str | None = None
     recommended_decision_reason: str | None = None
     signal_policy: dict[str, Any] | None = None
+    intersection_id: str = "intersection_main"
+    observation_provenance: Literal["ai_detection", "simulation", "manual_test", "unavailable"] = "unavailable"
+    network_context: dict[str, Any] = Field(default_factory=dict)
+    decision_context: dict[str, Any] = Field(default_factory=dict)
     prototype_only: bool = True
 
 
@@ -107,6 +111,10 @@ class RuntimeSettingsRequest(BaseModel):
 
 
 class SignalRulesConfigRequest(BaseModel):
+    config: dict[str, Any]
+
+
+class IntersectionNetworkConfigRequest(BaseModel):
     config: dict[str, Any]
 
 
