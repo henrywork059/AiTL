@@ -81,3 +81,7 @@ Use `../../../docs/LOCAL_TESTING.md` for current candidate validation. Do not de
 ## Safety boundary
 
 The backend produces local prototype detection, analytics, scenario, experiment, topology, and explanation data. It is not a public-road traffic controller and does not connect its decisions to physical/public-road traffic infrastructure.
+
+## V028 pedestrian-aware network evidence
+
+The isolated network experiment now adds `pedestrian_aware_cooperative` beside Fixed, Adaptive and Cooperative. It tracks request age, service sessions, synthetic crossing occupancy and bounded starvation/clearance guards. These are simulator-only behaviors and do not change the live public-road safety boundary.

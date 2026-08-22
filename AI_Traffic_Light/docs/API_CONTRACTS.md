@@ -312,3 +312,17 @@ Existing endpoints remain unchanged, including training status/start, inference 
 ## Safety boundary
 
 No API in V027 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+
+## V028 pedestrian-aware network experiment request fields
+
+`POST /api/traffic/network-experiments` additionally accepts:
+
+```json
+{
+  "pedestrian_max_wait_seconds": 30.0,
+  "pedestrian_crossing_clearance_seconds": 6.0,
+  "pedestrian_clearance_reserve_seconds": 3.0
+}
+```
+
+Bounds are respectively 5–180 s, 2–30 s, and 1–15 s. The result keeps the V027 `fixed`, `adaptive`, and `cooperative` fields and adds `pedestrian_aware_cooperative`. `comparison` remains Adaptive-vs-Fixed for compatibility; `comparisons.pedestrian_aware_cooperative_vs_cooperative` isolates the V028 pedestrian-aware layer. Results include `pedestrian_awareness_events`, pedestrian-specific network metrics, and explicit `pedestrian_aware_control_active`/provenance flags.

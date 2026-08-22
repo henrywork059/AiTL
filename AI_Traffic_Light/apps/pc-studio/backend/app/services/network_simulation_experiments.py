@@ -51,6 +51,8 @@ PEDESTRIAN_RATES_PER_MINUTE = {
 VEHICLE_SERVICE_PER_SECOND = 0.9
 PEDESTRIAN_SERVICE_PER_SECOND = 1.6
 COOPERATION_SERVICE_BUFFER_SECONDS = 2.0
+PEDESTRIAN_AWARE_MODES = {"pedestrian_aware_cooperative"}
+COOPERATIVE_MODES = {"cooperative", "pedestrian_aware_cooperative"}
 
 
 @dataclass
@@ -156,6 +158,7 @@ class _BenchmarkSignalRulesService(SignalRulesService):
         lookahead_seconds: float,
         max_extension_seconds: float,
         local_pedestrians_waiting: int,
+        local_pedestrians_crossing: int = 0,
         link_id: str,
         source_intersection_id: str,
         destination_intersection_id: str,
@@ -213,9 +216,9 @@ class _BenchmarkSignalRulesService(SignalRulesService):
                 )
             else:
                 pedestrian_phase = phase_key in {"pedestrian_green", "pedestrian_flashing"}
-                if pedestrian_phase and int(local_pedestrians_waiting) > 0:
+                if pedestrian_phase and (int(local_pedestrians_waiting) > 0 or int(local_pedestrians_crossing) > 0):
                     result["action"] = "protect_pedestrian_service"
-                    result["reason"] = "pedestrian demand is active, so cooperation does not shorten the protected pedestrian phase"
+                    result["reason"] = "pedestrian waiting/crossing demand is active, so cooperation does not shorten the protected pedestrian phase"
                 else:
                     minimum = float(phase_limits["min_seconds"])
                     requested_duration = max(minimum, elapsed + 0.2)
@@ -255,6 +258,113 @@ class _BenchmarkSignalRulesService(SignalRulesService):
             return result
 
 
+    def apply_pedestrian_service_guard(
+        self,
+        *,
+        clock_s: float,
+        waiting_count: int,
+        oldest_wait_seconds: float,
+        crossing_count: int,
+        max_wait_seconds: float,
+        clearance_reserve_seconds: float,
+        intersection_id: str,
+    ) -> dict[str, Any]:
+        """Apply bounded local pedestrian service/clearance protection.
+
+        This simulation-only guard never changes phase order. Starved waiting
+        demand may request earlier protected progression toward pedestrian
+        service by shortening only the current phase toward its configured
+        minimum. Active simulated crossings may reserve more of the current
+        pedestrian WALK/CLEAR phase, still within saved phase/cycle maxima.
+        """
+
+        waiting = max(0, int(waiting_count))
+        crossing = max(0, int(crossing_count))
+        oldest = max(0.0, float(oldest_wait_seconds))
+        result = {
+            "applied": False,
+            "action": "none",
+            "reason": "no pedestrian service guard action required",
+            "waiting_count": waiting,
+            "crossing_count": crossing,
+            "oldest_wait_seconds": round(oldest, 1),
+            "timing_delta_seconds": 0.0,
+        }
+        if waiting <= 0 and crossing <= 0:
+            return result
+
+        with self._lock:
+            config = self._load_config_locked()
+            profile = self._active_profile_locked(config)
+            if self._incident_hold:
+                result["reason"] = "incident hold blocks pedestrian timing adjustment"
+                return result
+
+            phase_key, _phase = PHASE_SEQUENCE[self._phase_index]
+            elapsed = max(0.0, float(clock_s) - self._phase_started_clock)
+            phase_limits = profile["phases"][phase_key]
+            previous = float(self._phase_duration_seconds)
+            changed = False
+
+            if crossing > 0 and phase_key in {"pedestrian_green", "pedestrian_flashing"}:
+                phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
+                reserve_target = elapsed + max(0.0, float(clearance_reserve_seconds))
+                self._phase_duration_seconds = max(previous, min(phase_cap, reserve_target))
+                changed = self._phase_duration_seconds > previous + 0.05
+                result["action"] = "protect_crossing_clearance" if changed else "crossing_clearance_already_protected"
+                result["reason"] = (
+                    "extended the active simulated pedestrian phase to preserve crossing-clearance reserve within configured bounds"
+                    if changed
+                    else "the active pedestrian phase already has sufficient bounded crossing-clearance reserve"
+                )
+            elif waiting > 0 and oldest + 1e-9 >= float(max_wait_seconds):
+                self._pending_request = "pedestrian"
+                if phase_key in {"pedestrian_green", "pedestrian_flashing"}:
+                    result["action"] = "pedestrian_service_active"
+                    result["reason"] = "pedestrian service is already active for a request at or above the maximum-wait threshold"
+                elif phase_key in {"vehicle_green", "vehicle_yellow", "all_red_to_pedestrian"}:
+                    minimum = float(phase_limits["min_seconds"])
+                    requested_duration = max(minimum, elapsed + 0.2)
+                    self._phase_duration_seconds = min(previous, requested_duration)
+                    changed = self._phase_duration_seconds < previous - 0.05
+                    result["action"] = "request_pedestrian_service" if changed else "pedestrian_service_pending"
+                    result["reason"] = (
+                        "shortened only the current protected phase toward its configured minimum because pedestrian wait reached the threshold"
+                        if changed
+                        else "pedestrian service is requested, but the current phase cannot be shortened further within protected bounds"
+                    )
+                else:
+                    result["action"] = "pedestrian_request_queued"
+                    result["reason"] = "pedestrian service request is retained until the protected sequence can progress toward pedestrian service"
+            else:
+                result["action"] = "waiting_below_threshold"
+                result["reason"] = "pedestrian demand is tracked, but the oldest wait remains below the configured service threshold"
+
+            delta = float(self._phase_duration_seconds) - previous
+            result["applied"] = changed
+            result["timing_delta_seconds"] = round(delta, 1)
+            result["phase_key"] = phase_key
+            result["previous_duration_seconds"] = round(previous, 1)
+            result["effective_duration_seconds"] = round(float(self._phase_duration_seconds), 1)
+            if changed:
+                self._record_event_locked(
+                    "pedestrian_service_guard_applied",
+                    {
+                        "intersection_id": intersection_id,
+                        "action": result["action"],
+                        "phase_key": phase_key,
+                        "waiting_count": waiting,
+                        "crossing_count": crossing,
+                        "oldest_wait_seconds": result["oldest_wait_seconds"],
+                        "max_wait_seconds": float(max_wait_seconds),
+                        "previous_duration_seconds": result["previous_duration_seconds"],
+                        "effective_duration_seconds": result["effective_duration_seconds"],
+                        "simulation_clock_seconds": round(float(clock_s), 1),
+                    },
+                )
+            return result
+
+
 class _IntersectionRuntime:
     def __init__(
         self,
@@ -274,7 +384,7 @@ class _IntersectionRuntime:
         self.zone_types = dict(zone_types)
 
         config = deepcopy(policy_config)
-        config["mode"] = "adaptive" if mode == "cooperative" else mode
+        config["mode"] = "adaptive" if mode in COOPERATIVE_MODES else mode
         config["dry_run"] = False
         config["active_profile"] = profile
         config_path = temp_root / f"{mode}_{self.intersection_id}_policy.json"
@@ -288,6 +398,7 @@ class _IntersectionRuntime:
 
         self.vehicle_queue: deque[_QueuedVehicle] = deque()
         self.pedestrian_queue: deque[float] = deque()
+        self.pedestrian_crossing_clear_times: deque[float] = deque()
         self.vehicle_waits: list[float] = []
         self.pedestrian_waits: list[float] = []
         self.vehicle_queue_samples: list[int] = []
@@ -301,6 +412,15 @@ class _IntersectionRuntime:
         self.external_vehicle_arrivals = 0
         self.transfer_vehicle_arrivals = 0
         self.external_pedestrian_arrivals = 0
+        self.pedestrian_requests_started = 0
+        self.pedestrian_requests_fulfilled = 0
+        self.pedestrian_service_sessions = 0
+        self.pedestrian_wait_threshold_hits = 0
+        self.pedestrian_crossing_peak = 0
+        self.max_observed_pedestrian_wait_seconds = 0.0
+        self.pedestrian_request_fulfillment_seconds: list[float] = []
+        self._pedestrian_request_started_at_s: float | None = None
+        self._pedestrian_service_session_open = False
         self.phase_time_seconds: dict[str, float] = {}
         self.phase_transitions = 0
         self.cycles_completed = 0
@@ -329,6 +449,9 @@ class _IntersectionRuntime:
         self.transfer_vehicle_arrivals += 1
 
     def enqueue_pedestrian(self, event: _PedestrianArrival) -> None:
+        if not self.pedestrian_queue and self._pedestrian_request_started_at_s is None:
+            self._pedestrian_request_started_at_s = event.at_s
+            self.pedestrian_requests_started += 1
         self.pedestrian_queue.append(event.at_s)
         self.external_pedestrian_arrivals += 1
 
@@ -342,12 +465,15 @@ class _IntersectionRuntime:
             zone_type = self.zone_types.get(str(zone_id))
             if zone_type == "vehicle_queue":
                 zone_class_counts[str(zone_id)] = dict(class_counts)
-            elif zone_type in {"pedestrian_waiting", "crossing"}:
+            elif zone_type == "pedestrian_waiting":
                 zone_class_counts[str(zone_id)] = {"person": len(self.pedestrian_queue)} if self.pedestrian_queue else {}
+            elif zone_type == "crossing":
+                zone_class_counts[str(zone_id)] = {"person": len(self.pedestrian_crossing_clear_times)} if self.pedestrian_crossing_clear_times else {}
             elif zone_type == "counting_region":
                 combined = dict(class_counts)
-                if self.pedestrian_queue:
-                    combined["person"] = len(self.pedestrian_queue)
+                person_count = len(self.pedestrian_queue) + len(self.pedestrian_crossing_clear_times)
+                if person_count:
+                    combined["person"] = person_count
                 zone_class_counts[str(zone_id)] = combined
             else:
                 zone_class_counts[str(zone_id)] = {}
@@ -355,7 +481,7 @@ class _IntersectionRuntime:
         return {
             "vehicles_waiting": len(self.vehicle_queue),
             "pedestrians_waiting": len(self.pedestrian_queue),
-            "pedestrians_crossing": 0,
+            "pedestrians_crossing": len(self.pedestrian_crossing_clear_times),
             "zone_class_counts": zone_class_counts,
             "data_source": "network_simulation_experiment",
         }
@@ -367,7 +493,7 @@ class _IntersectionRuntime:
         return self.controller.signal_state(clock_s)
 
     def apply_coordination(self, *, clock_s: float, advisory: dict[str, Any]) -> dict[str, Any]:
-        if self.mode != "cooperative":
+        if self.mode not in COOPERATIVE_MODES:
             return {"applied": False, "action": "disabled", "reason": "cooperative mode is not active"}
         method = getattr(self.controller, "apply_network_coordination", None)
         if method is None:
@@ -375,7 +501,46 @@ class _IntersectionRuntime:
         return method(
             clock_s=clock_s,
             local_pedestrians_waiting=len(self.pedestrian_queue),
+            local_pedestrians_crossing=len(self.pedestrian_crossing_clear_times),
             **advisory,
+        )
+
+    def prune_crossings(self, clock_s: float) -> None:
+        while self.pedestrian_crossing_clear_times and self.pedestrian_crossing_clear_times[0] <= clock_s + 1e-9:
+            self.pedestrian_crossing_clear_times.popleft()
+
+    def pedestrian_context(self, clock_s: float) -> dict[str, Any]:
+        self.prune_crossings(clock_s)
+        oldest = max(0.0, clock_s - self.pedestrian_queue[0]) if self.pedestrian_queue else 0.0
+        self.max_observed_pedestrian_wait_seconds = max(self.max_observed_pedestrian_wait_seconds, oldest)
+        self.pedestrian_crossing_peak = max(self.pedestrian_crossing_peak, len(self.pedestrian_crossing_clear_times))
+        return {
+            "waiting_count": len(self.pedestrian_queue),
+            "oldest_wait_seconds": oldest,
+            "crossing_count": len(self.pedestrian_crossing_clear_times),
+        }
+
+    def apply_pedestrian_awareness(
+        self,
+        *,
+        clock_s: float,
+        max_wait_seconds: float,
+        clearance_reserve_seconds: float,
+    ) -> dict[str, Any]:
+        if self.mode not in PEDESTRIAN_AWARE_MODES:
+            return {"applied": False, "action": "disabled", "reason": "pedestrian-aware mode is not active"}
+        method = getattr(self.controller, "apply_pedestrian_service_guard", None)
+        if method is None:
+            return {"applied": False, "action": "unsupported", "reason": "controller does not support pedestrian service guard"}
+        context = self.pedestrian_context(clock_s)
+        if context["waiting_count"] > 0 and context["oldest_wait_seconds"] + 1e-9 >= max_wait_seconds:
+            self.pedestrian_wait_threshold_hits += 1
+        return method(
+            clock_s=clock_s,
+            max_wait_seconds=max_wait_seconds,
+            clearance_reserve_seconds=clearance_reserve_seconds,
+            intersection_id=self.intersection_id,
+            **context,
         )
 
     def advance_signal_metrics(self, signal: dict[str, Any], dt: float) -> None:
@@ -402,20 +567,45 @@ class _IntersectionRuntime:
             served.append(vehicle)
         return served
 
-    def serve_pedestrians(self, *, clock_s: float, dt: float, pedestrian_walk: bool) -> None:
+    def serve_pedestrians(
+        self,
+        *,
+        clock_s: float,
+        dt: float,
+        pedestrian_walk: bool,
+        crossing_clearance_seconds: float,
+    ) -> None:
+        self.prune_crossings(clock_s)
         if not pedestrian_walk:
             self._pedestrian_service_credit = 0.0
+            self._pedestrian_service_session_open = False
             return
+        if self.pedestrian_queue and not self._pedestrian_service_session_open:
+            self.pedestrian_service_sessions += 1
+            self._pedestrian_service_session_open = True
         self._pedestrian_service_credit += PEDESTRIAN_SERVICE_PER_SECOND * dt
+        served_any = False
         while self._pedestrian_service_credit + 1e-9 >= 1.0 and self.pedestrian_queue:
             self._pedestrian_service_credit -= 1.0
             queued_at_s = self.pedestrian_queue.popleft()
             self.pedestrian_waits.append(max(0.0, clock_s - queued_at_s))
+            self.pedestrian_crossing_clear_times.append(clock_s + max(0.0, float(crossing_clearance_seconds)))
             self.pedestrians_served += 1
+            served_any = True
+        if served_any:
+            self.pedestrian_crossing_peak = max(self.pedestrian_crossing_peak, len(self.pedestrian_crossing_clear_times))
+        if not self.pedestrian_queue and self._pedestrian_request_started_at_s is not None:
+            self.pedestrian_requests_fulfilled += 1
+            self.pedestrian_request_fulfillment_seconds.append(max(0.0, clock_s - self._pedestrian_request_started_at_s))
+            self._pedestrian_request_started_at_s = None
 
-    def record_queue_time(self, dt: float) -> None:
+    def record_queue_time(self, dt: float, *, clock_s: float | None = None) -> None:
         vehicle_count = len(self.vehicle_queue)
         pedestrian_count = len(self.pedestrian_queue)
+        if clock_s is not None and self.pedestrian_queue:
+            self.max_observed_pedestrian_wait_seconds = max(
+                self.max_observed_pedestrian_wait_seconds, max(0.0, clock_s - self.pedestrian_queue[0])
+            )
         self.vehicle_queue_seconds += vehicle_count * dt
         self.pedestrian_queue_seconds += pedestrian_count * dt
         if vehicle_count:
@@ -496,6 +686,16 @@ class _IntersectionRuntime:
                     "transfer_vehicle_arrivals": self.transfer_vehicle_arrivals,
                     "external_pedestrian_arrivals": self.external_pedestrian_arrivals,
                 },
+                "pedestrian_awareness": {
+                    "requests_started": self.pedestrian_requests_started,
+                    "requests_fulfilled": self.pedestrian_requests_fulfilled,
+                    "service_sessions": self.pedestrian_service_sessions,
+                    "wait_threshold_evaluations": self.pedestrian_wait_threshold_hits,
+                    "max_observed_wait_seconds": round(self.max_observed_pedestrian_wait_seconds, 2),
+                    "request_fulfillment": _distribution(self.pedestrian_request_fulfillment_seconds),
+                    "crossing_peak": self.pedestrian_crossing_peak,
+                    "crossing_active_at_end": len(self.pedestrian_crossing_clear_times),
+                },
                 "signal": {
                     "phase_time_seconds": {key: round(value, 1) for key, value in sorted(self.phase_time_seconds.items())},
                     "phase_share_percent": {
@@ -533,6 +733,9 @@ class _NetworkModeSimulation:
         cooperation_lookahead_seconds: float = 12.0,
         cooperation_max_extension_seconds: float = 5.0,
         cooperation_min_incoming_vehicles: int = 1,
+        pedestrian_max_wait_seconds: float = 30.0,
+        pedestrian_crossing_clearance_seconds: float = 6.0,
+        pedestrian_clearance_reserve_seconds: float = 3.0,
     ) -> None:
         self.mode = mode
         self.duration_seconds = duration_seconds
@@ -541,6 +744,9 @@ class _NetworkModeSimulation:
         self.cooperation_lookahead_seconds = float(cooperation_lookahead_seconds)
         self.cooperation_max_extension_seconds = float(cooperation_max_extension_seconds)
         self.cooperation_min_incoming_vehicles = int(cooperation_min_incoming_vehicles)
+        self.pedestrian_max_wait_seconds = float(pedestrian_max_wait_seconds)
+        self.pedestrian_crossing_clearance_seconds = float(pedestrian_crossing_clearance_seconds)
+        self.pedestrian_clearance_reserve_seconds = float(pedestrian_clearance_reserve_seconds)
         self.source_vehicle_arrivals = source_vehicle_arrivals
         self.destination_vehicle_arrivals = destination_vehicle_arrivals
         self.source_pedestrian_arrivals = source_pedestrian_arrivals
@@ -566,6 +772,17 @@ class _NetworkModeSimulation:
         self.coordination_seconds_added = 0.0
         self.coordination_seconds_reduced = 0.0
         self.coordination_events: list[dict[str, Any]] = []
+        self.pedestrian_awareness_evaluations = 0
+        self.pedestrian_awareness_applied = 0
+        self.pedestrian_starvation_preventions = 0
+        self.pedestrian_clearance_extensions = 0
+        self.pedestrian_awareness_seconds_added = 0.0
+        self.pedestrian_awareness_seconds_reduced = 0.0
+        self.pedestrian_awareness_events: list[dict[str, Any]] = []
+        self._latest_pedestrian_awareness: dict[str, dict[str, Any]] = {
+            "source": {"active": False, "action": "none"},
+            "destination": {"active": False, "action": "none"},
+        }
         self._latest_coordination: dict[str, Any] = {
             "active": False,
             "incoming_vehicle_count": 0,
@@ -619,10 +836,17 @@ class _NetworkModeSimulation:
             dt = min(STEP_SECONDS, self.duration_seconds - clock)
             self._inject_arrivals(clock)
             self._deliver_transfers(clock)
+            self.source.prune_crossings(clock)
+            self.destination.prune_crossings(clock)
 
             source_signal = self.source.signal(clock)
             destination_signal = self.destination.signal(clock)
-            if self.mode == "cooperative":
+            if self.mode in PEDESTRIAN_AWARE_MODES:
+                self._evaluate_pedestrian_awareness(clock, self.source, source_signal, role="source")
+                self._evaluate_pedestrian_awareness(clock, self.destination, destination_signal, role="destination")
+                source_signal = self.source.signal(clock)
+                destination_signal = self.destination.signal(clock)
+            if self.mode in COOPERATIVE_MODES:
                 self._evaluate_cooperation(clock, destination_signal)
                 # Re-read after a timing advisory so the served phase/remaining
                 # time reflect the bounded mutation performed by the controller.
@@ -665,14 +889,16 @@ class _NetworkModeSimulation:
                 clock_s=clock,
                 dt=dt,
                 pedestrian_walk=bool(source_signal.get("pedestrian_walk")),
+                crossing_clearance_seconds=self.pedestrian_crossing_clearance_seconds,
             )
             self.destination.serve_pedestrians(
                 clock_s=clock,
                 dt=dt,
                 pedestrian_walk=bool(destination_signal.get("pedestrian_walk")),
+                crossing_clearance_seconds=self.pedestrian_crossing_clearance_seconds,
             )
-            self.source.record_queue_time(dt)
-            self.destination.record_queue_time(dt)
+            self.source.record_queue_time(dt, clock_s=clock)
+            self.destination.record_queue_time(dt, clock_s=clock)
 
             clock += dt
             self._deliver_transfers(clock)
@@ -686,6 +912,53 @@ class _NetworkModeSimulation:
         self.source.finalize_waits(self.duration_seconds)
         self.destination.finalize_waits(self.duration_seconds)
         return self._build_result(last_source_signal, last_destination_signal)
+
+    def _evaluate_pedestrian_awareness(
+        self,
+        clock_s: float,
+        runtime: _IntersectionRuntime,
+        signal: dict[str, Any],
+        *,
+        role: str,
+    ) -> None:
+        self.pedestrian_awareness_evaluations += 1
+        context = runtime.pedestrian_context(clock_s)
+        outcome = runtime.apply_pedestrian_awareness(
+            clock_s=clock_s,
+            max_wait_seconds=self.pedestrian_max_wait_seconds,
+            clearance_reserve_seconds=self.pedestrian_clearance_reserve_seconds,
+        )
+        event = {
+            "pedestrian_awareness_id": f"pedaware_{runtime.intersection_id}_{int(round(clock_s * 1000.0))}",
+            "t": round(clock_s, 1),
+            "role": role,
+            "intersection_id": runtime.intersection_id,
+            "provenance": "synthetic_pedestrian_demand",
+            "phase_before": signal.get("phase"),
+            "phase_key_before": signal.get("phase_key"),
+            "waiting_count": int(context["waiting_count"]),
+            "oldest_wait_seconds": round(float(context["oldest_wait_seconds"]), 1),
+            "crossing_count": int(context["crossing_count"]),
+            "action": outcome.get("action", "none"),
+            "applied": bool(outcome.get("applied")),
+            "reason": outcome.get("reason"),
+            "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+        }
+        active = event["waiting_count"] > 0 or event["crossing_count"] > 0
+        self._latest_pedestrian_awareness[role] = {"active": active, **event}
+        if active or event["applied"]:
+            self.pedestrian_awareness_events.append(event)
+        if event["applied"]:
+            self.pedestrian_awareness_applied += 1
+            delta = event["timing_delta_seconds"]
+            if delta > 0:
+                self.pedestrian_awareness_seconds_added += delta
+            elif delta < 0:
+                self.pedestrian_awareness_seconds_reduced += abs(delta)
+            if event["action"] == "request_pedestrian_service":
+                self.pedestrian_starvation_preventions += 1
+            elif event["action"] == "protect_crossing_clearance":
+                self.pedestrian_clearance_extensions += 1
 
     def _cooperation_advisory(self, clock_s: float) -> dict[str, Any]:
         candidates = [
@@ -804,6 +1077,7 @@ class _NetworkModeSimulation:
                     "phase_key": source_signal.get("phase_key"),
                     "vehicle_queue": len(self.source.vehicle_queue),
                     "pedestrian_queue": len(self.source.pedestrian_queue),
+                    "pedestrians_crossing": len(self.source.pedestrian_crossing_clear_times),
                     "vehicles_served": self.source.vehicles_served,
                     "active_rules": list(source_signal.get("active_rules", [])),
                 },
@@ -813,6 +1087,7 @@ class _NetworkModeSimulation:
                     "phase_key": destination_signal.get("phase_key"),
                     "vehicle_queue": len(self.destination.vehicle_queue),
                     "pedestrian_queue": len(self.destination.pedestrian_queue),
+                    "pedestrians_crossing": len(self.destination.pedestrian_crossing_clear_times),
                     "vehicles_served": self.destination.vehicles_served,
                     "active_rules": list(destination_signal.get("active_rules", [])),
                 },
@@ -820,7 +1095,10 @@ class _NetworkModeSimulation:
                 "transfers_departed": self.transfers_departed,
                 "transfers_arrived": self.transfers_arrived,
                 "corridor_completed": self.corridor_completed,
-                "coordination": deepcopy(self._latest_coordination) if self.mode == "cooperative" else None,
+                "coordination": deepcopy(self._latest_coordination) if self.mode in COOPERATIVE_MODES else None,
+                "pedestrian_awareness": (
+                    deepcopy(self._latest_pedestrian_awareness) if self.mode in PEDESTRIAN_AWARE_MODES else None
+                ),
             }
         )
 
@@ -837,6 +1115,11 @@ class _NetworkModeSimulation:
             for source, destination in zip(self.source.vehicle_queue_samples, self.destination.vehicle_queue_samples)
         ]
         total_vehicle_wait = sum(self.source.vehicle_waits) + sum(self.destination.vehicle_waits)
+        total_pedestrian_wait = sum(self.source.pedestrian_waits) + sum(self.destination.pedestrian_waits)
+        total_pedestrian_queue_samples = [
+            source + destination
+            for source, destination in zip(self.source.pedestrian_queue_samples, self.destination.pedestrian_queue_samples)
+        ]
         return {
             "mode": self.mode,
             "intersections": {
@@ -862,6 +1145,28 @@ class _NetworkModeSimulation:
                 else 0.0,
                 "total_vehicle_queue_p95": round(_percentile(total_queue_samples, 0.95), 2),
                 "total_vehicle_queue_peak": max(total_queue_samples, default=0),
+                "total_pedestrian_wait_seconds": round(total_pedestrian_wait, 2),
+                "total_pedestrian_queue_average": (
+                    round(sum(total_pedestrian_queue_samples) / len(total_pedestrian_queue_samples), 2)
+                    if total_pedestrian_queue_samples
+                    else 0.0
+                ),
+                "total_pedestrian_queue_p95": round(_percentile(total_pedestrian_queue_samples, 0.95), 2),
+                "total_pedestrian_queue_peak": max(total_pedestrian_queue_samples, default=0),
+                "max_observed_pedestrian_wait_seconds": round(
+                    max(self.source.max_observed_pedestrian_wait_seconds, self.destination.max_observed_pedestrian_wait_seconds), 2
+                ),
+                "pedestrian_awareness": {
+                    "evaluations": self.pedestrian_awareness_evaluations,
+                    "applied": self.pedestrian_awareness_applied,
+                    "starvation_preventions": self.pedestrian_starvation_preventions,
+                    "crossing_clearance_extensions": self.pedestrian_clearance_extensions,
+                    "timing_seconds_added": round(self.pedestrian_awareness_seconds_added, 1),
+                    "timing_seconds_reduced": round(self.pedestrian_awareness_seconds_reduced, 1),
+                    "max_wait_seconds": self.pedestrian_max_wait_seconds,
+                    "crossing_clearance_seconds": self.pedestrian_crossing_clearance_seconds,
+                    "clearance_reserve_seconds": self.pedestrian_clearance_reserve_seconds,
+                },
                 "coordination": {
                     "evaluations": self.coordination_evaluations,
                     "triggered": self.coordination_triggered,
@@ -879,21 +1184,30 @@ class _NetworkModeSimulation:
             "timeline": self.timeline,
             "transfer_events": [self.transfer_events[key] for key in sorted(self.transfer_events)],
             "coordination_events": self.coordination_events,
+            "pedestrian_awareness_events": self.pedestrian_awareness_events,
             "observation_provenance": "simulation",
             "transfer_provenance": "synthetic_network_simulation",
-            "coordination_provenance": "synthetic_predicted_arrivals" if self.mode == "cooperative" else None,
-            "cooperative_control_active": self.mode == "cooperative",
+            "coordination_provenance": "synthetic_predicted_arrivals" if self.mode in COOPERATIVE_MODES else None,
+            "pedestrian_awareness_provenance": (
+                "synthetic_pedestrian_demand" if self.mode in PEDESTRIAN_AWARE_MODES else None
+            ),
+            "cooperative_control_active": self.mode in COOPERATIVE_MODES,
+            "pedestrian_aware_control_active": self.mode in PEDESTRIAN_AWARE_MODES,
             "emergency_priority_active": False,
             "scope_note": (
-                "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
-                if self.mode == "cooperative"
-                else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                "Two-intersection pedestrian-aware cooperative simulation with bounded local pedestrian service/clearance guards plus synthetic predicted-arrival coordination."
+                if self.mode in PEDESTRIAN_AWARE_MODES
+                else (
+                    "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
+                    if self.mode in COOPERATIVE_MODES
+                    else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                )
             ),
         }
 
 
 class NetworkSimulationExperimentService:
-    """Run/persist deterministic Fixed/Adaptive/Cooperative network comparisons."""
+    """Run/persist deterministic Fixed/Adaptive/Cooperative/Pedestrian-aware comparisons."""
 
     def __init__(
         self,
@@ -924,6 +1238,9 @@ class NetworkSimulationExperimentService:
         cooperation_lookahead_seconds: float = 12.0,
         cooperation_max_extension_seconds: float = 5.0,
         cooperation_min_incoming_vehicles: int = 1,
+        pedestrian_max_wait_seconds: float = 30.0,
+        pedestrian_crossing_clearance_seconds: float = 6.0,
+        pedestrian_clearance_reserve_seconds: float = 3.0,
     ) -> dict[str, Any]:
         density = density.strip().lower()
         if density not in DENSITIES:
@@ -940,6 +1257,12 @@ class NetworkSimulationExperimentService:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "cooperation_max_extension_seconds must be between 0 and 20.", status_code=422)
         if not 1 <= int(cooperation_min_incoming_vehicles) <= 20:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "cooperation_min_incoming_vehicles must be between 1 and 20.", status_code=422)
+        if not 5.0 <= float(pedestrian_max_wait_seconds) <= 180.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_max_wait_seconds must be between 5 and 180.", status_code=422)
+        if not 2.0 <= float(pedestrian_crossing_clearance_seconds) <= 30.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_crossing_clearance_seconds must be between 2 and 30.", status_code=422)
+        if not 1.0 <= float(pedestrian_clearance_reserve_seconds) <= 15.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_clearance_reserve_seconds must be between 1 and 15.", status_code=422)
 
         network = deepcopy(self._network_provider())
         link, source_intersection, destination_intersection = self._resolve_pair(network, link_id)
@@ -976,6 +1299,9 @@ class NetworkSimulationExperimentService:
                 cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
                 cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
                 cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
+                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
+                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
                 **arrivals,
             ).run()
             adaptive = _NetworkModeSimulation(
@@ -993,6 +1319,9 @@ class NetworkSimulationExperimentService:
                 cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
                 cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
                 cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
+                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
+                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
                 **arrivals,
             ).run()
             cooperative = _NetworkModeSimulation(
@@ -1010,6 +1339,29 @@ class NetworkSimulationExperimentService:
                 cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
                 cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
                 cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
+                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
+                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
+                **arrivals,
+            ).run()
+            pedestrian_aware_cooperative = _NetworkModeSimulation(
+                mode="pedestrian_aware_cooperative",
+                duration_seconds=int(duration_seconds),
+                sample_interval_seconds=int(sample_interval_seconds),
+                source_intersection=source_intersection,
+                destination_intersection=destination_intersection,
+                link=link,
+                policy_config=policy,
+                profile_override=profile,
+                zone_types=zone_types,
+                temp_root=temp_root,
+                controller_factory=self._controller_factory,
+                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
+                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
+                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
+                pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
+                pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
                 **arrivals,
             ).run()
 
@@ -1026,6 +1378,18 @@ class NetworkSimulationExperimentService:
             baseline_label="adaptive",
             candidate_label="cooperative",
         )
+        pedestrian_aware_vs_cooperative = _network_comparison(
+            cooperative,
+            pedestrian_aware_cooperative,
+            baseline_label="cooperative",
+            candidate_label="pedestrian_aware_cooperative",
+        )
+        pedestrian_aware_vs_fixed = _network_comparison(
+            fixed,
+            pedestrian_aware_cooperative,
+            baseline_label="fixed",
+            candidate_label="pedestrian_aware_cooperative",
+        )
         result = {
             "run_id": run_id,
             "created_at_ms": created_at_ms,
@@ -1038,6 +1402,12 @@ class NetworkSimulationExperimentService:
                 "sample_interval_seconds": int(sample_interval_seconds),
                 "profile_override": profile,
                 "transfer_share_percent": int(transfer_share_percent),
+                "pedestrian_awareness": {
+                    "max_wait_seconds": float(pedestrian_max_wait_seconds),
+                    "crossing_clearance_seconds": float(pedestrian_crossing_clearance_seconds),
+                    "clearance_reserve_seconds": float(pedestrian_clearance_reserve_seconds),
+                    "provenance": "synthetic_pedestrian_demand",
+                },
                 "cooperation": {
                     "lookahead_seconds": float(cooperation_lookahead_seconds),
                     "max_extension_seconds": float(cooperation_max_extension_seconds),
@@ -1047,23 +1417,28 @@ class NetworkSimulationExperimentService:
                 "link": deepcopy(link),
                 "source_intersection": _intersection_snapshot(source_intersection),
                 "destination_intersection": _intersection_snapshot(destination_intersection),
-                "comparison": ["fixed", "adaptive", "cooperative"],
+                "comparison": ["fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"],
                 "arrival_plan": _arrival_plan_snapshot(arrivals),
                 "cooperative_control_active": True,
+                "pedestrian_aware_control_active": True,
             },
             "fixed": fixed,
             "adaptive": adaptive,
             "cooperative": cooperative,
+            "pedestrian_aware_cooperative": pedestrian_aware_cooperative,
             "comparison": adaptive_vs_fixed,
             "comparisons": {
                 "adaptive_vs_fixed": adaptive_vs_fixed,
                 "cooperative_vs_fixed": cooperative_vs_fixed,
                 "cooperative_vs_adaptive": cooperative_vs_adaptive,
+                "pedestrian_aware_cooperative_vs_cooperative": pedestrian_aware_vs_cooperative,
+                "pedestrian_aware_cooperative_vs_fixed": pedestrian_aware_vs_fixed,
             },
             "prototype_only": True,
             "scope_note": (
                 "Controlled local two-intersection simulation benchmark only. Cooperative mode uses synthetic predicted arrivals "
-                "to request bounded downstream timing changes while preserving the protected phase sequence."
+                "to request bounded downstream timing changes while preserving the protected phase sequence. V028 adds a fourth "
+                "pedestrian-aware cooperative mode with local maximum-wait service requests and synthetic crossing-clearance protection."
             ),
         }
         self._write_run(result)
@@ -1094,6 +1469,7 @@ class NetworkSimulationExperimentService:
             "storage_path": self._relative_storage_root(),
             "prototype_only": True,
             "cooperative_control_active": True,
+            "pedestrian_aware_control_active": True,
         }
 
     def get(self, run_id: str) -> dict[str, Any]:
@@ -1145,13 +1521,13 @@ class NetworkSimulationExperimentService:
         result = self.get(run_id)
         timelines = {
             mode: result.get(mode, {}).get("timeline", [])
-            for mode in ("fixed", "adaptive", "cooperative")
+            for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative")
         }
         rows = max((len(items) for items in timelines.values()), default=0)
         output = StringIO()
         writer = csv.writer(output, lineterminator="\n")
         header = ["t_seconds"]
-        for mode in ("fixed", "adaptive", "cooperative"):
+        for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"):
             header.extend(
                 [
                     f"{mode}_source_phase",
@@ -1172,6 +1548,14 @@ class NetworkSimulationExperimentService:
                     f"{mode}_coordination_incoming_vehicle_count",
                     f"{mode}_coordination_eta_seconds",
                     f"{mode}_coordination_applied",
+                    f"{mode}_pedestrian_awareness_source_action",
+                    f"{mode}_pedestrian_awareness_source_oldest_wait_seconds",
+                    f"{mode}_pedestrian_awareness_source_crossing_count",
+                    f"{mode}_pedestrian_awareness_source_applied",
+                    f"{mode}_pedestrian_awareness_destination_action",
+                    f"{mode}_pedestrian_awareness_destination_oldest_wait_seconds",
+                    f"{mode}_pedestrian_awareness_destination_crossing_count",
+                    f"{mode}_pedestrian_awareness_destination_applied",
                 ]
             )
         writer.writerow(header)
@@ -1182,11 +1566,14 @@ class NetworkSimulationExperimentService:
             }
             t_value = next((sample.get("t") for sample in samples.values() if sample.get("t") is not None), "")
             row: list[Any] = [t_value]
-            for mode in ("fixed", "adaptive", "cooperative"):
+            for mode in ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"):
                 sample = samples[mode]
                 source = sample.get("source", {})
                 destination = sample.get("destination", {})
                 coordination = sample.get("coordination") if isinstance(sample.get("coordination"), dict) else {}
+                pedestrian_awareness = sample.get("pedestrian_awareness") if isinstance(sample.get("pedestrian_awareness"), dict) else {}
+                ped_source = pedestrian_awareness.get("source") if isinstance(pedestrian_awareness.get("source"), dict) else {}
+                ped_destination = pedestrian_awareness.get("destination") if isinstance(pedestrian_awareness.get("destination"), dict) else {}
                 row.extend(
                     [
                         source.get("phase", ""),
@@ -1207,6 +1594,14 @@ class NetworkSimulationExperimentService:
                         coordination.get("incoming_vehicle_count", ""),
                         coordination.get("earliest_arrival_eta_seconds", ""),
                         coordination.get("applied", ""),
+                        ped_source.get("action", ""),
+                        ped_source.get("oldest_wait_seconds", ""),
+                        ped_source.get("crossing_count", ""),
+                        ped_source.get("applied", ""),
+                        ped_destination.get("action", ""),
+                        ped_destination.get("oldest_wait_seconds", ""),
+                        ped_destination.get("crossing_count", ""),
+                        ped_destination.get("applied", ""),
                     ]
                 )
             writer.writerow(row)
@@ -1285,6 +1680,9 @@ class NetworkSimulationExperimentService:
         comparison = payload.get("comparison") if isinstance(payload.get("comparison"), dict) else {}
         comparisons = payload.get("comparisons") if isinstance(payload.get("comparisons"), dict) else {}
         cooperation = comparisons.get("cooperative_vs_adaptive") if isinstance(comparisons.get("cooperative_vs_adaptive"), dict) else {}
+        pedestrian_awareness = comparisons.get("pedestrian_aware_cooperative_vs_cooperative") if isinstance(
+            comparisons.get("pedestrian_aware_cooperative_vs_cooperative"), dict
+        ) else {}
         return {
             "run_id": payload.get("run_id"),
             "created_at_ms": payload.get("created_at_ms"),
@@ -1297,6 +1695,9 @@ class NetworkSimulationExperimentService:
                 "cooperative_vs_adaptive_corridor_travel_average": cooperation.get("corridor_travel_average"),
                 "cooperative_vs_adaptive_total_vehicle_wait": cooperation.get("total_vehicle_wait"),
                 "cooperative_vs_adaptive_total_vehicle_queue_average": cooperation.get("total_vehicle_queue_average"),
+                "pedestrian_aware_vs_cooperative_total_pedestrian_wait": pedestrian_awareness.get("total_pedestrian_wait"),
+                "pedestrian_aware_vs_cooperative_pedestrian_queue_average": pedestrian_awareness.get("total_pedestrian_queue_average"),
+                "pedestrian_aware_vs_cooperative_max_pedestrian_wait": pedestrian_awareness.get("max_observed_pedestrian_wait"),
             },
         }
 
@@ -1564,6 +1965,10 @@ def _network_comparison(
         "total_vehicle_queue_average": delta("total_vehicle_queue_average", lower_is_better=True),
         "total_vehicle_queue_p95": delta("total_vehicle_queue_p95", lower_is_better=True),
         "transfer_pipeline_average": delta("transfer_pipeline_average", lower_is_better=True),
+        "total_pedestrian_wait": delta("total_pedestrian_wait_seconds", lower_is_better=True),
+        "total_pedestrian_queue_average": delta("total_pedestrian_queue_average", lower_is_better=True),
+        "total_pedestrian_queue_p95": delta("total_pedestrian_queue_p95", lower_is_better=True),
+        "max_observed_pedestrian_wait": delta("max_observed_pedestrian_wait_seconds", lower_is_better=True),
     }
 
 

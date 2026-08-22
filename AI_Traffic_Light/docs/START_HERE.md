@@ -1,63 +1,63 @@
-# Start Here — current V027 candidate
+# Start Here — Current V028 candidate
 
-Read root `VERSION` first. V027 / `0_2_7` is the current unaccepted candidate by explicit owner request. V026 / `0_2_6` is the previous version. V024 / `0_2_4` remains the owner-confirmed passed baseline until the owner explicitly accepts a later candidate.
+Root `VERSION` is authoritative. V028 / `0_2_8` is the current unaccepted candidate; V024 / `0_2_4` remains the owner-confirmed passed baseline. V027 is the previous candidate because the owner explicitly requested V028 before separately accepting V027.
 
-## What V027 adds
+## What V028 changes
 
-### Bounded cooperative two-intersection simulation
+V028 preserves/restores the intended V027 bounded cooperative two-intersection simulator and adds a fourth **Pedestrian-aware Cooperative** mode.
 
-V027 extends the V026 deterministic two-intersection experiment from two modes to three:
+One `network-experiments` run now compares the same seeded demand across:
 
-1. **Fixed** — configured normal timing only.
-2. **Independent Adaptive** — each intersection uses its own ranked local scenario controller with no neighbour timing influence.
-3. **Cooperative Adaptive** — both intersections retain independent controller state, while downstream B may consume predicted synthetic A→B arrivals from the configured-link transfer pipeline.
+1. **Fixed** — configured normal timing only;
+2. **Independent Adaptive** — local ranked scenarios, no neighbour influence;
+3. **Cooperative Adaptive** — V027 predicted A→B arrivals can request bounded downstream timing changes;
+4. **Pedestrian-aware Cooperative** — the same cooperation plus explicit local pedestrian service/clearance guards.
 
-All three modes receive the same seeded exogenous demand and the same configured source/destination/link snapshot.
+## Pedestrian-aware evidence
 
-### Cooperation behavior
+The fourth mode adds:
 
-For Cooperative Adaptive only:
+- oldest/max observed pedestrian wait;
+- request start/fulfillment lifecycle;
+- service-session count and fulfillment-time distribution;
+- synthetic crossing occupancy after service;
+- maximum-wait starvation prevention;
+- bounded pedestrian WALK/CLEAR clearance reserve;
+- structured pedestrian-awareness events with simulation provenance;
+- Pedestrian-aware Cooperative vs Cooperative comparisons so the new layer can be evaluated separately.
 
-- B examines synthetic transfers already discharged from A and scheduled to arrive within a configurable lookahead;
-- when B is already in vehicle green, cooperation may extend that green only inside the saved phase maximum and maximum-cycle cap;
-- when B is in another protected phase, cooperation may request earlier protected progression by reducing only the current phase toward its configured minimum;
-- active local pedestrian demand prevents cooperation from shortening pedestrian WALK/CLEAR phases;
-- phase order is never changed or skipped;
-- cooperation decisions are recorded as structured events with incoming count, ETA, action, reason, and timing delta;
-- coordination telemetry records evaluations, triggers, applied advisories, green extensions, progression requests, pedestrian-service protections, and timing seconds added/reduced.
+When oldest waiting time reaches the configured threshold, the guard may request pedestrian service and shorten only the **current protected phase** toward its configured minimum. It never skips protected phases. When synthetic crossing occupancy is active during WALK/CLEAR, it may extend that phase only inside saved phase and cycle maxima.
 
-This is **simulation-only cooperation**. It is not live multi-camera cooperation and is not public-road control.
+V028 also strengthens cooperation: neighbour coordination must not shorten pedestrian WALK/CLEAR while either waiting demand **or active crossing occupancy** exists.
 
-## Comparison evidence
+## Important preflight correction
 
-Each `netexp_*` result now contains:
+During V028 preparation, GitHub `main` was internally inconsistent: `VERSION`, V027 docs/models/tests described Cooperative Adaptive, but `network_simulation_experiments.py` was still the V026 independent implementation. The V028 patch therefore carries the complete intended V027 cooperative service forward and layers V028 behavior on it.
 
-- `fixed`;
-- `adaptive`;
-- `cooperative`;
-- backward-compatible `comparison` for Adaptive vs Fixed;
-- `comparisons.adaptive_vs_fixed`;
-- `comparisons.cooperative_vs_fixed`;
-- `comparisons.cooperative_vs_adaptive`.
+## Preserved capability
 
-The same seeded arrival-plan fingerprint remains available so the three modes can be audited against identical exogenous demand.
+V028 retains ranked scenarios, protected signal timing, the single-junction Fixed-vs-Adaptive Simulation Lab, intersection/topology identity, structured decision context/provenance, occupancy/flow separation, dataset capture/labeling/training, model management, and ESP camera receiving.
 
-## Inherited capability
+## Interpretation limits
 
-V027 retains V026 two-intersection transfer/persistence/CSV, V025 ranked scenarios, protected signal timing, single-junction Simulation Lab, intersection/topology identity, decision context/provenance, V024 persistence/polling hardening, V022 flow tracking, V021 occupancy, and the existing dataset/training/inference/model workflow.
-
-## Important interpretation rules
-
-- Cooperation is driven by **synthetic predicted arrivals** from the experiment transfer pipeline, not live camera tracking across intersections.
-- Configured link travel time is a simulation input, not a learned or measured road travel time.
-- Cooperative mode may improve or worsen a metric depending on the selected simulated demand/configuration; no universal superiority claim is valid.
+- Network transfer, cooperation, pedestrian demand and crossing occupancy in this experiment are synthetic.
+- `pedestrian_crossing_clearance_seconds` is a configurable simulator assumption, not a measured walking-speed model.
+- Per-frame person counts remain occupancy observations, not unique throughput.
 - Emergency priority remains inactive.
-- Existing PC Studio Simulation Lab remains the single-junction GUI; V027 network/cooperation experiments remain backend/API/test-first.
+- The existing PC Studio Simulation Lab UI remains single-junction; V028 network evidence is backend/API/test-first.
+- No V028 output controls physical/public-road signal infrastructure.
 
-## Recommended next step
+## Recommended validation order
 
-After V027 acceptance, the next logical feature is stronger **pedestrian-aware service evidence** or simulated **emergency priority** built on the same network/explanation architecture. Do not create a separate controller.
+Run the normal complete regression plus:
 
-## Safety boundary
+```powershell
+& $py .\scripts\test_network_simulation_experiments.py
+& $py .\scripts\test_pedestrian_aware_network_simulation.py
+```
 
-AiTL remains a supervised local simulation/computer-vision prototype. V027 cooperation, transfers, queues, timings, and comparison metrics are synthetic experiment evidence only and are not connected to physical/public-road signal infrastructure.
+Then run `check_structure.py`, live backend smoke, frontend typecheck/build, and the manual checks in `TEST_READY_CHECKLIST.md`.
+
+## Next dependency
+
+After V028 acceptance, the next planned invention layer is a **simulated/configured emergency-priority lifecycle** with protected grant/deny/recovery and downstream preparation. Do not claim live emergency recognition unless a compatible perception source is deliberately added.

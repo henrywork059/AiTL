@@ -95,3 +95,7 @@ Use `../../../docs/LOCAL_TESTING.md` for the current candidate's full validation
 ## Safety boundary
 
 Signal graphics, decisions, network context, experiments, and emergency/accessibility Test-mode inputs are prototype/simulation UI. The frontend is not connected to physical/public-road traffic infrastructure.
+
+## V028 network note
+
+V028 adds backend/API/test-first pedestrian-aware cooperative network evidence. The existing PC Studio Simulation Lab UI remains the single-junction surface; no new network dashboard is added in this patch.

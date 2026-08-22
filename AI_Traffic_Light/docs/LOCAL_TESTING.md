@@ -215,3 +215,11 @@ python .\scripts\validate_patch_zip.py <V027-patch.zip>
 ```
 
 Compare ZIP members with the supplied manifest. Only explicit owner acceptance may change `passed_baseline`.
+
+## V028 focused pedestrian-aware network test
+
+```powershell
+& $py .\scripts\test_pedestrian_aware_network_simulation.py
+```
+
+Then run the inherited V027 network regression as well. For API acceptance, run one `POST /api/traffic/network-experiments` with a configured two-intersection link and confirm four modes share the same arrival fingerprint; `pedestrian_aware_cooperative` should contain pedestrian-awareness events/metrics and `comparisons.pedestrian_aware_cooperative_vs_cooperative`. Verify emergency priority remains false.

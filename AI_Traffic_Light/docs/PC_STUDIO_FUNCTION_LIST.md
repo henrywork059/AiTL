@@ -33,11 +33,11 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - bounded persisted experiment history, reopen/delete, CSV export;
 - grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
 
-## V027 two-intersection cooperative network experiment
+## V028 pedestrian-aware cooperative network experiment
 
 - API/test-first isolated network benchmark using one enabled directed configured link;
 - two simultaneously modeled intersections with separate signal-controller runtime;
-- Fixed, Independent Adaptive, and Cooperative Adaptive modes receive the same deterministic exogenous demand plan;
+- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative modes receive the same deterministic exogenous demand plan;
 - selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
 - Cooperative Adaptive consumes predicted transfer arrivals inside a configurable lookahead;
 - bounded downstream vehicle-green extension respects saved phase maximum/cycle cap;
@@ -45,11 +45,12 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - active local pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR;
 - structured cooperation events include predicted incoming count, ETA, action, reason, and timing delta;
 - per-intersection wait/queue/throughput/signal/scenario telemetry plus network transfer/corridor/coordination telemetry;
-- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed, Cooperative vs Adaptive;
+- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed, Cooperative vs Adaptive, plus Pedestrian-aware Cooperative vs Cooperative/Fixed;
+- pedestrian request age/lifecycle, service sessions, maximum observed wait, synthetic crossing occupancy, starvation-prevention and clearance-protection telemetry;
 - persistent `netexp_*` list/get/delete and aligned three-mode CSV export;
 - emergency priority remains inactive.
 
-The current PC Studio Simulation Lab UI remains single-junction; V027 network/cooperation experiments are backend/API/test-first.
+The current PC Studio Simulation Lab UI remains single-junction; V028 network/cooperation/pedestrian-aware experiments are backend/API/test-first.
 
 ## Network / explanation foundation
 
@@ -60,7 +61,7 @@ The current PC Studio Simulation Lab UI remains single-junction; V027 network/co
 - enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
 - explicit inactive flags for cooperative control and emergency priority.
 
-Live configured links remain topology metadata. Synthetic transfer and bounded cooperation exist only inside the V027 isolated network experiment.
+Live configured links remain topology metadata. Synthetic transfer and bounded cooperation exist only inside the V028 isolated network experiment.
 
 ## Inference / zones / analytics
 

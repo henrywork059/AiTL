@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_2_8 — Pedestrian-aware cooperative two-intersection simulation
+
+- Created V028 / `0_2_8` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V027 as the previous unaccepted candidate.
+- Corrected a GitHub-main inconsistency discovered during V028 preflight: V027 models/tests/docs described cooperative mode while `network_simulation_experiments.py` was still the V026 independent implementation. V028 carries the complete intended V027 cooperative service forward before adding V028 behavior.
+- Added a fourth `pedestrian_aware_cooperative` network mode so Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative share one seeded exogenous demand plan.
+- Added pedestrian request lifecycle and evidence: request start/fulfillment counts, service sessions, request-fulfillment distribution, maximum observed wait, crossing occupancy and crossing peak.
+- Added bounded starvation prevention: once oldest waiting time reaches the configured threshold, the simulator requests pedestrian service and may shorten only the current protected phase toward its configured minimum.
+- Added synthetic crossing-clearance protection: served pedestrians remain in simulated crossing occupancy for a configured clearance interval; active WALK/CLEAR may be extended within saved phase/cycle maxima to preserve a configured clearance reserve.
+- Strengthened V027 cooperation so waiting **or crossing** pedestrian demand prevents neighbour coordination from shortening pedestrian WALK/CLEAR.
+- Added pedestrian-awareness events/provenance, network metrics, pairwise Pedestrian-aware-vs-Cooperative comparisons, and aligned four-mode CSV fields.
+- Added request bounds for max pedestrian wait, synthetic crossing clearance time, and clearance reserve. Emergency priority and live cross-camera pedestrian identity remain inactive.
+
 ## 0_2_7 — Bounded cooperative two-intersection network simulation
 
 - Created V027 / `0_2_7` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline; V026 remains the previous unaccepted candidate.

@@ -314,3 +314,24 @@ Detection centres are scaled into zone-reference space for membership. Display s
 ## Runtime-data rule
 
 Do not package runtime/user data such as `config/intersections.json`, zone/settings/signal config, histories, datasets, trained models, or experiment results in changed-files source patches.
+
+## V028 pedestrian-aware network evidence
+
+Pedestrian-aware network events are synthetic experiment records, for example:
+
+```json
+{
+  "pedestrian_awareness_id": "pedaware_B_42500",
+  "t": 42.5,
+  "intersection_id": "B",
+  "provenance": "synthetic_pedestrian_demand",
+  "waiting_count": 3,
+  "oldest_wait_seconds": 31.0,
+  "crossing_count": 0,
+  "action": "request_pedestrian_service",
+  "applied": true,
+  "timing_delta_seconds": -2.5
+}
+```
+
+When a synthetic pedestrian is served, V028 retains simulated crossing occupancy until `pedestrian_crossing_clearance_seconds` elapses. `crossing_count` is therefore simulator state, not live track-derived unique crossing throughput. Starvation-prevention and clearance actions remain bounded by the protected controller timing configuration.

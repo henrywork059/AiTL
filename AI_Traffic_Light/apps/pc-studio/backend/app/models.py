@@ -167,6 +167,9 @@ class NetworkSimulationExperimentRunRequest(BaseModel):
     cooperation_lookahead_seconds: float = Field(default=12.0, ge=1.0, le=60.0)
     cooperation_max_extension_seconds: float = Field(default=5.0, ge=0.0, le=20.0)
     cooperation_min_incoming_vehicles: int = Field(default=1, ge=1, le=20)
+    pedestrian_max_wait_seconds: float = Field(default=30.0, ge=5.0, le=180.0)
+    pedestrian_crossing_clearance_seconds: float = Field(default=6.0, ge=2.0, le=30.0)
+    pedestrian_clearance_reserve_seconds: float = Field(default=3.0, ge=1.0, le=15.0)
 
 
 class InferenceLoadRequest(BaseModel):

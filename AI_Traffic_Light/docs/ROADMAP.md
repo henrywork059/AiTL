@@ -2,54 +2,56 @@
 
 Root `VERSION` defines the active candidate. This roadmap records dependency order, not acceptance state.
 
-## Current V027 capability
+## 0_2_8 — Pedestrian-aware cooperative network candidate
 
-V027 provides the first bounded **simulation-only multi-intersection cooperation** evidence:
+V028 adds explicit pedestrian-service evidence to the bounded two-intersection cooperation benchmark:
 
-- deterministic two-intersection source→destination network experiment;
-- separate controller runtime per intersection;
-- explicit synthetic transfer pipeline and configured travel time;
-- Fixed, Independent Adaptive, and Cooperative Adaptive modes on the same seeded demand;
-- downstream predicted-arrival lookahead;
-- bounded green extension and protected progression requests;
-- pedestrian-service guard during WALK/CLEAR when local pedestrians are waiting;
-- structured coordination events and network telemetry;
-- pairwise network comparisons and persistent CSV/JSON results.
+- request age and request start/fulfillment lifecycle;
+- service-session and fulfillment-time evidence;
+- maximum-wait starvation prevention;
+- synthetic crossing occupancy after service;
+- bounded WALK/CLEAR clearance reserve;
+- interaction guard so neighbour cooperation cannot shorten pedestrian WALK/CLEAR during waiting or crossing demand;
+- Pedestrian-aware Cooperative vs Cooperative comparison under the same seeded exogenous demand.
 
-This is not yet a general live N-intersection cooperative controller. The generic topology schema remains N-intersection capable, while the V027 experiment deliberately selects one directed pair for controlled evidence.
+The patch also repairs the V027 GitHub-main mismatch by carrying the complete intended cooperative service forward.
 
-## Priority 1 — strengthen pedestrian-aware control
+## Priority 1 — simulated emergency priority
 
-Build on existing waiting/crossing zones, protected phases, dwell/wait metrics, ranked scenarios, and V027 cooperation:
+Add a simulation/configured emergency event lifecycle on the existing network/explanation architecture:
 
-- explicit service-request lifecycle;
-- longest individual waiting evidence where tracking quality supports it;
-- missed-service/starvation prevention;
-- service frequency and clearance evidence;
-- interaction with cooperation without silently sacrificing pedestrian service.
-
-## Priority 2 — simulated emergency priority
-
-Add an explicit simulated/configured emergency event lifecycle:
-
-- event/vehicle ID, type, source intersection, approach/direction, timestamp and provenance;
-- priority request, grant/deny explanation, protected transition path and recovery;
+- event/vehicle ID and type;
+- source intersection and approach/direction;
+- timestamp and explicit provenance;
+- active/cleared lifecycle;
+- protected priority request, grant/deny explanation and recovery;
 - downstream preparation over configured links;
-- emergency-specific delay/recovery telemetry;
-- no claim of live emergency recognition unless a compatible detector is added.
+- emergency delay/recovery telemetry;
+- no claim of live emergency recognition unless a compatible detector/source actually exists.
 
-## Priority 3 — broaden vehicle-class behavior
+## Priority 2 — broader vehicle-class behavior
 
-Build on retained detector class names and synthetic car/bus network transfer:
+Build on retained detector class names and synthetic car/bus transfer:
 
-- explicit class taxonomy including `unknown/other`;
+- explicit class taxonomy with `unknown/other` fallback;
 - additional synthetic classes where useful;
 - optional configured class weighting/priority with clear rationale;
-- class-aware metrics and provenance.
+- class-aware metrics and provenance;
+- no conflation of synthetic class generation with AI detections.
 
-## Cross-cutting — explainable decisions
+## Priority 3 — generalize network orchestration
 
-Every adaptive/cooperative/emergency feature should improve the same explanation model:
+After the two-intersection evidence is stable:
+
+- support multiple simultaneous directed links/intersections;
+- richer arrival prediction and travel-time uncertainty;
+- network/corridor objectives alongside local objectives;
+- compact PC Studio network experiment UI;
+- live multi-source retention/tracking only as a separate prototype step.
+
+## Cross-cutting — explainability
+
+Every adaptive/cooperative/pedestrian/emergency feature should improve the same evidence model:
 
 - decision/event ID;
 - intersection ID;
@@ -58,17 +60,7 @@ Every adaptive/cooperative/emergency feature should improve the same explanation
 - neighbour/predicted-arrival context;
 - pedestrian/emergency context;
 - action and timing before/after;
-- provenance and readable explanation.
-
-## Later network work
-
-After the two-intersection evidence is stable:
-
-- generalize experiment orchestration to more than one directed link;
-- compare corridor/network objectives against local objectives;
-- add richer arrival prediction and travel-time uncertainty;
-- expose network experiments in a compact PC Studio page without creating a long dashboard;
-- investigate live multi-source retention/tracking only as a separate prototype step.
+- provenance and concise explanation.
 
 ## Explicitly outside scope
 

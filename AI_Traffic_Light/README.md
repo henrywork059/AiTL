@@ -4,9 +4,9 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V027 / `0_2_7` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V026 is the previous version because the owner explicitly requested V027 before separately accepting V026. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. At this update, V028 / `0_2_8` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V027 is the previous version because the owner explicitly requested V028 before separately accepting V027. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
 
-V027 builds on V026 with a third Cooperative Adaptive network mode. Downstream timing can use predicted synthetic upstream arrivals for bounded, protected timing advisories, allowing Fixed vs Independent Adaptive vs Cooperative Adaptive comparison under the same seeded demand.
+V028 preserves the V027 Cooperative Adaptive baseline and adds a fourth Pedestrian-aware Cooperative mode. It tracks pedestrian request age and synthetic crossing occupancy, adds bounded starvation-prevention/service and crossing-clearance guards, and compares all four modes under the same seeded demand.
 
 ## Documentation entry points
 
@@ -19,7 +19,7 @@ V027 builds on V026 with a third Cooperative Adaptive network mode. Downstream t
 | Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
 | Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
 | API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_2_7.md`](docs/PATCH_0_2_7.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
+| Current candidate acceptance | [`docs/PATCH_0_2_8.md`](docs/PATCH_0_2_8.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
 | What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Implemented prototype functions
@@ -38,7 +38,8 @@ V027 builds on V026 with a third Cooperative Adaptive network mode. Downstream t
 - persistent experiment results and CSV export;
 - generic intersection/source identity and directed neighbour-link configuration;
 - deterministic two-intersection network experiments with synthetic configured-link vehicle transfer;
-- Fixed vs Independent Adaptive vs Cooperative Adaptive network comparison;
+- Fixed vs Independent Adaptive vs Cooperative Adaptive vs Pedestrian-aware Cooperative network comparison;
+- pedestrian request-age, synthetic crossing occupancy, starvation-prevention, service-session, and clearance-protection telemetry;
 - bounded downstream coordination using predicted synthetic upstream arrivals with protected pedestrian/timing guards;
 - structured live decision/explanation **foundation** with observation provenance.
 
@@ -48,7 +49,7 @@ V027 builds on V026 with a third Cooperative Adaptive network mode. Downstream t
 - Flow is produced by prototype track/line/region events.
 - Zone/class counts are per-frame observations.
 - Simulation Lab data is synthetic experiment output, separate from live histories.
-- Live network links remain configuration metadata; V027 cooperation exists only inside the isolated synthetic network experiment. Transfer and predicted-arrival evidence are simulator-generated, not observed real traffic.
+- Live network links remain configuration metadata; V028 cooperation and pedestrian-aware service guards exist only inside the isolated synthetic network experiment. Transfer and predicted-arrival evidence are simulator-generated, not observed real traffic.
 - Manual/synthetic events must remain labeled with their provenance.
 
 ## Planned invention capability areas

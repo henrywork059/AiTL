@@ -64,3 +64,20 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 40. No unsupported emergency/wheelchair/fall perception claim is introduced.
 41. Nothing controls or connects to physical/public-road traffic-signal infrastructure.
 42. Owner explicitly confirms V027 passed before `passed_baseline` changes.
+
+
+## V028 pedestrian-aware cooperative acceptance
+
+43. `VERSION` reports `0_2_8`, previous `0_2_7`, passed baseline `0_2_4`.
+44. Focused V028 pedestrian-aware network regression passes.
+45. Fixed / Adaptive / Cooperative / Pedestrian-aware Cooperative share one seeded exogenous demand fingerprint.
+46. V027 cooperation still produces bounded predicted-arrival coordination evidence.
+47. Oldest pedestrian wait and request lifecycle/service-session metrics are present.
+48. A request at/above `pedestrian_max_wait_seconds` can trigger bounded protected progression toward pedestrian service without violating phase minimums.
+49. Served synthetic pedestrians produce crossing occupancy for the configured clearance interval.
+50. Active crossing occupancy can reserve bounded WALK/CLEAR time within phase/cycle maxima.
+51. Neighbour coordination does not shorten pedestrian WALK/CLEAR while waiting or crossing demand is active.
+52. Pedestrian-aware vs Cooperative comparison includes pedestrian wait/queue/max-wait metrics.
+53. Four-mode CSV contains pedestrian-awareness evidence columns.
+54. Emergency priority remains inactive and no public-road control claim is introduced.
+55. Full inherited regression, structure check, frontend typecheck/build and live smoke pass locally before owner acceptance.

@@ -72,19 +72,19 @@ Priority must operate through protected transitions and include explicit grant/d
 
 ## 5. Planned invention capability: pedestrian-aware control
 
-**Status: strong partial implementation / planned enhancement.**
+**Status: implemented in synthetic network experiment / planned live-evidence enhancement.**
 
 Existing foundations include pedestrian waiting/crossing zones, counts, dwell/wait-related metrics, pedestrian-priority scenarios/profiles, protected WALK/CLEAR phases, and pedestrian simulation telemetry.
 
-Planned strengthening includes:
+V028 adds synthetic network evidence for oldest-wait tracking, request start/fulfillment lifecycle, service sessions, maximum-wait starvation prevention, simulated crossing occupancy, and bounded crossing-clearance reserve. These are simulation inputs/evidence; they are not live unique-pedestrian measurements.
 
-- longest individual waiting time where tracking quality supports it;
-- service-request lifecycle;
-- missed-service/starvation prevention;
-- service frequency;
-- crossing-clearance context;
-- interaction with neighbour/emergency decisions;
-- clearer pedestrian-specific evidence in experiments.
+Future strengthening should focus on live-evidence quality rather than re-implementing the V028 simulator layer:
+
+- longest individual live waiting time only where tracking quality supports it;
+- robust live service-request reconstruction across camera/source changes;
+- calibrated crossing-clearance evidence rather than a fixed synthetic duration;
+- interaction with the planned emergency-priority lifecycle;
+- compact frontend presentation of pedestrian-specific evidence.
 
 Per-frame person counts must not be described as unique pedestrian throughput.
 

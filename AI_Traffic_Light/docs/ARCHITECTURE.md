@@ -141,3 +141,7 @@ Camera nodes capture/upload frames and expose simple device status/settings. Hea
 ## 9. Capability and safety boundaries
 
 See `PROJECT_SCOPE.md` for implemented/foundation/planned status. Multi-intersection cooperation and emergency priority require additional simulator/controller evidence. All signal phases/actions remain prototype/simulation outputs; public-road control is outside scope.
+
+## V028 pedestrian-aware network layer
+
+Inside `network_simulation_experiments.py`, V028 keeps four isolated benchmark modes. `pedestrian_aware_cooperative` reuses the same per-intersection controllers and V027 coordinator, while adding local pedestrian request-age and synthetic crossing state. A bounded guard can request earlier protected pedestrian service at the maximum-wait threshold or reserve additional WALK/CLEAR time for active synthetic crossings. Phase order and configured min/max/cycle limits remain controller-owned.

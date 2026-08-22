@@ -67,9 +67,9 @@ app/core/         envelopes, errors, logging, middleware, version metadata, shar
 
 Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
 
-Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated V027 Fixed / Independent Adaptive / Cooperative Adaptive two-intersection benchmark and its bounded simulation-only coordinator; it must not mutate live camera/controller state.
+Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated V028 Fixed / Independent Adaptive / Cooperative Adaptive / Pedestrian-aware Cooperative two-intersection benchmark, bounded simulation-only coordinator, and local pedestrian service/clearance guards; it must not mutate live camera/controller state.
 
-Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V027 network transfer and cooperation are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, emergency priority, or multi-camera live-controller operation.
+Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V028 network transfer, cooperation, and pedestrian-aware service/clearance evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, emergency priority, or multi-camera live-controller operation.
 
 ### Frontend
 
