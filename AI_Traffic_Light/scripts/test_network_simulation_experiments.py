@@ -368,8 +368,8 @@ def main() -> int:
         assert first["scenario"]["link"]["travel_time_seconds"] == 7.5
         assert first["scenario"]["source_intersection"]["id"] == "A"
         assert first["scenario"]["destination_intersection"]["id"] == "B"
-        assert first["scenario"]["comparison"][:4] == ["fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative"]
-        assert first["scenario"]["comparison"][4:] == ["emergency_baseline_cooperative", "emergency_priority_cooperative"]
+        assert first["scenario"]["comparison"][:5] == ["fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative", "class_aware_cooperative"]
+        assert first["scenario"]["comparison"][5:] == ["emergency_baseline_cooperative", "emergency_priority_cooperative"]
         assert first["scenario"]["cooperative_control_active"] is True
         assert first["scenario"]["cooperation"]["lookahead_seconds"] == 12.0
         assert first["scenario"]["arrival_plan"]["source_vehicle_count"] > 0

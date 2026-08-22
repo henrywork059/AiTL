@@ -170,6 +170,12 @@ class NetworkSimulationExperimentRunRequest(BaseModel):
     pedestrian_max_wait_seconds: float = Field(default=30.0, ge=5.0, le=180.0)
     pedestrian_crossing_clearance_seconds: float = Field(default=6.0, ge=2.0, le=30.0)
     pedestrian_clearance_reserve_seconds: float = Field(default=3.0, ge=1.0, le=15.0)
+    vehicle_class_profile: Literal["legacy", "mixed_urban", "freight_heavy"] = "mixed_urban"
+    vehicle_class_priority_enabled: bool = True
+    vehicle_class_priority_class: Literal["car", "bus", "truck", "motorcycle", "bicycle", "other"] = "bus"
+    vehicle_class_priority_weight: float = Field(default=2.0, ge=1.0, le=5.0)
+    vehicle_class_priority_min_waiting: int = Field(default=1, ge=1, le=20)
+    vehicle_class_priority_max_extension_seconds: float = Field(default=4.0, ge=0.0, le=20.0)
     emergency_event_enabled: bool = True
     emergency_event_at_seconds: float = Field(default=15.0, ge=0.0, le=1800.0)
     emergency_vehicle_type: Literal["ambulance", "fire_engine", "police"] = "ambulance"

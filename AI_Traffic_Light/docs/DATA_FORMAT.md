@@ -366,3 +366,51 @@ Lifecycle records use `event_type` values such as `activated`, `source_departed`
 `network_metrics.emergency` records completion/status, source/destination wait, total simulated emergency travel time, priority evaluation/grant/denial/application counts, downstream preparation count, and timing seconds added/reduced. Wait/travel fields are `null` when the corresponding lifecycle point did not occur before the experiment ended.
 
 The matched baseline and priority modes receive the same emergency-event object. This is required for a policy comparison; do not compare a run with an emergency vehicle against a run without one and call the difference a priority effect.
+
+## V030 vehicle-class-aware network evidence
+
+Regular simulator taxonomy is:
+
+```text
+car | bus | truck | motorcycle | bicycle | other
+```
+
+`emergency` remains a separate V029 special simulator class. Unknown/unmapped regular labels normalize to `other`.
+
+The arrival-plan snapshot now contains class counts such as:
+
+```json
+{
+  "source_vehicle_class_counts": {"car": 22, "bus": 5, "truck": 4, "motorcycle": 3, "bicycle": 2, "other": 1},
+  "source_transfer_candidate_class_counts": {"car": 15, "bus": 3, "truck": 3},
+  "destination_vehicle_class_counts": {"car": 12, "bus": 2, "truck": 2}
+}
+```
+
+Counts are format examples, not expected benchmark values.
+
+Per-intersection `metrics.vehicle_classes.<class>` records `external_arrivals`, `transfer_arrivals`, `served`, wait distribution, and sampled queue distribution. Network `network_metrics.vehicle_classes.<class>` aggregates both intersections.
+
+Representative class-priority event:
+
+```json
+{
+  "vehicle_class_priority_id": "classprio_B_44000",
+  "t": 44.0,
+  "role": "destination",
+  "intersection_id": "B",
+  "class_name": "bus",
+  "waiting_count": 2,
+  "oldest_wait_seconds": 11.5,
+  "priority_weight": 2.0,
+  "weighted_waiting": 4.0,
+  "provenance": "synthetic_vehicle_class_demand",
+  "phase_before": "vehicle_green",
+  "action": "extend_vehicle_green_for_class",
+  "applied": true,
+  "timing_delta_seconds": 3.0,
+  "reason": "extended bounded vehicle green for configured bus demand"
+}
+```
+
+Possible class actions include `extend_vehicle_green_for_class`, `request_protected_vehicle_service_for_class`, `protect_pedestrian_service`, `neutral_class_weight`, pending/bounded variants, or `none`. These are simulator policy records and must not be interpreted as live AI classification or real transit/freight priority.

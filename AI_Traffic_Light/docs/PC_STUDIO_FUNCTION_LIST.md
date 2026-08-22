@@ -33,12 +33,13 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - bounded persisted experiment history, reopen/delete, CSV export;
 - grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
 
-## V029 cooperative / pedestrian-aware / emergency-priority network experiment
+## V030 cooperative / pedestrian-aware / vehicle-class-aware / emergency-priority network experiment
 
 - API/test-first isolated network benchmark using one enabled directed configured link;
 - two simultaneously modeled intersections with separate signal-controller runtime;
-- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative preserve the V028 deterministic base-demand comparison;
-- V029 additionally runs matched Emergency Baseline Cooperative and Emergency-priority Cooperative modes with the same configured emergency vehicle/event;
+- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative preserve the earlier deterministic base-demand comparison;
+- V030 adds Class-aware Cooperative using the same seeded class-rich base demand;
+- V029 matched Emergency Baseline Cooperative and Emergency-priority Cooperative modes remain with the same configured emergency vehicle/event;
 - selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
 - Cooperative Adaptive consumes predicted transfer arrivals inside a configurable lookahead;
 - bounded downstream vehicle-green extension respects saved phase maximum/cycle cap;
@@ -46,12 +47,12 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - active local pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR;
 - structured cooperation events include predicted incoming count, ETA, action, reason, and timing delta;
 - per-intersection wait/queue/throughput/signal/scenario telemetry plus network transfer/corridor/coordination telemetry;
-- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed, Cooperative vs Adaptive, plus Pedestrian-aware Cooperative vs Cooperative/Fixed;
+- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed/Adaptive, Pedestrian-aware vs Cooperative/Fixed, Class-aware vs Pedestrian-aware/Fixed, plus Emergency-priority vs Emergency-baseline;
 - pedestrian request age/lifecycle, service sessions, maximum observed wait, synthetic crossing occupancy, starvation-prevention and clearance-protection telemetry;
 - persistent `netexp_*` list/get/delete and aligned three-mode CSV export;
-- V029 emergency priority is active only in the isolated `emergency_priority_cooperative` simulator mode; the matched emergency baseline carries the same event without priority; live emergency recognition remains inactive.
+- V030 class priority is active only in `class_aware_cooperative` when enabled/weighted above neutral; V029 emergency priority remains active only in `emergency_priority_cooperative`; both are isolated simulator behavior.
 
-The current PC Studio Simulation Lab UI remains single-junction; V029 network/cooperation/pedestrian/emergency experiments are backend/API/test-first.
+The current PC Studio Simulation Lab UI remains single-junction; V030 network/cooperation/pedestrian/class/emergency experiments are backend/API/test-first.
 
 ## Network / explanation foundation
 
@@ -94,10 +95,10 @@ Live configured links remain topology metadata. Synthetic transfer, bounded coop
 See `PROJECT_SCOPE.md` / `ROADMAP.md`:
 
 - generalize bounded cooperation beyond one selected two-intersection link;
-- broader vehicle-class behavior and class-aware evidence;
-- stronger persistent structured explainability across scenario/cooperation/pedestrian/emergency decisions;
+- stronger persistent structured explainability across scenario/cooperation/pedestrian/class/emergency decisions;
+- generalization beyond one selected directed intersection pair;
 - compatible live-evidence provenance for pedestrian/emergency features only when an actual perception source exists.
 
 ## Limitations
 
-Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V027 transfer/predicted-arrival/coordination events are simulator-generated evidence, not measured vehicle movement. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.
+Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V027 transfer/predicted-arrival/coordination events are simulator-generated evidence, not measured vehicle movement. Synthetic vehicle-class profiles are not live detector evidence. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.

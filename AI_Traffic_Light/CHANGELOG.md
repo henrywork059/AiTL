@@ -1,5 +1,19 @@
 # Changelog
 
+## 0_3_0 — Vehicle-class-aware cooperative two-intersection simulation
+
+- Created V030 / `0_3_0` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V029 as the previous unaccepted candidate.
+- Added explicit regular synthetic class taxonomy `car`, `bus`, `truck`, `motorcycle`, `bicycle`, `other`, with unknown/unmapped regular labels normalized to `other`; retained V029 `emergency` as a separate special simulator class.
+- Added deterministic `legacy`, `mixed_urban`, and `freight_heavy` class profiles; all seven network modes in one run receive the same seeded class-rich base arrival plan.
+- Added `class_aware_cooperative` as a seventh mode, preserving Pedestrian-aware Cooperative behavior while optionally applying one configured regular-class weight/priority layer.
+- Added bounded class-aware vehicle service: neutral weight `1.0` causes no timing change; configured weight above `1.0` may extend vehicle green within class/phase/cycle caps or request earlier protected vehicle service by reducing only the current phase toward its minimum. Active pedestrian WALK/CLEAR demand blocks class-priority shortening.
+- Added per-intersection and network per-class external/transfer arrivals, served counts, wait distributions, and queue average/p95/peak plus class counts in the deterministic arrival-plan snapshot.
+- Added structured class-priority events/telemetry with intersection/role/class/wait/weight/action/timing/reason fields and explicit `synthetic_vehicle_class_demand` provenance.
+- Added `comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative` with selected-class served/wait/queue deltas, plus seven-mode CSV class-priority columns.
+- Added request fields for class profile, enable flag, selected class, weight, minimum waiting count, and maximum extension; no new stable error code was required.
+- Added focused V030 class-aware regression including direct protected-bound, pedestrian-protection, neutral-weight, deterministic-profile, disabled-layer-equivalence, persistence and CSV checks while retaining V027/V028/V029 regressions.
+- Synthetic class generation is simulator evidence only; no live class-accuracy, public-transit priority, hardware/public-road control, or safety claim is introduced.
+
 ## 0_2_9 — Simulated emergency-priority cooperative two-intersection simulation
 
 - Created V029 / `0_2_9` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V028 as the previous unaccepted candidate.

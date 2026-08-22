@@ -149,7 +149,7 @@ Runtime JSON is stored under `outputs/simulation_experiments/` and excluded from
 
 ### `POST /api/traffic/network-experiments`
 
-Runs one isolated multi-mode comparison over one enabled directed network link. V027 introduced three modes; V028/V029 extend the same endpoint while preserving those fields:
+Runs one isolated multi-mode comparison over one enabled directed network link. V027 introduced three modes; V028/V029/V030 extend the same endpoint while preserving those fields:
 
 ```json
 {
@@ -179,7 +179,7 @@ Rules:
 - the selected link must connect two enabled configured intersections;
 - a supplied `profile` overrides both intersection profiles and must exist in the saved signal config.
 
-The result preserves V026/V027 compatibility. Current V029 results include:
+The result preserves V026/V027 compatibility. The backward-compatible core fields remain:
 
 - `fixed`;
 - `adaptive` = Independent Adaptive;
@@ -189,7 +189,7 @@ The result preserves V026/V027 compatibility. Current V029 results include:
 - `comparisons.cooperative_vs_fixed`;
 - `comparisons.cooperative_vs_adaptive`.
 
-`scenario.arrival_plan` contains deterministic exogenous-demand counts plus a SHA-256 fingerprint. All modes receive the same base external arrival plan; the two V029 emergency modes additionally share one identical configured emergency event. `scenario.cooperation` snapshots lookahead/max-extension/min-incoming settings.
+`scenario.arrival_plan` contains deterministic exogenous-demand counts plus a SHA-256 fingerprint. All modes receive the same base external arrival plan; V030 additionally records class counts/profile provenance, and the two V029 emergency modes share one identical configured emergency event. `scenario.cooperation` snapshots lookahead/max-extension/min-incoming settings.
 
 Each mode contains per-intersection waiting/queue/throughput/signal metrics, network transfer/corridor telemetry, a bounded timeline, and synthetic transfer evidence. Cooperative mode additionally contains:
 
@@ -209,7 +209,7 @@ Network transfer, predicted arrivals, and cooperation are synthetic simulator ev
 - `GET /api/traffic/network-experiments?limit=50` — list compact `netexp_*` summaries.
 - `GET /api/traffic/network-experiments/{run_id}` — load one complete result.
 - `DELETE /api/traffic/network-experiments/{run_id}` — delete one stored network result.
-- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned current-mode source/destination queue/service/signal fields plus transfer, cooperation, pedestrian-awareness, and V029 emergency timeline fields; preserves `X-Request-ID`.
+- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned current-mode source/destination queue/service/signal fields plus transfer, cooperation, pedestrian-awareness, V030 vehicle-class-priority, and V029 emergency timeline fields; preserves `X-Request-ID`.
 
 Network experiment JSON remains under ignored runtime `outputs/simulation_experiments/`. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
 
@@ -311,7 +311,7 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V029 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V030 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
 
 ## V028 pedestrian-aware network experiment request fields
 
@@ -348,14 +348,15 @@ Rules:
 - emergency downstream lookahead: 1–120 seconds;
 - emergency maximum vehicle-green extension: 0–30 seconds.
 
-Current `scenario.comparison` order is:
+Current `scenario.comparison` order in V030 is:
 
 1. `fixed`;
 2. `adaptive`;
 3. `cooperative`;
 4. `pedestrian_aware_cooperative`;
-5. `emergency_baseline_cooperative`;
-6. `emergency_priority_cooperative`.
+5. `class_aware_cooperative`;
+6. `emergency_baseline_cooperative`;
+7. `emergency_priority_cooperative`.
 
 The two emergency modes receive the same explicit event and emergency vehicle. `emergency_baseline_cooperative` preserves pedestrian-aware cooperation but applies no emergency timing priority. `emergency_priority_cooperative` may extend current vehicle green inside saved bounds or request earlier protected progression by reducing only the current phase toward its configured minimum. Active simulated pedestrian crossings produce a priority denial until clearance; protected phase order is never skipped.
 
@@ -364,3 +365,34 @@ Emergency results expose `emergency_event`, `emergency_lifecycle_events`, `emerg
 `comparisons.emergency_priority_vs_emergency_baseline` is the matched policy comparison. It includes ordinary network metrics plus an `emergency` subobject for source wait, destination wait and total emergency travel time when the event completes in both runs.
 
 The CSV adds emergency status, role, grant/deny/defer decision, action, ETA and applied fields for each mode.
+
+## V030 vehicle-class-aware network experiment request fields
+
+`POST /api/traffic/network-experiments` additionally accepts:
+
+```json
+{
+  "vehicle_class_profile": "mixed_urban",
+  "vehicle_class_priority_enabled": true,
+  "vehicle_class_priority_class": "bus",
+  "vehicle_class_priority_weight": 2.0,
+  "vehicle_class_priority_min_waiting": 1,
+  "vehicle_class_priority_max_extension_seconds": 4.0
+}
+```
+
+Rules:
+
+- profile: `legacy | mixed_urban | freight_heavy`;
+- selected priority class: `car | bus | truck | motorcycle | bicycle | other`;
+- weight: 1.0–5.0; weight `1.0` is neutral;
+- minimum waiting: 1–20;
+- maximum class vehicle-green extension: 0–20 seconds.
+
+V030 adds `class_aware_cooperative`. It inherits the pedestrian-aware/cooperative layers and, only when enabled, evaluates the configured regular class. The advisory may extend current vehicle green within class/phase/cycle caps or request earlier protected vehicle service by reducing only the current phase toward its configured minimum. Active pedestrian WALK/CLEAR demand is protected from class-priority shortening. Protected phase order is never skipped.
+
+`scenario.vehicle_classes` records taxonomy, profile/mix, `unknown_fallback: other`, and `synthetic_vehicle_class_demand` provenance. `scenario.vehicle_class_priority` snapshots the policy configuration. Results expose per-class metrics, `vehicle_class_priority_events`, `vehicle_class_priority_metrics`, and explicit active/provenance flags.
+
+`comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative` isolates the class-aware layer and includes a `selected_class` subobject for served, average/p95 wait, and queue-average deltas.
+
+The CSV adds source/destination class-priority action, class, waiting count, weighted waiting, and applied fields for all seven modes. Synthetic class profiles are not live detector evidence.

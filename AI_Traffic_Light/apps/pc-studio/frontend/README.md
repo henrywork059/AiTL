@@ -103,3 +103,7 @@ V028 adds backend/API/test-first pedestrian-aware cooperative network evidence. 
 ## V029 network note
 
 V029 adds backend/API/test-first matched emergency baseline and emergency-priority cooperative evidence. The existing PC Studio Simulation Lab UI remains single-junction; no emergency-pre-emption or network-control dashboard is added. If a later UI exposes these results, it must label the emergency event as simulated/configured, show grant/deny/recovery provenance, and must not imply camera emergency recognition or physical signal control.
+
+## V030 network note
+
+V030 adds backend/API/test-first regular vehicle-class profiles, per-class telemetry, and a Class-aware Cooperative comparison. The existing PC Studio Simulation Lab UI remains single-junction; no class-priority or network-control dashboard is added. A later UI should label class data as synthetic experiment evidence, expose configured class/weight/provenance, and avoid implying live detector accuracy or physical signal authority.

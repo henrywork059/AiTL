@@ -69,7 +69,7 @@ Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend
 
 Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated V028 Fixed / Independent Adaptive / Cooperative Adaptive / Pedestrian-aware Cooperative two-intersection benchmark, bounded simulation-only coordinator, and local pedestrian service/clearance guards; it must not mutate live camera/controller state.
 
-Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V028 network transfer, cooperation, and pedestrian-aware service/clearance evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, emergency priority, or multi-camera live-controller operation.
+Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V030 network transfer, cooperation, pedestrian-aware, vehicle-class-aware, and V029 emergency evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, live class priority, emergency priority, or multi-camera live-controller operation.
 
 ### Frontend
 
@@ -94,7 +94,7 @@ Preserve these distinctions unless the task explicitly changes them:
 - **flow** = track-derived line/region events;
 - **zone/class counts** = per-frame detector observations for scenario conditions;
 - **experiment telemetry** = isolated synthetic simulator/controller output;
-- **network links** = configured topology metadata in live state; V027 `network-experiments` may generate explicit synthetic transfer, predicted-arrival, and coordination events over a selected link;
+- **network links** = configured topology metadata in live state; `network-experiments` may generate explicit synthetic transfer, predicted-arrival, coordination, pedestrian, vehicle-class, and emergency events over a selected link;
 - **observation provenance** must identify simulation/manual sources rather than presenting them as AI detections.
 
 Canonical boxes remain in original-image coordinates. Zone geometry remains in the validated reference coordinate system; display scaling is presentation-only.
@@ -146,7 +146,7 @@ Before editing:
 4. decide whether the request repairs the current candidate or explicitly starts a new version;
 5. write down material assumptions rather than silently broadening scope.
 
-Extend the existing architecture instead of building a parallel controller or duplicate data model. For planned multi-intersection, emergency, pedestrian, class-aware, and explainability work, follow the dependency/evidence boundaries in `docs/PROJECT_SCOPE.md` and `docs/ROADMAP.md`.
+Extend the existing architecture instead of building a parallel controller or duplicate data model. For multi-intersection, emergency, pedestrian, vehicle-class-aware, and explainability work, follow the dependency/evidence boundaries in `docs/PROJECT_SCOPE.md` and `docs/ROADMAP.md`.
 
 ## 9. Testing evidence must be precise
 
@@ -215,3 +215,6 @@ Only pull when the working tree situation is understood. Preserve runtime data a
 ## 13. When uncertain
 
 Choose the smallest safe interpretation that preserves accepted behavior, current candidate state, data semantics, and the prototype-only safety boundary. If repository evidence and an old document disagree, prefer current code/contracts/`VERSION` and update the stale durable document as part of the patch when appropriate.
+### Vehicle-class evidence rule
+
+V030 regular class generation is synthetic simulator input. Keep `synthetic_vehicle_class_demand` provenance on class-aware experiment evidence. Unknown/unmapped regular labels normalize to `other`. Do not present V030 class profiles or class-priority outcomes as detector accuracy, live transit priority, or public-road authority. A configured class weight of `1.0` is neutral; class-aware timing must remain within the existing protected phase/cycle bounds and must not shorten active pedestrian WALK/CLEAR demand.

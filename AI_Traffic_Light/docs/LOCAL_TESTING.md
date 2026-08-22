@@ -222,7 +222,7 @@ Compare ZIP members with the supplied manifest. Only explicit owner acceptance m
 & $py .\scripts\test_pedestrian_aware_network_simulation.py
 ```
 
-Then run the inherited V027 network regression as well. For API acceptance, run one `POST /api/traffic/network-experiments` with a configured two-intersection link and confirm four modes share the same arrival fingerprint; `pedestrian_aware_cooperative` should contain pedestrian-awareness events/metrics and `comparisons.pedestrian_aware_cooperative_vs_cooperative`. Verify emergency priority remains false in the four retained pre-emergency modes; then run the V029 emergency checks below.
+Then run the inherited V027 network regression as well. For API acceptance, run one `POST /api/traffic/network-experiments` with a configured two-intersection link and confirm the retained Fixed/Adaptive/Cooperative/Pedestrian-aware modes share the same arrival fingerprint; `pedestrian_aware_cooperative` should contain pedestrian-awareness events/metrics and `comparisons.pedestrian_aware_cooperative_vs_cooperative`. Verify emergency priority remains false in the four retained pre-emergency modes; then run the V029 emergency checks below.
 
 ## V029 focused emergency-priority network test
 
@@ -244,7 +244,7 @@ The V029 focused regression must confirm:
 - the emergency baseline reports `emergency_priority_active: false`;
 - the priority mode reports priority evaluations/grants and downstream preparation;
 - lifecycle evidence contains activation, source departure and downstream arrival, and contains clear/recovery when the event completes during the run;
-- same seed/config repeats all six mode results exactly except run metadata;
+- same seed/config repeats all current mode results exactly except run metadata;
 - CSV contains emergency status/role/decision/action/ETA/applied columns.
 
 ### API acceptance example
@@ -283,7 +283,7 @@ $run.data.comparisons.emergency_priority_vs_emergency_baseline | ConvertTo-Json 
 
 Acceptance checks:
 
-1. `scenario.comparison` contains six modes in the documented order.
+1. `scenario.comparison` contains the current seven modes in the documented order; the V029 emergency baseline/priority pair remains the final two modes.
 2. The two emergency modes contain equal `emergency_event` objects.
 3. Event provenance is `simulated_configured_emergency_event`; `detector_claimed` is false and confidence is null.
 4. Baseline priority counts remain zero.
@@ -295,3 +295,51 @@ Acceptance checks:
 10. No live emergency recognition or public-road-control claim appears in the UI/API/docs.
 
 After focused checks, run the normal complete-repository validation including Python compilation, backend tests, live API smoke, frontend typecheck/build, `scripts/check_structure.py`, and `git diff --check`.
+
+## V030 focused vehicle-class-aware network test
+
+Run after the retained V027/V028/V029 focused regressions:
+
+```powershell
+python .\scripts\test_vehicle_class_aware_network_simulation.py
+```
+
+The focused regression must confirm:
+
+- documented taxonomy/fallback normalization;
+- deterministic `mixed_urban` class-rich arrival generation;
+- seven comparison modes and identical seeded class demand;
+- per-intersection/network class arrival/service/wait/queue metrics;
+- real bounded class-priority method: green extension cap, protected progression, pedestrian WALK/CLEAR guard, and neutral weight;
+- structured class-priority events with `synthetic_vehicle_class_demand` provenance;
+- `comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative.selected_class`;
+- seven-mode CSV class-priority columns;
+- disabling class priority yields no class events and Class-aware network metrics equal Pedestrian-aware Cooperative under the same run.
+
+### V030 API acceptance example
+
+```powershell
+$body = @{
+  duration_seconds = 240
+  density = "busy"
+  seed = 30030
+  sample_interval_seconds = 2
+  label = "V030 class-aware acceptance"
+  link_id = "A_to_B"
+  transfer_share_percent = 70
+  vehicle_class_profile = "mixed_urban"
+  vehicle_class_priority_enabled = $true
+  vehicle_class_priority_class = "bus"
+  vehicle_class_priority_weight = 2.0
+  vehicle_class_priority_min_waiting = 1
+  vehicle_class_priority_max_extension_seconds = 4.0
+  emergency_event_enabled = $false
+} | ConvertTo-Json
+
+$run = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $body -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
+$run.data.scenario | ConvertTo-Json -Depth 12
+$run.data.class_aware_cooperative.vehicle_class_priority_metrics | ConvertTo-Json -Depth 12
+$run.data.comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative | ConvertTo-Json -Depth 12
+```
+
+Confirm `scenario.comparison` contains seven documented modes, class counts/fingerprint are present, class-priority evidence is synthetic, and no result claims live detector accuracy or physical/public-road authority. Repeat with `vehicle_class_priority_weight = 1.0` or `vehicle_class_priority_enabled = $false`; class-aware timing must not change because of the class layer.

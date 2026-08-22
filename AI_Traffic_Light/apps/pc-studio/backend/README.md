@@ -89,3 +89,7 @@ The isolated network experiment now adds `pedestrian_aware_cooperative` beside F
 ## V029 emergency-priority network evidence
 
 `POST /api/traffic/network-experiments` now also produces matched `emergency_baseline_cooperative` and `emergency_priority_cooperative` results. The emergency event is a configured simulator input with explicit provenance, no detector claim, and lifecycle records. Priority remains bounded by the existing protected phase controller and active simulated pedestrian crossings can deny an emergency timing change. This feature does not connect to hardware pre-emption or public-road infrastructure.
+
+## V030 vehicle-class-aware network evidence
+
+`POST /api/traffic/network-experiments` now generates class-rich seeded regular traffic using `legacy`, `mixed_urban`, or `freight_heavy` profiles and adds `class_aware_cooperative`. Per-class arrival/transfer/service/wait/queue metrics and class-priority events use explicit `synthetic_vehicle_class_demand` provenance. The selected class weight is configurable; weight `1.0` is neutral, and any timing action remains inside the existing protected phase/cycle bounds with active pedestrian WALK/CLEAR protection. This is simulator evidence, not live detector accuracy or public-road transit/freight priority.

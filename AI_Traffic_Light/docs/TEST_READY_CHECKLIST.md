@@ -87,7 +87,7 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 56. `VERSION` reports `0_2_9`, previous `0_2_8`, passed baseline `0_2_4`, candidate status.
 57. `docs/PATCH_0_2_9.md` and a V029 changelog section exist.
 58. Retained V027 cooperation, retained V028 pedestrian-aware, and focused V029 emergency regressions pass.
-59. Current network `scenario.comparison` contains six documented modes.
+59. Current network `scenario.comparison` retains the V029 emergency baseline/priority pair; later candidates may add modes before that pair.
 60. `emergency_baseline_cooperative` and `emergency_priority_cooperative` receive identical configured emergency event objects and the same seeded base arrival plan.
 61. Emergency event contains ID/type/vehicle/source/destination/link/activation fields with `simulated_configured_emergency_event` provenance, null confidence, and `detector_claimed: false`.
 62. Baseline emergency mode carries the event but reports emergency timing priority inactive/zero.
@@ -103,3 +103,26 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 72. V029 is described only as simulated/configured emergency priority; no live detector, hardware/public-road pre-emption, safety-interlock bypass, or safety-certification claim is introduced.
 73. Full inherited backend/frontend/structure/live-smoke/`git diff --check` validation passes locally before owner acceptance.
 74. Owner explicitly confirms V029 passed before `passed_baseline` changes.
+
+## V030 vehicle-class-aware acceptance
+
+76. `VERSION` reports `0_3_0`, previous `0_2_9`, passed baseline `0_2_4`, candidate status.
+77. `docs/PATCH_0_3_0.md` and a V030 changelog section exist.
+78. Retained V027 cooperation, V028 pedestrian-aware, V029 emergency-priority, and V030 vehicle-class-aware focused regressions pass.
+79. `scenario.comparison` contains seven documented modes including `class_aware_cooperative`.
+80. `scenario.vehicle_classes.regular_taxonomy` is `car`, `bus`, `truck`, `motorcycle`, `bicycle`, `other`; special `emergency` remains separate and unknown regular labels fall back to `other`.
+81. `legacy`, `mixed_urban`, and `freight_heavy` profiles are accepted; invalid profile is rejected through the existing traffic-rule validation path.
+82. One run gives all modes the same deterministic class-rich base arrival fingerprint and class-count snapshot.
+83. Per-intersection and network class metrics contain arrivals, transfer arrivals, served, wait distribution, and queue evidence.
+84. Class-aware mode records selected class, weight, minimum waiting count, maximum extension, active flag, events, metrics, and `synthetic_vehicle_class_demand` provenance.
+85. Direct class-method test shows vehicle-green extension remains inside phase/cycle/class cap.
+86. Direct class-method test shows protected progression never shortens below the configured current-phase minimum.
+87. Active pedestrian WALK/CLEAR demand blocks class-priority shortening.
+88. Class weight `1.0` produces no class timing change.
+89. Disabling class priority produces no class-priority events and class-aware network metrics match Pedestrian-aware Cooperative for the same run.
+90. `comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative.selected_class` reports served/wait/queue deltas for the selected class.
+91. Seven-mode CSV includes class-priority source/destination action/class/waiting/weighted-waiting/applied columns and preserves existing export conventions.
+92. V029 emergency baseline/priority lifecycle and matched-event semantics remain unchanged.
+93. V030 is described only as synthetic class-aware evidence; no live detector-accuracy, real transit/freight priority, hardware/public-road control, or safety claim is introduced.
+94. Full inherited regression, structure check, backend live smoke, frontend typecheck/build, and repository `git diff --check` pass on the complete checkout.
+95. Owner explicitly confirms V030 passed before `passed_baseline` changes.

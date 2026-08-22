@@ -631,7 +631,7 @@ def main() -> int:
         assert first["scenario"]["destination_intersection"]["id"] == "B"
         assert first["scenario"]["comparison"] == [
             "fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative",
-            "emergency_baseline_cooperative", "emergency_priority_cooperative",
+            "class_aware_cooperative", "emergency_baseline_cooperative", "emergency_priority_cooperative",
         ]
         assert first["scenario"]["cooperative_control_active"] is True
         assert first["scenario"]["cooperation"]["lookahead_seconds"] == 12.0

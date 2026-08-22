@@ -34,8 +34,8 @@ STEP_SECONDS = 0.5
 MAX_STORED_RUNS = 100
 
 # Exogenous demand remains intentionally simple and deterministic. The same
-# generated arrival plan is supplied to Fixed, Independent Adaptive, and
-# Cooperative Adaptive. Policy-dependent upstream service can still change the
+# generated arrival plan is supplied to every network comparison mode, including
+# class-aware and emergency variants. Policy-dependent upstream service can still change the
 # timing of transferred arrivals at the downstream intersection; that is an
 # experiment outcome, not a changed input.
 VEHICLE_RATES_PER_MINUTE = {
@@ -53,15 +53,18 @@ PEDESTRIAN_SERVICE_PER_SECOND = 1.6
 COOPERATION_SERVICE_BUFFER_SECONDS = 2.0
 PEDESTRIAN_AWARE_MODES = {
     "pedestrian_aware_cooperative",
+    "class_aware_cooperative",
     "emergency_baseline_cooperative",
     "emergency_priority_cooperative",
 }
 COOPERATIVE_MODES = {
     "cooperative",
     "pedestrian_aware_cooperative",
+    "class_aware_cooperative",
     "emergency_baseline_cooperative",
     "emergency_priority_cooperative",
 }
+CLASS_AWARE_MODES = {"class_aware_cooperative"}
 EMERGENCY_EVENT_MODES = {"emergency_baseline_cooperative", "emergency_priority_cooperative"}
 EMERGENCY_PRIORITY_MODES = {"emergency_priority_cooperative"}
 NETWORK_EXPERIMENT_MODES = (
@@ -69,9 +72,31 @@ NETWORK_EXPERIMENT_MODES = (
     "adaptive",
     "cooperative",
     "pedestrian_aware_cooperative",
+    "class_aware_cooperative",
     "emergency_baseline_cooperative",
     "emergency_priority_cooperative",
 )
+REGULAR_VEHICLE_CLASSES = ("car", "bus", "truck", "motorcycle", "bicycle", "other")
+SPECIAL_VEHICLE_CLASSES = ("emergency",)
+VEHICLE_CLASS_PROFILES = {
+    "legacy": {"car": 0.84, "bus": 0.16},
+    "mixed_urban": {
+        "car": 0.62,
+        "bus": 0.12,
+        "truck": 0.10,
+        "motorcycle": 0.08,
+        "bicycle": 0.06,
+        "other": 0.02,
+    },
+    "freight_heavy": {
+        "car": 0.48,
+        "bus": 0.10,
+        "truck": 0.27,
+        "motorcycle": 0.07,
+        "bicycle": 0.04,
+        "other": 0.04,
+    },
+}
 EMERGENCY_SERVICE_BUFFER_SECONDS = 2.0
 EMERGENCY_VEHICLE_TYPES = {"ambulance", "fire_engine", "police"}
 
@@ -386,6 +411,120 @@ class _BenchmarkSignalRulesService(SignalRulesService):
             return result
 
 
+    def apply_vehicle_class_priority(
+        self,
+        *,
+        clock_s: float,
+        class_name: str,
+        waiting_count: int,
+        oldest_wait_seconds: float,
+        priority_weight: float,
+        max_extension_seconds: float,
+        local_pedestrians_waiting: int,
+        local_pedestrians_crossing: int,
+        intersection_id: str,
+    ) -> dict[str, Any]:
+        """Apply one bounded simulation-only regular vehicle-class advisory.
+
+        A configured class weight above 1.0 can reserve bounded vehicle service.
+        The method never changes phase order, never shortens active pedestrian
+        WALK/CLEAR with local demand, and has no effect for neutral weights.
+        """
+
+        normalized_class = _normalize_vehicle_class(class_name)
+        waiting = max(0, int(waiting_count))
+        oldest = max(0.0, float(oldest_wait_seconds))
+        weight = max(0.0, float(priority_weight))
+        result = {
+            "applied": False,
+            "action": "none",
+            "reason": "no configured class-aware timing action required",
+            "class_name": normalized_class,
+            "waiting_count": waiting,
+            "oldest_wait_seconds": round(oldest, 1),
+            "priority_weight": round(weight, 2),
+            "weighted_waiting": round(waiting * weight, 2),
+            "timing_delta_seconds": 0.0,
+        }
+        if waiting <= 0:
+            result["reason"] = "configured priority class is not waiting"
+            return result
+        if weight <= 1.0 + 1e-9:
+            result["action"] = "neutral_class_weight"
+            result["reason"] = "class priority weight is neutral, so timing remains unchanged"
+            return result
+
+        with self._lock:
+            config = self._load_config_locked()
+            profile = self._active_profile_locked(config)
+            if self._incident_hold:
+                result["reason"] = "incident hold blocks class-aware timing adjustment"
+                return result
+
+            phase_key, _phase = PHASE_SEQUENCE[self._phase_index]
+            elapsed = max(0.0, float(clock_s) - self._phase_started_clock)
+            phase_limits = profile["phases"][phase_key]
+            previous = float(self._phase_duration_seconds)
+            changed = False
+            pedestrian_phase = phase_key in {"pedestrian_green", "pedestrian_flashing"}
+            if pedestrian_phase and (int(local_pedestrians_waiting) > 0 or int(local_pedestrians_crossing) > 0):
+                result["action"] = "protect_pedestrian_service"
+                result["reason"] = "class-aware vehicle priority cannot shorten active pedestrian WALK/CLEAR demand"
+            elif phase_key == "vehicle_green":
+                requested_extension = min(
+                    max(0.0, float(max_extension_seconds)),
+                    max(0.5, (weight - 1.0) * min(waiting, 4) * 1.5),
+                )
+                phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
+                class_cap = min(phase_cap, float(self._phase_base_seconds) + max(0.0, float(max_extension_seconds)))
+                self._phase_duration_seconds = max(previous, min(class_cap, previous + requested_extension))
+                changed = self._phase_duration_seconds > previous + 0.05
+                result["action"] = "extend_vehicle_green_for_class" if changed else "class_vehicle_green_already_bounded"
+                result["reason"] = (
+                    f"extended bounded vehicle green for configured {normalized_class} demand"
+                    if changed
+                    else "vehicle green cannot be extended further within configured class/phase/cycle bounds"
+                )
+            else:
+                minimum = float(phase_limits["min_seconds"])
+                requested_duration = max(minimum, elapsed + 0.2)
+                self._phase_duration_seconds = min(previous, requested_duration)
+                self._pending_request = "vehicle"
+                changed = self._phase_duration_seconds < previous - 0.05
+                result["action"] = "request_protected_vehicle_service_for_class" if changed else "class_vehicle_service_pending"
+                result["reason"] = (
+                    f"shortened only the current protected phase toward its minimum for configured {normalized_class} demand"
+                    if changed
+                    else "vehicle service is requested, but the current phase cannot be shortened further within protected bounds"
+                )
+
+            delta = float(self._phase_duration_seconds) - previous
+            result["applied"] = changed
+            result["timing_delta_seconds"] = round(delta, 1)
+            result["phase_key"] = phase_key
+            result["previous_duration_seconds"] = round(previous, 1)
+            result["effective_duration_seconds"] = round(float(self._phase_duration_seconds), 1)
+            if changed:
+                self._record_event_locked(
+                    "vehicle_class_priority_applied",
+                    {
+                        "intersection_id": intersection_id,
+                        "class_name": normalized_class,
+                        "waiting_count": waiting,
+                        "oldest_wait_seconds": round(oldest, 1),
+                        "priority_weight": round(weight, 2),
+                        "weighted_waiting": round(waiting * weight, 2),
+                        "action": result["action"],
+                        "phase_key": phase_key,
+                        "previous_duration_seconds": result["previous_duration_seconds"],
+                        "effective_duration_seconds": result["effective_duration_seconds"],
+                        "simulation_clock_seconds": round(float(clock_s), 1),
+                        "provenance": "synthetic_vehicle_class_demand",
+                    },
+                )
+            return result
+
+
     def apply_emergency_priority(
         self,
         *,
@@ -558,6 +697,11 @@ class _IntersectionRuntime:
         self.pedestrian_crossing_clear_times: deque[float] = deque()
         self.vehicle_waits: list[float] = []
         self.pedestrian_waits: list[float] = []
+        self.vehicle_class_external_arrivals: dict[str, int] = {}
+        self.vehicle_class_transfer_arrivals: dict[str, int] = {}
+        self.vehicle_class_served: dict[str, int] = {}
+        self.vehicle_class_waits: dict[str, list[float]] = {}
+        self.vehicle_class_queue_samples: dict[str, list[int]] = {}
         self.vehicle_queue_samples: list[int] = []
         self.pedestrian_queue_samples: list[int] = []
         self.vehicle_queue_seconds = 0.0
@@ -596,6 +740,8 @@ class _IntersectionRuntime:
             )
         )
         self.external_vehicle_arrivals += 1
+        class_name = _normalize_vehicle_class(event.class_name)
+        self.vehicle_class_external_arrivals[class_name] = self.vehicle_class_external_arrivals.get(class_name, 0) + 1
 
     def enqueue_transfer(self, transfer: _Transfer) -> None:
         vehicle = transfer.vehicle
@@ -604,6 +750,8 @@ class _IntersectionRuntime:
         vehicle.continues_to_destination = False
         self.vehicle_queue.append(vehicle)
         self.transfer_vehicle_arrivals += 1
+        class_name = _normalize_vehicle_class(vehicle.class_name)
+        self.vehicle_class_transfer_arrivals[class_name] = self.vehicle_class_transfer_arrivals.get(class_name, 0) + 1
 
     def enqueue_pedestrian(self, event: _PedestrianArrival) -> None:
         if not self.pedestrian_queue and self._pedestrian_request_started_at_s is None:
@@ -615,7 +763,8 @@ class _IntersectionRuntime:
     def observation(self) -> dict[str, Any]:
         class_counts: dict[str, int] = {}
         for vehicle in self.vehicle_queue:
-            class_counts[vehicle.class_name] = class_counts.get(vehicle.class_name, 0) + 1
+            class_name = _normalize_vehicle_class(vehicle.class_name)
+            class_counts[class_name] = class_counts.get(class_name, 0) + 1
 
         zone_class_counts: dict[str, dict[str, int]] = {}
         for zone_id in self.intersection.get("zone_ids", []):
@@ -700,6 +849,42 @@ class _IntersectionRuntime:
             **context,
         )
 
+    def vehicle_class_context(self, class_name: str, clock_s: float) -> dict[str, Any]:
+        normalized = _normalize_vehicle_class(class_name)
+        matches = [vehicle for vehicle in self.vehicle_queue if _normalize_vehicle_class(vehicle.class_name) == normalized]
+        oldest = max((max(0.0, clock_s - vehicle.queued_at_s) for vehicle in matches), default=0.0)
+        return {
+            "class_name": normalized,
+            "waiting_count": len(matches),
+            "oldest_wait_seconds": oldest,
+        }
+
+    def apply_vehicle_class_priority(
+        self,
+        *,
+        clock_s: float,
+        class_name: str,
+        priority_weight: float,
+        max_extension_seconds: float,
+    ) -> dict[str, Any]:
+        if self.mode not in CLASS_AWARE_MODES:
+            return {"applied": False, "action": "disabled", "reason": "vehicle-class-aware mode is not active"}
+        method = getattr(self.controller, "apply_vehicle_class_priority", None)
+        if method is None:
+            return {"applied": False, "action": "unsupported", "reason": "controller does not support vehicle-class-aware priority"}
+        context = self.vehicle_class_context(class_name, clock_s)
+        pedestrian = self.pedestrian_context(clock_s)
+        return method(
+            clock_s=clock_s,
+            priority_weight=priority_weight,
+            max_extension_seconds=max_extension_seconds,
+            local_pedestrians_waiting=int(pedestrian["waiting_count"]),
+            local_pedestrians_crossing=int(pedestrian["crossing_count"]),
+            intersection_id=self.intersection_id,
+            **context,
+        )
+
+
     def apply_emergency_priority(
         self,
         *,
@@ -751,7 +936,11 @@ class _IntersectionRuntime:
         while self._vehicle_service_credit + 1e-9 >= 1.0 and self.vehicle_queue:
             self._vehicle_service_credit -= 1.0
             vehicle = self.vehicle_queue.popleft()
-            self.vehicle_waits.append(max(0.0, clock_s - vehicle.queued_at_s))
+            wait_seconds = max(0.0, clock_s - vehicle.queued_at_s)
+            self.vehicle_waits.append(wait_seconds)
+            class_name = _normalize_vehicle_class(vehicle.class_name)
+            self.vehicle_class_waits.setdefault(class_name, []).append(wait_seconds)
+            self.vehicle_class_served[class_name] = self.vehicle_class_served.get(class_name, 0) + 1
             self.vehicles_served += 1
             served.append(vehicle)
         return served
@@ -805,10 +994,19 @@ class _IntersectionRuntime:
     def sample_queues(self) -> None:
         self.vehicle_queue_samples.append(len(self.vehicle_queue))
         self.pedestrian_queue_samples.append(len(self.pedestrian_queue))
+        counts = {class_name: 0 for class_name in (*REGULAR_VEHICLE_CLASSES, *SPECIAL_VEHICLE_CLASSES)}
+        for vehicle in self.vehicle_queue:
+            class_name = _normalize_vehicle_class(vehicle.class_name)
+            counts[class_name] = counts.get(class_name, 0) + 1
+        for class_name, count in counts.items():
+            self.vehicle_class_queue_samples.setdefault(class_name, []).append(count)
 
     def finalize_waits(self, clock_s: float) -> None:
         for vehicle in self.vehicle_queue:
-            self.vehicle_waits.append(max(0.0, clock_s - vehicle.queued_at_s))
+            wait_seconds = max(0.0, clock_s - vehicle.queued_at_s)
+            self.vehicle_waits.append(wait_seconds)
+            class_name = _normalize_vehicle_class(vehicle.class_name)
+            self.vehicle_class_waits.setdefault(class_name, []).append(wait_seconds)
         for queued_at_s in self.pedestrian_queue:
             self.pedestrian_waits.append(max(0.0, clock_s - queued_at_s))
 
@@ -875,6 +1073,7 @@ class _IntersectionRuntime:
                     "transfer_vehicle_arrivals": self.transfer_vehicle_arrivals,
                     "external_pedestrian_arrivals": self.external_pedestrian_arrivals,
                 },
+                "vehicle_classes": _intersection_vehicle_class_metrics(self),
                 "pedestrian_awareness": {
                     "requests_started": self.pedestrian_requests_started,
                     "requests_fulfilled": self.pedestrian_requests_fulfilled,
@@ -925,6 +1124,11 @@ class _NetworkModeSimulation:
         pedestrian_max_wait_seconds: float = 30.0,
         pedestrian_crossing_clearance_seconds: float = 6.0,
         pedestrian_clearance_reserve_seconds: float = 3.0,
+        vehicle_class_priority_enabled: bool = True,
+        vehicle_class_priority_class: str = "bus",
+        vehicle_class_priority_weight: float = 2.0,
+        vehicle_class_priority_min_waiting: int = 1,
+        vehicle_class_priority_max_extension_seconds: float = 4.0,
         emergency_event: dict[str, Any] | None = None,
         emergency_priority_lookahead_seconds: float = 20.0,
         emergency_priority_max_extension_seconds: float = 8.0,
@@ -939,6 +1143,11 @@ class _NetworkModeSimulation:
         self.pedestrian_max_wait_seconds = float(pedestrian_max_wait_seconds)
         self.pedestrian_crossing_clearance_seconds = float(pedestrian_crossing_clearance_seconds)
         self.pedestrian_clearance_reserve_seconds = float(pedestrian_clearance_reserve_seconds)
+        self.vehicle_class_priority_enabled = bool(vehicle_class_priority_enabled)
+        self.vehicle_class_priority_class = _normalize_vehicle_class(vehicle_class_priority_class)
+        self.vehicle_class_priority_weight = float(vehicle_class_priority_weight)
+        self.vehicle_class_priority_min_waiting = int(vehicle_class_priority_min_waiting)
+        self.vehicle_class_priority_max_extension_seconds = float(vehicle_class_priority_max_extension_seconds)
         self.emergency_event = deepcopy(emergency_event) if emergency_event else None
         self.emergency_priority_lookahead_seconds = float(emergency_priority_lookahead_seconds)
         self.emergency_priority_max_extension_seconds = float(emergency_priority_max_extension_seconds)
@@ -983,6 +1192,17 @@ class _NetworkModeSimulation:
             "incoming_vehicle_count": 0,
             "earliest_arrival_eta_seconds": None,
             "action": "none",
+        }
+        self.vehicle_class_priority_evaluations = 0
+        self.vehicle_class_priority_triggered = 0
+        self.vehicle_class_priority_applied = 0
+        self.vehicle_class_priority_pedestrian_protections = 0
+        self.vehicle_class_priority_seconds_added = 0.0
+        self.vehicle_class_priority_seconds_reduced = 0.0
+        self.vehicle_class_priority_events: list[dict[str, Any]] = []
+        self._latest_vehicle_class_priority: dict[str, dict[str, Any]] = {
+            "source": {"active": False, "action": "none"},
+            "destination": {"active": False, "action": "none"},
         }
         self._emergency_injected = False
         self._emergency_status = "scheduled" if self.emergency_event else "none"
@@ -1066,6 +1286,11 @@ class _NetworkModeSimulation:
                 self._evaluate_cooperation(clock, destination_signal)
                 # Re-read after a timing advisory so the served phase/remaining
                 # time reflect the bounded mutation performed by the controller.
+                destination_signal = self.destination.signal(clock)
+            if self.mode in CLASS_AWARE_MODES and self.vehicle_class_priority_enabled:
+                self._evaluate_vehicle_class_priority(clock, self.source, source_signal, role="source")
+                self._evaluate_vehicle_class_priority(clock, self.destination, destination_signal, role="destination")
+                source_signal = self.source.signal(clock)
                 destination_signal = self.destination.signal(clock)
             if self.mode in EMERGENCY_PRIORITY_MODES:
                 self._evaluate_emergency_priority(clock, source_signal, destination_signal)
@@ -1349,6 +1574,70 @@ class _NetworkModeSimulation:
             return self.destination, "destination_priority", 0.0
         return None, self._emergency_status, None
 
+    def _evaluate_vehicle_class_priority(
+        self,
+        clock_s: float,
+        runtime: _IntersectionRuntime,
+        signal: dict[str, Any],
+        *,
+        role: str,
+    ) -> None:
+        if self.mode not in CLASS_AWARE_MODES or not self.vehicle_class_priority_enabled:
+            return
+        self.vehicle_class_priority_evaluations += 1
+        context = runtime.vehicle_class_context(self.vehicle_class_priority_class, clock_s)
+        if int(context["waiting_count"]) < self.vehicle_class_priority_min_waiting:
+            self._latest_vehicle_class_priority[role] = {
+                "active": True,
+                "class_name": self.vehicle_class_priority_class,
+                "waiting_count": int(context["waiting_count"]),
+                "oldest_wait_seconds": round(float(context["oldest_wait_seconds"]), 1),
+                "priority_weight": self.vehicle_class_priority_weight,
+                "weighted_waiting": round(int(context["waiting_count"]) * self.vehicle_class_priority_weight, 2),
+                "action": "below_min_waiting",
+                "applied": False,
+                "reason": "configured class count is below the class-priority minimum waiting threshold",
+            }
+            return
+        self.vehicle_class_priority_triggered += 1
+        outcome = runtime.apply_vehicle_class_priority(
+            clock_s=clock_s,
+            class_name=self.vehicle_class_priority_class,
+            priority_weight=self.vehicle_class_priority_weight,
+            max_extension_seconds=self.vehicle_class_priority_max_extension_seconds,
+        )
+        event = {
+            "vehicle_class_priority_id": f"classprio_{runtime.intersection_id}_{int(round(clock_s * 1000.0))}",
+            "t": round(clock_s, 1),
+            "role": role,
+            "intersection_id": runtime.intersection_id,
+            "class_name": self.vehicle_class_priority_class,
+            "waiting_count": int(context["waiting_count"]),
+            "oldest_wait_seconds": round(float(context["oldest_wait_seconds"]), 1),
+            "priority_weight": round(self.vehicle_class_priority_weight, 2),
+            "weighted_waiting": round(int(context["waiting_count"]) * self.vehicle_class_priority_weight, 2),
+            "min_waiting": self.vehicle_class_priority_min_waiting,
+            "provenance": "synthetic_vehicle_class_demand",
+            "phase_before": signal.get("phase"),
+            "phase_key_before": signal.get("phase_key"),
+            "action": outcome.get("action", "none"),
+            "applied": bool(outcome.get("applied")),
+            "reason": outcome.get("reason"),
+            "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+        }
+        self._latest_vehicle_class_priority[role] = {"active": True, **event}
+        self.vehicle_class_priority_events.append(event)
+        if event["action"] == "protect_pedestrian_service":
+            self.vehicle_class_priority_pedestrian_protections += 1
+        if event["applied"]:
+            self.vehicle_class_priority_applied += 1
+            delta = event["timing_delta_seconds"]
+            if delta > 0:
+                self.vehicle_class_priority_seconds_added += delta
+            elif delta < 0:
+                self.vehicle_class_priority_seconds_reduced += abs(delta)
+
+
     def _evaluate_emergency_priority(
         self,
         clock_s: float,
@@ -1496,6 +1785,9 @@ class _NetworkModeSimulation:
                 "pedestrian_awareness": (
                     deepcopy(self._latest_pedestrian_awareness) if self.mode in PEDESTRIAN_AWARE_MODES else None
                 ),
+                "vehicle_class_priority": (
+                    deepcopy(self._latest_vehicle_class_priority) if self.mode in CLASS_AWARE_MODES else None
+                ),
                 "emergency_priority": (
                     deepcopy(self._latest_emergency_priority) if self.mode in EMERGENCY_EVENT_MODES else None
                 ),
@@ -1572,6 +1864,7 @@ class _NetworkModeSimulation:
                 "max_observed_pedestrian_wait_seconds": round(
                     max(self.source.max_observed_pedestrian_wait_seconds, self.destination.max_observed_pedestrian_wait_seconds), 2
                 ),
+                "vehicle_classes": _network_vehicle_class_metrics(self.source, self.destination),
                 "pedestrian_awareness": {
                     "evaluations": self.pedestrian_awareness_evaluations,
                     "applied": self.pedestrian_awareness_applied,
@@ -1619,6 +1912,17 @@ class _NetworkModeSimulation:
             "transfer_events": [self.transfer_events[key] for key in sorted(self.transfer_events)],
             "coordination_events": self.coordination_events,
             "pedestrian_awareness_events": self.pedestrian_awareness_events,
+            "vehicle_class_priority_events": self.vehicle_class_priority_events,
+            "vehicle_class_priority_metrics": {
+                "evaluations": self.vehicle_class_priority_evaluations,
+                "triggered": self.vehicle_class_priority_triggered,
+                "applied": self.vehicle_class_priority_applied,
+                "pedestrian_service_protections": self.vehicle_class_priority_pedestrian_protections,
+                "seconds_added": round(self.vehicle_class_priority_seconds_added, 1),
+                "seconds_reduced": round(self.vehicle_class_priority_seconds_reduced, 1),
+                "configured_class": self.vehicle_class_priority_class,
+                "configured_weight": round(self.vehicle_class_priority_weight, 2),
+            },
             "emergency_event": deepcopy(self.emergency_event) if self.emergency_event else None,
             "emergency_lifecycle_events": self.emergency_lifecycle_events,
             "emergency_priority_events": self.emergency_priority_events,
@@ -1628,11 +1932,16 @@ class _NetworkModeSimulation:
             "pedestrian_awareness_provenance": (
                 "synthetic_pedestrian_demand" if self.mode in PEDESTRIAN_AWARE_MODES else None
             ),
+            "vehicle_class_provenance": "synthetic_vehicle_class_demand",
+            "vehicle_class_priority_provenance": (
+                "synthetic_vehicle_class_demand" if self.mode in CLASS_AWARE_MODES else None
+            ),
             "emergency_event_provenance": (
                 "simulated_configured_emergency_event" if self.mode in EMERGENCY_EVENT_MODES else None
             ),
             "cooperative_control_active": self.mode in COOPERATIVE_MODES,
             "pedestrian_aware_control_active": self.mode in PEDESTRIAN_AWARE_MODES,
+            "vehicle_class_aware_control_active": self.mode in CLASS_AWARE_MODES and self.vehicle_class_priority_enabled,
             "emergency_event_active": self.mode in EMERGENCY_EVENT_MODES and self.emergency_event is not None,
             "emergency_priority_active": self.mode in EMERGENCY_PRIORITY_MODES and self.emergency_event is not None,
             "scope_note": (
@@ -1642,12 +1951,16 @@ class _NetworkModeSimulation:
                     "Matched emergency-event baseline using the same simulated emergency vehicle without emergency timing priority."
                     if self.mode in EMERGENCY_EVENT_MODES
                     else (
-                        "Two-intersection pedestrian-aware cooperative simulation with bounded local pedestrian service/clearance guards plus synthetic predicted-arrival coordination."
-                        if self.mode in PEDESTRIAN_AWARE_MODES
+                        "Two-intersection class-aware cooperative simulation with bounded configured regular vehicle-class priority plus pedestrian protections and synthetic predicted-arrival coordination."
+                        if self.mode in CLASS_AWARE_MODES
                         else (
-                            "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
-                            if self.mode in COOPERATIVE_MODES
-                            else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                            "Two-intersection pedestrian-aware cooperative simulation with bounded local pedestrian service/clearance guards plus synthetic predicted-arrival coordination."
+                            if self.mode in PEDESTRIAN_AWARE_MODES
+                            else (
+                                "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
+                                if self.mode in COOPERATIVE_MODES
+                                else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
+                            )
                         )
                     )
                 )
@@ -1656,7 +1969,7 @@ class _NetworkModeSimulation:
 
 
 class NetworkSimulationExperimentService:
-    """Run/persist deterministic Fixed/Adaptive/Cooperative/Pedestrian-aware comparisons."""
+    """Run/persist deterministic network comparisons with bounded synthetic policy layers."""
 
     def __init__(
         self,
@@ -1690,6 +2003,12 @@ class NetworkSimulationExperimentService:
         pedestrian_max_wait_seconds: float = 30.0,
         pedestrian_crossing_clearance_seconds: float = 6.0,
         pedestrian_clearance_reserve_seconds: float = 3.0,
+        vehicle_class_profile: str = "mixed_urban",
+        vehicle_class_priority_enabled: bool = True,
+        vehicle_class_priority_class: str = "bus",
+        vehicle_class_priority_weight: float = 2.0,
+        vehicle_class_priority_min_waiting: int = 1,
+        vehicle_class_priority_max_extension_seconds: float = 4.0,
         emergency_event_enabled: bool = True,
         emergency_event_at_seconds: float = 15.0,
         emergency_vehicle_type: str = "ambulance",
@@ -1717,6 +2036,18 @@ class NetworkSimulationExperimentService:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_crossing_clearance_seconds must be between 2 and 30.", status_code=422)
         if not 1.0 <= float(pedestrian_clearance_reserve_seconds) <= 15.0:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "pedestrian_clearance_reserve_seconds must be between 1 and 15.", status_code=422)
+        vehicle_class_profile = str(vehicle_class_profile).strip().lower()
+        if vehicle_class_profile not in VEHICLE_CLASS_PROFILES:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "vehicle_class_profile must be legacy, mixed_urban, or freight_heavy.", status_code=422)
+        vehicle_class_priority_class = _normalize_vehicle_class(vehicle_class_priority_class)
+        if vehicle_class_priority_class not in REGULAR_VEHICLE_CLASSES:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "vehicle_class_priority_class must identify a regular supported vehicle class.", status_code=422)
+        if not 1.0 <= float(vehicle_class_priority_weight) <= 5.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "vehicle_class_priority_weight must be between 1 and 5.", status_code=422)
+        if not 1 <= int(vehicle_class_priority_min_waiting) <= 20:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "vehicle_class_priority_min_waiting must be between 1 and 20.", status_code=422)
+        if not 0.0 <= float(vehicle_class_priority_max_extension_seconds) <= 20.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "vehicle_class_priority_max_extension_seconds must be between 0 and 20.", status_code=422)
         if emergency_event_enabled and not 0.0 <= float(emergency_event_at_seconds) < float(duration_seconds):
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "emergency_event_at_seconds must be within the experiment duration.", status_code=422)
         emergency_vehicle_type = str(emergency_vehicle_type).strip().lower()
@@ -1745,6 +2076,7 @@ class NetworkSimulationExperimentService:
             density=density,
             seed=int(seed),
             transfer_share_percent=int(transfer_share_percent),
+            vehicle_class_profile=vehicle_class_profile,
         )
         emergency_event = (
             _emergency_event_plan(
@@ -1783,6 +2115,11 @@ class NetworkSimulationExperimentService:
                     pedestrian_max_wait_seconds=float(pedestrian_max_wait_seconds),
                     pedestrian_crossing_clearance_seconds=float(pedestrian_crossing_clearance_seconds),
                     pedestrian_clearance_reserve_seconds=float(pedestrian_clearance_reserve_seconds),
+                    vehicle_class_priority_enabled=bool(vehicle_class_priority_enabled),
+                    vehicle_class_priority_class=vehicle_class_priority_class,
+                    vehicle_class_priority_weight=float(vehicle_class_priority_weight),
+                    vehicle_class_priority_min_waiting=int(vehicle_class_priority_min_waiting),
+                    vehicle_class_priority_max_extension_seconds=float(vehicle_class_priority_max_extension_seconds),
                     emergency_event=(deepcopy(emergency_event) if mode in EMERGENCY_EVENT_MODES else None),
                     emergency_priority_lookahead_seconds=float(emergency_priority_lookahead_seconds),
                     emergency_priority_max_extension_seconds=float(emergency_priority_max_extension_seconds),
@@ -1793,6 +2130,7 @@ class NetworkSimulationExperimentService:
             adaptive = run_mode("adaptive")
             cooperative = run_mode("cooperative")
             pedestrian_aware_cooperative = run_mode("pedestrian_aware_cooperative")
+            class_aware_cooperative = run_mode("class_aware_cooperative")
             emergency_baseline_cooperative = run_mode("emergency_baseline_cooperative")
             emergency_priority_cooperative = run_mode("emergency_priority_cooperative")
 
@@ -1820,6 +2158,25 @@ class NetworkSimulationExperimentService:
             pedestrian_aware_cooperative,
             baseline_label="fixed",
             candidate_label="pedestrian_aware_cooperative",
+        )
+        class_aware_vs_pedestrian_aware = _network_comparison(
+            pedestrian_aware_cooperative,
+            class_aware_cooperative,
+            baseline_label="pedestrian_aware_cooperative",
+            candidate_label="class_aware_cooperative",
+        )
+        class_aware_vs_pedestrian_aware["selected_class"] = _vehicle_class_comparison(
+            pedestrian_aware_cooperative,
+            class_aware_cooperative,
+            vehicle_class_priority_class,
+            baseline_label="pedestrian_aware_cooperative",
+            candidate_label="class_aware_cooperative",
+        )
+        class_aware_vs_fixed = _network_comparison(
+            fixed,
+            class_aware_cooperative,
+            baseline_label="fixed",
+            candidate_label="class_aware_cooperative",
         )
         emergency_priority_vs_baseline = _network_comparison(
             emergency_baseline_cooperative,
@@ -1849,6 +2206,22 @@ class NetworkSimulationExperimentService:
                     "clearance_reserve_seconds": float(pedestrian_clearance_reserve_seconds),
                     "provenance": "synthetic_pedestrian_demand",
                 },
+                "vehicle_classes": {
+                    "regular_taxonomy": list(REGULAR_VEHICLE_CLASSES),
+                    "special_classes": list(SPECIAL_VEHICLE_CLASSES),
+                    "unknown_fallback": "other",
+                    "profile": vehicle_class_profile,
+                    "mix": deepcopy(VEHICLE_CLASS_PROFILES[vehicle_class_profile]),
+                    "provenance": "synthetic_vehicle_class_demand",
+                },
+                "vehicle_class_priority": {
+                    "enabled": bool(vehicle_class_priority_enabled),
+                    "class_name": vehicle_class_priority_class,
+                    "priority_weight": float(vehicle_class_priority_weight),
+                    "min_waiting": int(vehicle_class_priority_min_waiting),
+                    "max_extension_seconds": float(vehicle_class_priority_max_extension_seconds),
+                    "provenance": "synthetic_vehicle_class_demand",
+                },
                 "cooperation": {
                     "lookahead_seconds": float(cooperation_lookahead_seconds),
                     "max_extension_seconds": float(cooperation_max_extension_seconds),
@@ -1872,18 +2245,21 @@ class NetworkSimulationExperimentService:
                     "adaptive",
                     "cooperative",
                     "pedestrian_aware_cooperative",
+                    "class_aware_cooperative",
                     "emergency_baseline_cooperative",
                     "emergency_priority_cooperative",
                 ],
                 "arrival_plan": _arrival_plan_snapshot(arrivals),
                 "cooperative_control_active": True,
                 "pedestrian_aware_control_active": True,
+                "vehicle_class_aware_control_active": bool(vehicle_class_priority_enabled),
                 "emergency_priority_active": bool(emergency_event_enabled),
             },
             "fixed": fixed,
             "adaptive": adaptive,
             "cooperative": cooperative,
             "pedestrian_aware_cooperative": pedestrian_aware_cooperative,
+            "class_aware_cooperative": class_aware_cooperative,
             "emergency_baseline_cooperative": emergency_baseline_cooperative,
             "emergency_priority_cooperative": emergency_priority_cooperative,
             "comparison": adaptive_vs_fixed,
@@ -1893,13 +2269,15 @@ class NetworkSimulationExperimentService:
                 "cooperative_vs_adaptive": cooperative_vs_adaptive,
                 "pedestrian_aware_cooperative_vs_cooperative": pedestrian_aware_vs_cooperative,
                 "pedestrian_aware_cooperative_vs_fixed": pedestrian_aware_vs_fixed,
+                "class_aware_cooperative_vs_pedestrian_aware_cooperative": class_aware_vs_pedestrian_aware,
+                "class_aware_cooperative_vs_fixed": class_aware_vs_fixed,
                 "emergency_priority_vs_emergency_baseline": emergency_priority_vs_baseline,
             },
             "prototype_only": True,
             "scope_note": (
-                "Controlled local two-intersection simulation benchmark only. V029 adds matched simulated emergency-event baseline and "
-                "emergency-priority cooperative modes. Priority uses explicit configured/synthetic event provenance, protected phase bounds, "
-                "pedestrian crossing guards, downstream preparation and recovery evidence; it is not live emergency detection or public-road control."
+                "Controlled local two-intersection simulation benchmark only. V030 adds explicit synthetic regular vehicle-class taxonomy, "
+                "class-rich seeded demand, per-class evidence and a bounded class-aware cooperative comparison while preserving V029 emergency priority. "
+                "Synthetic class labels are not presented as live AI detection, and no physical/public-road control is enabled."
             ),
         }
         self._write_run(result)
@@ -2015,6 +2393,16 @@ class NetworkSimulationExperimentService:
                     f"{mode}_pedestrian_awareness_destination_oldest_wait_seconds",
                     f"{mode}_pedestrian_awareness_destination_crossing_count",
                     f"{mode}_pedestrian_awareness_destination_applied",
+                    f"{mode}_vehicle_class_priority_source_action",
+                    f"{mode}_vehicle_class_priority_source_class",
+                    f"{mode}_vehicle_class_priority_source_waiting_count",
+                    f"{mode}_vehicle_class_priority_source_weighted_waiting",
+                    f"{mode}_vehicle_class_priority_source_applied",
+                    f"{mode}_vehicle_class_priority_destination_action",
+                    f"{mode}_vehicle_class_priority_destination_class",
+                    f"{mode}_vehicle_class_priority_destination_waiting_count",
+                    f"{mode}_vehicle_class_priority_destination_weighted_waiting",
+                    f"{mode}_vehicle_class_priority_destination_applied",
                     f"{mode}_emergency_status",
                     f"{mode}_emergency_role",
                     f"{mode}_emergency_decision",
@@ -2039,6 +2427,9 @@ class NetworkSimulationExperimentService:
                 pedestrian_awareness = sample.get("pedestrian_awareness") if isinstance(sample.get("pedestrian_awareness"), dict) else {}
                 ped_source = pedestrian_awareness.get("source") if isinstance(pedestrian_awareness.get("source"), dict) else {}
                 ped_destination = pedestrian_awareness.get("destination") if isinstance(pedestrian_awareness.get("destination"), dict) else {}
+                class_priority = sample.get("vehicle_class_priority") if isinstance(sample.get("vehicle_class_priority"), dict) else {}
+                class_source = class_priority.get("source") if isinstance(class_priority.get("source"), dict) else {}
+                class_destination = class_priority.get("destination") if isinstance(class_priority.get("destination"), dict) else {}
                 emergency_priority = sample.get("emergency_priority") if isinstance(sample.get("emergency_priority"), dict) else {}
                 row.extend(
                     [
@@ -2068,6 +2459,16 @@ class NetworkSimulationExperimentService:
                         ped_destination.get("oldest_wait_seconds", ""),
                         ped_destination.get("crossing_count", ""),
                         ped_destination.get("applied", ""),
+                        class_source.get("action", ""),
+                        class_source.get("class_name", ""),
+                        class_source.get("waiting_count", ""),
+                        class_source.get("weighted_waiting", ""),
+                        class_source.get("applied", ""),
+                        class_destination.get("action", ""),
+                        class_destination.get("class_name", ""),
+                        class_destination.get("waiting_count", ""),
+                        class_destination.get("weighted_waiting", ""),
+                        class_destination.get("applied", ""),
                         emergency_priority.get("status", ""),
                         emergency_priority.get("role", ""),
                         emergency_priority.get("decision", ""),
@@ -2155,6 +2556,9 @@ class NetworkSimulationExperimentService:
         pedestrian_awareness = comparisons.get("pedestrian_aware_cooperative_vs_cooperative") if isinstance(
             comparisons.get("pedestrian_aware_cooperative_vs_cooperative"), dict
         ) else {}
+        vehicle_class_priority = comparisons.get("class_aware_cooperative_vs_pedestrian_aware_cooperative") if isinstance(
+            comparisons.get("class_aware_cooperative_vs_pedestrian_aware_cooperative"), dict
+        ) else {}
         emergency_priority = comparisons.get("emergency_priority_vs_emergency_baseline") if isinstance(
             comparisons.get("emergency_priority_vs_emergency_baseline"), dict
         ) else {}
@@ -2174,6 +2578,7 @@ class NetworkSimulationExperimentService:
                 "pedestrian_aware_vs_cooperative_total_pedestrian_wait": pedestrian_awareness.get("total_pedestrian_wait"),
                 "pedestrian_aware_vs_cooperative_pedestrian_queue_average": pedestrian_awareness.get("total_pedestrian_queue_average"),
                 "pedestrian_aware_vs_cooperative_max_pedestrian_wait": pedestrian_awareness.get("max_observed_pedestrian_wait"),
+                "class_aware_vs_pedestrian_aware_selected_class": vehicle_class_priority.get("selected_class"),
                 "emergency_priority_total_travel": emergency_metrics.get("total_travel_seconds"),
                 "emergency_priority_source_wait": emergency_metrics.get("source_wait_seconds"),
                 "emergency_priority_downstream_preparations": emergency_metrics.get("downstream_preparations"),
@@ -2210,16 +2615,125 @@ def _emergency_event_plan(
     }
 
 
+def _normalize_vehicle_class(class_name: Any) -> str:
+    value = str(class_name or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "car": "car",
+        "vehicle": "car",
+        "passenger_car": "car",
+        "bus": "bus",
+        "coach": "bus",
+        "truck": "truck",
+        "lorry": "truck",
+        "hgv": "truck",
+        "motorcycle": "motorcycle",
+        "motorbike": "motorcycle",
+        "motor_cycle": "motorcycle",
+        "bicycle": "bicycle",
+        "bike": "bicycle",
+        "cyclist": "bicycle",
+        "emergency": "emergency",
+    }
+    normalized = aliases.get(value, value)
+    if normalized in REGULAR_VEHICLE_CLASSES or normalized in SPECIAL_VEHICLE_CLASSES:
+        return normalized
+    return "other"
+
+
+def _weighted_vehicle_class(rng: random.Random, class_mix: dict[str, float]) -> str:
+    normalized: list[tuple[str, float]] = []
+    total = 0.0
+    for raw_class, raw_weight in class_mix.items():
+        class_name = _normalize_vehicle_class(raw_class)
+        if class_name not in REGULAR_VEHICLE_CLASSES:
+            class_name = "other"
+        weight = max(0.0, float(raw_weight))
+        if weight <= 0:
+            continue
+        normalized.append((class_name, weight))
+        total += weight
+    if total <= 0 or not normalized:
+        return "car"
+    target = rng.random() * total
+    cumulative = 0.0
+    for class_name, weight in normalized:
+        cumulative += weight
+        if target <= cumulative + 1e-12:
+            return class_name
+    return normalized[-1][0]
+
+
+def _vehicle_class_counts(vehicles: list[Any]) -> dict[str, int]:
+    counts = {class_name: 0 for class_name in REGULAR_VEHICLE_CLASSES}
+    for vehicle in vehicles:
+        class_name = _normalize_vehicle_class(getattr(vehicle, "class_name", None))
+        if class_name in SPECIAL_VEHICLE_CLASSES:
+            continue
+        counts[class_name] = counts.get(class_name, 0) + 1
+    return {key: value for key, value in counts.items() if value > 0}
+
+
+def _intersection_vehicle_class_metrics(runtime: Any) -> dict[str, Any]:
+    classes = set(REGULAR_VEHICLE_CLASSES) | set(SPECIAL_VEHICLE_CLASSES)
+    classes.update(runtime.vehicle_class_external_arrivals)
+    classes.update(runtime.vehicle_class_transfer_arrivals)
+    classes.update(runtime.vehicle_class_served)
+    classes.update(runtime.vehicle_class_waits)
+    classes.update(runtime.vehicle_class_queue_samples)
+    result: dict[str, Any] = {}
+    for class_name in sorted(classes):
+        queue_samples = runtime.vehicle_class_queue_samples.get(class_name, [])
+        result[class_name] = {
+            "external_arrivals": int(runtime.vehicle_class_external_arrivals.get(class_name, 0)),
+            "transfer_arrivals": int(runtime.vehicle_class_transfer_arrivals.get(class_name, 0)),
+            "served": int(runtime.vehicle_class_served.get(class_name, 0)),
+            "waiting": _distribution(runtime.vehicle_class_waits.get(class_name, [])),
+            "queue": {
+                "sample_count": len(queue_samples),
+                "average": round(sum(queue_samples) / len(queue_samples), 2) if queue_samples else 0.0,
+                "p95": round(_percentile(queue_samples, 0.95), 2),
+                "max": max(queue_samples, default=0),
+            },
+        }
+    return result
+
+
+def _network_vehicle_class_metrics(source: Any, destination: Any) -> dict[str, Any]:
+    classes = set(REGULAR_VEHICLE_CLASSES) | set(SPECIAL_VEHICLE_CLASSES)
+    result: dict[str, Any] = {}
+    for class_name in sorted(classes):
+        waits = source.vehicle_class_waits.get(class_name, []) + destination.vehicle_class_waits.get(class_name, [])
+        queue_samples = [
+            a + b
+            for a, b in zip(
+                source.vehicle_class_queue_samples.get(class_name, []),
+                destination.vehicle_class_queue_samples.get(class_name, []),
+            )
+        ]
+        result[class_name] = {
+            "external_arrivals": int(source.vehicle_class_external_arrivals.get(class_name, 0) + destination.vehicle_class_external_arrivals.get(class_name, 0)),
+            "transfer_arrivals": int(source.vehicle_class_transfer_arrivals.get(class_name, 0) + destination.vehicle_class_transfer_arrivals.get(class_name, 0)),
+            "served": int(source.vehicle_class_served.get(class_name, 0) + destination.vehicle_class_served.get(class_name, 0)),
+            "waiting": _distribution(waits),
+            "queue_average": round(sum(queue_samples) / len(queue_samples), 2) if queue_samples else 0.0,
+            "queue_p95": round(_percentile(queue_samples, 0.95), 2),
+            "queue_peak": max(queue_samples, default=0),
+        }
+    return result
+
+
 def _arrival_plan(
     *,
     duration_seconds: int,
     density: str,
     seed: int,
     transfer_share_percent: int,
+    vehicle_class_profile: str = "legacy",
 ) -> dict[str, list[Any]]:
     rng = random.Random(seed + {"light": 1103, "normal": 2207, "busy": 3301}[density])
     source_vehicle_rate, destination_vehicle_rate = VEHICLE_RATES_PER_MINUTE[density]
     source_ped_rate, destination_ped_rate = PEDESTRIAN_RATES_PER_MINUTE[density]
+    class_mix = VEHICLE_CLASS_PROFILES.get(vehicle_class_profile, VEHICLE_CLASS_PROFILES["legacy"])
 
     return {
         "source_vehicle_arrivals": _vehicle_arrivals(
@@ -2228,6 +2742,7 @@ def _arrival_plan(
             duration_seconds=duration_seconds,
             prefix="src",
             transfer_share_percent=transfer_share_percent,
+            class_mix=class_mix,
         ),
         "destination_vehicle_arrivals": _vehicle_arrivals(
             rng,
@@ -2235,6 +2750,7 @@ def _arrival_plan(
             duration_seconds=duration_seconds,
             prefix="dst",
             transfer_share_percent=0,
+            class_mix=class_mix,
         ),
         "source_pedestrian_arrivals": _pedestrian_arrivals(
             rng,
@@ -2277,6 +2793,9 @@ def _arrival_plan_snapshot(arrivals: dict[str, list[Any]]) -> dict[str, Any]:
         "source_vehicle_count": len(source_vehicles),
         "source_transfer_candidate_count": sum(1 for item in source_vehicles if item.continues_to_destination),
         "destination_external_vehicle_count": len(destination_vehicles),
+        "source_vehicle_class_counts": _vehicle_class_counts(source_vehicles),
+        "source_transfer_candidate_class_counts": _vehicle_class_counts([item for item in source_vehicles if item.continues_to_destination]),
+        "destination_vehicle_class_counts": _vehicle_class_counts(destination_vehicles),
         "source_pedestrian_count": len(source_pedestrians),
         "destination_pedestrian_count": len(destination_pedestrians),
         "fingerprint_sha256": fingerprint,
@@ -2291,6 +2810,7 @@ def _vehicle_arrivals(
     duration_seconds: int,
     prefix: str,
     transfer_share_percent: int,
+    class_mix: dict[str, float] | None = None,
 ) -> list[_VehicleArrival]:
     events: list[_VehicleArrival] = []
     if rate_per_minute <= 0:
@@ -2303,7 +2823,7 @@ def _vehicle_arrivals(
         if clock > duration_seconds:
             break
         index += 1
-        class_name = "bus" if rng.random() < 0.16 else "car"
+        class_name = _weighted_vehicle_class(rng, class_mix or VEHICLE_CLASS_PROFILES["legacy"])
         continues = rng.random() * 100.0 < transfer_share_percent
         events.append(
             _VehicleArrival(
@@ -2477,6 +2997,54 @@ def _network_comparison(
         "total_pedestrian_queue_average": delta("total_pedestrian_queue_average", lower_is_better=True),
         "total_pedestrian_queue_p95": delta("total_pedestrian_queue_p95", lower_is_better=True),
         "max_observed_pedestrian_wait": delta("max_observed_pedestrian_wait_seconds", lower_is_better=True),
+    }
+
+
+def _vehicle_class_comparison(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    class_name: str,
+    *,
+    baseline_label: str,
+    candidate_label: str,
+) -> dict[str, Any]:
+    normalized = _normalize_vehicle_class(class_name)
+    baseline_metrics = baseline.get("network_metrics", {}).get("vehicle_classes", {}).get(normalized, {})
+    candidate_metrics = candidate.get("network_metrics", {}).get("vehicle_classes", {}).get(normalized, {})
+    baseline_wait = baseline_metrics.get("waiting", {})
+    candidate_wait = candidate_metrics.get("waiting", {})
+    return {
+        "class_name": normalized,
+        "baseline_label": baseline_label,
+        "candidate_label": candidate_label,
+        "served": _delta(
+            float(baseline_metrics.get("served", 0) or 0),
+            float(candidate_metrics.get("served", 0) or 0),
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
+            lower_is_better=False,
+        ),
+        "average_wait_seconds": _delta(
+            float(baseline_wait.get("average_seconds", 0.0) or 0.0),
+            float(candidate_wait.get("average_seconds", 0.0) or 0.0),
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
+            lower_is_better=True,
+        ),
+        "p95_wait_seconds": _delta(
+            float(baseline_wait.get("p95_seconds", 0.0) or 0.0),
+            float(candidate_wait.get("p95_seconds", 0.0) or 0.0),
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
+            lower_is_better=True,
+        ),
+        "queue_average": _delta(
+            float(baseline_metrics.get("queue_average", 0.0) or 0.0),
+            float(candidate_metrics.get("queue_average", 0.0) or 0.0),
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
+            lower_is_better=True,
+        ),
     }
 
 

@@ -1,86 +1,91 @@
-# Start Here — Current V029 candidate
+# Start Here — Current V030 candidate
 
-Root `VERSION` is authoritative. V029 / `0_2_9` is the current unaccepted candidate; V024 / `0_2_4` remains the owner-confirmed passed baseline. V028 is the previous candidate because the owner explicitly requested V029 before separately accepting V028.
+Root `VERSION` is authoritative. V030 / `0_3_0` is the current unaccepted candidate; V024 / `0_2_4` remains the owner-confirmed passed baseline. V029 is the previous candidate because the owner explicitly requested V030 before separately accepting V029.
 
-## What V029 changes
+## What V030 changes
 
-V029 preserves the V028 deterministic two-intersection network benchmark and adds an explicit **simulation-only emergency-priority lifecycle**.
+V030 preserves the V029 deterministic two-intersection cooperation, pedestrian-aware, and matched emergency-priority benchmark and adds explicit **simulation-only regular vehicle-class behavior/evidence**.
 
-One `POST /api/traffic/network-experiments` run now contains six modes:
+One `POST /api/traffic/network-experiments` run now contains seven modes:
 
 1. **Fixed**;
 2. **Independent Adaptive**;
 3. **Cooperative Adaptive**;
 4. **Pedestrian-aware Cooperative**;
-5. **Emergency Baseline Cooperative** — same pedestrian/cooperation logic plus the configured synthetic emergency event, but no emergency timing priority;
-6. **Emergency-priority Cooperative** — receives the same emergency event and may apply bounded emergency timing priority.
+5. **Class-aware Cooperative** — same cooperation/pedestrian layer plus configured regular-class timing advisory;
+6. **Emergency Baseline Cooperative**;
+7. **Emergency-priority Cooperative**.
 
-The two emergency modes are the policy-isolation pair: they share the same base arrival plan and the same emergency vehicle/event. Their difference is emergency-priority behavior.
+Class-aware Cooperative vs Pedestrian-aware Cooperative is the V030 policy-isolation pair. The V029 emergency pair remains separate.
 
-## Emergency event and evidence
+## Vehicle-class taxonomy and demand
 
-The V029 event is explicitly configured/synthetic. It records:
+Regular simulator classes are:
 
-- deterministic emergency event and vehicle IDs;
-- emergency vehicle type: `ambulance`, `fire_engine`, or `police`;
-- source/destination intersection and approach;
-- selected directed link;
-- activation time;
-- `simulated_configured_emergency_event` provenance;
-- `confidence: null` and `detector_claimed: false`;
-- activation → source departure → downstream arrival → clear → recovery lifecycle evidence.
+`car`, `bus`, `truck`, `motorcycle`, `bicycle`, `other`.
 
-V029 does **not** claim that a camera or model recognized an emergency vehicle.
+`emergency` remains a separate V029 special simulator class. Unknown/unmapped regular labels normalize to `other`.
 
-## Protected priority behavior
+Class profiles:
 
-Emergency-priority Cooperative may:
+- `legacy` — car/bus mix compatible with the earlier simulator;
+- `mixed_urban` — broader urban class mix;
+- `freight_heavy` — greater truck share.
 
-- extend an active vehicle green, bounded by the configured phase maximum, maximum-cycle cap, and emergency extension cap;
-- request earlier vehicle service by shortening only the **current** protected phase toward its configured minimum;
-- prepare the downstream intersection when the emergency vehicle enters the configured lookahead window.
+These are seeded synthetic inputs with `synthetic_vehicle_class_demand` provenance. They are not camera/model accuracy claims.
 
-It does not skip phase order. An active simulated pedestrian crossing causes an explicit emergency-priority denial until that crossing clears through protected service.
+## Bounded class-aware behavior
 
-Each evaluation records grant/deny/defer, action, phase, role, ETA, timing delta, reason, provenance, and intersection/link identity.
+Class-aware Cooperative can be enabled/disabled and configured with one selected regular class, a weight, minimum waiting count, and maximum extension.
 
-## V028 and earlier behavior retained
+- weight `1.0` is neutral;
+- weight above `1.0` may extend active vehicle green inside phase/cycle/class caps;
+- it may request earlier protected vehicle service by shortening only the current phase toward its configured minimum;
+- it never skips protected phase order;
+- active pedestrian WALK/CLEAR with local waiting/crossing demand is protected.
 
-V029 retains:
+Each event records class, waiting count, oldest wait, weight, weighted demand, phase, action, timing delta, reason, role/intersection, and synthetic provenance.
 
+## V029 and earlier behavior retained
+
+V030 retains:
+
+- V029 matched configured emergency-event baseline/priority lifecycle and downstream preparation;
 - V028 pedestrian request-age, starvation-prevention and synthetic crossing-clearance evidence;
 - V027 bounded neighbour-informed cooperation;
-- V026 deterministic A→B vehicle transfer and per-intersection controllers;
+- V026 deterministic A→B transfer and separate per-intersection controllers;
 - V025 ranked scenarios and single-junction Fixed-vs-Adaptive Simulation Lab;
-- topology/source identity, structured decision context/provenance, occupancy/flow separation, dataset capture/labeling/training, model management, and ESP camera receiving.
+- topology/source identity, structured decision context/provenance, occupancy/flow separation, dataset/training/model and ESP camera workflows.
 
 ## Current limitations
 
-- The network benchmark selects one configured directed pair; it is not yet general N-intersection cooperative orchestration.
-- Emergency events are simulation/configuration inputs, not live perception.
-- The existing PC Studio Simulation Lab UI remains single-junction; V029 network/emergency evidence is backend/API/test-first.
-- No physical/public-road traffic controller, cabinet, pre-emption interface, safety interlock bypass, or safety-certification claim exists.
+- Class labels generated for V030 experiments are synthetic, not live perception.
+- The class policy is a configurable prototype weighting layer, not a claim that buses/trucks/etc. should receive real-world priority.
+- The network benchmark still selects one configured directed pair.
+- Existing PC Studio Simulation Lab UI remains single-junction; V030 network class evidence is backend/API/test-first.
+- No physical/public-road signal controller, cabinet, pre-emption interface, safety interlock bypass, or safety-certification claim exists.
 
 ## Validation starting point
 
 Read:
 
-1. `docs/PATCH_0_2_9.md`;
+1. `docs/PATCH_0_3_0.md`;
 2. `docs/LOCAL_TESTING.md`;
 3. `docs/TEST_READY_CHECKLIST.md`;
 4. `docs/PROJECT_SCOPE.md`;
 5. `docs/API_CONTRACTS.md`.
 
-The focused regressions are:
+Focused regressions:
 
 ```powershell
 python .\scripts\test_network_simulation_experiments.py
 python .\scripts\test_pedestrian_aware_network_simulation.py
 python .\scripts\test_emergency_priority_network_simulation.py
+python .\scripts\test_vehicle_class_aware_network_simulation.py
 ```
 
 Owner acceptance is still required before `passed_baseline` changes.
 
 ## Next invention direction
 
-After V029 acceptance, the next high-value layer is broader **vehicle-class behavior and class-aware evidence**, followed by stronger persistent explainability and generalization beyond one selected two-intersection link.
+After V030 acceptance, the next high-value layer is **persistent consolidated explainability/evidence**, followed by generalization beyond one selected two-intersection link.
