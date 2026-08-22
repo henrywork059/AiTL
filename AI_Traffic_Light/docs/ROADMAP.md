@@ -1,44 +1,108 @@
 # Roadmap
 
-## 0_2_5 — Ranked signal scenarios and simulation telemetry candidate
+This roadmap defines dependency order and evidence goals. Root `VERSION` defines the active candidate; `PROJECT_SCOPE.md` defines capability-status wording.
 
-Status: V025 candidate. Previous version is V024 / `0_2_4`, which is the owner-confirmed passed baseline. V025 remains unaccepted until the owner explicitly promotes it.
+## Current foundation
 
-V025 now combines the signal-policy and experiment layers:
+The current V025 work combines:
 
-- editable ranked scenarios with rank `1` highest;
-- controller-metric and zone/class-count conditions;
-- ALL/ANY multi-condition matching;
-- one-winner eligible arbitration with explicit suppressed/unavailable reasons;
-- bounded scenario actions with persistence, cooldown, protected phase targets and optional requested service;
-- compatibility migration from older V023/V024 predefined rules into editable scenarios;
-- live `zone_class_counts` observations separate from occupancy/flow semantics;
-- isolated Fixed-vs-Adaptive Simulation Lab using the same selected profile, density, duration and seed;
-- zone snapshot + synthetic zone/class counts in experiments so zone-based scenarios can be benchmarked;
-- wait/queue/throughput/signal/scenario/diagnostic telemetry;
-- bounded persisted experiment history and aligned CSV export;
-- compact one-page Traffic Logic and Simulation Lab presentation using tabs, panels, dropdowns, toggles, pagination and internal scrolling.
+- ranked simulated signal scenarios and deterministic one-winner arbitration;
+- isolated Fixed-vs-Adaptive Simulation Lab telemetry;
+- camera-aligned zones, occupancy, prototype tracking/flow;
+- dataset/training/inference/model workflow;
+- generic intersection/source identity and directed neighbour-link configuration;
+- structured live decision/explanation context.
 
-## Inherited V024/V022/V021 layers
+Configured topology is foundation only: cooperation/emergency priority remain inactive.
 
-V024 provides atomic persistence hardening, synchronized zone/model-registry transitions, serial App-level polling, Windows update/test/run hardening, and the Material-derived PC Studio presentation system.
+## Priority 1 — deterministic multi-intersection simulation
 
-V022 provides cross-frame prototype tracking/counting-line flow. V021 provides sampled occupancy analytics. These remain distinct from V025 scenario observations and experiment telemetry.
+Goal: make intersection identity real in the simulator before adding cooperation.
 
-## Next useful prototype directions after V025 acceptance
+Minimum scope:
 
-- **scenario import/export and reusable templates** so ranked scenario sets can be saved, shared, cloned and restored without editing JSON;
-- **richer scenario condition sources** such as track-derived direction/entry/dwell events, only where semantics remain clear and deduplicated;
-- **scenario diagnostics** showing activation frequency, time-as-winner, suppressed-by-higher-rank counts, cooldown suppression counts and zone-missing warnings across a session;
-- model evaluation / dataset quality: validation precision, recall, mAP50, mAP50-95, per-class metrics, confusion matrix, false-positive/false-negative review, dataset class distribution and quality warnings;
-- experiment/session reports with richer charts and scenario/policy snapshots;
-- expand experiment demand generators beyond the current closed synthetic population, including explicit arrival-rate scenarios while preserving deterministic A/B inputs;
-- stronger tracking/motion prediction and track-quality diagnostics;
-- continue consolidating page-specific periodic polling where serial scheduling provides measurable benefit;
-- pin/automate frontend dependency updates instead of indefinitely relying on broad `latest` declarations;
-- optional compatible accessibility/incident perception research, clearly separated from manual Test inputs;
-- device-camera workflow completion and model export/runtime packaging.
+- at least two simultaneous synthetic intersections;
+- per-intersection zones/traffic state/controller runtime;
+- deterministic links/travel time;
+- explicit vehicle/demand transfer or arrival events A → B;
+- per-intersection and network aggregate telemetry;
+- seeded repeatability tests;
+- no hard-coded assumption that the architecture can only ever contain two intersections.
+
+Evidence gate: demonstrate that transferred arrivals at B correspond to departures/links from A under the same deterministic run.
+
+## Priority 2 — bounded multi-intersection cooperation
+
+Goal: neighbour-informed simulated timing while preserving each intersection's protected local controller.
+
+Minimum scope:
+
+- predicted incoming demand/arrival context from links;
+- neighbour context as an explicit condition/input, not hidden global state;
+- bounded cooperation scenario/action integrated with the ranked scenario engine;
+- decision history records the neighbour evidence used;
+- comparison modes: Fixed vs Independent Adaptive vs Cooperative Adaptive;
+- network metrics such as total/percentile delay, queues, throughput/service, stops or transfer completion where semantics are valid.
+
+Evidence gate: same seeded demand produces a deterministic decision difference attributable to neighbour context and measurable network-level outcome differences.
+
+## Priority 3 — pedestrian service quality
+
+Strengthen the existing pedestrian-aware controller with:
+
+- explicit service request lifecycle;
+- longest individual wait where tracking supports it;
+- missed-service/starvation prevention;
+- service frequency;
+- crossing-clearance evidence;
+- interaction with network cooperation;
+- pedestrian-specific experiment summaries.
+
+Do not call per-frame person counts unique throughput.
+
+## Priority 4 — simulated emergency priority
+
+Begin with explicit simulated/configured emergency events, not an unsupported perception claim.
+
+Minimum scope:
+
+- event ID/type/source/approach/time/provenance/lifecycle;
+- bounded priority request through protected transitions;
+- grant/deny reason;
+- downstream preparation over configured path/link context;
+- recovery to normal operation;
+- event/decision timing metrics and structured explanation.
+
+Only add real emergency perception later if a compatible detector/source is separately implemented and evaluated.
+
+## Priority 5 — broader vehicle-class behavior
+
+Build on existing class retention/zone-class scenarios:
+
+- explicit class taxonomy/fallback;
+- additional synthetic classes where useful;
+- class-aware scenario metrics/weighting only when clearly configured;
+- class/provenance visibility in experiments/explanations;
+- per-class evaluation where it helps demonstrate behavior.
+
+## Cross-cutting — explainable decisions
+
+Every future adaptive/cooperative/emergency feature should improve the same explanation model rather than add ad-hoc strings.
+
+Target persistent decision evidence includes decision/intersection IDs, trigger category, winning scenario, observed values, neighbour/pedestrian/emergency context, resulting simulated phase/action, before/after timing, provenance, and readable explanation.
+
+## Evidence/reporting improvements
+
+After core behavior is stable:
+
+- model/dataset quality metrics (precision, recall, mAP, class distribution, confusion/error review);
+- scenario diagnostics (activation/winner/suppression/cooldown/unavailable counts);
+- experiment/session reports with policy/config snapshots;
+- stronger tracking/motion prediction diagnostics;
+- scenario import/export/templates;
+- exogenous arrival-rate demand generators;
+- device-camera workflow completion where useful to the model demonstration.
 
 ## Explicitly outside scope
 
-Physical public-road traffic signal control remains outside the project. Detection, tracking, analytics, experiment results, scenario evaluation, timing changes, and phase outputs are prototype/simulation information only.
+Physical/public-road traffic control, cabinet integration, safety-interlock bypass, and production autonomous signal authority remain outside AiTL. Simulation results are not public-road safety certification evidence.

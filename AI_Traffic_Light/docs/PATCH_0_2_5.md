@@ -190,3 +190,33 @@ Documentation/release state:
 ## Safety
 
 All signal scenarios, topology links, neighbour context, decision explanations, comparisons and phase outputs remain local prototype/simulation information. Physical/public-road traffic control remains disabled and outside project scope.
+
+## Same-candidate documentation hardening update
+
+This follow-up does not change V025 behavior or promote the candidate. It improves repository guidance after a documentation audit found durable guides that still contained obsolete early/V024-era "current state" text.
+
+### Documentation authority changes
+
+- added `docs/DOCUMENTATION_MAP.md` to define authority order and distinguish current-state, durable, and historical documents;
+- added `docs/PROJECT_SCOPE.md` to classify implemented/foundation/simulation-only/planned/out-of-scope capabilities and record evidence gates for the five planned invention capability areas;
+- rewrote `HUMAN_GUIDE.md`, `DEVELOPMENT_WORKFLOW.md`, and `VERSIONING.md` so they no longer own hard-coded current release snapshots;
+- strengthened `AGENTS.md`, `AI_AGENT_GUIDE.md`, and `AI_AGENT_CHECKLIST.md` around release-state authority, capability-claim discipline, documentation anti-drift, network architecture, provenance, and exact test evidence;
+- refreshed `START_HERE.md`, `ROADMAP.md`, `PC_STUDIO_FUNCTION_LIST.md`, `ARCHITECTURE.md`, and README so current network-foundation status and planned dependency order are explicit.
+- refreshed `DATA_FORMAT.md`, `DEBUGGING_AND_LOGGING.md`, and `GUI_PLAN.md` to remove early-placeholder assumptions and document V025 data/provenance/network/explanation semantics.
+- refreshed the PC Studio backend/frontend READMEs to remove V024-era labels/rule terminology and document current scenario, Simulation Lab, network-foundation, polling, data-semantic, and architecture ownership.
+
+### Planned capability documentation
+
+The repository now explicitly records these planned invention capability families:
+
+1. multi-intersection cooperation;
+2. emergency priority;
+3. stronger pedestrian-aware control;
+4. different vehicle classes;
+5. explainable decisions.
+
+The docs distinguish current foundations from completed behavior. In particular, configured network links are not described as active cooperation and emergency priority remains planned.
+
+### Documentation policy
+
+Long-lived guides should remain version-agnostic. Current candidate facts belong in root `VERSION`, `START_HERE.md`, the current `PATCH_*`, `LOCAL_TESTING.md`, `TEST_READY_CHECKLIST.md`, and `CHANGELOG.md`. Historical patch/changelog facts remain historical and should not be rewritten merely because they contain old version strings.

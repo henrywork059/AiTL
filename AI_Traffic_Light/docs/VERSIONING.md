@@ -1,48 +1,97 @@
 # Versioning and Acceptance State
 
-AiTL uses underscore project versions such as `0_2_3` and `0_2_4`.
+AiTL uses underscore release versions such as `0_2_5`. This document defines the rules; it intentionally does not own the current version snapshot.
 
-## Canonical source
+## 1. Canonical source
 
-Root `VERSION` is authoritative and contains `version`, `status`, `previous_version`, `passed_baseline`, and `notes`. Backend runtime version surfaces read it through `app/core/project_version.py`; frontend fallback/navigation uses the checked mirror in `src/constants/projectVersion.ts`.
-
-## Current state
+Root `VERSION` is authoritative and contains:
 
 ```text
-candidate:         0_2_4 (V024)
-previous_version:  0_2_3 (V023)
-passed_baseline:   0_2_2 (V022)
+version
+status
+previous_version
+passed_baseline
+notes
 ```
 
-The owner explicitly accepted V022 before requesting V023. The owner later explicitly requested V024 without explicitly accepting V023, so the passed baseline remains V022. V024 remains unaccepted until the owner completes its manual acceptance checks and explicitly confirms it passed.
+Backend runtime version surfaces read it through `app/core/project_version.py`. Frontend fallback/navigation uses the checked mirror in `src/constants/projectVersion.ts` where required by the current implementation.
 
-## Candidate versus passed baseline
+To learn the current candidate, read `VERSION`; do not copy a version number from this guide.
 
-- **version** — patch currently under development/testing.
+## 2. Meaning of fields
+
+- **version** — candidate currently under development/testing.
+- **status** — concise description/state of that candidate.
+- **previous_version** — version immediately preceding the candidate according to the repository's chosen release sequence.
 - **passed_baseline** — latest version explicitly confirmed working by the owner.
+- **notes** — important release-state context and limitations.
 
-Automated tests, builds, GitHub upload, or agent judgment never promote `passed_baseline`.
+`version` and `passed_baseline` may differ. That is normal while a candidate is being tested.
 
-## Increment rule
+## 3. Acceptance rule
 
-If a candidate has a bug before acceptance, normally repair that same candidate; do not silently create the next version. The owner may explicitly override this rule, as happened when V024 was requested before V023 acceptance. After explicit acceptance, normal development continues from the accepted version unless the owner requests another version.
+Only explicit owner acceptance promotes `passed_baseline`.
 
-## Version surfaces
+These do **not** count as acceptance:
 
-For a real version change:
+- automated tests;
+- successful build;
+- GitHub upload/merge to `main`;
+- an AI-agent judgment;
+- "test-ready" documentation;
+- a patch ZIP being produced.
+
+## 4. Same-candidate repair rule
+
+If a candidate has a bug or needs hardening before owner acceptance, normally repair that same candidate. Do not silently increment the version.
+
+The owner may explicitly request a new version even if the current candidate is unaccepted. Record such exceptions clearly so `passed_baseline` remains truthful.
+
+## 5. Normal increment rule
+
+After explicit acceptance, normal development proceeds from the accepted candidate to the next agreed version. Small increments usually advance the final component; larger milestone increments are allowed when deliberately chosen.
+
+Version numbers describe project releases, not semantic compatibility guarantees.
+
+## 6. Version change checklist
+
+For an actual version change:
 
 1. update root `VERSION`;
-2. update `src/constants/projectVersion.ts`;
-3. keep backend version surfaces derived from `project_version.py`;
-4. update changelog/patch/testing/current-state docs;
-5. run `scripts/check_structure.py`.
+2. update any required checked frontend version mirror;
+3. keep backend runtime metadata derived from root `VERSION`;
+4. add/update the relevant `CHANGELOG` and `PATCH_<version>` section;
+5. update `START_HERE`, `LOCAL_TESTING`, and `TEST_READY_CHECKLIST`;
+6. update README/function/roadmap docs when capability status changes;
+7. run structure/version-surface checks.
 
-Historical changelog/patch documents intentionally retain old release values.
+Do not modify historical patch/changelog facts just because they contain old versions.
 
-## Package-manager versions
+## 7. Documentation anti-drift rule
 
-Tool manifests such as npm `package.json` use dotted semantic versions and are not the authoritative AiTL release state unless a patch explicitly synchronizes them.
+Long-lived guides (`HUMAN_GUIDE`, `DEVELOPMENT_WORKFLOW`, `AI_AGENT_GUIDE`, this file) should not contain a hard-coded current candidate snapshot. Current release state belongs in:
 
-## Patch ZIP naming
+```text
+VERSION
+START_HERE.md
+PATCH_<version>.md
+LOCAL_TESTING.md
+TEST_READY_CHECKLIST.md
+CHANGELOG.md
+```
 
-Use a descriptive candidate name such as `AiTL_V024_maintenance_hardening_patch.zip`. Archives remain changed-files-only and every member path starts with `AI_Traffic_Light/`.
+See `DOCUMENTATION_MAP.md`.
+
+## 8. Package/tool versions
+
+Npm/Python package versions are not automatically the AiTL release version. Package manifests may use their ecosystem's dotted versions and should only be synchronized when the patch explicitly requires it.
+
+## 9. Patch ZIP naming
+
+Use a descriptive candidate name, for example:
+
+```text
+AiTL_V025_<short_description>_patch.zip
+```
+
+The archive remains changed-files-only and each member starts with `AI_Traffic_Light/`.

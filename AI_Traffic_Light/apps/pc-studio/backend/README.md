@@ -1,28 +1,79 @@
-# PC Studio Backend — V024 candidate
+# PC Studio Backend
 
-FastAPI backend for the local AI Traffic Light prototype.
+FastAPI backend for the local AiTL computer-vision and traffic-light simulation prototype. Root `AI_Traffic_Light/VERSION` is the release-state authority.
 
-## Working prototype functions
+## Main responsibilities
 
-- receive device JPEG/PNG frames and run the controllable signal-aware synthetic camera;
-- persist captures, deletion/labels, managed YOLO datasets, optional local training, trained-model registry, and live inference;
-- assign frame-deduplicated prototype track IDs and persist occupancy/flow analytics separately;
-- persist camera-aligned traffic regions and two-point counting lines;
-- configure validated simulated signal min/base/max timings and Fixed / Adaptive / Test policy modes;
-- evaluate bounded adaptive timing rules with priority ordering, persistence, cooldown, demand memory, stale-data fallback, protected phase order, and maximum-cycle limits;
-- expose live signal-policy status, rule health/arbitration, dry previews, Test-mode accessibility/incident inputs, incident clearing, adaptive-state reset, and decision-history APIs;
-- persist signal policy in `config/signal_rules.json` and runtime decision history in `outputs/signal_rules/decision_history.jsonl`.
+- receive/store the latest device frame and run the synthetic signal-aware camera;
+- dataset capture/delete/label/build workflow;
+- local Ultralytics training/model registry/live inference;
+- camera-aligned zones and sampled occupancy;
+- lightweight cross-frame tracking and flow events;
+- ranked simulated signal scenarios and protected phase timing;
+- signal decision history/preview/Test inputs;
+- isolated deterministic Simulation Lab experiments;
+- runtime settings/logging;
+- generic intersection/source/topology foundation;
+- structured non-controlling live decision context.
 
+See `../../../docs/PC_STUDIO_FUNCTION_LIST.md` for the current function catalog and `../../../docs/PROJECT_SCOPE.md` for implemented/foundation/planned capability status.
 
-## V024 maintenance hardening
+## Architecture ownership
 
-- `app/core/json_store.py` centralizes atomic UTF-8 JSON replacement for runtime settings, zones, and model-registry metadata using unique same-directory temporary files, flush/fsync, and `os.replace`.
-- Zone saves use the service lock shared with reads.
-- Model-registry discovery/default/delete/metadata transitions use a re-entrant lock.
-- Service validation, return shapes, logging, API envelopes, and existing stable error codes are unchanged.
+```text
+app/main.py       FastAPI creation/wiring only
+app/routes/       HTTP translation
+app/services/     domain behavior/state/persistence/inference/training
+app/models.py     Pydantic contracts
+app/core/         envelopes/errors/logging/middleware/version/persistence helpers
+```
 
-The current perception model is not claimed to detect wheelchairs/mobility aids or person-fall incidents. Those conditions are Test-mode inputs until a compatible detector is deliberately added.
+Do not move signal arbitration into routes/network/explanation services. `services/signal_rules.py` owns ranked scenario arbitration and protected simulated timing. `services/simulation_experiments.py` owns isolated experiment runs. `services/intersection_network.py` owns topology/source identity. `services/decision_context.py` projects explanation context but does not control the signal.
 
-Root `AI_Traffic_Light/VERSION` is the canonical release state. Runtime datasets, settings, signal policy, occupancy/flow/signal histories, and trained models are user/runtime data and are excluded from source patches.
+## API conventions
 
-This backend is for prototype, simulation, classroom, and supervised testing only. It is not a public-road traffic controller.
+Successful JSON:
+
+```json
+{"ok": true, "data": {}, "meta": {"request_id": "..."}}
+```
+
+Expected errors use central stable error codes/AppError and the standard error envelope. Binary/image/CSV responses preserve `X-Request-ID`.
+
+See `../../../docs/API_CONTRACTS.md` and `../../../docs/ERROR_CODES.md`.
+
+## Data/persistence rules
+
+Runtime/user data such as captures, labels, models, zone/settings/signal/network config, occupancy/flow/signal histories, and Simulation Lab results must not be included in changed-files source patches.
+
+Replace-style runtime JSON persistence should use the shared atomic helper where the owning service's persistence semantics match it; services retain validation, locking, logging, and stable error translation.
+
+Important semantic distinctions:
+
+- occupancy = sampled presence;
+- flow = track-derived events;
+- zone/class counts = per-frame scenario observations;
+- experiment telemetry = isolated synthetic simulator output;
+- network links = configured topology metadata.
+
+## Network/explanation foundation
+
+The current foundation can persist generic intersections/links, resolve source IDs to intersection identity, and expose neighbour/decision context. It does **not** yet run simultaneous multi-intersection controllers, transfer vehicles between intersections, coordinate green phases, or implement emergency pre-emption.
+
+Future network behavior should create explicit per-intersection runtime/controller state and transfer/arrival context while reusing the existing ranked-scenario controller.
+
+## Local backend run
+
+Typical Windows environment:
+
+```powershell
+Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\backend"
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Use `../../../docs/LOCAL_TESTING.md` for current candidate validation. Do not describe a test as passed unless it actually ran.
+
+## Safety boundary
+
+The backend produces local prototype detection, analytics, scenario, experiment, topology, and explanation data. It is not a public-road traffic controller and does not connect its decisions to physical/public-road traffic infrastructure.

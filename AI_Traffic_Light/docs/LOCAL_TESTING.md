@@ -206,3 +206,14 @@ git status --short
 ```
 
 From `AI_Traffic_Light`, validate the supplied ZIP with `python .\scripts\validate_patch_zip.py <zip>` and compare its member list with the supplied manifest. Only explicit owner acceptance may promote V025.
+
+
+## Documentation consistency acceptance
+
+1. Read root `VERSION`; confirm `START_HERE.md`, README, current patch/testing/checklist docs agree with its candidate/baseline state.
+2. Open `DOCUMENTATION_MAP.md`; confirm long-lived guides point to `VERSION` rather than owning a stale current-version snapshot.
+3. Open `PROJECT_SCOPE.md`; confirm multi-intersection cooperation is foundation/planned active behavior, emergency priority is planned, pedestrian/class/explainability statuses are not overstated.
+4. Confirm `HUMAN_GUIDE.md`, `DEVELOPMENT_WORKFLOW.md`, and `VERSIONING.md` contain durable workflow rules rather than obsolete V0xx "current state" sections.
+5. Confirm configured network links are described as metadata/foundation and not measured transfer/cooperative control.
+6. Confirm manual/synthetic emergency/accessibility inputs are not described as live AI perception.
+7. Confirm historical `PATCH_*`/changelog sections retain historical release values; do not "fix" them to the current version.

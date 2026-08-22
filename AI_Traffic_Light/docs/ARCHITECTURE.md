@@ -1,101 +1,126 @@
 # Architecture
 
-## Current V025 prototype architecture
+AiTL is a local/student-scale computer-vision and traffic-light simulation prototype. No layer sends commands to physical/public-road traffic infrastructure.
 
-AiTL is a local/student-scale traffic-light computer-vision and simulation prototype. No layer sends commands to physical/public-road traffic infrastructure.
+## 1. Live single-intersection path
 
 ```text
 ESP-CAM / uploaded receiver frame / synthetic camera
                 ↓
           CameraFrameService
                 ↓
-       local inference / tracking
+        local inference/tracking
                 ↓
-      zones + per-class observations
+ zones + occupancy/flow/class observations
                 ↓
-          traffic state evaluation
+       traffic-state evaluation
                 ↓
-      ranked signal-scenario controller
+ ranked signal-scenario controller
                 ↓
- protected simulated phase / recommendation
+ protected simulated phase/recommendation
                 ↓
-       PC Studio + analytics + capture
+ PC Studio + analytics + capture/explanation
 ```
 
-The isolated Simulation Lab uses separate numeric agents and separate controller instances so Fixed-vs-Adaptive experiments do not reset the live Camera Sources simulation/controller runtime.
+`signal_rules.py` owns arbitration and protected phase timing. Other services may supply observations/context but must not reimplement controller authority.
 
-## Same-candidate network foundation
+## 2. Isolated Simulation Lab path
 
-V025 now also contains a configuration-only network layer:
+```text
+saved profile + zones + density + seed
+        ↙                     ↘
+ Fixed numeric simulator    Adaptive numeric simulator
+ + isolated controller     + isolated controller
+        ↘                     ↙
+       aligned synthetic telemetry
+```
+
+Experiment controllers/agents are separate from the live camera/controller runtime.
+
+## 3. Network/explanation foundation
 
 ```text
 camera/source id
       ↓
 IntersectionNetworkService
       ↓
-intersection identity + configured links/neighbours
+intersection identity + configured directed links
       ↓
 traffic API enrichment
       ↓
-structured decision context
+DecisionContext projection
 ```
 
-`IntersectionNetworkService` persists generic intersection metadata under runtime `config/intersections.json` and supports up to the validated limits without assuming exactly two intersections. Each configured intersection may declare source ids, zone ids, a signal profile name, and enabled state. Directed links describe source/destination intersections, approaches, and an optional prototype travel-time estimate.
+The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. Neither service creates a second signal controller.
 
-This foundation does **not** yet run more than one active live controller, transfer vehicles between intersections, predict arrivals, coordinate green windows, or implement emergency pre-emption. `cooperative_control_active` and `emergency_priority_active` remain false. The purpose is to establish stable identities/topology before later multi-intersection simulation work.
+Configured links are **metadata**, not measured transfers. Current cooperative/emergency-active flags remain false until corresponding behavior exists.
 
-## Structured decision context
+## 4. Planned multi-intersection architecture
 
-`GET /api/traffic/state` keeps the existing V025 traffic-state fields and adds network/explanation metadata at the API boundary:
+The intended next architecture extends existing ownership instead of creating a parallel controller:
 
-- `intersection_id`;
-- `observation_provenance` (`ai_detection`, `simulation`, `manual_test`, or `unavailable`);
-- `network_context` with configured neighbours;
-- `decision_context` with a deterministic decision id, trigger category, active ranked scenario/observed conditions when available, requested service, timing, pedestrian/vehicle context, emergency placeholder state, neighbour context, and a human-readable explanation.
+```text
+Intersection A runtime ── explicit transfer/arrival context ──► Intersection B runtime
+       │                                                        │
+ SignalRulesService A                                      SignalRulesService B
+       │                                                        │
+       └──────────── neighbour/network context layer ────────────┘
+                              ↓
+                 network experiment/telemetry
+```
 
-Existing `outputs/signal_rules/decision_history.jsonl` remains the authoritative persisted controller-event history. The V025 network foundation does not create a second controller or claim historical causal reconstruction from the live decision context.
+Requirements before cooperation is considered implemented:
 
-## Backend ownership
+- independent per-intersection runtime/controller state;
+- explicit vehicle/demand transfer or predicted-arrival events;
+- neighbour context enters bounded ranked-scenario evaluation;
+- protected local phase rules remain controller-owned;
+- decisions record neighbour evidence;
+- deterministic network tests and metrics exist.
+
+## 5. Backend ownership
 
 ```text
 apps/pc-studio/backend/app/
-  main.py                 FastAPI app/wiring only
-  models.py               Pydantic API/request models
-  core/                   envelopes, errors, logging, middleware, atomic JSON helpers, version metadata
-  routes/                  HTTP translation only
+  main.py                 FastAPI wiring only
+  models.py               Pydantic contracts
+  core/                   envelope/error/logging/middleware/version/persistence helpers
+  routes/                  HTTP translation
   services/                domain behavior/state/persistence/inference/training
 ```
 
-Important service ownership includes:
+Important services:
 
-- `camera_frames.py` — latest receiver frame and single-junction synthetic camera runtime;
-- `inference.py` — local trained-model inference;
-- `object_tracking.py` / `traffic_flow.py` — prototype tracking and flow events;
-- `zones.py` / `traffic_history.py` — zone configuration and occupancy history;
-- `signal_rules.py` — ranked scenario arbitration and protected simulated phase timing;
-- `simulation_experiments.py` — isolated deterministic Fixed-vs-Adaptive experiments;
-- `intersection_network.py` — persistent generic intersection/topology metadata only;
-- `decision_context.py` — non-controlling structured live explanation projection.
+- `camera_frames.py` — latest receiver frame + synthetic camera runtime;
+- inference service — trained-model inference;
+- `object_tracking.py` / `traffic_flow.py` — prototype tracking/flow;
+- `zones.py` / `traffic_history.py` — zone config/occupancy;
+- `signal_rules.py` — ranked scenarios + protected simulated timing;
+- `simulation_experiments.py` — isolated deterministic A/B experiments;
+- `intersection_network.py` — intersection/source/topology metadata;
+- `decision_context.py` — non-controlling structured explanation.
 
-## Frontend ownership
+## 6. Frontend ownership
 
-PC Studio remains React/Vite. `App.tsx` coordinates navigation/top-level state, pages own page behavior, reusable components own presentation, `api.ts` owns typed domain calls, and `useSerialPolling` prevents overlapping async poll loops.
+React/Vite PC Studio keeps `App.tsx` for top-level composition, pages for page behavior, components for reusable presentation, API modules for HTTP, shared types for contracts, and serial polling for non-overlapping periodic async refresh.
 
-The network foundation is backend/API-first in this same-candidate update; a dedicated multi-intersection visual editor/simulator is intentionally deferred until a later candidate.
+Dense experiment/explanation data should be grouped rather than rendered as an unbounded dashboard.
 
-## Data semantics
+## 7. Data semantics
 
-- Occupancy is sampled presence, not throughput.
-- Unique passage requires prototype track identity plus a counting-line event.
-- Zone/class counts are per-frame scenario observations.
-- Network links are configured metadata, not evidence of observed vehicle transfer.
-- Simulation Lab telemetry is synthetic benchmark data and is isolated from live occupancy/flow history.
-- Manual Test-mode accessibility/incident flags must remain explicit manual/simulation sources.
+- occupancy = sampled presence;
+- flow = track-derived events;
+- zone/class counts = per-frame scenario observations;
+- Simulation Lab telemetry = synthetic isolated output;
+- network links = configuration metadata;
+- observation provenance = AI/simulation/manual/unavailable source classification.
 
-## Device camera role
+Do not silently convert one category into another.
 
-ESP32/Raspberry Pi camera nodes remain lightweight frame sources. They may connect to Wi-Fi, capture frames, and upload JPEG/PNG data to PC Studio. Heavy inference, model training, ranked signal logic, network cooperation, and analytics belong on the PC side.
+## 8. Device-camera role
 
-## Safety boundary
+Camera nodes capture/upload frames and expose simple device status/settings. Heavy inference, model training, signal scenarios, analytics, network cooperation, and experiment logic stay on the PC side.
 
-All phases, scenarios, topology links, neighbour context, emergency placeholders, and decision explanations are local prototype/simulation/recommendation data. Physical/public-road signal control remains outside project scope.
+## 9. Capability and safety boundaries
+
+See `PROJECT_SCOPE.md` for implemented/foundation/planned status. Multi-intersection cooperation and emergency priority require additional simulator/controller evidence. All signal phases/actions remain prototype/simulation outputs; public-road control is outside scope.

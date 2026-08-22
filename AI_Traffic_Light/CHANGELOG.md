@@ -2,6 +2,8 @@
 
 ## 0_2_5 — Ranked signal scenarios and simulation telemetry
 
+- Same-candidate documentation hardening: added `docs/DOCUMENTATION_MAP.md` and `docs/PROJECT_SCOPE.md`, removed stale current-version/placeholder ownership from durable human/agent/workflow/versioning/debugging/UI guides and PC Studio app READMEs, refreshed data semantics, and clarified documentation authority/maintenance rules.
+- Documented the planned invention capability sequence and evidence boundaries for multi-intersection cooperation, emergency priority, pedestrian-aware control, different vehicle classes, and explainable decisions; configured network links remain foundation metadata rather than active cooperation.
 - Owner explicitly accepted/promoted V024 / `0_2_4`; V025 now records `passed_baseline: 0_2_4` while remaining the current unaccepted candidate.
 - Same-candidate network-foundation update: added persistent generic intersection/topology metadata, source-to-intersection resolution, directed neighbour links, and runtime `config/intersections.json` without promoting V025 or enabling cooperative control.
 - Added `GET/PUT /api/traffic/network`, `POST /api/traffic/network/reset`, and `GET /api/traffic/network/context` with standard envelopes/request IDs, atomic persistence, validation, and stable `ATL-TRAFFIC-013..015` errors.

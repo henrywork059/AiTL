@@ -1,65 +1,84 @@
-# PC Studio Function List (V025 candidate highlights)
+# PC Studio Function List
+
+This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for candidate state and `PROJECT_SCOPE.md` for planned-capability status.
 
 ## Camera / simulation
+
 - receive JPEG/PNG device frames;
-- signal-aware synthetic scene with vehicle stop-line queues and pedestrian curb/WALK behavior;
+- signal-aware synthetic single-junction scene with vehicle queues and pedestrian WALK behavior;
 - Light / Normal / Busy density and pause/resume;
-- V023+ configurable protected simulated signal timing consumed by synthetic agents.
+- configurable protected simulated signal timing consumed by synthetic agents.
 
 ## Signal scenarios / traffic simulation
-- edit six protected normal-operation phase base/min/max durations;
-- Fixed, Adaptive, and Test modes plus dry-run;
-- Normal / Pedestrian Priority / Vehicle Priority / Accessibility profiles;
-- create, duplicate, delete, enable/disable, and rank editable scenarios (`1` highest);
-- define 1–8 conditions per scenario using ALL/ANY matching;
-- use controller metrics or detected class counts inside a selected polygon zone (`*` = all detected classes);
-- choose `>`, `>=`, `<`, `<=`, or `=` comparison and numeric threshold;
-- define bounded response: extend/reduce/hold current phase, request protected next phase sooner, or Test-mode incident all-red hold;
-- choose which protected phase keys may execute the response and optionally request pedestrian/vehicle service;
-- execute only the highest-ranked eligible triggered scenario per arbitration evaluation;
-- explain winner/suppressed/inactive/unavailable states and show observed condition values;
-- persistence, cooldown, demand memory, stale fallback, protected minimums/max/cycle bounds, incident recovery, and runtime-state reset;
-- migrate older V023/V024 rule configs into editable scenarios while retaining compatibility fields;
-- persistent runtime signal-decision history with explicit clearing.
 
-## V025 Simulation Lab / experiments
-- isolated Fixed-vs-Adaptive runs using the same selected profile, density, duration, and random seed;
-- no reset/mutation of the currently running camera simulation or live controller state; configured zones are snapshotted so synthetic zone/class scenarios can participate;
-- vehicle/pedestrian wait count, average, median, p95, maximum, and total delay;
-- queue average, p95, peak, queue-seconds, queue-active share, and simultaneous vehicle/pedestrian queue time;
-- vehicle/pedestrian/combined throughput and vehicle passages per green minute;
-- phase utilization, transitions, cycles, clearance time/share, adaptive scenario applications, and timing extension/reduction totals;
-- simulator-only conflict-overlap diagnostic;
-- bounded persisted experiment history under `outputs/simulation_experiments/`, reopen/delete, and aligned Fixed/Adaptive sample CSV export;
-- one-page Simulation Lab grouped with setup/stored-run controls and Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs;
-- Fixed/Adaptive raw-sample toggle, page-size menu, and pagination rather than an unbounded table.
+- edit protected phase base/min/max durations;
+- Fixed, Adaptive, and Test modes plus dry-run preview;
+- named signal profiles;
+- create/duplicate/delete/enable/disable/rank scenarios (`1` highest);
+- 1–8 ALL/ANY conditions;
+- controller metrics and zone/class counts (`*` supported for all classes in a selected polygon zone);
+- bounded extend/reduce/hold/request-next-protected-service/Test incident actions;
+- protected target-phase selection and optional pedestrian/vehicle request;
+- one highest-ranked eligible winner per evaluation;
+- winner/suppressed/inactive/unavailable explanations and observed values;
+- persistence, cooldown, demand memory, stale fallback, phase/cycle bounds, incident recovery;
+- persistent runtime signal-decision history.
+
+## Simulation Lab
+
+- isolated Fixed-vs-Adaptive seeded comparisons without resetting live camera/controller state;
+- configured zone snapshot and synthetic per-zone/per-class observations;
+- wait distributions, queue pressure, throughput/service, vehicle-green efficiency;
+- phase utilization, transitions/cycles, clearance, scenario applications, timing changes, conflict diagnostic;
+- bounded persisted experiment history, reopen/delete, CSV export;
+- grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
+
+## Network / explanation foundation
+
+- configure generic intersection IDs, source IDs, labels, optional zone IDs/profile names;
+- configure directed neighbour links and prototype travel-time metadata;
+- resolve source ID to intersection;
+- query per-intersection neighbour context;
+- enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
+- explicit inactive flags for cooperative control and emergency priority.
+
+**Not currently implemented:** simultaneous multi-intersection live/synthetic control, vehicle transfer between intersections, predicted arrivals, cooperative green coordination, or emergency pre-emption.
 
 ## Inference / zones / analytics
-- trained-model inference and V022 cross-frame prototype IDs;
-- camera-aligned waiting/crossing/queue/counting/ignore geometry;
+
+- local trained-model inference and prototype cross-frame track IDs;
+- camera-aligned waiting/crossing/queue/counting/ignore regions and counting lines;
 - sampled whole-frame/region occupancy history;
-- counting-line directional unique-passage events;
+- counting-line directional passage events;
 - region entry/exit/dwell and pedestrian waiting dwell;
-- separate Occupancy and Flow / Tracks analytics with CSV exports.
+- separate Occupancy and Flow/Tracks analytics with CSV export.
 
 ## Dataset / training / model management
+
 - capture/delete/review/manual-label frames;
 - managed YOLO train/validation dataset;
-- local Ultralytics training, convergence and early stopping;
+- local Ultralytics training with convergence monitoring and patience-based early stopping;
 - model registry/load/default/delete.
 
 ## System / development integrity
+
 - persistent runtime settings and recent logs;
-- canonical root `VERSION` metadata;
-- runtime signal-scenario config/history, datasets, models, occupancy/flow/experiment history excluded from source patches;
-- repository/version and patch-ZIP validation.
+- root `VERSION` release metadata;
+- atomic JSON persistence for migrated runtime stores and intersection config;
+- non-overlapping App-level polling helper;
+- repository/version and patch-ZIP validation;
+- documentation authority/scope guides.
 
-## V024 maintenance / reliability retained
-- shared atomic JSON persistence for runtime settings, zones, and model-registry metadata;
-- synchronized zone and model-registry state transitions;
-- reusable non-overlapping App-level camera/live-context polling;
-- architecture/regression guards for persistence and polling mechanics.
+## Planned capability families
 
-## Limitations / later
+See `PROJECT_SCOPE.md`/`ROADMAP.md`:
 
-V025 experiment results remain supervised local synthetic simulation data. The benchmark is not a calibrated traffic microsimulator or public-road safety evaluation. Wheelchair/mobility and fall detection are not live perception capabilities unless a compatible future model/source supplies them. The tracker is lightweight and not certified measurement. Future directions include model evaluation/quality, richer exogenous demand generators, policy import/export, stronger tracking, and richer experiment reports. Physical public-road traffic control is explicitly outside scope.
+- multi-intersection cooperation;
+- emergency priority;
+- stronger pedestrian-aware control;
+- broader vehicle-class behavior;
+- persistent structured explainability.
+
+## Limitations
+
+Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Configured network links are metadata. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.

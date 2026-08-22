@@ -107,4 +107,13 @@ V025 / `0_2_5` is the current candidate. V024 / `0_2_4` is the previous version 
 77. Experiment results are seeded synthetic simulation evidence only, not a claim Adaptive is universally better.
 78. Network links are configured topology metadata, not measured traffic flow or proof of cooperation.
 79. Nothing in V025 controls or connects to physical/public-road traffic-signal infrastructure.
-80. Owner completes manual/UI/API checks and explicitly confirms V025 passed before `passed_baseline` changes.
+
+## Documentation integrity / capability claims
+
+80. `DOCUMENTATION_MAP.md` clearly identifies `VERSION` as the release-state authority and separates current-state, durable, and historical docs.
+81. `PROJECT_SCOPE.md` records multi-intersection cooperation, emergency priority, pedestrian-aware control, different vehicle classes, and explainable decisions with explicit completion/evidence boundaries.
+82. Durable guides (`HUMAN_GUIDE`, `DEVELOPMENT_WORKFLOW`, `VERSIONING`, `AI_AGENT_GUIDE`) do not depend on an obsolete hard-coded current candidate.
+83. Current README/`START_HERE`/patch/testing docs describe network links as configuration/foundation only; they do not claim active cooperation, vehicle transfer, predicted arrivals, or emergency pre-emption.
+84. Documentation preserves occupancy/flow/zone-class/experiment/topology distinctions and AI/simulation/manual provenance.
+85. Historical changelog/patch facts remain historical and are not rewritten to the current release number.
+86. Owner completes manual/UI/API/documentation checks and explicitly confirms V025 passed before `passed_baseline` changes.

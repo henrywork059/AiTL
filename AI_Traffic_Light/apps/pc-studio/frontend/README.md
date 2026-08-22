@@ -1,36 +1,85 @@
-# PC Studio Frontend — V024 candidate
+# PC Studio Frontend
 
-React/Vite GUI for the AI Traffic Light PC Studio prototype.
+React/Vite GUI for the AiTL local prototype. Root `AI_Traffic_Light/VERSION` defines release state; this README describes frontend ownership and current capability families without owning the candidate/baseline snapshot.
 
-Visual styling is governed by `docs/PC_STUDIO_DESIGN_SYSTEM.md` and role tokens under `src/styles/`. V024 uses a Material-inspired role hierarchy rather than a generic dashboard palette: neutral surfaces dominate, primary blue identifies navigation/main actions, secondary teal is selective for progress/selection, and success/warning/error colors are semantic only.
+## Working surfaces
 
+PC Studio currently includes:
 
-## V024 polling hardening
+- Dashboard;
+- Camera Sources;
+- Live AI;
+- Zone Editor;
+- Traffic Logic;
+- Simulation Lab;
+- Traffic Analytics;
+- Dataset Capture / Review & Label;
+- Train / Export;
+- Model Registry;
+- Settings;
+- Logs.
 
-`src/lib/useSerialPolling.ts` is the shared scheduler for top-level periodic API refreshes. Camera status and Live AI traffic/zone context now schedule the next refresh only after the previous async request settles, preventing overlapping interval requests during a slow backend response. The existing live-detection loop remains self-serial.
+See `../../../docs/PC_STUDIO_FUNCTION_LIST.md` for detailed current functions.
 
-## Current working surfaces
+## Traffic Logic UI
 
-- Dashboard, Live AI, Camera Sources, camera-aligned Zone Editor, Traffic Analytics, Dataset Capture/Review, Train/Export, Model Registry, Settings, and Logs;
-- Traffic Logic now contains tabs for **Live Decision**, **Normal Timing**, **Adaptive Rules**, **Safety & Test**, and **Decision History**;
-- normal timing editing for all protected simulated signal phases with min/base/max values and cycle/stale/demand-memory limits;
-- Fixed / Adaptive / Test modes, named policy profiles, dry-run toggle, Save / Discard / Reset Defaults;
-- rule editing for threshold, stable-for duration, adjustment, cooldown, priority, and enable/disable state;
-- live active/suppressed/inactive/unavailable rule explanations and effective phase timing;
-- manual Test-mode pedestrian/vehicle/mobility/incident inputs, Clear Incident, Reset Adaptive State, and scenario previews;
-- runtime signal-decision history display/clear.
+Traffic Logic uses compact grouped surfaces:
 
-Mobility assistance and fall/incident controls are explicit simulation/test inputs. The frontend does not claim the current model can detect wheelchairs or falls.
+- **Live Decision** — active phase/decision, current winner and arbitration context;
+- **Signal Timing** — protected phase policy/timing configuration;
+- **Scenario Rules** — ranked scenario list + selected-scenario editor;
+- **Test & Safety** — dry-run/Test-mode inputs, incident/reset tooling;
+- **History** — signal-decision history.
+
+Ranked scenarios may use controller metrics or zone/class observations. The UI should distinguish triggered, winner, suppressed, inactive, unavailable, persistence/cooldown, and current observed values without dumping raw state into one long page.
+
+## Simulation Lab UI
+
+Simulation Lab keeps dense telemetry grouped behind Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs. Stored-run selection, toggles/dropdowns, pagination, and internal scrolling keep the experiment view bounded.
+
+Synthetic results must be labeled as local simulation evidence, not public-road performance/safety evidence.
+
+## Network/explanation direction
+
+The current network foundation is backend/API-first. A future UI should support generic N-intersection configuration and per-intersection/network views without assuming exactly two intersections.
+
+Until explicit transfer/cooperation behavior exists, configured links must not be visualized or described as measured traffic transfer. Structured decision details should show neighbour/emergency/pedestrian/class context with provenance where appropriate.
+
+## Frontend ownership
+
+```text
+src/App.tsx          top-level composition/navigation/shared coordination
+src/pages/           page behavior/state
+src/components/      reusable presentation
+src/api.ts           typed domain API functions
+src/lib/apiClient.ts shared envelope/error handling
+src/lib/useSerialPolling.ts non-overlapping periodic async refresh
+src/types.ts/types/  shared contracts
+src/constants/       navigation/release fallback metadata
+src/styles/          shared design system
+```
+
+Do not place page-specific domain logic in `App.tsx`. Do not recreate API shapes ad hoc inside pages.
+
+## Polling
+
+Async periodic work that can overlap should use the shared serial polling mechanism or an equivalent self-scheduling loop. A slow backend request should not cause a second same-loop request to start before the first settles.
+
+## Image/overlay coordinates
+
+Detection boxes and zones remain canonical in source/reference coordinates. Browser/canvas scaling is presentation-only and must not be persisted as the source geometry.
 
 ## Visual system
 
-Shared presentation is isolated under `src/styles/` and documented in `docs/PC_STUDIO_DESIGN_SYSTEM.md`. `src/styles.css` is the stable import entrypoint. Pages may keep small page-specific CSS files for layout/behavior, but they should consume shared design tokens instead of defining independent palettes.
+Use the shared design system under `src/styles/` and its role-based semantics. Keep neutral surfaces dominant, interaction colors purposeful, semantic success/warning/error distinct, and traffic-signal colors separate from generic app state.
 
-The visual system follows the operating-system appearance. Dark mode retains the Material 2 `#121212` base with progressively lighter elevated surfaces. Primary/secondary controls have explicit readable on-colors, generic badges are neutral, and traffic-signal colors remain separate from application state. Decorative gradient/glass/neon AI styling is intentionally excluded.
+Avoid page-local neon/gradient/glass dashboard themes or giant decorative cards. Dense technical information should be grouped with hierarchy, details, tabs, filters, and bounded scrolling.
 
-Visible interface copy follows the same design discipline: describe the current task/state, use concise action verbs, make destructive effects explicit, avoid stale release-history language on normal working pages, and state the simulation-only boundary precisely.
+## Error/fallback behavior
 
-Run:
+Loading/offline/read-only fallbacks may keep the UI understandable, but mutation failures should not be silently hidden. Preserve backend stable error/request context where useful for debugging.
+
+## Local frontend run
 
 ```powershell
 npm ci
@@ -39,4 +88,8 @@ npm run build
 npm run dev
 ```
 
-The frontend is a supervised prototype UI and is not connected to physical public-road traffic infrastructure.
+Use `../../../docs/LOCAL_TESTING.md` for the current candidate's full validation sequence.
+
+## Safety boundary
+
+Signal graphics, decisions, network context, experiments, and emergency/accessibility Test-mode inputs are prototype/simulation UI. The frontend is not connected to physical/public-road traffic infrastructure.

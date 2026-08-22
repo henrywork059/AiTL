@@ -1,252 +1,136 @@
 # Human Guide
 
-This guide is for the project owner, students, teachers, and anyone reading or using the **AI Traffic Light** repository.
+This guide is for the project owner, students, teachers, and reviewers using **AI Traffic Light (AiTL)**. It is intentionally version-agnostic; read root `VERSION` and `START_HERE.md` for the current candidate.
 
-## 1. What this project is
+## 1. What AiTL is
 
-AI Traffic Light is a prototype project for an **AI vision-based adaptive traffic light system**.
-
-The system idea is:
+AiTL is a local prototype for studying computer vision and adaptive traffic-light **simulation**.
 
 ```text
-Camera watches a road/crossing scene
-→ AI detects pedestrians and vehicles
-→ software counts them in defined zones
-→ system simulates better traffic-light timing
-→ GUI shows detections, counts, warnings, and signal state
+camera or synthetic scene
+→ local object detection
+→ zones/tracking/counting
+→ simulated signal scenario evaluation
+→ explanation, analytics, and experiment results in PC Studio
 ```
 
-This project is for controlled testing, school demonstration, and development. It is **not** a certified public-road traffic-control system.
+It also contains a local dataset/training workflow and a developing multi-intersection/network foundation.
 
-## 2. Main parts of the project
+AiTL is **not** a certified public-road traffic-control system and does not connect its simulated decisions to public traffic infrastructure.
 
-```text
-PC Studio App
+## 2. Where to start
+
+For current project state:
+
+1. Read `../VERSION`.
+2. Read `START_HERE.md`.
+3. Read `PROJECT_SCOPE.md` to distinguish implemented, foundation, and planned capabilities.
+4. Use `LOCAL_TESTING.md` / `TEST_READY_CHECKLIST.md` when testing the current candidate.
+5. Use `DOCUMENTATION_MAP.md` if documents appear to disagree.
+
+## 3. Main project parts
+
+### PC Studio
+
+React/Vite frontend + FastAPI backend. Current prototype functions include camera receiving/simulation, inference, zones, tracking/analytics, dataset/training/model tools, ranked simulated signal scenarios, experiment telemetry, and network/explanation foundation.
+
+### Device camera
+
+ESP32-CAM or similar nodes act as lightweight frame sources. Heavy AI, training, signal-policy logic, analytics, and future network cooperation belong on the PC side.
+
+### Runtime data
+
+Local datasets, outputs, trained models, labels, zone/settings/signal/network config, histories, and experiment results are valuable working data. They are not source-patch content.
+
+## 4. Understand the data categories
+
+Do not interpret every number as the same type of traffic measurement:
+
+- **Occupancy** — how many relevant detections are present in a sampled frame/region.
+- **Flow** — events produced by prototype cross-frame tracks crossing lines or entering/leaving regions.
+- **Zone/class observation** — detector-class count inside a polygon for a scenario evaluation.
+- **Simulation experiment telemetry** — synthetic numeric simulator output.
+- **Network link** — configured topology metadata; not proof that vehicles actually transferred between intersections.
+
+The lightweight tracker can lose/swap identities in difficult scenes, so track-derived figures remain prototype measurements.
+
+## 5. Signal logic in plain language
+
+The simulated controller uses protected phases. Adaptive/Test modes can evaluate ranked scenarios against observations. Multiple scenarios can be true, but one highest-ranked eligible scenario wins an evaluation. Its action remains bounded by protected timing/order rules.
+
+A scenario may use controller metrics or a class count in a configured zone. These values must be interpreted according to their source; a per-frame count is not throughput.
+
+## 6. Network and future capabilities
+
+AiTL is being designed to grow toward:
+
+- multi-intersection cooperation;
+- emergency priority;
+- stronger pedestrian-aware control;
+- different vehicle-class handling;
+- explainable decisions.
+
+Some supporting foundations already exist, but these capabilities have different completion levels. `PROJECT_SCOPE.md` is the authoritative capability-status guide. Do not present a planned/foundation feature as operational.
+
+## 7. Safe GitHub patch workflow
+
+A patch ZIP contains **changed files only**.
+
+1. Download the patch ZIP and manifest.
+2. Verify the ZIP/member list if desired.
+3. Extract the ZIP.
+4. Upload the extracted files into their matching paths under `AI_Traffic_Light/` on GitHub `main`.
+5. Do not upload only the ZIP as a repository file.
+6. Use a clear commit message describing the candidate and change.
+
+Before uploading, confirm the patch contains no datasets, outputs, trained models, secrets, caches, or personal/private media.
+
+## 8. Safe Windows update after GitHub upload
+
+Stop the running backend/frontend first. From the repository root:
+
+```powershell
+Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
+git status --short
+git pull --ff-only origin main
+Get-Content .\AI_Traffic_Light\VERSION
 ```
 
-The main computer app. It will eventually handle:
+Do **not** use `git clean -fd`. If `git status` shows local work you care about, inspect/preserve it before pulling rather than deleting it.
 
-```text
-live camera/video input
-object detection
-future segmentation/tracking
-data capture
-zone counting
-traffic-light simulation
-training/review/export tools
-```
+The repository's `scripts/update_test_run.ps1` may be used when the current candidate documentation says it is appropriate.
 
-```text
-Device Camera App
-```
+## 9. Testing a candidate
 
-The camera-side app. It will usually run on ESP32-CAM or a similar camera node. Its job is only:
+Use the exact current commands in `LOCAL_TESTING.md`. A normal validation includes:
 
-```text
-capture frames
-send frames to the PC
-provide simple camera settings/status
-```
+- Python compile/structure checks;
+- backend regression scripts;
+- live smoke with backend running;
+- frontend typecheck/build;
+- manual PC Studio acceptance checks;
+- repository/ZIP hygiene checks.
 
-It should not train the model or run heavy AI.
+Automated tests make a candidate test-ready; they do **not** make it the passed baseline.
 
-## 3. Recommended development order
+## 10. Owner acceptance rule
 
-Follow this order:
+The owner is the only authority that promotes a candidate.
 
-```text
-1. Open the placeholder PC GUI.
-2. Use mock/fake detection data.
-3. Add webcam or video-file input.
-4. Add pretrained object detection.
-5. Add traffic zones.
-6. Count pedestrians and vehicles inside zones.
-7. Add traffic-light simulation logic.
-8. Add data capture and review tools.
-9. Add ESP-CAM input.
-10. Add training/fine-tuning only if the pretrained model is not good enough.
-```
+If root `VERSION` shows `version` different from `passed_baseline`, the candidate remains unaccepted. After testing, the owner should explicitly state that it passes/works before a later repository update changes `passed_baseline`.
 
-Do not start with ESP-CAM, segmentation, or training unless there is a specific reason.
+## 11. Data privacy
 
-## 4. Folder map
+Traffic imagery may include people, vehicles, license plates, or school surroundings. Before storing/sharing real data:
 
-```text
-AI_Traffic_Light/
-  README.md                         project overview
-  VERSION                           current project version
-  CHANGELOG.md                      version history
-  AGENTS.md                         short rules for AI agents
-  docs/
-    START_HERE.md                   first human orientation
-    HUMAN_GUIDE.md                  this file
-    AI_AGENT_GUIDE.md               detailed AI-agent instructions
-    DEVELOPMENT_WORKFLOW.md         development sequence
-    ROADMAP.md                      milestone plan
-    VERSIONING.md                   version and patch rules
-  apps/
-    pc-studio/
-      frontend/                     React/Vite GUI placeholder
-      backend/                      Python/FastAPI backend placeholder
-    device-camera/
-      esp32-cam/                    ESP32-CAM firmware placeholder
-  packages/
-    schema/                         shared JSON/data schemas
-    ui/                             shared UI planning/component notes
-  samples/                          small sample files
-  datasets/                         dataset placeholders
-  models/                           model placeholders
-  outputs/                          generated output placeholders
-```
+- follow school/local privacy rules;
+- minimize identifiable faces/plates;
+- prefer synthetic/demo media when possible;
+- keep only data needed for the experiment;
+- never place sensitive datasets in a source patch.
 
-## 5. GitHub web upload workflow
+## 12. Safety boundary
 
-If you are uploading patches through the GitHub website:
+Appropriate uses include classroom demonstrations, model junctions, recorded/synthetic analysis, local computer-vision experiments, and supervised simulated decision support.
 
-1. Download the patch zip.
-2. Unzip it.
-3. Open the repository folder on GitHub:
-
-```text
-https://github.com/henrywork059/AiTL/tree/main/AI_Traffic_Light
-```
-
-4. Upload the changed files into the matching folders.
-5. Replace existing files when GitHub asks.
-6. Use a clear commit message.
-
-Example commit message:
-
-```text
-Patch v0_0_2: add human and AI-agent docs
-```
-
-Important: future patch zips should contain **only changed files**, not the whole repository.
-
-## 6. Versioning rule
-
-The project uses underscore versions:
-
-```text
-0_0_0 = initial skeleton
-0_0_1 = documentation/version cleanup
-0_0_2 = human and AI-agent instruction docs
-```
-
-Small patches should increase the last number:
-
-```text
-0_0_3
-0_0_4
-0_0_5
-```
-
-Larger milestones can use:
-
-```text
-0_1_0
-0_2_0
-```
-
-## 7. What a good first demo should show
-
-A strong first demo should show:
-
-```text
-camera/video frame
-boxes around pedestrians and vehicles
-zones drawn on the road/crossing
-counts for pedestrians and vehicles
-traffic-light state
-reason for the current decision
-```
-
-Example display:
-
-```text
-Pedestrians waiting: 4
-Pedestrians crossing: 1
-Vehicles waiting: 7
-Current phase: vehicle green
-Suggested action: extend pedestrian green next cycle
-```
-
-## 8. Safety notes
-
-This project should only simulate traffic-light behavior or control a small model/LED demo.
-
-Safe uses:
-
-```text
-classroom demo
-model junction
-traffic-light GUI simulation
-LED traffic-light model
-recorded video analysis
-human-supervised decision support
-```
-
-Unsafe or out-of-scope uses:
-
-```text
-controlling real public traffic lights
-deploying on public roads without certification
-relying on AI detection as the only safety layer
-bypassing traffic-signal hardware safety systems
-```
-
-## 9. Data privacy notes
-
-Traffic camera data may include people, vehicles, license plates, and school surroundings.
-
-Before saving or sharing real video/images:
-
-```text
-check school rules
-avoid identifiable faces if possible
-avoid publishing license plates
-use sample/demo footage when possible
-store only what is needed
-```
-
-For GitHub, prefer:
-
-```text
-small fake samples
-placeholder JSON
-synthetic/demo images
-```
-
-Do not upload large real datasets unless there is approval.
-
-## 10. Human decision checklist before each patch
-
-Before uploading a new patch, check:
-
-```text
-Does it match the project version?
-Does it only include changed files?
-Does it avoid secrets and private data?
-Does it keep the PC/device app split?
-Does it update CHANGELOG.md and VERSION if needed?
-Does it avoid public-road deployment claims?
-```
-
-## 11. Current status
-
-Current patch: **0_0_2**
-
-Current focus:
-
-```text
-documentation hygiene
-clear rules for AI agents
-clear instructions for humans
-safe project scope
-```
-
-Next likely development step:
-
-```text
-0_0_3 or 0_1_0: first runnable webcam/video detection prototype
-```
+Out of scope: public-road control, production signal-cabinet integration, bypassing safety systems, or relying on an unsupported AI detection as the only safety layer.

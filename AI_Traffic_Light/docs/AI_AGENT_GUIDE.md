@@ -1,232 +1,202 @@
 # AI Agent Guide
 
-This is the detailed operating guide for AI coding agents working on **AI Traffic Light (AiTL)**. `../AGENTS.md` is mandatory and takes priority when the two overlap.
+Detailed operating guide for AI coding agents working on **AI Traffic Light (AiTL)**. `../AGENTS.md` is mandatory and takes priority when instructions overlap.
 
 ## 1. Mental model
 
-AiTL is a local prototype with this flow:
+AiTL is a local prototype with several deliberately separate data/control paths:
 
 ```text
-receiver/simulated camera frame
-→ local object detection
-→ persisted zone geometry
-→ detection-centre zone counts
-→ simulation-only traffic recommendation
-→ PC Studio visualization
+camera/upload/simulation frame
+→ local inference
+→ tracking + zones
+→ occupancy / flow / zone-class observations
+→ ranked simulated signal controller
+→ PC Studio explanation/visualization
 ```
 
-It also contains a local data/model workflow:
+```text
+configured intersection/source identity + neighbour links
+→ network context
+→ decision explanation context
+```
+
+The second path is currently a **foundation**: topology/context does not itself create multi-intersection cooperation.
+
+Data/model workflow:
 
 ```text
-capture image + metadata
+capture + metadata
 → manual review/labels
 → managed YOLO dataset
-→ local Ultralytics training
+→ local training
 → model registry
-→ local live inference
+→ local inference
 ```
 
-No path in this project should turn those recommendations into direct public-road signal control.
+Isolated experiment workflow:
 
-## 2. Source-of-truth order
+```text
+saved signal profile + zone snapshot + density/seed
+→ separate Fixed simulator/controller
+→ separate Adaptive simulator/controller
+→ aligned synthetic telemetry
+```
 
-For a development task, resolve state in this order:
+No path converts these outputs into public-road signal commands.
 
-1. The owner's explicit current request.
-2. Current GitHub `main` content.
-3. Root `VERSION` release state.
-4. `AGENTS.md` and this guide.
-5. API/error/data contracts and current tests.
-6. Historical patch/roadmap documents for context only.
+## 2. Resolve authority before coding
 
-Historical docs are not evidence that a candidate passed. Only explicit owner acceptance can promote `passed_baseline`.
+Use `DOCUMENTATION_MAP.md`. For repository state:
+
+1. owner's explicit current instruction;
+2. current GitHub `main` source/tests/contracts;
+3. root `VERSION`;
+4. `AGENTS.md` + `PROJECT_SCOPE.md`;
+5. current candidate docs;
+6. durable guides;
+7. historical docs.
+
+If a durable guide contains an obsolete current-version claim, do not follow the stale claim. Fix the durable guide when that is within patch scope.
 
 ## 3. Version-state decision gate
 
-Before coding, read all five root `VERSION` fields.
+Read all `VERSION` fields before editing.
 
-### If `version != passed_baseline`
+### `version != passed_baseline`
 
-Treat the current version as unaccepted unless the owner explicitly says otherwise. Fix/harden that candidate. Do not increment automatically.
+Current version is an unaccepted candidate unless the owner explicitly says otherwise. Repair/harden the same candidate by default.
 
-### If the owner explicitly confirms the candidate passed
+### Owner explicitly confirms acceptance
 
-First record the promotion in the next patch/state update so `passed_baseline` reflects the accepted version. Normal future increments then continue from that accepted version unless the owner chooses a different version.
+Promote `passed_baseline` only in a repository update that records that explicit decision. Normal next-version work may then proceed from the accepted state unless the owner directs otherwise.
 
-### Never infer acceptance from
+Never infer acceptance from unit tests, builds, upload to `main`, a test-ready label, or agent judgment.
 
-- unit tests;
-- successful build;
-- “looks good” in agent-generated output;
-- presence on GitHub `main`;
-- a patch document calling something test-ready.
+## 4. Capability-claim gate
 
-## 4. Preflight repository inspection
+Before documenting a capability, classify it using `PROJECT_SCOPE.md`:
 
-For every non-trivial patch, inspect:
+- implemented;
+- foundation;
+- simulation-only;
+- planned;
+- out of scope.
+
+A schema, toggle, source ID, configured link, class label, or placeholder does not prove the target behavior is implemented. For example, a neighbour link is topology metadata until a real multi-intersection simulator/controller uses neighbour information to alter a bounded decision.
+
+## 5. Preflight inspection
+
+For a non-trivial patch inspect, as relevant:
 
 ```text
 VERSION
 AGENTS.md
-relevant source files
-relevant tests
-API_CONTRACTS.md if HTTP behavior is involved
-ERROR_CODES.md and error_codes.py if errors are involved
-DATA_FORMAT.md/schema files if persisted data or coordinates are involved
+DOCUMENTATION_MAP.md
+PROJECT_SCOPE.md
+relevant source + tests
+API_CONTRACTS.md
+ERROR_CODES.md / error_codes.py
+DATA_FORMAT.md / schemas
+ARCHITECTURE.md / CODE_STRUCTURE.md
 LOCAL_TESTING.md
 TEST_READY_CHECKLIST.md
+PATCH_<version>.md
 ```
 
-Also inspect nearby modules before adding a new abstraction. Reuse existing services/types/helpers when their responsibility already matches the need.
+Inspect nearby modules before adding a new abstraction. Reuse existing services/types/helpers when ownership already matches.
 
-## 5. Change-size decision rules
+## 6. Change-size decision rules
 
-Prefer the smallest cohesive change.
+Prefer the smallest cohesive change. Refactor when duplication or ownership ambiguity materially blocks the request, not merely because a file is long.
 
-Refactor when one of these is true:
+For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. Establish identity/state/transfer evidence before cooperation algorithms. Do not hard-code exactly two intersections into generic services.
 
-- the same project fact/constant is duplicated across multiple runtime surfaces;
-- a file owns multiple unrelated responsibilities;
-- the same validation/error mapping is repeated;
-- a page/service is difficult to test because I/O and business rules are entangled;
-- adding the requested feature would otherwise require copy/paste logic.
-
-Do not refactor merely because a file is long. A large training/inference service can be legitimate if its functions are cohesive. Split only when the ownership boundary is clear and tests can verify it.
-
-## 6. Backend implementation protocol
+## 7. Backend implementation protocol
 
 ### Routes
 
-Routes translate HTTP input/output. They should:
+Routes translate HTTP input/output only:
 
-- accept Pydantic input where applicable;
-- call a service;
-- return the standard envelope/binary response;
-- attach/preserve request IDs;
-- avoid filesystem/model/training algorithms.
+- Pydantic input where applicable;
+- service call;
+- standard envelope or binary response;
+- request ID;
+- logging at the appropriate boundary.
+
+Do not place filesystem, topology validation, arbitration, training, or inference algorithms in routes.
 
 ### Services
 
-Services own business logic and side effects such as:
+Services own domain behavior/side effects. Important ownership includes:
 
-- capture persistence/deletion;
-- labeling and dataset build;
-- camera-frame state;
-- model discovery/loading;
-- inference;
-- training;
-- zone persistence/counting;
-- simulation-only traffic logic.
-
-Prefer explicit service return data over route-layer knowledge of internal files.
+- camera state: `camera_frames.py`;
+- detection/inference: inference service;
+- zones/occupancy: zones + traffic history;
+- tracking/flow: tracking + traffic flow;
+- signal arbitration: `signal_rules.py`;
+- isolated A/B simulation: `simulation_experiments.py`;
+- intersection/topology identity: `intersection_network.py`;
+- non-controlling explanation projection: `decision_context.py`.
 
 ### Core
 
-Cross-cutting mechanisms belong in `app/core/`:
+Cross-cutting envelopes, stable errors, request middleware, logging, root-version metadata, and shared atomic JSON primitives belong in `app/core/`.
 
-- API envelopes;
-- stable errors/exceptions;
-- logging;
-- request middleware;
-- project runtime metadata.
+## 8. Frontend implementation protocol
 
-Backend release version surfaces must use `app/core/project_version.py`, which validates root `VERSION`. Do not reintroduce literal release strings in `main.py`, health, smoke, or template state.
+Keep page behavior in pages, reusable rendering in components, HTTP logic in the API layer, and shared response shapes in TypeScript types.
 
-## 7. Frontend implementation protocol
+For overlays, persist canonical image/reference coordinates and scale only for display. For dense analytics/experiments/explanations, use tabs/panels/details/dropdowns/filtering/internal scrolling rather than an unbounded dashboard.
 
-`App.tsx` should coordinate top-level state/navigation only. Put page behavior in pages, reusable rendering in components, and HTTP behavior in the existing API client/functions.
+Periodic async polling must not overlap. Prefer the shared serial scheduler or an equivalent self-scheduling pattern.
 
-Use shared TypeScript types rather than recreating response shapes locally. Use `src/constants/projectVersion.ts` for frontend release fallbacks/navigation; do not repeat literal release strings in `api.ts`, Dashboard, or navigation metadata.
+## 9. Data-integrity and semantics protocol
 
-For camera/inference overlays:
+Treat datasets, labels, runtime config, models, histories, and experiment outputs as user data.
 
-- canonical boxes/zones remain in source/reference image coordinates;
-- scale only for the displayed frame/canvas;
-- do not persist browser/canvas pixel coordinates as canonical data;
-- keep visibility toggles presentation-only unless the user explicitly requests inference changes.
+Never conflate:
 
-For traffic analytics:
+- occupancy with flow;
+- a zone/class per-frame count with throughput;
+- configured travel time with measured arrival time;
+- Simulation Lab data with live histories;
+- manual/synthetic events with AI detections.
 
-- treat per-frame counts as occupancy observations and never sum them into throughput;
-- V022 flow events come from explicit cross-frame track identity plus counting-line/region transitions;
-- only call a passage unique when one stable track generates one `line_crossing` event for that counting line;
-- keep `counting_region` and `counting_line` analytics-only and separate from simulation recommendations;
-- preserve frame deduplication so multiple API/background polls cannot double-count one source frame;
-- document that the current centroid/IoU tracker can lose/swap IDs under occlusion/crowding.
+When changing deletion/build/persistence logic, define paired files, failure behavior, locks, stale markers, and stable error paths.
 
-For mutation APIs, do not silently hide real backend errors behind offline fallback behavior unless the existing contract intentionally does so.
+## 10. Signal and network safety protocol
 
-## 8. Data-integrity protocol
+Ranked scenarios may alter bounded **simulated** phase timing or request protected service sooner. Preserve protected minimums, maximums, cycle limits, phase sequence, stale fallback, persistence/cooldown, and incident recovery.
 
-Treat these as user data, not disposable build artifacts:
+For future multi-intersection cooperation:
 
-```text
-datasets/captures/**
-datasets/yolo/**
-outputs/training/**
-manual label JSON
-runtime zone/settings JSON
-outputs/traffic_history/**
-outputs/traffic_flow/**
-trained *.pt files
-```
+- use per-intersection controller/runtime state;
+- use explicit transfer/arrival events or predictions;
+- retain deterministic protected local safety bounds;
+- record which neighbour context changed a decision;
+- compare cooperative against independent control in the same seeded demand scenario.
 
-When changing deletion/build logic:
+For emergency priority, begin with simulation/configured events unless a compatible detector is intentionally introduced. Record event lifecycle and recovery. Do not equate an arbitrary class label with validated emergency recognition.
 
-- define the complete set of paired files;
-- handle partial failures deliberately;
-- update counts/status after successful changes;
-- preserve stale/rebuild markers for derived datasets;
-- test missing-file and failure paths using stable error codes.
+## 11. API/error/logging protocol
 
-Patch archives must never contain those runtime paths/files.
+Use the standard envelopes and central stable error codes. Do not invent one-off route error JSON. Binary/image/CSV responses retain `X-Request-ID`.
 
-## 9. API/error/logging protocol
+When endpoints/schemas/errors change, update contract docs and focused tests in the same patch.
 
-Success and errors must keep the established envelopes. Stable domain failures use central error codes and `AppError`; unexpected failures reach the global handler and are logged.
+## 12. Testing protocol
 
-Do not invent one-off error JSON in a route.
-
-Binary image responses are the exception to the JSON body format but still carry `X-Request-ID`.
-
-When adding/changing an endpoint, update the contract docs and tests in the same patch.
-
-## 10. Safety protocol for traffic logic
-
-Allowed language/code intent:
-
-```text
-simulation phase
-recommendation
-visualized signal
-model junction
-classroom prototype
-supervised test
-```
-
-Forbidden project direction without a separate explicitly approved and safety-engineered project scope:
-
-```text
-public-road controller
-physical cabinet integration
-production autonomous signal authority
-bypass/failsafe defeat
-```
-
-A GUI traffic-light graphic must be described as simulated/display-only.
-
-## 11. Testing protocol
-
-Use the backend `.venv` for backend scripts when available. A normal local validation pass should include:
+Use the backend `.venv` when available. Typical validation:
 
 ```powershell
 python -m compileall .\apps\pc-studio\backend\app .\scripts
 python .\scripts\check_structure.py
 ```
 
-Then run the service/API regression scripts relevant to the patch. With the backend running, run `scripts/test_backend_smoke.py`.
+Then run focused and inherited regressions relevant to the changed ownership. Run live `test_backend_smoke.py` with the backend active when practical.
 
-Frontend validation:
+Frontend:
 
 ```powershell
 npm ci
@@ -234,65 +204,58 @@ npm run typecheck
 npm run build
 ```
 
-Repository hygiene:
+Repository/handoff hygiene:
 
 ```text
 git diff --check
 version-surface check
-forbidden runtime/generated-file scan
+runtime/generated-file exclusion scan
 patch ZIP validation
+manifest comparison
+SHA-256
 ```
 
-Do not claim a command passed unless it actually ran in the current environment.
+State clearly what did and did not run.
 
-## 12. Patch assembly protocol
+## 13. Documentation synchronization protocol
 
-Build the archive from the known changed-file list, not by zipping the project root.
+Follow `DOCUMENTATION_MAP.md` instead of mechanically editing every document.
 
-Expected member shape:
+Long-lived guides should describe rules without hard-coded current release state. Current candidate details belong in `VERSION`, `START_HERE`, current `PATCH_*`, `LOCAL_TESTING`, and `TEST_READY_CHECKLIST`.
 
-```text
-AI_Traffic_Light/VERSION
-AI_Traffic_Light/CHANGELOG.md
-AI_Traffic_Light/apps/...
-AI_Traffic_Light/docs/...
-```
+When planned scope changes, update `PROJECT_SCOPE.md` and `ROADMAP.md`. When architecture ownership changes, update `ARCHITECTURE.md` and `CODE_STRUCTURE.md`. When the API/data/error contract changes, update its dedicated contract.
 
-Never include runtime/generated paths. Run:
+## 14. Patch assembly protocol
 
-```powershell
-python .\scripts\validate_patch_zip.py <patch.zip>
-```
+Build from an explicit changed-file manifest, not the project root. Every archive member begins with `AI_Traffic_Light/`. Exclude runtime/generated content. Validate archive integrity and compare members to the intended manifest.
 
-Then independently compare the ZIP manifest with the intended change manifest.
+## 15. Handoff protocol
 
-## 13. Handoff protocol
+Tell the owner exactly:
 
-A useful handoff tells the owner exactly:
+- candidate/version decision;
+- files changed;
+- implemented vs foundation/planned changes;
+- limitations;
+- checks actually run;
+- checks still required locally;
+- acceptance steps;
+- archive/manifest hash.
 
-- why the patch stays on or increments the current version;
-- what files changed;
-- what behavior changed and what did not;
-- what automated/targeted checks ran;
-- what could not be tested;
-- what manual acceptance checks to perform;
-- SHA-256 of the ZIP.
+Do not mark a passed baseline until explicit owner acceptance.
 
-Do not write “passed baseline” until the owner explicitly confirms manual acceptance.
+## 16. Common failure patterns
 
-## 14. Common failure patterns to avoid
-
-- Starting a new version while the current candidate is still unaccepted.
-- Hard-coding release strings in multiple backend surfaces.
-- Putting service logic into FastAPI routes.
-- Growing `App.tsx` with page-specific business logic.
-- Treating datasets/training outputs as disposable Git clutter.
-- Running `git clean -fd` on the user's working copy.
-- Packaging the full repository instead of changed files.
-- Calling synthetic/unit checks a full regression pass.
-- Editing historical changelog versions during a stale-version scan.
-- Describing simulated recommendations as real traffic control.
-
-## 15. When context is incomplete
-
-Inspect the repository first. If a safe, narrow assumption is possible, make it explicit in `docs/PATCH_<version>.md` and continue. Do not broaden scope just to avoid uncertainty.
+- using a stale durable guide as release truth;
+- silently starting a new version while a candidate is unaccepted;
+- claiming configured topology as active cooperation;
+- claiming a detector class/manual flag as a validated perception capability;
+- putting service logic in routes;
+- duplicating controller/arbitration logic in a network module;
+- growing `App.tsx` into a domain container;
+- summing occupancy into throughput;
+- losing provenance between AI/simulation/manual observations;
+- destructive cleanup of runtime/user data;
+- full-repository patch ZIPs;
+- reporting unrun tests as passed;
+- rewriting historical version facts during documentation cleanup.
