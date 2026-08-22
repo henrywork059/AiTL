@@ -16,6 +16,17 @@ V031 consolidates existing V030 evidence without adding another signal-control m
 - on-demand projection for older stored network runs without rewriting them;
 - detailed legacy histories retained for drill-down/backward compatibility.
 
+## V031 acceptance/stability gate
+
+Before N-intersection generalization, keep the repaired V031 decision model stable:
+
+- one explicit higher-level overlay owner per intersection/tick;
+- ranked scenario evaluation once per tick with non-reapplying post-advisory snapshots;
+- meaningful protected-service request lifecycle rather than stale status-only requests;
+- transition-oriented arbitration evidence and normalized arbitration context;
+- retained seven-mode ablation semantics (class-aware and emergency-priority are not yet one integrated mode);
+- complete-repository regressions and owner acceptance before `passed_baseline` changes.
+
 ## Priority 1 — generalize network orchestration
 
 After the selected two-intersection evidence is stable:

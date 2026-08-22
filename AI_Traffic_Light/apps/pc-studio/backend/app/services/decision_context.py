@@ -25,10 +25,26 @@ def _scenario_conditions(signal: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def _active_requested_service(signal: dict[str, Any]) -> str | None:
+    """Return only lifecycle-backed active service requests.
+
+    Older/live signal status may expose a legacy ``pending_request`` flag that
+    can remain set after the relevant timing adjustment. V031 decision context
+    must not treat that descriptive flag as causal service state unless an
+    explicit lifecycle object says the request is still active.
+    """
+
+    lifecycle = signal.get("service_request")
+    if not isinstance(lifecycle, dict) or not bool(lifecycle.get("active")):
+        return None
+    service = str(lifecycle.get("service") or "").strip().lower()
+    return service if service in {"pedestrian", "vehicle"} else None
+
+
 def _category(signal: dict[str, Any], state: dict[str, Any]) -> str:
     if signal.get("incident_hold"):
         return "incident_test_hold"
-    request = signal.get("pending_request")
+    request = _active_requested_service(signal)
     if request == "pedestrian":
         return "pedestrian_service"
     if request == "vehicle":
@@ -111,7 +127,7 @@ def build_decision_context(
             "label": winner_label,
             "conditions": conditions,
         },
-        "requested_service": signal.get("pending_request"),
+        "requested_service": _active_requested_service(signal),
         "timing": {
             "base_duration_seconds": signal.get("base_duration_seconds"),
             "effective_duration_seconds": signal.get("effective_duration_seconds"),

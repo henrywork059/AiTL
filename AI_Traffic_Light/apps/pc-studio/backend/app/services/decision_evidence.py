@@ -89,6 +89,7 @@ def export_network_decision_evidence_csv(evidence: dict[str, Any]) -> str:
             "pedestrian_context",
             "vehicle_class_context",
             "emergency_context",
+            "arbitration_context",
             "source_ref",
         ]
     )
@@ -124,6 +125,7 @@ def export_network_decision_evidence_csv(evidence: dict[str, Any]) -> str:
                 _compact_context(context.get("pedestrian")),
                 _compact_context(context.get("vehicle_class")),
                 _compact_context(context.get("emergency")),
+                _compact_context(context.get("arbitration")),
                 record.get("source_ref", ""),
             ]
         )
@@ -228,6 +230,7 @@ def _coordination_records(run_id: str, mode: str, payload: dict[str, Any]) -> li
                     },
                     "vehicle_class": {},
                     "emergency": {},
+                    "arbitration": _dict_or_empty(event.get("arbitration")),
                 },
                 explanation=f"Neighbour cooperation {action}; {reason}",
             )
@@ -246,7 +249,7 @@ def _pedestrian_records(run_id: str, mode: str, payload: dict[str, Any]) -> list
         action = str(event.get("action") or "none")
         if applied:
             decision = "grant"
-        elif action in {"pedestrian_service_pending", "pedestrian_request_queued"}:
+        elif action in {"pedestrian_service_pending", "pedestrian_request_queued"} or action.startswith("defer_for_"):
             decision = "defer"
         elif action.startswith("deny_"):
             decision = "deny"
@@ -283,6 +286,7 @@ def _pedestrian_records(run_id: str, mode: str, payload: dict[str, Any]) -> list
                     },
                     "vehicle_class": {},
                     "emergency": {},
+                    "arbitration": _dict_or_empty(event.get("arbitration")),
                 },
                 explanation=f"Pedestrian-aware guard {action}; {reason}",
             )
@@ -337,6 +341,7 @@ def _vehicle_class_records(run_id: str, mode: str, payload: dict[str, Any]) -> l
                         "min_waiting": event.get("min_waiting"),
                     },
                     "emergency": {},
+                    "arbitration": _dict_or_empty(event.get("arbitration")),
                 },
                 explanation=f"Vehicle-class-aware priority {action}; {reason}",
             )
@@ -386,6 +391,7 @@ def _emergency_priority_records(run_id: str, mode: str, payload: dict[str, Any])
                         "role": event.get("role"),
                         "eta_seconds": event.get("eta_seconds"),
                     },
+                    "arbitration": _dict_or_empty(event.get("arbitration")),
                 },
                 explanation=f"Emergency priority {decision}: {action}; {reason}",
             )
@@ -495,6 +501,7 @@ def _record(
             "pedestrian": _dict_or_empty(context.get("pedestrian")),
             "vehicle_class": _dict_or_empty(context.get("vehicle_class")),
             "emergency": _dict_or_empty(context.get("emergency")),
+            "arbitration": _dict_or_empty(context.get("arbitration")),
         },
         "provenance": provenance,
         "reason": reason,

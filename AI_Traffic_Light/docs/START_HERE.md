@@ -2,6 +2,8 @@
 
 Root `VERSION` is authoritative. V031 / `0_3_1` is the current unaccepted candidate; V024 / `0_2_4` remains the owner-confirmed passed baseline. V030 is the previous candidate because the owner explicitly requested V031 before separately accepting V030.
 
+The current same-candidate repair adds explicit network-overlay arbitration, non-reapplying post-advisory snapshots, and protected-service request lifecycle metadata. The seven experiment modes remain ablation/comparison modes; no integrated class+emergency mode is claimed.
+
 ## What V031 changes
 
 V031 keeps the seven V030 network modes and their protected timing behavior unchanged. It adds **persistent normalized explainability/evidence** so users and future agents do not need separate parsers for every scenario/cooperation/pedestrian/class/emergency history shape.

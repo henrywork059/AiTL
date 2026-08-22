@@ -37,7 +37,7 @@ saved profile + zones + density + seed
 
 Experiment controllers/agents are separate from the live camera/controller runtime.
 
-## 3. Network/explanation foundation and V027 experiment path
+## 3. Network/explanation foundation and V031 experiment path
 
 ```text
 camera/source id
@@ -53,7 +53,7 @@ DecisionContext projection
 
 The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. These live services still do not create a second live signal controller.
 
-V027 keeps the isolated experiment path and adds a bounded cooperation layer:
+The current V031 benchmark keeps the isolated experiment path and layers bounded pedestrian, class, emergency, cooperation and evidence behavior over the protected controller:
 
 ```text
 same seeded exogenous demand
@@ -71,15 +71,17 @@ same seeded exogenous demand
  per-intersection + network + coordination telemetry
 ```
 
-`network_simulation_experiments.py` owns this isolated path. It creates separate controller instances, explicit synthetic transfer events, and a simulation-only downstream coordinator without touching live camera/controller runtime.
+`network_simulation_experiments.py` owns this isolated path. It creates separate controller instances, explicit synthetic transfer events, and simulation-only network policy overlays without touching live camera/controller runtime. `network_policy_arbiter.py` is a pure selector that chooses one overlay owner per intersection/tick; it never changes timing directly. Ranked scenarios are evaluated once as the controller-owned base policy, then post-advisory reads use a non-reapplying snapshot.
 
-### V027 comparison modes
+V031 overlay priority is explicit: **incident hold > active pedestrian crossing > simulated emergency priority > pedestrian max-wait > configured vehicle-class priority > network cooperation**. This removes call-order arbitration between the network overlays. Protected phase order and min/max/cycle bounds remain controller-owned.
 
-- **Fixed** — configured normal timing.
-- **Independent Adaptive** — local ranked scenarios only.
-- **Cooperative Adaptive** — the same local adaptive controller plus neighbour-informed bounded timing advisories at the downstream intersection.
+The benchmark also gives protected-service requests a lifecycle (`service`, `source`, `priority`, `started_at_s`, satisfaction) so a status field is not mistaken for causal state after the requested service has begun.
 
-The coordinator does not replace `SignalRulesService`, does not reorder phases, and does not write a second signal policy. It may extend vehicle green only within saved phase/cycle caps or request earlier protected progression toward vehicle service. Active pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR.
+### Current comparison / ablation modes
+
+The seven modes remain separate comparison variants: Fixed, Independent Adaptive, Cooperative Adaptive, Pedestrian-aware Cooperative, Class-aware Cooperative, Emergency Baseline Cooperative, and Emergency-priority Cooperative. They are **not** one all-features-integrated controller. In particular, class-aware and emergency-priority overlays do not currently execute together in the same mode.
+
+The network overlays do not replace `SignalRulesService`, do not reorder phases, and do not write a second physical signal policy. They may change only bounded simulated phase duration/progression through the benchmark controller. Active crossing protection outranks simulated emergency priority; simulated emergency priority outranks pedestrian max-wait, while every protected phase minimum/sequence remains enforced.
 
 Live configured links remain **metadata**, not observed transfers. V027 transfer, predicted-arrival, and coordination events are synthetic simulator evidence. V029 emergency priority is likewise isolated synthetic experiment evidence, not live perception or hardware pre-emption.
 

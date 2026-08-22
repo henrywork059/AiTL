@@ -27,7 +27,7 @@ This same-candidate network-foundation update also adds:
 - `intersection_id` — resolved from the current camera/source id or the configured active-intersection fallback;
 - `observation_provenance` — `ai_detection | simulation | manual_test | unavailable`;
 - `network_context` — the configured intersection plus inbound/outbound neighbour links;
-- `decision_context` — deterministic decision id, category, source/intersection identity, winning scenario and observed conditions when available, requested service, timing, pedestrian/vehicle context, explicit emergency-placeholder state, neighbour context, and a readable explanation.
+- `decision_context` — deterministic decision id, category, source/intersection identity, winning scenario and observed conditions when available, lifecycle-backed requested service when available, timing, pedestrian/vehicle context, explicit emergency-placeholder state, neighbour context, and a readable explanation. Legacy `signal_policy.pending_request` alone is not treated as active causal service state.
 
 The decision context is a live explanation projection. Existing signal-rule history remains the persisted controller-event audit. Live/runtime `cooperative_control_active` remains false; V027 cooperation exists only inside isolated network experiments.
 
@@ -239,7 +239,7 @@ Each record includes:
 - normalized `decision`: `grant | deny | defer | observe`;
 - `action`, `applied`, `phase_before`, `phase_key_before`;
 - `timing.delta_seconds` plus previous/effective duration when present in the detailed source event; repaired V031 cooperation/pedestrian/class/emergency-priority events retain those before/after values for newly generated runs;
-- grouped `context.local`, `context.neighbour`, `context.pedestrian`, `context.vehicle_class`, `context.emergency`;
+- grouped `context.local`, `context.neighbour`, `context.pedestrian`, `context.vehicle_class`, `context.emergency`, and repaired-V031 `context.arbitration` when the source event exposes overlay arbitration;
 - `provenance`, `reason`, concise `explanation`;
 - `source_ref` pointing back to the preserved detailed mode-specific history.
 
@@ -248,7 +248,11 @@ Individual records intentionally omit the random experiment `run_id`; the enclos
 V031+ network scenario snapshots add the active ranked scenario/winner, local observations and available base/effective timing to each intersection result under `scenario_evidence_events`. This is evidence capture only and does not change scenario arbitration.
 
 Historical stored runs are not rewritten by `GET .../evidence`. The projection can only expose information actually present in the stored raw histories; for example, pre-V031 runs cannot recover scenario observation snapshots that were never persisted.
-The repaired V031 network orchestrator also prevents ordinary cooperation/class advisories from undoing a pedestrian starvation-prevention request in the same tick. Once local wait reaches `pedestrian_max_wait_seconds`, those ordinary vehicle advisories are deferred until pedestrian WALK/CLEAR begins. This is simulation-only arbitration and does not change the protected phase sequence or physical-control scope.
+The repaired V031 network orchestrator uses one explicit higher-level overlay owner per intersection/tick. Priority is `incident_hold > pedestrian_crossing > emergency_priority > pedestrian_max_wait > vehicle_class_priority > network_cooperation`; ranked scenarios remain the controller-owned base policy. Lower-priority triggered overlays return defer/protection evidence rather than mutating timing first. Post-advisory signal reads use non-reapplying snapshots, so ranked scenarios are evaluated once per simulation tick.
+
+Each mode result additionally exposes transition-oriented `policy_arbitration_events` and `network_metrics.policy_arbitration` (`evaluations`, `conflict_evaluations`, `owner_counts`, priority order). Timeline samples carry the latest source/destination arbitration snapshot. Repaired network signal snapshots may also expose `service_request` lifecycle metadata (`active`, request id, service, source, priority, reason, start time); the request clears when the requested protected service begins.
+
+The seven comparison modes remain ablation modes. `class_aware_cooperative` and `emergency_priority_cooperative` are not one simultaneously integrated class+emergency controller. No new endpoint or stable error code is introduced by the arbitration repair.
 
 No new stable error code is introduced; ordinary stored-experiment read errors remain `ATL-TRAFFIC-010`.
 

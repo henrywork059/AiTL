@@ -27,7 +27,11 @@ from app.services.decision_evidence import (  # noqa: E402
     build_network_decision_evidence,
     export_network_decision_evidence_csv,
 )
-from app.services.network_simulation_experiments import _NetworkModeSimulation  # noqa: E402
+from app.services.network_policy_arbiter import arbitrate_network_policy  # noqa: E402
+from app.services.network_simulation_experiments import (  # noqa: E402
+    _BenchmarkSignalRulesService,
+    _NetworkModeSimulation,
+)
 
 
 def _timed_outcome(outcome: dict, *, previous: float = 20.0) -> dict:
@@ -39,17 +43,26 @@ def _timed_outcome(outcome: dict, *, previous: float = 20.0) -> dict:
     }
 
 
+_EVIDENCE_CONTROLLERS: list["_EvidenceController"] = []
+
+
 class _EvidenceController(_FakeController):
-    def signal_state(self, clock_s: float) -> dict:
-        state = dict(super().signal_state(clock_s))
-        if self.mode == "adaptive" and state.get("phase_key") == "vehicle_green":
+    def __init__(self, config_path: Path, history_path: Path) -> None:
+        super().__init__(config_path, history_path)
+        self.signal_state_calls = 0
+        self.snapshot_state_calls = 0
+        _EVIDENCE_CONTROLLERS.append(self)
+
+    @staticmethod
+    def _decorate_state(controller: "_EvidenceController", state: dict) -> dict:
+        if controller.mode == "adaptive" and state.get("phase_key") == "vehicle_green":
             state.update(
                 {
                     "winning_scenario_id": "test_queue_extend",
                     "active_rules": ["test_queue_extend"],
                     "base_duration_seconds": 12.0,
                     "effective_duration_seconds": 15.0,
-                    "observations": dict(getattr(self, "observation", {})),
+                    "observations": dict(getattr(controller, "observation", {})),
                     "scenario_status": [
                         {
                             "scenario_id": "test_queue_extend",
@@ -61,6 +74,16 @@ class _EvidenceController(_FakeController):
                 }
             )
         return state
+
+    def signal_state(self, clock_s: float) -> dict:
+        self.signal_state_calls += 1
+        return self._decorate_state(self, dict(super().signal_state(clock_s)))
+
+    def snapshot_state(self, clock_s: float) -> dict:
+        self.snapshot_state_calls += 1
+        # Bypass this class' mutating/evaluating signal_state wrapper so the
+        # network runtime can prove post-advisory reads use snapshot semantics.
+        return self._decorate_state(self, dict(_FakeController.signal_state(self, clock_s)))
 
     def apply_network_coordination(self, **kwargs) -> dict:
         return _timed_outcome(super().apply_network_coordination(**kwargs))
@@ -351,8 +374,21 @@ def _assert_cross_layer_pedestrian_lock() -> None:
         "phase_key": "vehicle_green",
         "effective_duration_seconds": 12.0,
     }
+    arbitration = arbitrate_network_policy(
+        incident_hold=False,
+        phase_key="vehicle_green",
+        pedestrian_waiting=2,
+        pedestrian_crossing=0,
+        oldest_pedestrian_wait_seconds=31.0,
+        pedestrian_max_wait_seconds=30.0,
+        emergency_priority_active=False,
+        vehicle_class_priority_active=True,
+        cooperation_active=True,
+    )
+    assert arbitration.owner == "pedestrian_max_wait"
+    assert arbitration.conflict is True
 
-    simulation._evaluate_cooperation(31.0, signal)
+    simulation._evaluate_cooperation(31.0, signal, arbitration=arbitration)
     cooperation = simulation.coordination_events[-1]
     assert cooperation["action"] == "defer_for_pedestrian_max_wait"
     assert cooperation["applied"] is False
@@ -360,7 +396,9 @@ def _assert_cross_layer_pedestrian_lock() -> None:
     assert cooperation["effective_duration_seconds"] == 12.0
     assert simulation.destination.coordination_calls == 0
 
-    simulation._evaluate_vehicle_class_priority(31.0, simulation.destination, signal, role="destination")
+    simulation._evaluate_vehicle_class_priority(
+        31.0, simulation.destination, signal, role="destination", arbitration=arbitration
+    )
     class_event = simulation.vehicle_class_priority_events[-1]
     assert class_event["action"] == "defer_for_pedestrian_max_wait"
     assert class_event["applied"] is False
@@ -388,21 +426,66 @@ def _assert_cross_layer_pedestrian_lock() -> None:
     assert all(record["decision"] == "defer" for record in suppression_records)
     assert all(record["context"]["pedestrian"]["protected"] is True for record in suppression_records)
     assert all(record["context"]["pedestrian"]["max_wait_lock"] is True for record in suppression_records)
+    assert all(record["context"]["arbitration"]["owner"] == "pedestrian_max_wait" for record in suppression_records)
+    assert all(record["context"]["arbitration"]["conflict"] is True for record in suppression_records)
     assert all(record["timing"]["previous_duration_seconds"] == 12.0 for record in suppression_records)
     assert all(record["timing"]["effective_duration_seconds"] == 12.0 for record in suppression_records)
 
-    # Once pedestrian WALK/CLEAR begins, the starvation lock is released.
-    pedestrian_signal = {
-        "phase": "pedestrian_green",
-        "phase_key": "pedestrian_green",
-        "effective_duration_seconds": 8.0,
-    }
-    released = simulation._pedestrian_max_wait_lock(
-        clock_s=31.0,
-        runtime=simulation.destination,
-        signal=pedestrian_signal,
+    # Once pedestrian WALK/CLEAR begins, max-wait is no longer an overlay
+    # candidate because the requested protected service has begun.
+    released = arbitrate_network_policy(
+        incident_hold=False,
+        phase_key="pedestrian_green",
+        pedestrian_waiting=2,
+        pedestrian_crossing=0,
+        oldest_pedestrian_wait_seconds=31.0,
+        pedestrian_max_wait_seconds=30.0,
+        emergency_priority_active=False,
+        vehicle_class_priority_active=False,
+        cooperation_active=False,
     )
-    assert released["active"] is False
+    assert released.owner == "normal_timing"
+
+
+def _assert_service_request_priority_state() -> None:
+    controller = object.__new__(_BenchmarkSignalRulesService)
+    controller._phase_index = 1  # vehicle_yellow: neither service is active
+    controller._pending_request = None
+    controller._service_request_sequence = 0
+    controller._service_request_service = None
+    controller._service_request_priority = 0
+    controller._service_request_source = None
+    controller._service_request_reason = None
+    controller._service_request_started_at_s = None
+    controller._service_request_id = None
+    recorded: list[tuple[str, dict]] = []
+    controller._record_event_locked = lambda event_type, details: recorded.append((event_type, dict(details)))
+
+    assert controller._request_service_locked(
+        "pedestrian",
+        clock_s=10.0,
+        source="pedestrian_max_wait",
+        priority=700,
+        reason="test higher-priority pedestrian request",
+    ) is True
+    assert controller._pending_request == "pedestrian"
+    assert controller._service_request_priority == 700
+
+    assert controller._request_service_locked(
+        "vehicle",
+        clock_s=10.5,
+        source="network_cooperation",
+        priority=500,
+        reason="test lower-priority vehicle request",
+    ) is False
+    assert controller._pending_request == "pedestrian"
+    assert controller._service_request_source == "pedestrian_max_wait"
+    assert any(event_type == "service_request_suppressed" for event_type, _ in recorded)
+
+    controller._clear_service_request_locked(clock_s=12.0, reason="test protected service began")
+    assert controller._pending_request is None
+    assert controller._service_request_service is None
+    assert any(event_type == "service_request_satisfied" for event_type, _ in recorded)
 
 
 def _assert_service_projection_and_backfill() -> None:
@@ -414,6 +497,7 @@ def _assert_service_projection_and_backfill() -> None:
             zones_provider=_zones,
             controller_factory=_evidence_factory,
         )
+        _EVIDENCE_CONTROLLERS.clear()
         result = service.run(
             duration_seconds=120,
             density="busy",
@@ -442,6 +526,10 @@ def _assert_service_projection_and_backfill() -> None:
             emergency_priority_max_extension_seconds=5.0,
         )
         evidence = result["decision_evidence"]
+        expected_ticks = int(120 / 0.5)
+        assert _EVIDENCE_CONTROLLERS
+        assert all(controller.signal_state_calls == expected_ticks for controller in _EVIDENCE_CONTROLLERS)
+        assert any(controller.snapshot_state_calls > 0 for controller in _EVIDENCE_CONTROLLERS)
         assert evidence["schema_version"] == 1
         assert evidence["record_count"] > 0
         assert len({record["evidence_id"] for record in evidence["records"]}) == evidence["record_count"]
@@ -517,6 +605,7 @@ def _assert_service_projection_and_backfill() -> None:
 def main() -> int:
     _assert_schema_projection()
     _assert_cross_layer_pedestrian_lock()
+    _assert_service_request_priority_state()
     _assert_service_projection_and_backfill()
     print("V031 persistent decision evidence regression OK")
     return 0

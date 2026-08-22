@@ -67,7 +67,7 @@ app/core/         envelopes, errors, logging, middleware, version metadata, shar
 
 Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
 
-Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated current multi-mode two-intersection benchmark and protected simulation-only policy layers; it must not mutate live camera/controller state. `app/services/decision_evidence.py` owns the additive normalized V031 network evidence projection/export and must not perform signal arbitration.
+Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated current multi-mode two-intersection benchmark and protected simulation-only policy layers; it must not mutate live camera/controller state. `app/services/network_policy_arbiter.py` is the pure V031 network-overlay priority selector: it chooses one higher-level overlay owner per intersection/tick but does not mutate timing itself. `app/services/decision_evidence.py` owns the additive normalized V031 network evidence projection/export and must not perform signal arbitration.
 
 Network/topology identity belongs in `app/services/intersection_network.py`. Structured live explanation projection belongs in `app/services/decision_context.py`; normalized stored network-experiment evidence belongs in `app/services/decision_evidence.py`. V031 network transfer, cooperation, pedestrian-aware, vehicle-class-aware, scenario, and emergency evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, live class priority, emergency priority, or multi-camera live-controller operation.
 
@@ -197,7 +197,9 @@ Handoff must include:
 - exact owner acceptance checks;
 - ZIP/manifest hashes.
 
-The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is insufficient.
+The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is insufficient. Prefer applying the overlay locally and pushing one atomic Git commit (or merging one PR) rather than uploading files piecemeal. If web upload is used, verify every manifest member is present in the same resulting candidate commit before treating GitHub as the patch base.
+
+After explicit owner acceptance, update `passed_baseline` in repository metadata before normal next-version development. When the owner's Git workflow permits it, also create an immutable tag such as `passed-0_3_1` on the accepted commit so a known-good checkout/rollback target exists; the root `VERSION` file remains the release-state authority.
 
 ## 12. Local update safety after GitHub upload
 
@@ -215,6 +217,10 @@ Only pull when the working tree situation is understood. Preserve runtime data a
 ## 13. When uncertain
 
 Choose the smallest safe interpretation that preserves accepted behavior, current candidate state, data semantics, and the prototype-only safety boundary. If repository evidence and an old document disagree, prefer current code/contracts/`VERSION` and update the stale durable document as part of the patch when appropriate.
+
+### Network policy-arbitration rule
+
+In the isolated network benchmark, ranked scenarios are the controller-owned base policy and higher-level network overlays must not compete through call order. Use the pure network policy arbiter and one overlay owner per intersection/tick. Current priority order is incident hold > active pedestrian crossing > simulated emergency priority > pedestrian max-wait > configured regular vehicle-class priority > network cooperation. Post-advisory signal reads must use non-reapplying snapshot semantics. The existing seven modes are comparison/ablation modes; do not claim class-aware and emergency-priority overlays are simultaneously integrated unless a future explicit integrated mode is implemented and tested.
 
 ### Persistent decision-evidence rule
 

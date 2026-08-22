@@ -1,11 +1,11 @@
-# V027 Acceptance Checklist
+# V031 Acceptance Checklist
 
-V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks do not promote V027.
+V031 / `0_3_1` is the current unaccepted candidate. V030 / `0_3_0` is the previous candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks do not promote V031.
 
 ## Release / packaging
 
-1. `VERSION` reports `0_2_7`, previous `0_2_6`, passed baseline `0_2_4`, and candidate status.
-2. `docs/PATCH_0_2_7.md` and a V027 changelog section exist.
+1. `VERSION` reports `0_3_1`, previous `0_3_0`, passed baseline `0_2_4`, and candidate status.
+2. `docs/PATCH_0_3_1.md` and a V031 changelog section exist.
 3. Changed-files ZIP contains only `AI_Traffic_Light/` paths and excludes runtime/generated data.
 4. Python compile, structure checks, relevant regressions, frontend typecheck/build, live smoke, `git diff --check`, and ZIP validation pass locally.
 
@@ -150,3 +150,17 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 114. `pedestrian_service_pending` / `pedestrian_request_queued` normalize to `defer`, not `observe`.
 115. Full inherited backend regression, live API smoke, frontend typecheck/build, structure check, and full-repository `git diff --check` pass on the owner checkout.
 116. Owner explicitly confirms V031 passed before `passed_baseline` changes.
+## V031 conflict/arbitration repair acceptance
+
+117. `scripts/test_network_policy_arbiter.py` passes and proves the documented overlay priority order.
+118. `scripts/test_network_service_request_lifecycle.py` passes in the complete repository.
+119. Repaired benchmark controllers evaluate ranked scenarios once per simulation tick; post-advisory snapshots do not reapply ranked-scenario timing.
+120. When class priority and cooperation trigger together, class priority owns the destination overlay and cooperation records a defer rather than mutating timing first.
+121. Pedestrian max-wait owns ordinary class/cooperation conflicts; an in-lookahead simulated emergency owns max-wait conflicts unless an active pedestrian crossing owns clearance protection.
+122. `service_request` metadata is causal/lifecycle state in the network benchmark and clears when requested protected service begins; stale `pending_request` is not left after satisfaction.
+123. `policy_arbitration_events` are transition-oriented and `network_metrics.policy_arbitration` exposes evaluation/conflict/owner counts.
+124. New normalized cooperation/pedestrian/class/emergency evidence includes `context.arbitration` when source events contain it.
+125. The seven modes are treated as comparison/ablation modes; no acceptance claim says class-aware and emergency-priority overlays execute together in one integrated mode.
+126. Candidate upload is atomic where practical (single commit/PR); if web upload is used, all manifest members are verified on GitHub before local pull.
+127. After explicit V031 acceptance, `passed_baseline` is updated before V032 and an immutable accepted tag is recommended for rollback.
+128. `scripts/test_decision_context_request_semantics.py` passes; legacy `pending_request` without active lifecycle metadata does not appear as causal `decision_context.requested_service`.

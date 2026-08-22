@@ -25,6 +25,31 @@ The current V031 candidate was reviewed against GitHub `main` before acceptance.
 
 The focused V031 regression includes a direct cross-layer test proving ordinary cooperation/class handlers are not invoked while the max-wait lock is active and that the lock releases once pedestrian WALK/CLEAR starts.
 
+## Second same-candidate conflict/decision repair
+
+A second review found that the earlier max-wait lock fixed one conflict but the benchmark still allowed several network overlays to rely on execution order. This repair keeps V031 and introduces a pure arbitration layer:
+
+```text
+incident hold
+> active pedestrian crossing
+> simulated emergency priority
+> pedestrian maximum-wait protection
+> configured regular vehicle-class priority
+> network cooperation
+> ranked scenario base policy
+> normal timing
+```
+
+`network_policy_arbiter.py` selects exactly one higher-level overlay owner per intersection/tick. It does not mutate timing. Lower-priority triggered overlays record a bounded defer/protection outcome rather than mutating first and being overwritten later.
+
+Ranked scenarios remain `SignalRulesService` base behavior, but the network runtime now evaluates them once per tick. Re-reads after pedestrian/cooperation/class/emergency adjustments use `snapshot_state()` and therefore do not reapply ranked-scenario timing.
+
+The benchmark adapter also upgrades protected-service request state: requests retain service/source/priority/start metadata, lower-priority replacement is suppressed, and the request is marked satisfied/cleared when the corresponding protected service begins. Request lifecycle events remain simulator history only. Live `decision_context` is correspondingly conservative: it only calls a service request active when explicit lifecycle metadata says so, rather than treating the legacy stale-capable `pending_request` flag as causal.
+
+The result adds transition-oriented `policy_arbitration_events`, `network_metrics.policy_arbitration`, timeline arbitration snapshots, and normalized `context.arbitration` on repaired cooperation/pedestrian/class/emergency evidence. This is additive to schema v1.
+
+The existing seven modes remain comparison/ablation modes. V031 still does **not** implement one mode where class-aware and emergency-priority overlays execute together.
+
 ## Implemented
 
 ### Schema-v1 normalized decision ledger
@@ -112,4 +137,10 @@ Owner acceptance should confirm:
 9. JSON and CSV evidence endpoints preserve standard API/request-ID behavior;
 10. no evidence service changes protected signal timing or introduces a public-road control claim;
 11. a max-wait pedestrian request cannot be undone by ordinary cooperation or class-priority extension before pedestrian service begins;
-12. newly generated cooperation/pedestrian/class/emergency-priority evidence retains previous/effective timing when the controller supplies it, and pending/queued pedestrian requests normalize to `defer`.
+12. newly generated cooperation/pedestrian/class/emergency-priority evidence retains previous/effective timing when the controller supplies it, and pending/queued pedestrian requests normalize to `defer`;
+13. pure network-policy arbitration obeys the documented priority order and permits one overlay owner per intersection/tick;
+14. class-priority/cooperation conflicts defer cooperation, pedestrian max-wait defers ordinary class/cooperation, emergency priority outranks max-wait, and active crossing protection outranks emergency;
+15. post-advisory snapshots do not perform a second ranked-scenario evaluation in the same tick;
+16. network protected-service request lifecycle starts/suppresses/satisfies correctly and does not leave stale pending state after service begins;
+17. arbitration metrics/events/context are present without creating a new physical/live controller;
+18. candidate files are uploaded atomically where practical and the full manifest is verified before treating GitHub as the new patch base.

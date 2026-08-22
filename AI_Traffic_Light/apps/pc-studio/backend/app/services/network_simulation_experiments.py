@@ -22,6 +22,12 @@ from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 from app.services.decision_evidence import build_network_decision_evidence, export_network_decision_evidence_csv
 from app.services.intersection_network import intersection_network_service
+from app.services.network_policy_arbiter import (
+    POLICY_PRIORITIES,
+    PolicyArbitration,
+    arbitrate_network_policy,
+    defer_action_for,
+)
 from app.services.signal_rules import PHASE_SEQUENCE, SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
 
@@ -139,6 +145,13 @@ class _BenchmarkSignalRulesService(SignalRulesService):
     def __init__(self, *, config_path: Path, history_path: Path) -> None:
         self._benchmark_clock_s = 0.0
         super().__init__(config_path=config_path, history_path=history_path)
+        self._service_request_sequence = 0
+        self._service_request_service: str | None = None
+        self._service_request_priority = 0
+        self._service_request_source: str | None = None
+        self._service_request_reason: str | None = None
+        self._service_request_started_at_s: float | None = None
+        self._service_request_id: str | None = None
 
     def set_benchmark_clock(self, clock_s: float) -> None:
         self._benchmark_clock_s = max(0.0, float(clock_s))
@@ -195,6 +208,186 @@ class _BenchmarkSignalRulesService(SignalRulesService):
             fresh = True
         fallback_reason = None if fresh else "Adaptive observations are stale or unavailable; normal configured timing is active."
         return base, fresh, fallback_reason
+
+    def _service_request_active_phase(self, service: str, phase_key: str) -> bool:
+        if service == "pedestrian":
+            return phase_key in {"pedestrian_green", "pedestrian_flashing"}
+        if service == "vehicle":
+            return phase_key == "vehicle_green"
+        return False
+
+    def _request_service_locked(
+        self,
+        service: str,
+        *,
+        clock_s: float,
+        source: str,
+        priority: int,
+        reason: str,
+    ) -> bool:
+        """Persist one meaningful protected-service request lifecycle.
+
+        The base controller historically exposed ``pending_request`` mainly as
+        descriptive status. The isolated network benchmark now attaches source,
+        priority and lifecycle metadata, prevents lower-priority request
+        replacement, and clears a request when the requested protected service
+        actually begins. Phase order is unchanged.
+        """
+
+        normalized = str(service or "").strip().lower()
+        if normalized not in {"pedestrian", "vehicle"}:
+            return False
+        phase_key = PHASE_SEQUENCE[self._phase_index][0]
+        if self._service_request_active_phase(normalized, phase_key):
+            if getattr(self, "_service_request_service", None) == normalized:
+                self._clear_service_request_locked(clock_s=clock_s, reason="requested protected service is already active")
+            return False
+
+        current_service = getattr(self, "_service_request_service", None)
+        current_priority = int(getattr(self, "_service_request_priority", 0) or 0)
+        if current_service and current_service != normalized and current_priority > int(priority):
+            self._record_event_locked(
+                "service_request_suppressed",
+                {
+                    "requested_service": normalized,
+                    "requested_source": source,
+                    "requested_priority": int(priority),
+                    "active_service": current_service,
+                    "active_source": getattr(self, "_service_request_source", None),
+                    "active_priority": current_priority,
+                    "simulation_clock_seconds": round(float(clock_s), 1),
+                },
+            )
+            self._pending_request = current_service
+            return False
+
+        replacing = bool(current_service and current_service != normalized)
+        if current_service == normalized:
+            self._pending_request = normalized
+            if int(priority) > current_priority:
+                self._service_request_priority = int(priority)
+                self._service_request_source = source
+                self._service_request_reason = reason
+            return True
+
+        self._service_request_sequence = int(getattr(self, "_service_request_sequence", 0) or 0) + 1
+        self._service_request_service = normalized
+        self._service_request_priority = int(priority)
+        self._service_request_source = source
+        self._service_request_reason = reason
+        self._service_request_started_at_s = float(clock_s)
+        self._service_request_id = f"svc_{normalized}_{self._service_request_sequence}_{int(round(float(clock_s) * 1000.0))}"
+        self._pending_request = normalized
+        self._record_event_locked(
+            "service_request_replaced" if replacing else "service_request_started",
+            {
+                "request_id": self._service_request_id,
+                "service": normalized,
+                "source": source,
+                "priority": int(priority),
+                "reason": reason,
+                "simulation_clock_seconds": round(float(clock_s), 1),
+            },
+        )
+        return True
+
+    def _clear_service_request_locked(self, *, clock_s: float, reason: str) -> None:
+        service = getattr(self, "_service_request_service", None)
+        if not service:
+            self._pending_request = None
+            return
+        started = getattr(self, "_service_request_started_at_s", None)
+        self._record_event_locked(
+            "service_request_satisfied",
+            {
+                "request_id": getattr(self, "_service_request_id", None),
+                "service": service,
+                "source": getattr(self, "_service_request_source", None),
+                "priority": int(getattr(self, "_service_request_priority", 0) or 0),
+                "reason": reason,
+                "wait_seconds": round(max(0.0, float(clock_s) - float(started)), 1) if started is not None else None,
+                "simulation_clock_seconds": round(float(clock_s), 1),
+            },
+        )
+        self._service_request_service = None
+        self._service_request_priority = 0
+        self._service_request_source = None
+        self._service_request_reason = None
+        self._service_request_started_at_s = None
+        self._service_request_id = None
+        self._pending_request = None
+
+    def _initialize_phase_locked(self, clock: float) -> None:
+        # SignalRulesService calls this for every protected phase transition.
+        # Dynamic dispatch therefore lets the request lifecycle settle even if
+        # a caller advances across more than one phase in a single clock jump.
+        super()._initialize_phase_locked(clock)
+        requested_service = getattr(self, "_service_request_service", None)
+        if requested_service and self._service_request_active_phase(
+            requested_service, PHASE_SEQUENCE[self._phase_index][0]
+        ):
+            self._clear_service_request_locked(
+                clock_s=clock,
+                reason=f"requested {requested_service} protected service began",
+            )
+
+    def _apply_scenario_locked(
+        self,
+        scenario: dict[str, Any],
+        clock: float,
+        elapsed: float,
+        phase_limits: dict[str, Any],
+        profile: dict[str, Any],
+        phase_key: str,
+    ) -> None:
+        requested_service = scenario.get("action", {}).get("request_service")
+        scenario_without_request = deepcopy(scenario)
+        if isinstance(scenario_without_request.get("action"), dict):
+            scenario_without_request["action"]["request_service"] = None
+        super()._apply_scenario_locked(
+            scenario_without_request,
+            clock,
+            elapsed,
+            phase_limits,
+            profile,
+            phase_key,
+        )
+        if requested_service:
+            self._request_service_locked(
+                str(requested_service),
+                clock_s=clock,
+                source=f"ranked_scenario:{scenario.get('id')}",
+                priority=POLICY_PRIORITIES["ranked_scenario"],
+                reason="ranked scenario requested protected service",
+            )
+
+    def _status_locked(self, clock: float) -> dict[str, Any]:
+        status = super()._status_locked(clock)
+        service = getattr(self, "_service_request_service", None)
+        status["pending_request"] = service
+        status["service_request"] = {
+            "active": bool(service),
+            "request_id": getattr(self, "_service_request_id", None),
+            "service": service,
+            "source": getattr(self, "_service_request_source", None),
+            "priority": int(getattr(self, "_service_request_priority", 0) or 0),
+            "reason": getattr(self, "_service_request_reason", None),
+            "started_at_s": (
+                round(float(self._service_request_started_at_s), 1)
+                if getattr(self, "_service_request_started_at_s", None) is not None
+                else None
+            ),
+        }
+        return status
+
+    def snapshot_state(self, clock_s: float) -> dict[str, Any]:
+        """Return the current benchmark signal snapshot without reapplying scenarios."""
+
+        clock = max(0.0, float(clock_s))
+        self.set_benchmark_clock(clock)
+        with self._lock:
+            self._advance_phase_locked(clock)
+            return self._status_locked(clock)
 
     def apply_network_coordination(
         self,
@@ -271,7 +464,13 @@ class _BenchmarkSignalRulesService(SignalRulesService):
                     requested_duration = max(minimum, elapsed + 0.2)
                     requested_duration = min(previous, requested_duration)
                     self._phase_duration_seconds = requested_duration
-                    self._pending_request = "vehicle"
+                    self._request_service_locked(
+                        "vehicle",
+                        clock_s=clock_s,
+                        source="network_cooperation",
+                        priority=POLICY_PRIORITIES["network_cooperation"],
+                        reason="predicted upstream arrivals requested protected vehicle service",
+                    )
                     changed = self._phase_duration_seconds < previous - 0.05
                     result["action"] = "request_protected_vehicle_progression" if changed else "vehicle_progression_pending"
                     result["reason"] = (
@@ -365,7 +564,13 @@ class _BenchmarkSignalRulesService(SignalRulesService):
                     else "the active pedestrian phase already has sufficient bounded crossing-clearance reserve"
                 )
             elif waiting > 0 and oldest + 1e-9 >= float(max_wait_seconds):
-                self._pending_request = "pedestrian"
+                self._request_service_locked(
+                    "pedestrian",
+                    clock_s=clock_s,
+                    source="pedestrian_max_wait",
+                    priority=POLICY_PRIORITIES["pedestrian_max_wait"],
+                    reason="pedestrian wait reached the configured maximum",
+                )
                 if phase_key in {"pedestrian_green", "pedestrian_flashing"}:
                     result["action"] = "pedestrian_service_active"
                     result["reason"] = "pedestrian service is already active for a request at or above the maximum-wait threshold"
@@ -490,7 +695,13 @@ class _BenchmarkSignalRulesService(SignalRulesService):
                 minimum = float(phase_limits["min_seconds"])
                 requested_duration = max(minimum, elapsed + 0.2)
                 self._phase_duration_seconds = min(previous, requested_duration)
-                self._pending_request = "vehicle"
+                self._request_service_locked(
+                    "vehicle",
+                    clock_s=clock_s,
+                    source="vehicle_class_priority",
+                    priority=POLICY_PRIORITIES["vehicle_class_priority"],
+                    reason=f"configured {normalized_class} priority requested protected vehicle service",
+                )
                 changed = self._phase_duration_seconds < previous - 0.05
                 result["action"] = "request_protected_vehicle_service_for_class" if changed else "class_vehicle_service_pending"
                 result["reason"] = (
@@ -614,7 +825,13 @@ class _BenchmarkSignalRulesService(SignalRulesService):
                     }
                 )
             else:
-                self._pending_request = "vehicle"
+                self._request_service_locked(
+                    "vehicle",
+                    clock_s=clock_s,
+                    source="emergency_priority",
+                    priority=POLICY_PRIORITIES["emergency_priority"],
+                    reason="simulated emergency priority requested protected vehicle service",
+                )
                 minimum = float(phase_limits["min_seconds"])
                 requested_duration = max(minimum, elapsed + 0.2)
                 self._phase_duration_seconds = min(previous, requested_duration)
@@ -803,6 +1020,21 @@ class _IntersectionRuntime:
         signal = self.controller.signal_state(clock_s)
         self._capture_scenario_evidence(clock_s, signal, observation)
         return signal
+
+    def signal_snapshot(self, clock_s: float) -> dict[str, Any]:
+        """Read current signal state after an overlay without reapplying scenarios."""
+
+        if hasattr(self.controller, "set_benchmark_clock"):
+            self.controller.set_benchmark_clock(clock_s)
+        snapshot = getattr(self.controller, "snapshot_state", None)
+        if callable(snapshot):
+            return snapshot(clock_s)
+        status = getattr(self.controller, "status", None)
+        if callable(status):
+            return status(clock_s)
+        # Compatibility fallback for focused fake controllers that predate the
+        # V031 arbitration repair. Real benchmark controllers use snapshot_state.
+        return self.controller.signal_state(clock_s)
 
     def _capture_scenario_evidence(
         self,
@@ -1340,6 +1572,18 @@ class _NetworkModeSimulation:
             "action": "none",
             "decision": "defer",
         }
+        self.policy_arbitration_evaluations = 0
+        self.policy_arbitration_conflicts = 0
+        self.policy_arbitration_owner_counts: dict[str, int] = {}
+        self.policy_arbitration_events: list[dict[str, Any]] = []
+        self._latest_policy_arbitration: dict[str, dict[str, Any]] = {
+            "source": {"owner": "normal_timing", "priority": 0, "conflict": False, "candidates": []},
+            "destination": {"owner": "normal_timing", "priority": 0, "conflict": False, "candidates": []},
+        }
+        self._last_policy_arbitration_signature: dict[str, tuple[Any, ...] | None] = {
+            "source": None,
+            "destination": None,
+        }
         self._sample_at_s = 0.0
 
         profiles = policy_config.get("profiles") if isinstance(policy_config, dict) else None
@@ -1379,6 +1623,92 @@ class _NetworkModeSimulation:
             controller_factory=controller_factory,
         )
 
+    def _emergency_overlay_active_for(self, runtime: _IntersectionRuntime, clock_s: float) -> bool:
+        if self.mode not in EMERGENCY_PRIORITY_MODES or not self.emergency_event:
+            return False
+        target_runtime, role, eta = self._emergency_priority_context(clock_s)
+        if target_runtime is not runtime:
+            return False
+        if role == "downstream_preparation" and eta is not None:
+            return eta <= self.emergency_priority_lookahead_seconds + 1e-9
+        return role in {"source_priority", "destination_priority"}
+
+    def _policy_arbitration(
+        self,
+        *,
+        clock_s: float,
+        runtime: _IntersectionRuntime,
+        signal: dict[str, Any],
+        role: str,
+    ) -> PolicyArbitration:
+        pedestrian = runtime.pedestrian_context(clock_s)
+        class_context = runtime.vehicle_class_context(self.vehicle_class_priority_class, clock_s)
+        class_active = (
+            self.mode in CLASS_AWARE_MODES
+            and self.vehicle_class_priority_enabled
+            and self.vehicle_class_priority_weight > 1.0 + 1e-9
+            and int(class_context.get("waiting_count", 0) or 0) >= self.vehicle_class_priority_min_waiting
+        )
+        cooperation_active = (
+            role == "destination"
+            and self.mode in COOPERATIVE_MODES
+            and int(self._cooperation_advisory(clock_s).get("incoming_vehicle_count", 0) or 0) > 0
+        )
+        arbitration = arbitrate_network_policy(
+            incident_hold=bool(signal.get("incident_hold")),
+            phase_key=str(signal.get("phase_key") or signal.get("phase") or "unknown"),
+            pedestrian_waiting=int(pedestrian.get("waiting_count", 0) or 0),
+            pedestrian_crossing=int(pedestrian.get("crossing_count", 0) or 0),
+            oldest_pedestrian_wait_seconds=float(pedestrian.get("oldest_wait_seconds", 0.0) or 0.0),
+            pedestrian_max_wait_seconds=self.pedestrian_max_wait_seconds,
+            emergency_priority_active=self._emergency_overlay_active_for(runtime, clock_s),
+            vehicle_class_priority_active=class_active,
+            cooperation_active=cooperation_active,
+        )
+        self._record_policy_arbitration(
+            clock_s=clock_s,
+            runtime=runtime,
+            signal=signal,
+            role=role,
+            arbitration=arbitration,
+        )
+        return arbitration
+
+    def _record_policy_arbitration(
+        self,
+        *,
+        clock_s: float,
+        runtime: _IntersectionRuntime,
+        signal: dict[str, Any],
+        role: str,
+        arbitration: PolicyArbitration,
+    ) -> None:
+        self.policy_arbitration_evaluations += 1
+        if arbitration.conflict:
+            self.policy_arbitration_conflicts += 1
+        self.policy_arbitration_owner_counts[arbitration.owner] = (
+            self.policy_arbitration_owner_counts.get(arbitration.owner, 0) + 1
+        )
+        payload = {
+            "t": round(float(clock_s), 1),
+            "role": role,
+            "intersection_id": runtime.intersection_id,
+            "phase": signal.get("phase"),
+            "phase_key": signal.get("phase_key"),
+            "base_scenario_id": signal.get("winning_scenario_id"),
+            **arbitration.as_dict(),
+        }
+        self._latest_policy_arbitration[role] = deepcopy(payload)
+        signature = (
+            payload["owner"],
+            payload["priority"],
+            payload["phase_key"],
+            tuple(item["owner"] for item in payload["candidates"]),
+        )
+        if signature != self._last_policy_arbitration_signature[role]:
+            self.policy_arbitration_events.append(payload)
+            self._last_policy_arbitration_signature[role] = signature
+
     def run(self) -> dict[str, Any]:
         clock = 0.0
         last_source_signal: dict[str, Any] | None = None
@@ -1391,29 +1721,50 @@ class _NetworkModeSimulation:
             self.source.prune_crossings(clock)
             self.destination.prune_crossings(clock)
 
+            # Ranked scenarios are evaluated exactly once per simulation tick.
+            # Higher-level network overlays are then arbitrated explicitly;
+            # subsequent reads use signal_snapshot() so scenario timing is not
+            # silently re-applied between overlays.
             source_signal = self.source.signal(clock)
             destination_signal = self.destination.signal(clock)
+            source_arbitration = self._policy_arbitration(
+                clock_s=clock, runtime=self.source, signal=source_signal, role="source"
+            )
+            destination_arbitration = self._policy_arbitration(
+                clock_s=clock, runtime=self.destination, signal=destination_signal, role="destination"
+            )
+
             if self.mode in PEDESTRIAN_AWARE_MODES:
-                self._evaluate_pedestrian_awareness(clock, self.source, source_signal, role="source")
-                self._evaluate_pedestrian_awareness(clock, self.destination, destination_signal, role="destination")
-                source_signal = self.source.signal(clock)
-                destination_signal = self.destination.signal(clock)
+                self._evaluate_pedestrian_awareness(
+                    clock, self.source, source_signal, role="source", arbitration=source_arbitration
+                )
+                self._evaluate_pedestrian_awareness(
+                    clock, self.destination, destination_signal, role="destination", arbitration=destination_arbitration
+                )
+                source_signal = self.source.signal_snapshot(clock)
+                destination_signal = self.destination.signal_snapshot(clock)
             if self.mode in COOPERATIVE_MODES:
-                self._evaluate_cooperation(clock, destination_signal)
-                # Re-read after a timing advisory so the served phase/remaining
-                # time reflect the bounded mutation performed by the controller.
-                destination_signal = self.destination.signal(clock)
+                self._evaluate_cooperation(clock, destination_signal, arbitration=destination_arbitration)
+                destination_signal = self.destination.signal_snapshot(clock)
             if self.mode in CLASS_AWARE_MODES and self.vehicle_class_priority_enabled:
-                self._evaluate_vehicle_class_priority(clock, self.source, source_signal, role="source")
-                self._evaluate_vehicle_class_priority(clock, self.destination, destination_signal, role="destination")
-                source_signal = self.source.signal(clock)
-                destination_signal = self.destination.signal(clock)
+                self._evaluate_vehicle_class_priority(
+                    clock, self.source, source_signal, role="source", arbitration=source_arbitration
+                )
+                self._evaluate_vehicle_class_priority(
+                    clock, self.destination, destination_signal, role="destination", arbitration=destination_arbitration
+                )
+                source_signal = self.source.signal_snapshot(clock)
+                destination_signal = self.destination.signal_snapshot(clock)
             if self.mode in EMERGENCY_PRIORITY_MODES:
-                self._evaluate_emergency_priority(clock, source_signal, destination_signal)
-                # Emergency priority is the last advisory layer, but still only
-                # mutates timing through protected minimum/maximum/cycle bounds.
-                source_signal = self.source.signal(clock)
-                destination_signal = self.destination.signal(clock)
+                self._evaluate_emergency_priority(
+                    clock,
+                    source_signal,
+                    destination_signal,
+                    source_arbitration=source_arbitration,
+                    destination_arbitration=destination_arbitration,
+                )
+                source_signal = self.source.signal_snapshot(clock)
+                destination_signal = self.destination.signal_snapshot(clock)
             last_source_signal = source_signal
             last_destination_signal = destination_signal
             self.source.advance_signal_metrics(source_signal, dt)
@@ -1480,44 +1831,6 @@ class _NetworkModeSimulation:
         self.destination.finalize_waits(self.duration_seconds)
         return self._build_result(last_source_signal, last_destination_signal)
 
-    def _pedestrian_max_wait_lock(
-        self,
-        *,
-        clock_s: float,
-        runtime: _IntersectionRuntime,
-        signal: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Return the cross-layer pedestrian starvation-prevention lock.
-
-        Once local waiting demand reaches the configured maximum wait, ordinary
-        vehicle cooperation/class advisories may not extend or re-prioritize
-        vehicle service until protected pedestrian service starts. Emergency
-        priority remains a separate higher-priority simulation advisory, while
-        its existing active-crossing guard still applies.
-        """
-        context = runtime.pedestrian_context(clock_s)
-        phase_key = str(signal.get("phase_key") or signal.get("phase") or "unknown")
-        waiting_count = int(context.get("waiting_count", 0) or 0)
-        oldest_wait = float(context.get("oldest_wait_seconds", 0.0) or 0.0)
-        service_active = phase_key in {"pedestrian_green", "pedestrian_flashing"}
-        active = (
-            self.mode in PEDESTRIAN_AWARE_MODES
-            and waiting_count > 0
-            and oldest_wait + 1e-9 >= self.pedestrian_max_wait_seconds
-            and not service_active
-        )
-        effective = signal.get("effective_duration_seconds")
-        if not isinstance(effective, (int, float)):
-            effective = None
-        return {
-            "active": active,
-            "waiting_count": waiting_count,
-            "oldest_wait_seconds": round(oldest_wait, 1),
-            "phase_key": phase_key,
-            "previous_duration_seconds": float(effective) if effective is not None else None,
-            "effective_duration_seconds": float(effective) if effective is not None else None,
-        }
-
     def _evaluate_pedestrian_awareness(
         self,
         clock_s: float,
@@ -1525,14 +1838,37 @@ class _NetworkModeSimulation:
         signal: dict[str, Any],
         *,
         role: str,
+        arbitration: PolicyArbitration | None = None,
     ) -> None:
+        if arbitration is None:
+            arbitration = self._policy_arbitration(clock_s=clock_s, runtime=runtime, signal=signal, role=role)
         self.pedestrian_awareness_evaluations += 1
         context = runtime.pedestrian_context(clock_s)
-        outcome = runtime.apply_pedestrian_awareness(
-            clock_s=clock_s,
-            max_wait_seconds=self.pedestrian_max_wait_seconds,
-            clearance_reserve_seconds=self.pedestrian_clearance_reserve_seconds,
+        phase_key = str(signal.get("phase_key") or signal.get("phase") or "unknown")
+        max_wait_trigger = (
+            int(context.get("waiting_count", 0) or 0) > 0
+            and float(context.get("oldest_wait_seconds", 0.0) or 0.0) + 1e-9 >= self.pedestrian_max_wait_seconds
+            and phase_key not in {"pedestrian_green", "pedestrian_flashing"}
         )
+        if max_wait_trigger and arbitration.owner != "pedestrian_max_wait":
+            effective = signal.get("effective_duration_seconds")
+            outcome = {
+                "applied": False,
+                "action": defer_action_for(arbitration.owner),
+                "reason": (
+                    f"pedestrian max-wait timing request is deferred by higher-priority {arbitration.owner}; "
+                    "the protected request remains observable but does not mutate timing in this tick"
+                ),
+                "timing_delta_seconds": 0.0,
+                "previous_duration_seconds": effective,
+                "effective_duration_seconds": effective,
+            }
+        else:
+            outcome = runtime.apply_pedestrian_awareness(
+                clock_s=clock_s,
+                max_wait_seconds=self.pedestrian_max_wait_seconds,
+                clearance_reserve_seconds=self.pedestrian_clearance_reserve_seconds,
+            )
         event = {
             "pedestrian_awareness_id": f"pedaware_{runtime.intersection_id}_{int(round(clock_s * 1000.0))}",
             "t": round(clock_s, 1),
@@ -1550,6 +1886,7 @@ class _NetworkModeSimulation:
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
             "previous_duration_seconds": outcome.get("previous_duration_seconds"),
             "effective_duration_seconds": outcome.get("effective_duration_seconds"),
+            "arbitration": arbitration.as_dict(),
         }
         active = event["waiting_count"] > 0 or event["crossing_count"] > 0
         self._latest_pedestrian_awareness[role] = {"active": active, **event}
@@ -1585,28 +1922,35 @@ class _NetworkModeSimulation:
             "destination_intersection_id": self.destination.intersection_id,
         }
 
-    def _evaluate_cooperation(self, clock_s: float, destination_signal: dict[str, Any]) -> None:
+    def _evaluate_cooperation(
+        self,
+        clock_s: float,
+        destination_signal: dict[str, Any],
+        *,
+        arbitration: PolicyArbitration | None = None,
+    ) -> None:
+        if arbitration is None:
+            arbitration = self._policy_arbitration(
+                clock_s=clock_s, runtime=self.destination, signal=destination_signal, role="destination"
+            )
         self.coordination_evaluations += 1
         advisory = self._cooperation_advisory(clock_s)
         incoming = int(advisory["incoming_vehicle_count"])
         if incoming > 0:
             self.coordination_triggered += 1
-        pedestrian_lock = self._pedestrian_max_wait_lock(
-            clock_s=clock_s,
-            runtime=self.destination,
-            signal=destination_signal,
-        )
-        if incoming > 0 and pedestrian_lock["active"]:
+        if incoming > 0 and arbitration.owner != "network_cooperation":
+            effective = destination_signal.get("effective_duration_seconds")
+            action = defer_action_for(arbitration.owner)
             outcome = {
                 "applied": False,
-                "action": "defer_for_pedestrian_max_wait",
+                "action": action,
                 "reason": (
-                    "ordinary network cooperation is deferred because local pedestrian wait reached the configured maximum; "
-                    "protected pedestrian service must begin before vehicle-green extension can resume"
+                    f"ordinary network cooperation is deferred by higher-priority {arbitration.owner}; "
+                    "only one network timing overlay may own this intersection in a simulation tick"
                 ),
                 "timing_delta_seconds": 0.0,
-                "previous_duration_seconds": pedestrian_lock["previous_duration_seconds"],
-                "effective_duration_seconds": pedestrian_lock["effective_duration_seconds"],
+                "previous_duration_seconds": effective,
+                "effective_duration_seconds": effective,
             }
         else:
             outcome = self.destination.apply_coordination(clock_s=clock_s, advisory=advisory)
@@ -1631,9 +1975,10 @@ class _NetworkModeSimulation:
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
             "previous_duration_seconds": outcome.get("previous_duration_seconds"),
             "effective_duration_seconds": outcome.get("effective_duration_seconds"),
+            "arbitration": arbitration.as_dict(),
         }
         self._latest_coordination = {"active": incoming > 0, **event}
-        if incoming > 0 or event["applied"] or event["action"] in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"}:
+        if incoming > 0 or event["applied"] or event["action"].startswith("defer_for_") or event["action"] == "protect_pedestrian_service":
             self.coordination_events.append(event)
         if event["applied"]:
             self.coordination_applied += 1
@@ -1757,7 +2102,10 @@ class _NetworkModeSimulation:
         signal: dict[str, Any],
         *,
         role: str,
+        arbitration: PolicyArbitration | None = None,
     ) -> None:
+        if arbitration is None:
+            arbitration = self._policy_arbitration(clock_s=clock_s, runtime=runtime, signal=signal, role=role)
         if self.mode not in CLASS_AWARE_MODES or not self.vehicle_class_priority_enabled:
             return
         self.vehicle_class_priority_evaluations += 1
@@ -1776,22 +2124,19 @@ class _NetworkModeSimulation:
             }
             return
         self.vehicle_class_priority_triggered += 1
-        pedestrian_lock = self._pedestrian_max_wait_lock(
-            clock_s=clock_s,
-            runtime=runtime,
-            signal=signal,
-        )
-        if pedestrian_lock["active"]:
+        neutral_weight = self.vehicle_class_priority_weight <= 1.0 + 1e-9
+        if not neutral_weight and arbitration.owner != "vehicle_class_priority":
+            effective = signal.get("effective_duration_seconds")
             outcome = {
                 "applied": False,
-                "action": "defer_for_pedestrian_max_wait",
+                "action": defer_action_for(arbitration.owner),
                 "reason": (
-                    "ordinary vehicle-class priority is deferred because local pedestrian wait reached the configured maximum; "
-                    "protected pedestrian service must begin before class-based vehicle extension can resume"
+                    f"ordinary vehicle-class priority is deferred by higher-priority {arbitration.owner}; "
+                    "only one network timing overlay may own this intersection in a simulation tick"
                 ),
                 "timing_delta_seconds": 0.0,
-                "previous_duration_seconds": pedestrian_lock["previous_duration_seconds"],
-                "effective_duration_seconds": pedestrian_lock["effective_duration_seconds"],
+                "previous_duration_seconds": effective,
+                "effective_duration_seconds": effective,
             }
         else:
             outcome = runtime.apply_vehicle_class_priority(
@@ -1820,6 +2165,7 @@ class _NetworkModeSimulation:
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
             "previous_duration_seconds": outcome.get("previous_duration_seconds"),
             "effective_duration_seconds": outcome.get("effective_duration_seconds"),
+            "arbitration": arbitration.as_dict(),
         }
         self._latest_vehicle_class_priority[role] = {"active": True, **event}
         self.vehicle_class_priority_events.append(event)
@@ -1839,6 +2185,9 @@ class _NetworkModeSimulation:
         clock_s: float,
         source_signal: dict[str, Any],
         destination_signal: dict[str, Any],
+        *,
+        source_arbitration: PolicyArbitration | None = None,
+        destination_arbitration: PolicyArbitration | None = None,
     ) -> None:
         if self.mode not in EMERGENCY_PRIORITY_MODES or not self.emergency_event:
             return
@@ -1859,6 +2208,14 @@ class _NetworkModeSimulation:
 
         self.emergency_priority_evaluations += 1
         signal = source_signal if runtime is self.source else destination_signal
+        if runtime is self.source:
+            arbitration = source_arbitration or self._policy_arbitration(
+                clock_s=clock_s, runtime=self.source, signal=source_signal, role="source"
+            )
+        else:
+            arbitration = destination_arbitration or self._policy_arbitration(
+                clock_s=clock_s, runtime=self.destination, signal=destination_signal, role="destination"
+            )
         outcome = runtime.apply_emergency_priority(
             clock_s=clock_s,
             emergency_event=self.emergency_event,
@@ -1887,6 +2244,7 @@ class _NetworkModeSimulation:
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
             "previous_duration_seconds": outcome.get("previous_duration_seconds"),
             "effective_duration_seconds": outcome.get("effective_duration_seconds"),
+            "arbitration": arbitration.as_dict(),
         }
         self._latest_emergency_priority = {"active": True, "status": self._emergency_status, **event}
         self.emergency_priority_events.append(event)
@@ -1989,6 +2347,7 @@ class _NetworkModeSimulation:
                 "emergency_priority": (
                     deepcopy(self._latest_emergency_priority) if self.mode in EMERGENCY_EVENT_MODES else None
                 ),
+                "policy_arbitration": deepcopy(self._latest_policy_arbitration),
             }
         )
 
@@ -2087,6 +2446,21 @@ class _NetworkModeSimulation:
                     "max_extension_seconds": self.cooperation_max_extension_seconds,
                     "min_incoming_vehicles": self.cooperation_min_incoming_vehicles,
                 },
+                "policy_arbitration": {
+                    "evaluations": self.policy_arbitration_evaluations,
+                    "conflict_evaluations": self.policy_arbitration_conflicts,
+                    "owner_counts": dict(sorted(self.policy_arbitration_owner_counts.items())),
+                    "priority_order": [
+                        "incident_hold",
+                        "pedestrian_crossing",
+                        "emergency_priority",
+                        "pedestrian_max_wait",
+                        "vehicle_class_priority",
+                        "network_cooperation",
+                        "ranked_scenario",
+                        "normal_timing",
+                    ],
+                },
                 "emergency": {
                     "event_present": self.emergency_event is not None,
                     "status": self._emergency_status,
@@ -2121,6 +2495,7 @@ class _NetworkModeSimulation:
                 "configured_class": self.vehicle_class_priority_class,
                 "configured_weight": round(self.vehicle_class_priority_weight, 2),
             },
+            "policy_arbitration_events": self.policy_arbitration_events,
             "emergency_event": deepcopy(self.emergency_event) if self.emergency_event else None,
             "emergency_lifecycle_events": self.emergency_lifecycle_events,
             "emergency_priority_events": self.emergency_priority_events,
