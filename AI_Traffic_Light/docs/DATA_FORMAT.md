@@ -459,8 +459,8 @@ Representative record:
   "phase_key_before": "vehicle_green",
   "timing": {
     "delta_seconds": 2.0,
-    "previous_duration_seconds": null,
-    "effective_duration_seconds": null
+    "previous_duration_seconds": 12.0,
+    "effective_duration_seconds": 14.0
   },
   "context": {
     "local": {},
@@ -483,6 +483,9 @@ Representative record:
 The exact evidence-ID suffix is an implementation detail; callers should treat `evidence_id` as opaque/stable within equivalent runs rather than parse it for meaning.
 
 Trigger categories are `scenario`, `cooperation`, `pedestrian`, `vehicle_class`, `emergency_priority`, and `emergency_lifecycle`. Normalized decisions are `grant`, `deny`, `defer`, or `observe` according to the source event semantics.
+For repaired V031 runs, cooperation, pedestrian-awareness, vehicle-class, and emergency-priority detailed events retain previous/effective duration as well as delta, so normalized timing can reconstruct before/after values. Historical pre-repair V031/V030 source events may still project `null` for values that were never stored. Pedestrian `pedestrian_service_pending` and `pedestrian_request_queued` map to `defer`.
+
+A pedestrian request at or above `pedestrian_max_wait_seconds` also creates a simulation-only starvation-prevention lock: ordinary cooperation and regular class-priority timing are deferred until pedestrian WALK/CLEAR begins. Emergency priority remains separately bounded and still cannot bypass active simulated crossing clearance.
 
 Individual normalized records intentionally omit the random experiment `run_id`; the enclosing experiment identifies the run. This prevents volatile metadata from breaking same-seed repeatability comparisons.
 

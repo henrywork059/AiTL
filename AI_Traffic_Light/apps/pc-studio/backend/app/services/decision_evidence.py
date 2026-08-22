@@ -213,6 +213,8 @@ def _coordination_records(run_id: str, mode: str, payload: dict[str, Any]) -> li
                 phase_before=event.get("destination_phase_before"),
                 phase_key_before=event.get("destination_phase_key_before"),
                 timing_delta_seconds=event.get("timing_delta_seconds", 0.0),
+                previous_duration_seconds=event.get("previous_duration_seconds"),
+                effective_duration_seconds=event.get("effective_duration_seconds"),
                 provenance=str(event.get("provenance") or "synthetic_predicted_arrivals"),
                 context={
                     "local": {},
@@ -220,7 +222,10 @@ def _coordination_records(run_id: str, mode: str, payload: dict[str, Any]) -> li
                         "incoming_vehicle_count": event.get("incoming_vehicle_count"),
                         "earliest_arrival_eta_seconds": event.get("earliest_arrival_eta_seconds"),
                     },
-                    "pedestrian": {"protected": action == "protect_pedestrian_service"},
+                    "pedestrian": {
+                        "protected": action in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"},
+                        "max_wait_lock": action == "defer_for_pedestrian_max_wait",
+                    },
                     "vehicle_class": {},
                     "emergency": {},
                 },
@@ -239,7 +244,14 @@ def _pedestrian_records(run_id: str, mode: str, payload: dict[str, Any]) -> list
         trigger_id = str(event.get("pedestrian_awareness_id") or f"pedestrian_{index}")
         applied = bool(event.get("applied"))
         action = str(event.get("action") or "none")
-        decision = "grant" if applied else "observe"
+        if applied:
+            decision = "grant"
+        elif action in {"pedestrian_service_pending", "pedestrian_request_queued"}:
+            decision = "defer"
+        elif action.startswith("deny_"):
+            decision = "deny"
+        else:
+            decision = "observe"
         reason = str(event.get("reason") or "")
         records.append(
             _record(
@@ -257,6 +269,8 @@ def _pedestrian_records(run_id: str, mode: str, payload: dict[str, Any]) -> list
                 phase_before=event.get("phase_before"),
                 phase_key_before=event.get("phase_key_before"),
                 timing_delta_seconds=event.get("timing_delta_seconds", 0.0),
+                previous_duration_seconds=event.get("previous_duration_seconds"),
+                effective_duration_seconds=event.get("effective_duration_seconds"),
                 provenance=str(event.get("provenance") or "synthetic_pedestrian_demand"),
                 context={
                     "local": {},
@@ -303,11 +317,16 @@ def _vehicle_class_records(run_id: str, mode: str, payload: dict[str, Any]) -> l
                 phase_before=event.get("phase_before"),
                 phase_key_before=event.get("phase_key_before"),
                 timing_delta_seconds=event.get("timing_delta_seconds", 0.0),
+                previous_duration_seconds=event.get("previous_duration_seconds"),
+                effective_duration_seconds=event.get("effective_duration_seconds"),
                 provenance=str(event.get("provenance") or "synthetic_vehicle_class_demand"),
                 context={
                     "local": {},
                     "neighbour": {},
-                    "pedestrian": {"protected": action == "protect_pedestrian_service"},
+                    "pedestrian": {
+                        "protected": action in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"},
+                        "max_wait_lock": action == "defer_for_pedestrian_max_wait",
+                    },
                     "vehicle_class": {
                         "role": event.get("role"),
                         "class_name": event.get("class_name"),
@@ -353,6 +372,8 @@ def _emergency_priority_records(run_id: str, mode: str, payload: dict[str, Any])
                 phase_before=event.get("phase_before"),
                 phase_key_before=event.get("phase_key_before"),
                 timing_delta_seconds=event.get("timing_delta_seconds", 0.0),
+                previous_duration_seconds=event.get("previous_duration_seconds"),
+                effective_duration_seconds=event.get("effective_duration_seconds"),
                 provenance=str(event.get("provenance") or "simulated_configured_emergency_event"),
                 context={
                     "local": {},

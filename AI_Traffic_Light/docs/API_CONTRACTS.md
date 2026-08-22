@@ -238,7 +238,7 @@ Each record includes:
 - `trigger_category`: `scenario | cooperation | pedestrian | vehicle_class | emergency_priority | emergency_lifecycle`;
 - normalized `decision`: `grant | deny | defer | observe`;
 - `action`, `applied`, `phase_before`, `phase_key_before`;
-- `timing.delta_seconds` and available previous/effective duration;
+- `timing.delta_seconds` plus previous/effective duration when present in the detailed source event; repaired V031 cooperation/pedestrian/class/emergency-priority events retain those before/after values for newly generated runs;
 - grouped `context.local`, `context.neighbour`, `context.pedestrian`, `context.vehicle_class`, `context.emergency`;
 - `provenance`, `reason`, concise `explanation`;
 - `source_ref` pointing back to the preserved detailed mode-specific history.
@@ -248,6 +248,7 @@ Individual records intentionally omit the random experiment `run_id`; the enclos
 V031+ network scenario snapshots add the active ranked scenario/winner, local observations and available base/effective timing to each intersection result under `scenario_evidence_events`. This is evidence capture only and does not change scenario arbitration.
 
 Historical stored runs are not rewritten by `GET .../evidence`. The projection can only expose information actually present in the stored raw histories; for example, pre-V031 runs cannot recover scenario observation snapshots that were never persisted.
+The repaired V031 network orchestrator also prevents ordinary cooperation/class advisories from undoing a pedestrian starvation-prevention request in the same tick. Once local wait reaches `pedestrian_max_wait_seconds`, those ordinary vehicle advisories are deferred until pedestrian WALK/CLEAR begins. This is simulation-only arbitration and does not change the protected phase sequence or physical-control scope.
 
 No new stable error code is introduced; ordinary stored-experiment read errors remain `ATL-TRAFFIC-010`.
 

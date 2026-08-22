@@ -143,6 +143,10 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 107. Detailed mode-specific histories remain present; V031 does not replace/delete them.
 108. An older stored V030 result without a V031 block can be projected through the evidence service without rewriting the historical JSON.
 109. Same-seed/config repeated network runs preserve V030 repeatability semantics except normal top-level run metadata.
-110. No V031 evidence code performs signal arbitration, changes phase order/timing, mutates live camera/controller state, or introduces physical/public-road signal authority.
-111. Full inherited backend regression, live API smoke, frontend typecheck/build, structure check, and full-repository `git diff --check` pass on the owner checkout.
-112. Owner explicitly confirms V031 passed before `passed_baseline` changes.
+110. The V031 evidence service itself performs no signal arbitration, changes no phase order/timing, mutates no live camera/controller state, and introduces no physical/public-road signal authority.
+111. A pedestrian at/above `pedestrian_max_wait_seconds` causes ordinary cooperation/class timing to defer with `defer_for_pedestrian_max_wait` until pedestrian WALK/CLEAR begins.
+112. The starvation-prevention lock does not bypass or replace emergency crossing protection; emergency priority remains separately bounded.
+113. New repaired-V031 cooperation/pedestrian/class/emergency-priority detailed events preserve previous/effective duration when returned by the controller, and normalized evidence projects them.
+114. `pedestrian_service_pending` / `pedestrian_request_queued` normalize to `defer`, not `observe`.
+115. Full inherited backend regression, live API smoke, frontend typecheck/build, structure check, and full-repository `git diff --check` pass on the owner checkout.
+116. Owner explicitly confirms V031 passed before `passed_baseline` changes.

@@ -358,6 +358,9 @@ The V031 focused regression must confirm:
 - normalized scenario/cooperation/pedestrian/vehicle-class/emergency-priority/emergency-lifecycle categories;
 - local scenario observations and class-zone context can be projected when stored by V031+ runs;
 - normalized grant/deny/defer/observe decisions, action, timing, reason, explanation, provenance and `source_ref` fields;
+- pending/queued pedestrian service records normalize to `defer`;
+- newly generated cooperation/pedestrian/class/emergency-priority source events preserve previous/effective timing when supplied by the controller;
+- a max-wait pedestrian request suppresses ordinary cooperation/class timing until pedestrian service begins, then releases;
 - individual records contain no volatile random `run_id` that would break seeded repeatability;
 - new network runs persist `decision_evidence`;
 - `service.evidence(run_id)` returns the persisted ledger;
@@ -417,5 +420,8 @@ Acceptance checks:
 8. JSON and CSV evidence reads succeed after backend restart because the experiment JSON is persisted.
 9. An older stored V030 run can be read through `/evidence` without the historical file being silently rewritten.
 10. The evidence service never changes protected phase order/timing and no output claims public-road authority.
+11. When pedestrian wait is at/above the configured maximum during vehicle service, ordinary cooperation/class events report `defer_for_pedestrian_max_wait` with zero timing delta rather than re-extending vehicle service.
+12. After pedestrian WALK/CLEAR begins, that starvation lock is no longer active.
+13. For new repaired-V031 runs, applied cooperation/pedestrian/class/emergency-priority events expose previous/effective duration when the underlying controller outcome provides it; pending/queued pedestrian evidence uses `decision: defer`.
 
 After focused checks, run the normal complete-repository validation: Python compilation, all backend/service tests, live API smoke, frontend typecheck/build, `scripts/check_structure.py`, and full-repository `git diff --check`.

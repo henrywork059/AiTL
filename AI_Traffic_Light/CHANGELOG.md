@@ -11,6 +11,9 @@
 - Added `GET /api/traffic/network-experiments/{run_id}/evidence` and `GET /api/traffic/network-experiments/{run_id}/evidence.csv`; CSV preserves `X-Request-ID`. Older stored runs without the V031 block are projected on demand without being rewritten.
 - Kept evidence records repeatable by excluding volatile random run IDs from record content while retaining deterministic source references/IDs.
 - Added focused V031 evidence regression and retained V027/V028/V029/V030 focused regressions. No new stable error code or physical/public-road control path was introduced.
+- Same-candidate V031 repair: a pedestrian request at/above the configured maximum wait now creates a cross-layer starvation-prevention lock that defers ordinary network cooperation and regular vehicle-class priority until pedestrian WALK/CLEAR begins; the simulated emergency layer remains separate, and active crossing protection still governs emergency timing.
+- Same-candidate V031 repair: cooperation, pedestrian-awareness, vehicle-class, and emergency-priority detailed events now retain `previous_duration_seconds` and `effective_duration_seconds` in addition to timing delta, and the normalized ledger projects those values when available.
+- Same-candidate V031 repair: non-applied pedestrian `pedestrian_service_pending` / `pedestrian_request_queued` evidence is normalized as `defer` rather than `observe`; focused regression now covers cross-layer suppression and timing reconstruction.
 
 ## 0_3_0 — Vehicle-class-aware cooperative two-intersection simulation
 

@@ -1480,6 +1480,44 @@ class _NetworkModeSimulation:
         self.destination.finalize_waits(self.duration_seconds)
         return self._build_result(last_source_signal, last_destination_signal)
 
+    def _pedestrian_max_wait_lock(
+        self,
+        *,
+        clock_s: float,
+        runtime: _IntersectionRuntime,
+        signal: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Return the cross-layer pedestrian starvation-prevention lock.
+
+        Once local waiting demand reaches the configured maximum wait, ordinary
+        vehicle cooperation/class advisories may not extend or re-prioritize
+        vehicle service until protected pedestrian service starts. Emergency
+        priority remains a separate higher-priority simulation advisory, while
+        its existing active-crossing guard still applies.
+        """
+        context = runtime.pedestrian_context(clock_s)
+        phase_key = str(signal.get("phase_key") or signal.get("phase") or "unknown")
+        waiting_count = int(context.get("waiting_count", 0) or 0)
+        oldest_wait = float(context.get("oldest_wait_seconds", 0.0) or 0.0)
+        service_active = phase_key in {"pedestrian_green", "pedestrian_flashing"}
+        active = (
+            self.mode in PEDESTRIAN_AWARE_MODES
+            and waiting_count > 0
+            and oldest_wait + 1e-9 >= self.pedestrian_max_wait_seconds
+            and not service_active
+        )
+        effective = signal.get("effective_duration_seconds")
+        if not isinstance(effective, (int, float)):
+            effective = None
+        return {
+            "active": active,
+            "waiting_count": waiting_count,
+            "oldest_wait_seconds": round(oldest_wait, 1),
+            "phase_key": phase_key,
+            "previous_duration_seconds": float(effective) if effective is not None else None,
+            "effective_duration_seconds": float(effective) if effective is not None else None,
+        }
+
     def _evaluate_pedestrian_awareness(
         self,
         clock_s: float,
@@ -1510,6 +1548,8 @@ class _NetworkModeSimulation:
             "applied": bool(outcome.get("applied")),
             "reason": outcome.get("reason"),
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+            "previous_duration_seconds": outcome.get("previous_duration_seconds"),
+            "effective_duration_seconds": outcome.get("effective_duration_seconds"),
         }
         active = event["waiting_count"] > 0 or event["crossing_count"] > 0
         self._latest_pedestrian_awareness[role] = {"active": active, **event}
@@ -1551,7 +1591,25 @@ class _NetworkModeSimulation:
         incoming = int(advisory["incoming_vehicle_count"])
         if incoming > 0:
             self.coordination_triggered += 1
-        outcome = self.destination.apply_coordination(clock_s=clock_s, advisory=advisory)
+        pedestrian_lock = self._pedestrian_max_wait_lock(
+            clock_s=clock_s,
+            runtime=self.destination,
+            signal=destination_signal,
+        )
+        if incoming > 0 and pedestrian_lock["active"]:
+            outcome = {
+                "applied": False,
+                "action": "defer_for_pedestrian_max_wait",
+                "reason": (
+                    "ordinary network cooperation is deferred because local pedestrian wait reached the configured maximum; "
+                    "protected pedestrian service must begin before vehicle-green extension can resume"
+                ),
+                "timing_delta_seconds": 0.0,
+                "previous_duration_seconds": pedestrian_lock["previous_duration_seconds"],
+                "effective_duration_seconds": pedestrian_lock["effective_duration_seconds"],
+            }
+        else:
+            outcome = self.destination.apply_coordination(clock_s=clock_s, advisory=advisory)
         event = {
             "coordination_id": f"coord_{self.source.intersection_id}_{self.destination.intersection_id}_{int(round(clock_s * 1000.0))}",
             "t": round(clock_s, 1),
@@ -1571,9 +1629,11 @@ class _NetworkModeSimulation:
             "applied": bool(outcome.get("applied")),
             "reason": outcome.get("reason"),
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+            "previous_duration_seconds": outcome.get("previous_duration_seconds"),
+            "effective_duration_seconds": outcome.get("effective_duration_seconds"),
         }
         self._latest_coordination = {"active": incoming > 0, **event}
-        if incoming > 0 or event["applied"] or event["action"] == "protect_pedestrian_service":
+        if incoming > 0 or event["applied"] or event["action"] in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"}:
             self.coordination_events.append(event)
         if event["applied"]:
             self.coordination_applied += 1
@@ -1586,7 +1646,7 @@ class _NetworkModeSimulation:
                 self.coordination_green_extensions += 1
             elif event["action"] == "request_protected_vehicle_progression":
                 self.coordination_progression_requests += 1
-        elif event["action"] == "protect_pedestrian_service":
+        elif event["action"] in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"}:
             self.coordination_pedestrian_protections += 1
 
     def _is_emergency_vehicle(self, vehicle_id: str) -> bool:
@@ -1716,12 +1776,30 @@ class _NetworkModeSimulation:
             }
             return
         self.vehicle_class_priority_triggered += 1
-        outcome = runtime.apply_vehicle_class_priority(
+        pedestrian_lock = self._pedestrian_max_wait_lock(
             clock_s=clock_s,
-            class_name=self.vehicle_class_priority_class,
-            priority_weight=self.vehicle_class_priority_weight,
-            max_extension_seconds=self.vehicle_class_priority_max_extension_seconds,
+            runtime=runtime,
+            signal=signal,
         )
+        if pedestrian_lock["active"]:
+            outcome = {
+                "applied": False,
+                "action": "defer_for_pedestrian_max_wait",
+                "reason": (
+                    "ordinary vehicle-class priority is deferred because local pedestrian wait reached the configured maximum; "
+                    "protected pedestrian service must begin before class-based vehicle extension can resume"
+                ),
+                "timing_delta_seconds": 0.0,
+                "previous_duration_seconds": pedestrian_lock["previous_duration_seconds"],
+                "effective_duration_seconds": pedestrian_lock["effective_duration_seconds"],
+            }
+        else:
+            outcome = runtime.apply_vehicle_class_priority(
+                clock_s=clock_s,
+                class_name=self.vehicle_class_priority_class,
+                priority_weight=self.vehicle_class_priority_weight,
+                max_extension_seconds=self.vehicle_class_priority_max_extension_seconds,
+            )
         event = {
             "vehicle_class_priority_id": f"classprio_{runtime.intersection_id}_{int(round(clock_s * 1000.0))}",
             "t": round(clock_s, 1),
@@ -1740,10 +1818,12 @@ class _NetworkModeSimulation:
             "applied": bool(outcome.get("applied")),
             "reason": outcome.get("reason"),
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+            "previous_duration_seconds": outcome.get("previous_duration_seconds"),
+            "effective_duration_seconds": outcome.get("effective_duration_seconds"),
         }
         self._latest_vehicle_class_priority[role] = {"active": True, **event}
         self.vehicle_class_priority_events.append(event)
-        if event["action"] == "protect_pedestrian_service":
+        if event["action"] in {"protect_pedestrian_service", "defer_for_pedestrian_max_wait"}:
             self.vehicle_class_priority_pedestrian_protections += 1
         if event["applied"]:
             self.vehicle_class_priority_applied += 1
@@ -1805,6 +1885,8 @@ class _NetworkModeSimulation:
             "applied": bool(outcome.get("applied")),
             "reason": outcome.get("reason"),
             "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+            "previous_duration_seconds": outcome.get("previous_duration_seconds"),
+            "effective_duration_seconds": outcome.get("effective_duration_seconds"),
         }
         self._latest_emergency_priority = {"active": True, "status": self._emergency_status, **event}
         self.emergency_priority_events.append(event)

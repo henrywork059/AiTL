@@ -27,6 +27,17 @@ from app.services.decision_evidence import (  # noqa: E402
     build_network_decision_evidence,
     export_network_decision_evidence_csv,
 )
+from app.services.network_simulation_experiments import _NetworkModeSimulation  # noqa: E402
+
+
+def _timed_outcome(outcome: dict, *, previous: float = 20.0) -> dict:
+    delta = float(outcome.get("timing_delta_seconds", 0.0) or 0.0)
+    return {
+        **outcome,
+        "previous_duration_seconds": previous,
+        "effective_duration_seconds": round(previous + delta, 1),
+    }
+
 
 class _EvidenceController(_FakeController):
     def signal_state(self, clock_s: float) -> dict:
@@ -50,6 +61,26 @@ class _EvidenceController(_FakeController):
                 }
             )
         return state
+
+    def apply_network_coordination(self, **kwargs) -> dict:
+        return _timed_outcome(super().apply_network_coordination(**kwargs))
+
+    def apply_pedestrian_service_guard(self, **kwargs) -> dict:
+        return _timed_outcome(super().apply_pedestrian_service_guard(**kwargs))
+
+    def apply_vehicle_class_priority(self, **kwargs) -> dict:
+        return _timed_outcome(super().apply_vehicle_class_priority(**kwargs))
+
+    def apply_emergency_priority(self, **_kwargs) -> dict:
+        return {
+            "applied": False,
+            "decision": "defer",
+            "action": "emergency_progression_pending",
+            "reason": "evidence timing propagation regression",
+            "timing_delta_seconds": 0.0,
+            "previous_duration_seconds": 20.0,
+            "effective_duration_seconds": 20.0,
+        }
 
 
 def _evidence_factory(config_path: Path, history_path: Path):
@@ -82,6 +113,8 @@ def _synthetic_raw_result() -> dict:
                             "previous_duration_seconds": 15.0,
                             "effective_duration_seconds": 18.0,
                             "timing_delta_seconds": 3.0,
+                            "previous_duration_seconds": 15.0,
+                            "effective_duration_seconds": 18.0,
                             "provenance": "simulation_signal_controller",
                         }
                     ]
@@ -103,6 +136,8 @@ def _synthetic_raw_result() -> dict:
                     "applied": True,
                     "reason": "predicted arrivals",
                     "timing_delta_seconds": 2.0,
+                    "previous_duration_seconds": 12.0,
+                    "effective_duration_seconds": 14.0,
                 }
             ],
             "pedestrian_awareness_events": [
@@ -121,6 +156,26 @@ def _synthetic_raw_result() -> dict:
                     "applied": True,
                     "reason": "maximum wait reached",
                     "timing_delta_seconds": -2.0,
+                    "previous_duration_seconds": 12.0,
+                    "effective_duration_seconds": 10.0,
+                },
+                {
+                    "pedestrian_awareness_id": "pedaware_B_6500",
+                    "t": 6.5,
+                    "role": "destination",
+                    "intersection_id": "B",
+                    "provenance": "synthetic_pedestrian_demand",
+                    "phase_before": "vehicle_green",
+                    "phase_key_before": "vehicle_green",
+                    "waiting_count": 3,
+                    "oldest_wait_seconds": 30.5,
+                    "crossing_count": 0,
+                    "action": "pedestrian_service_pending",
+                    "applied": False,
+                    "reason": "protected minimum reached",
+                    "timing_delta_seconds": 0.0,
+                    "previous_duration_seconds": 10.0,
+                    "effective_duration_seconds": 10.0,
                 }
             ],
             "vehicle_class_priority_events": [
@@ -142,6 +197,8 @@ def _synthetic_raw_result() -> dict:
                     "applied": True,
                     "reason": "configured bus priority",
                     "timing_delta_seconds": 1.0,
+                    "previous_duration_seconds": 14.0,
+                    "effective_duration_seconds": 15.0,
                 }
             ],
             "emergency_priority_events": [
@@ -162,6 +219,8 @@ def _synthetic_raw_result() -> dict:
                     "applied": False,
                     "reason": "active pedestrian crossing blocks emergency timing change",
                     "timing_delta_seconds": 0.0,
+                    "previous_duration_seconds": 9.0,
+                    "effective_duration_seconds": 9.0,
                 }
             ],
             "emergency_lifecycle_events": [
@@ -186,13 +245,13 @@ def _assert_schema_projection() -> None:
     second = build_network_decision_evidence(_synthetic_raw_result())
     assert first == second
     assert first["schema_version"] == EVIDENCE_SCHEMA_VERSION == 1
-    assert first["record_count"] == 6
+    assert first["record_count"] == 7
     assert first["applied_count"] == 4
     assert first["categories"] == {
         "cooperation": 1,
         "emergency_lifecycle": 1,
         "emergency_priority": 1,
-        "pedestrian": 1,
+        "pedestrian": 2,
         "scenario": 1,
         "vehicle_class": 1,
     }
@@ -202,6 +261,19 @@ def _assert_schema_projection() -> None:
     scenario = next(record for record in records if record["trigger_category"] == "scenario")
     assert scenario["context"]["local"]["vehicles_waiting"] == 5
     assert scenario["context"]["vehicle_class"]["zone_class_counts"]["queue_a"]["bus"] == 2
+    pending_pedestrian = next(
+        record
+        for record in records
+        if record["trigger_category"] == "pedestrian" and record["action"] == "pedestrian_service_pending"
+    )
+    assert pending_pedestrian["decision"] == "defer"
+    timed_categories = {"scenario", "cooperation", "pedestrian", "vehicle_class", "emergency_priority"}
+    for record in records:
+        if record["trigger_category"] not in timed_categories:
+            continue
+        assert record["timing"]["previous_duration_seconds"] is not None
+        assert record["timing"]["effective_duration_seconds"] is not None
+
     emergency = next(record for record in records if record["trigger_category"] == "emergency_priority")
     assert emergency["decision"] == "deny"
     assert emergency["context"]["pedestrian"]["protected"] is True
@@ -210,6 +282,127 @@ def _assert_schema_projection() -> None:
     assert "evidence_id,mode,t_seconds,trigger_category" in csv_text
     assert "protect_active_pedestrian_crossing" in csv_text
     assert "synthetic_vehicle_class_demand" in csv_text
+
+
+def _assert_cross_layer_pedestrian_lock() -> None:
+    class _Runtime:
+        def __init__(self, intersection_id: str) -> None:
+            self.intersection_id = intersection_id
+            self.coordination_calls = 0
+            self.class_calls = 0
+
+        def pedestrian_context(self, _clock_s: float) -> dict:
+            return {"waiting_count": 2, "oldest_wait_seconds": 31.0, "crossing_count": 0}
+
+        def vehicle_class_context(self, class_name: str, _clock_s: float) -> dict:
+            return {"class_name": class_name, "waiting_count": 3, "oldest_wait_seconds": 12.0}
+
+        def apply_coordination(self, **_kwargs) -> dict:
+            self.coordination_calls += 1
+            raise AssertionError("ordinary cooperation must be suppressed by the pedestrian max-wait lock")
+
+        def apply_vehicle_class_priority(self, **_kwargs) -> dict:
+            self.class_calls += 1
+            raise AssertionError("ordinary class priority must be suppressed by the pedestrian max-wait lock")
+
+    simulation = object.__new__(_NetworkModeSimulation)
+    simulation.mode = "class_aware_cooperative"
+    simulation.pedestrian_max_wait_seconds = 30.0
+    simulation.cooperation_lookahead_seconds = 12.0
+    simulation.cooperation_max_extension_seconds = 5.0
+    simulation.cooperation_min_incoming_vehicles = 1
+    simulation.vehicle_class_priority_enabled = True
+    simulation.vehicle_class_priority_class = "bus"
+    simulation.vehicle_class_priority_weight = 2.0
+    simulation.vehicle_class_priority_min_waiting = 1
+    simulation.vehicle_class_priority_max_extension_seconds = 4.0
+    simulation.link = {"id": "A_to_B"}
+    simulation.source = types.SimpleNamespace(intersection_id="A")
+    simulation.destination = _Runtime("B")
+    simulation.coordination_evaluations = 0
+    simulation.coordination_triggered = 0
+    simulation.coordination_applied = 0
+    simulation.coordination_green_extensions = 0
+    simulation.coordination_progression_requests = 0
+    simulation.coordination_pedestrian_protections = 0
+    simulation.coordination_seconds_added = 0.0
+    simulation.coordination_seconds_reduced = 0.0
+    simulation.coordination_events = []
+    simulation._latest_coordination = {}
+    simulation.vehicle_class_priority_evaluations = 0
+    simulation.vehicle_class_priority_triggered = 0
+    simulation.vehicle_class_priority_applied = 0
+    simulation.vehicle_class_priority_pedestrian_protections = 0
+    simulation.vehicle_class_priority_seconds_added = 0.0
+    simulation.vehicle_class_priority_seconds_reduced = 0.0
+    simulation.vehicle_class_priority_events = []
+    simulation._latest_vehicle_class_priority = {"source": {}, "destination": {}}
+    simulation._cooperation_advisory = lambda _clock_s: {
+        "incoming_vehicle_count": 3,
+        "earliest_arrival_eta_seconds": 4.0,
+        "lookahead_seconds": 12.0,
+        "max_extension_seconds": 5.0,
+        "link_id": "A_to_B",
+        "source_intersection_id": "A",
+        "destination_intersection_id": "B",
+    }
+    signal = {
+        "phase": "vehicle_green",
+        "phase_key": "vehicle_green",
+        "effective_duration_seconds": 12.0,
+    }
+
+    simulation._evaluate_cooperation(31.0, signal)
+    cooperation = simulation.coordination_events[-1]
+    assert cooperation["action"] == "defer_for_pedestrian_max_wait"
+    assert cooperation["applied"] is False
+    assert cooperation["previous_duration_seconds"] == 12.0
+    assert cooperation["effective_duration_seconds"] == 12.0
+    assert simulation.destination.coordination_calls == 0
+
+    simulation._evaluate_vehicle_class_priority(31.0, simulation.destination, signal, role="destination")
+    class_event = simulation.vehicle_class_priority_events[-1]
+    assert class_event["action"] == "defer_for_pedestrian_max_wait"
+    assert class_event["applied"] is False
+    assert class_event["previous_duration_seconds"] == 12.0
+    assert class_event["effective_duration_seconds"] == 12.0
+    assert simulation.destination.class_calls == 0
+
+    projected = build_network_decision_evidence(
+        {
+            "scenario": {"comparison": ["class_aware_cooperative"]},
+            "class_aware_cooperative": {
+                "intersections": {},
+                "coordination_events": [cooperation],
+                "pedestrian_awareness_events": [],
+                "vehicle_class_priority_events": [class_event],
+                "emergency_priority_events": [],
+                "emergency_lifecycle_events": [],
+            },
+        }
+    )
+    suppression_records = [
+        record for record in projected["records"] if record["action"] == "defer_for_pedestrian_max_wait"
+    ]
+    assert len(suppression_records) == 2
+    assert all(record["decision"] == "defer" for record in suppression_records)
+    assert all(record["context"]["pedestrian"]["protected"] is True for record in suppression_records)
+    assert all(record["context"]["pedestrian"]["max_wait_lock"] is True for record in suppression_records)
+    assert all(record["timing"]["previous_duration_seconds"] == 12.0 for record in suppression_records)
+    assert all(record["timing"]["effective_duration_seconds"] == 12.0 for record in suppression_records)
+
+    # Once pedestrian WALK/CLEAR begins, the starvation lock is released.
+    pedestrian_signal = {
+        "phase": "pedestrian_green",
+        "phase_key": "pedestrian_green",
+        "effective_duration_seconds": 8.0,
+    }
+    released = simulation._pedestrian_max_wait_lock(
+        clock_s=31.0,
+        runtime=simulation.destination,
+        signal=pedestrian_signal,
+    )
+    assert released["active"] is False
 
 
 def _assert_service_projection_and_backfill() -> None:
@@ -258,6 +451,14 @@ def _assert_service_projection_and_backfill() -> None:
         assert evidence["categories"].get("vehicle_class", 0) > 0
         assert evidence["categories"].get("emergency_lifecycle", 0) > 0
         assert evidence["categories"].get("emergency_priority", 0) > 0
+        reconstructable = [
+            record
+            for record in evidence["records"]
+            if record["trigger_category"] in {"cooperation", "pedestrian", "vehicle_class", "emergency_priority"}
+        ]
+        assert reconstructable
+        assert any(record["timing"]["previous_duration_seconds"] is not None for record in reconstructable)
+        assert any(record["timing"]["effective_duration_seconds"] is not None for record in reconstructable)
         assert service.evidence(result["run_id"]) == evidence
         csv_text = service.export_evidence_csv(result["run_id"])
         assert "source_ref" in csv_text
@@ -315,6 +516,7 @@ def _assert_service_projection_and_backfill() -> None:
 
 def main() -> int:
     _assert_schema_projection()
+    _assert_cross_layer_pedestrian_lock()
     _assert_service_projection_and_backfill()
     print("V031 persistent decision evidence regression OK")
     return 0
