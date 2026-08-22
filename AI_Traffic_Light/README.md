@@ -4,9 +4,9 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V025 / `0_2_5` is the current unaccepted candidate and V024 / `0_2_4` is the owner-confirmed passed baseline. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. At this update, V026 / `0_2_6` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V025 is the previous version because the owner explicitly requested V026 before separately accepting V025. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
 
-V025 includes ranked signal scenarios, isolated Fixed-vs-Adaptive Simulation Lab telemetry, and a same-candidate intersection/network + structured-decision-context foundation.
+V026 builds on the V025 ranked-scenario, Simulation Lab, network-identity, and explanation foundation with a deterministic two-intersection network experiment baseline and synthetic configured-link vehicle transfer.
 
 ## Documentation entry points
 
@@ -19,7 +19,7 @@ V025 includes ranked signal scenarios, isolated Fixed-vs-Adaptive Simulation Lab
 | Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
 | Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
 | API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_2_5.md`](docs/PATCH_0_2_5.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
+| Current candidate acceptance | [`docs/PATCH_0_2_6.md`](docs/PATCH_0_2_6.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
 | What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Implemented prototype functions
@@ -36,7 +36,8 @@ V025 includes ranked signal scenarios, isolated Fixed-vs-Adaptive Simulation Lab
 - persistent signal decision history;
 - isolated seeded Fixed-vs-Adaptive Simulation Lab with wait/queue/throughput/signal/scenario telemetry;
 - persistent experiment results and CSV export;
-- generic intersection/source identity and directed neighbour-link **foundation**;
+- generic intersection/source identity and directed neighbour-link configuration;
+- deterministic two-intersection independent-controller network experiments with synthetic configured-link vehicle transfer;
 - structured live decision/explanation **foundation** with observation provenance.
 
 ## Important semantics
@@ -45,7 +46,7 @@ V025 includes ranked signal scenarios, isolated Fixed-vs-Adaptive Simulation Lab
 - Flow is produced by prototype track/line/region events.
 - Zone/class counts are per-frame observations.
 - Simulation Lab data is synthetic experiment output, separate from live histories.
-- Network links are configured topology metadata, not proof of observed vehicle transfer or active cooperation.
+- Live network links remain configuration metadata; V026 network-experiment transfer events are explicitly synthetic simulator evidence, not observed real traffic and not active cooperation.
 - Manual/synthetic events must remain labeled with their provenance.
 
 ## Planned invention capability areas

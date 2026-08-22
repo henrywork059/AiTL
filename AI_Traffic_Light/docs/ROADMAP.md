@@ -2,51 +2,40 @@
 
 This roadmap defines dependency order and evidence goals. Root `VERSION` defines the active candidate; `PROJECT_SCOPE.md` defines capability-status wording.
 
-## Current foundation
+## Current V026 foundation
 
-The current V025 work combines:
+V026 combines:
 
 - ranked simulated signal scenarios and deterministic one-winner arbitration;
-- isolated Fixed-vs-Adaptive Simulation Lab telemetry;
-- camera-aligned zones, occupancy, prototype tracking/flow;
-- dataset/training/inference/model workflow;
+- isolated single-junction Fixed-vs-Adaptive Simulation Lab telemetry;
 - generic intersection/source identity and directed neighbour-link configuration;
-- structured live decision/explanation context.
-
-Configured topology is foundation only: cooperation/emergency priority remain inactive.
-
-## Priority 1 — deterministic multi-intersection simulation
-
-Goal: make intersection identity real in the simulator before adding cooperation.
-
-Minimum scope:
-
-- at least two simultaneous synthetic intersections;
-- per-intersection zones/traffic state/controller runtime;
-- deterministic links/travel time;
-- explicit vehicle/demand transfer or arrival events A → B;
+- structured live decision/explanation context;
+- deterministic **two-intersection** independent-control network experiments;
+- separate controller runtime per simulated intersection;
+- synthetic configured-link vehicle transfer A → B;
+- per-transfer departure/scheduled-arrival/arrival evidence;
 - per-intersection and network aggregate telemetry;
-- seeded repeatability tests;
-- no hard-coded assumption that the architecture can only ever contain two intersections.
+- persistent network experiment JSON and CSV export.
 
-Evidence gate: demonstrate that transferred arrivals at B correspond to departures/links from A under the same deterministic run.
+V026 still reports `cooperative_control_active: false`. It is the baseline against which later cooperation should be measured.
 
-## Priority 2 — bounded multi-intersection cooperation
+## Priority 1 — bounded multi-intersection cooperation
 
 Goal: neighbour-informed simulated timing while preserving each intersection's protected local controller.
 
 Minimum scope:
 
-- predicted incoming demand/arrival context from links;
-- neighbour context as an explicit condition/input, not hidden global state;
-- bounded cooperation scenario/action integrated with the ranked scenario engine;
-- decision history records the neighbour evidence used;
+- expose predicted/scheduled incoming demand from the V026 transfer pipeline;
+- make neighbour context an explicit controller/scenario condition/input, not hidden global state;
+- integrate bounded cooperation with the ranked scenario engine;
+- preserve protected phase order/min/max/cycle constraints;
+- decision evidence records the neighbour values that affected arbitration;
 - comparison modes: Fixed vs Independent Adaptive vs Cooperative Adaptive;
-- network metrics such as total/percentile delay, queues, throughput/service, stops or transfer completion where semantics are valid.
+- network metrics such as total/percentile delay, queues, throughput/service, transfer completion and corridor travel where semantics are valid.
 
-Evidence gate: same seeded demand produces a deterministic decision difference attributable to neighbour context and measurable network-level outcome differences.
+Evidence gate: same seeded demand must produce a deterministic decision difference attributable to neighbour context and a measurable network-level outcome difference.
 
-## Priority 3 — pedestrian service quality
+## Priority 2 — pedestrian service quality
 
 Strengthen the existing pedestrian-aware controller with:
 
@@ -60,7 +49,7 @@ Strengthen the existing pedestrian-aware controller with:
 
 Do not call per-frame person counts unique throughput.
 
-## Priority 4 — simulated emergency priority
+## Priority 3 — simulated emergency priority
 
 Begin with explicit simulated/configured emergency events, not an unsupported perception claim.
 
@@ -75,9 +64,9 @@ Minimum scope:
 
 Only add real emergency perception later if a compatible detector/source is separately implemented and evaluated.
 
-## Priority 5 — broader vehicle-class behavior
+## Priority 4 — broader vehicle-class behavior
 
-Build on existing class retention/zone-class scenarios:
+Build on existing class retention/zone-class scenarios and V026 synthetic car/bus transfer evidence:
 
 - explicit class taxonomy/fallback;
 - additional synthetic classes where useful;
@@ -95,12 +84,13 @@ Target persistent decision evidence includes decision/intersection IDs, trigger 
 
 After core behavior is stable:
 
+- PC Studio network-experiment UI integrated into the existing grouped Simulation Lab presentation;
 - model/dataset quality metrics (precision, recall, mAP, class distribution, confusion/error review);
 - scenario diagnostics (activation/winner/suppression/cooldown/unavailable counts);
-- experiment/session reports with policy/config snapshots;
+- experiment/session reports with policy/config/topology snapshots;
 - stronger tracking/motion prediction diagnostics;
 - scenario import/export/templates;
-- exogenous arrival-rate demand generators;
+- richer exogenous arrival-rate demand generators;
 - device-camera workflow completion where useful to the model demonstration.
 
 ## Explicitly outside scope

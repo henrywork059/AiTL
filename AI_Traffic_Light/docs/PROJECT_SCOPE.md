@@ -27,33 +27,44 @@ AiTL currently includes local prototype capability in these families:
 - ranked adaptive signal scenarios with deterministic one-winner arbitration;
 - isolated seeded Fixed-vs-Adaptive Simulation Lab telemetry;
 - persistent experiment/config/history tooling;
-- generic intersection/topology **foundation** and source-to-intersection identity;
+- generic intersection/topology foundation and source-to-intersection identity;
+- deterministic two-intersection independent-controller network simulation with synthetic configured-link vehicle transfer;
 - structured live decision/explanation **foundation**.
 
 Exact candidate details belong in `START_HERE.md` and the current patch document.
 
 ## 3. Planned invention capability: multi-intersection cooperation
 
-**Status: foundation / planned active behavior. Highest next architecture priority.**
+**Status: multi-intersection simulation implemented / cooperative control still planned. Highest next architecture priority.**
 
-Target concept:
+V026 now provides evidence foundations that were missing in V025:
 
-- intersections have stable IDs and directed neighbour links;
-- an upstream intersection can expose demand/expected arrivals to a downstream intersection;
+- at least two intersections can be modeled simultaneously in an isolated network experiment;
+- each intersection owns a separate signal-controller runtime;
+- one enabled directed link can transfer synthetic vehicles from upstream to downstream;
+- transfer arrival time is tied deterministically to configured link travel time;
+- Fixed and Adaptive share the same seeded exogenous demand plan;
+- per-intersection and network aggregate metrics are persisted/exportable.
+
+These capabilities are **not cooperation**. In V026, neighbour/transfer context does not alter either controller and `cooperative_control_active` remains false.
+
+Target cooperation concept:
+
+- an upstream intersection exposes predicted/scheduled incoming demand to a downstream intersection;
 - downstream timing can prepare for predicted incoming traffic while respecting protected local timing;
-- the design generalizes beyond exactly two intersections;
-- network-level results can be compared with independent local adaptive control.
+- neighbour context is explicit evidence in ranked arbitration/decision history;
+- the design generalizes beyond one selected two-node link;
+- network-level results compare Fixed, Independent Adaptive, and Cooperative Adaptive.
 
 Minimum evidence before claiming "cooperation implemented":
 
-1. at least two simultaneously modeled intersections;
-2. explicit vehicle/demand transfer or arrival prediction between them;
-3. per-intersection controller state, not one global controller relabeled twice;
-4. bounded neighbour-informed decision logic;
-5. deterministic tests showing neighbour context changes an eligible simulated decision;
-6. network-level metrics and a comparison against non-cooperative control.
+1. bounded neighbour-informed condition/input integrated with the existing controller;
+2. deterministic test showing neighbour context changes an otherwise eligible simulated decision;
+3. structured decision evidence records the neighbour values used;
+4. comparison against the V026 independent-control baseline;
+5. network metrics show the resulting outcome under the same seeded demand.
 
-Configured links alone are **not** cooperation.
+Synthetic transfer alone is **not** cooperation.
 
 ## 4. Planned invention capability: emergency priority
 

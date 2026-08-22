@@ -34,14 +34,24 @@ capture + metadata
 → local inference
 ```
 
-Isolated experiment workflow:
+Isolated experiment workflows:
 
 ```text
 saved signal profile + zone snapshot + density/seed
-→ separate Fixed simulator/controller
-→ separate Adaptive simulator/controller
+→ separate single-junction Fixed simulator/controller
+→ separate single-junction Adaptive simulator/controller
 → aligned synthetic telemetry
 ```
+
+```text
+configured directed link + seeded exogenous arrivals
+→ independent source-intersection controller runtime
+→ explicit synthetic transfer pipeline
+→ independent destination-intersection controller runtime
+→ per-intersection + network telemetry
+```
+
+The V026 network experiment is an **independent-control baseline**. It is not cooperation because neighbour context does not yet change either controller's decision.
 
 No path converts these outputs into public-road signal commands.
 
@@ -110,7 +120,7 @@ Inspect nearby modules before adding a new abstraction. Reuse existing services/
 
 Prefer the smallest cohesive change. Refactor when duplication or ownership ambiguity materially blocks the request, not merely because a file is long.
 
-For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. Establish identity/state/transfer evidence before cooperation algorithms. Do not hard-code exactly two intersections into generic services.
+For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. V026 establishes deterministic two-intersection transfer evidence as an isolated benchmark; the next cooperation layer should consume explicit neighbour/arrival context while preserving independent per-intersection controller state. Do not hard-code exactly two intersections into generic topology services.
 
 ## 7. Backend implementation protocol
 
@@ -135,7 +145,8 @@ Services own domain behavior/side effects. Important ownership includes:
 - zones/occupancy: zones + traffic history;
 - tracking/flow: tracking + traffic flow;
 - signal arbitration: `signal_rules.py`;
-- isolated A/B simulation: `simulation_experiments.py`;
+- isolated single-junction A/B simulation: `simulation_experiments.py`;
+- isolated two-intersection network benchmark: `network_simulation_experiments.py`;
 - intersection/topology identity: `intersection_network.py`;
 - non-controlling explanation projection: `decision_context.py`.
 

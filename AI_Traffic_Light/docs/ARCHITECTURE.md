@@ -37,7 +37,7 @@ saved profile + zones + density + seed
 
 Experiment controllers/agents are separate from the live camera/controller runtime.
 
-## 3. Network/explanation foundation
+## 3. Network/explanation foundation and V026 experiment path
 
 ```text
 camera/source id
@@ -51,32 +51,49 @@ traffic API enrichment
 DecisionContext projection
 ```
 
-The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. Neither service creates a second signal controller.
+The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. Those live services still do not create a second live signal controller.
 
-Configured links are **metadata**, not measured transfers. Current cooperative/emergency-active flags remain false until corresponding behavior exists.
-
-## 4. Planned multi-intersection architecture
-
-The intended next architecture extends existing ownership instead of creating a parallel controller:
+V026 adds a separate isolated experiment path:
 
 ```text
-Intersection A runtime ── explicit transfer/arrival context ──► Intersection B runtime
-       │                                                        │
- SignalRulesService A                                      SignalRulesService B
-       │                                                        │
-       └──────────── neighbour/network context layer ────────────┘
-                              ↓
-                 network experiment/telemetry
+seeded exogenous demand + configured directed link
+              ↓
+   Intersection A experiment runtime
+      + SignalRulesService A
+              ↓ synthetic serviced transfer
+      deterministic travel pipeline
+              ↓
+   Intersection B experiment runtime
+      + SignalRulesService B
+              ↓
+ per-intersection + network telemetry
+```
+
+`network_simulation_experiments.py` owns this path. It creates separate controller instances and explicit synthetic transfer events without touching the live camera/controller runtime.
+
+Live configured links remain **metadata**, not observed transfers. V026 experiment transfer is synthetic simulator evidence. Cooperative/emergency-active flags remain false.
+
+## 4. Planned cooperative multi-intersection architecture
+
+The next architecture step reuses the V026 independent baseline instead of creating a parallel controller:
+
+```text
+Intersection A runtime ── predicted/scheduled arrival context ──► Intersection B runtime
+       │                                                          │
+ SignalRulesService A                                        SignalRulesService B
+       │                                                          │
+       └──────────── explicit neighbour evidence layer ────────────┘
+                                ↓
+          Fixed / Independent Adaptive / Cooperative comparison
 ```
 
 Requirements before cooperation is considered implemented:
 
-- independent per-intersection runtime/controller state;
-- explicit vehicle/demand transfer or predicted-arrival events;
-- neighbour context enters bounded ranked-scenario evaluation;
+- neighbour/arrival context enters bounded ranked-scenario evaluation;
 - protected local phase rules remain controller-owned;
-- decisions record neighbour evidence;
-- deterministic network tests and metrics exist.
+- decisions record the neighbour evidence used;
+- deterministic tests show neighbour context changes an eligible decision;
+- network metrics compare against the V026 independent-control baseline.
 
 ## 5. Backend ownership
 
@@ -96,7 +113,8 @@ Important services:
 - `object_tracking.py` / `traffic_flow.py` — prototype tracking/flow;
 - `zones.py` / `traffic_history.py` — zone config/occupancy;
 - `signal_rules.py` — ranked scenarios + protected simulated timing;
-- `simulation_experiments.py` — isolated deterministic A/B experiments;
+- `simulation_experiments.py` — isolated deterministic single-junction Fixed-vs-Adaptive experiments;
+- `network_simulation_experiments.py` — isolated two-intersection independent-control experiment + synthetic link transfer;
 - `intersection_network.py` — intersection/source/topology metadata;
 - `decision_context.py` — non-controlling structured explanation.
 
@@ -112,7 +130,7 @@ Dense experiment/explanation data should be grouped rather than rendered as an u
 - flow = track-derived events;
 - zone/class counts = per-frame scenario observations;
 - Simulation Lab telemetry = synthetic isolated output;
-- network links = configuration metadata;
+- live network links = configuration metadata; V026 network-experiment transfer = synthetic simulator events over a selected configured link;
 - observation provenance = AI/simulation/manual/unavailable source classification.
 
 Do not silently convert one category into another.

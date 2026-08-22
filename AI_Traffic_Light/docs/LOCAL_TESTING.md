@@ -1,19 +1,10 @@
-# Local Testing Notes (V025)
+# Local Testing Notes (V026)
 
-V025 / `0_2_5` is the current candidate. V024 / `0_2_4` is the previous version and is now the owner-confirmed passed baseline. Automated checks do not promote V025.
+V026 / `0_2_6` is the current candidate by explicit owner request. V025 / `0_2_5` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks never promote a candidate.
 
-## Quick Windows workflow
+## 1. Safe Windows update
 
-```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
-.\scripts\update_test_run.ps1
-```
-
-The V024 helper remains the normal update → test → run path: it protects tracked work, fast-forwards `main`, synchronizes dependencies, runs backend/frontend validation and live smoke, then launches PC Studio without deleting runtime data.
-
-## 1. Safe update
-
-Stop backend/frontend. From the repository root:
+Stop backend/frontend first. From the repository root:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
@@ -22,17 +13,17 @@ git pull --ff-only origin main
 Get-Content .\AI_Traffic_Light\VERSION
 ```
 
-Expected:
+Expected release fields:
 
 ```text
-version: 0_2_5
-previous_version: 0_2_4
+version: 0_2_6
+previous_version: 0_2_5
 passed_baseline: 0_2_4
 ```
 
-Do not use `git clean -fd`. Preserve runtime datasets, outputs, models, labels, zones, settings, `config/signal_rules.json`, `config/intersections.json`, occupancy/flow/signal history, and `outputs/simulation_experiments/`.
+Do not use `git clean -fd`. Preserve datasets, outputs, trained models, labels, runtime zones/settings/signal rules, `config/intersections.json`, occupancy/flow/signal history, and all experiment results.
 
-## 2. Backend compile/structure/regression
+## 2. Backend compile / structure / regression
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
@@ -41,7 +32,12 @@ $py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
 & $py -m pip install -r ".\apps\pc-studio\backend\requirements-training.txt"
 & $py -m compileall ".\apps\pc-studio\backend\app" ".\scripts"
 & $py ".\scripts\check_structure.py"
+& $py ".\scripts\test_network_simulation_experiments.py"
+```
 
+Then run the complete non-live regression set:
+
+```powershell
 $tests = Get-ChildItem ".\scripts\test_*.py" | Where-Object { $_.Name -ne "test_backend_smoke.py" }
 foreach ($test in $tests) {
     Write-Host "`n===== RUNNING $($test.Name) =====" -ForegroundColor Cyan
@@ -50,31 +46,20 @@ foreach ($test in $tests) {
 }
 ```
 
-V025-focused regressions:
+Important inherited tests include `test_intersection_network.py`, `test_simulation_experiments.py`, `test_signal_scenarios.py`, `test_signal_rules_service.py`, camera/simulation, tracking/flow, persistence, dataset/training/model, frontend polling structure, and update-runner regressions.
 
-```powershell
-& $py ".\scripts\test_signal_scenarios.py"
-& $py ".\scripts\test_simulation_experiments.py"
-& $py ".\scripts\test_intersection_network.py"
-```
+`test_network_simulation_experiments.py` is the V026-focused regression. It checks deterministic seeded demand, separate A/B controller/runtime state, explicit transfer timing, persistence/list/get/delete/CSV, and invalid-link rejection.
 
-`test_signal_scenarios.py` verifies zone/class conditions, ALL matching, rank arbitration, unavailable-zone fallback, observed values, bounded phase adjustment, and preview behavior. `test_simulation_experiments.py` verifies same-seed repeatability, Fixed/Adaptive mode separation, adaptive scenario activity including zone-based scenarios, telemetry invariants, stored-run list/get/delete, and CSV export.
+## 3. Frontend release validation
 
-`test_intersection_network.py` verifies generic three-intersection topology, directed neighbour context, source-id resolution, numeric-leading camera-source compatibility, atomic persistence, duplicate-source rejection, missing/self-link rejection, and structured live decision-context construction without enabling cooperation/emergency behavior.
-
-Retain the V024/V023 regressions including `test_atomic_json_store.py`, `test_frontend_polling_structure.py`, `test_signal_rules_service.py`, camera/simulation tests, tracking/flow tests, dataset/training/model tests, and all other `scripts/test_*.py` tests.
-
-## 3. Frontend
+V026 does not add a dedicated network-experiment page. The existing Simulation Lab UI remains the single-junction experiment surface, but frontend release metadata still changes to `0_2_6`.
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
 npm ci
 npm run typecheck
 npm run build
-npm run dev
 ```
-
-This same-candidate network foundation is backend/API-first; no new dedicated frontend network editor is expected in this patch.
 
 ## 4. Backend + live smoke
 
@@ -93,111 +78,127 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\apps\pc-studio\backend\.venv\Scripts\python.exe .\scripts\test_backend_smoke.py
 ```
 
-## 5. V025 ranked scenario acceptance
+Confirm health/smoke/template/version surfaces report `0_2_6` and retain request IDs.
 
-1. Confirm visible version is `0_2_5`, previous version is `0_2_4`, and `passed_baseline` is `0_2_4`.
-2. Open Traffic → **Traffic Logic**. Confirm tabs are Live Decision / Signal Timing / Scenario Rules / Test & Safety / History.
-3. In Scenario Rules, create a scenario using **Zone / class count**: choose a vehicle queue zone, class `car`, comparison `>`, threshold `2`, rank `1`, action Extend current phase by `4s`, target Vehicle green, requested service Vehicle. Save.
-4. Make the live/simulation observation satisfy the condition. Live Decision should show the scenario as the winner and show the observed car count beside the condition.
-5. Create a second simultaneously true scenario at rank `2`. Confirm rank `1` wins and rank `2` says it was suppressed by the higher-ranked winner.
-6. Swap the ranks, Save, and confirm the other scenario wins. Rank `1` is always highest; duplicate saved ranks are rejected so arbitration remains unambiguous.
-7. Edit the higher-ranked scenario to reference a nonexistent/deleted zone. Confirm it becomes **unavailable** and does not block the next eligible scenario.
-8. Add a two-condition scenario. In ALL mode, both conditions must match. In ANY mode, either matching condition is enough.
-9. Confirm persistence prevents immediate one-frame activation and cooldown prevents repeated adjustment after application.
-10. Configure a triggered scenario whose target-phase checkboxes exclude the current phase. It should be suppressed for phase applicability and the next eligible scenario may win.
-11. Confirm Fixed mode executes no adaptive scenario, while Adaptive mode uses live observations. Test mode additionally permits the explicit mobility/fall flags.
-12. Confirm Signal Timing still rejects invalid protected minimum/order values and scenario actions never jump directly between conflicting movement phases.
-13. Use Test & Safety preview/current observation and confirm preview does not mutate the running controller.
-14. Confirm History records scenario application details including scenario id/label/rank/action and phase timing change.
-15. Restart backend and confirm saved scenario definitions persist in `config/signal_rules.json`. An older V023/V024 config without `scenarios` should load through migration rather than fail.
-16. Confirm zone/class counts are described as per-frame observations, not throughput.
+## 5. Prepare a two-intersection topology
 
-## 6. Same-candidate intersection/network foundation acceptance
-
-The following examples use PowerShell's `Invoke-RestMethod`. Keep the backend running on port 8000.
-
-1. Read defaults:
+Keep the backend running. The example below creates two enabled intersections and one A→B link with a deterministic 7.5-second synthetic link travel time.
 
 ```powershell
-$network = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network"
-$network.data | ConvertTo-Json -Depth 8
-```
-
-Confirm `active_intersection_id` is `intersection_main`, one default intersection exists, links are empty, and `cooperative_control_active` is `false`.
-
-2. Save a generic three-intersection topology:
-
-```powershell
-$body = @{
+$networkBody = @{
   config = @{
     schema_version = 1
     active_intersection_id = "intersection_a"
     intersections = @(
       @{ id="intersection_a"; label="Intersection A"; enabled=$true; source_ids=@("simulation_camera","camera_a"); zone_ids=@(); signal_profile="Normal" },
-      @{ id="intersection_b"; label="Intersection B"; enabled=$true; source_ids=@("camera_b"); zone_ids=@(); signal_profile="Normal" },
-      @{ id="intersection_c"; label="Intersection C"; enabled=$true; source_ids=@(); zone_ids=@(); signal_profile="Normal" }
+      @{ id="intersection_b"; label="Intersection B"; enabled=$true; source_ids=@("camera_b"); zone_ids=@(); signal_profile="Normal" }
     )
     links = @(
-      @{ id="a_to_b"; enabled=$true; source_intersection_id="intersection_a"; destination_intersection_id="intersection_b"; source_approach="eastbound"; destination_approach="westbound"; travel_time_seconds=12.5 },
-      @{ id="b_to_c"; enabled=$true; source_intersection_id="intersection_b"; destination_intersection_id="intersection_c"; source_approach="southbound"; destination_approach="northbound"; travel_time_seconds=18 }
+      @{ id="a_to_b"; enabled=$true; source_intersection_id="intersection_a"; destination_intersection_id="intersection_b"; source_approach="eastbound"; destination_approach="westbound"; travel_time_seconds=7.5 }
     )
   }
 } | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Method Put -ContentType "application/json" -Body $body -Uri "http://127.0.0.1:8000/api/traffic/network"
+
+Invoke-RestMethod -Method Put -ContentType "application/json" -Body $networkBody -Uri "http://127.0.0.1:8000/api/traffic/network" | ConvertTo-Json -Depth 12
 ```
 
-Confirm three intersections are accepted; the schema is not hard-coded to exactly two.
+Confirm the saved topology contains the two intersections and enabled `a_to_b` link. This remains runtime config and must not be packaged in a source patch.
 
-3. Read B's neighbour context:
+## 6. V026 network-experiment API acceptance
+
+### 6.1 Run a deterministic network comparison
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network/context?intersection_id=intersection_b" | ConvertTo-Json -Depth 10
+$runBody = @{
+  duration_seconds = 180
+  density = "normal"
+  seed = 26026
+  sample_interval_seconds = 1
+  profile = "Normal"
+  label = "V026 acceptance"
+  link_id = "a_to_b"
+  transfer_share_percent = 70
+} | ConvertTo-Json
+
+$run1 = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $runBody -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
+$run1.data | ConvertTo-Json -Depth 15
 ```
 
-Confirm both A and C appear with inbound/outbound direction metadata and configured travel times.
+Confirm:
 
-4. Negative tests: try assigning `camera_a` to two intersections, linking to a nonexistent node, and creating a self-link. Each should fail with `ATL-TRAFFIC-013` and should not replace the last valid config.
+1. `scenario.kind` is `two_intersection_network`.
+2. `scenario.link.id` is `a_to_b` and its travel time is `7.5` seconds.
+3. `fixed.intersections` and `adaptive.intersections` both contain `intersection_a` and `intersection_b`.
+4. Each mode reports `cooperative_control_active: false` and `emergency_priority_active: false`.
+5. Transfer counts are non-zero for this normal-density/180-second acceptance run.
+6. At least one transfer event has `arrived_at_s`; for every arrived event, `arrived_at_s - departed_at_s` equals the configured link travel time (allow only normal displayed rounding).
+7. Per-intersection waiting/queue/throughput/signal metrics exist.
+8. Network metrics include transfers departed/arrived, transfer pipeline average/peak, corridor completion, end-to-end corridor travel, and aggregate vehicle wait/queue measures.
+9. The response labels observations/transfers as synthetic experiment data rather than AI-detected live transfer.
 
-5. Restart the backend and confirm the valid topology persists under `config/intersections.json`.
+### 6.2 Verify same-seed repeatability
 
-6. Start Camera Sources simulation and query:
+Run exactly the same POST body again:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/state" | ConvertTo-Json -Depth 12
+$run2 = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $runBody -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
 ```
 
-Confirm `intersection_id` resolves from `simulation_camera`, `observation_provenance` is `simulation`, and `network_context`/`decision_context` are present.
+The run IDs/creation timestamps will differ. Compare the scenario arrival plan and Fixed/Adaptive/comparison payloads; they should otherwise be repeatable for the same topology, policy, zones, seed, density, duration, interval, link, and transfer share.
 
-7. Trigger a ranked scenario. Confirm `decision_context.scenario.id/label/conditions` reflects the current winner and observed values while existing Traffic Logic winner/timing behavior is unchanged.
+The Fixed and Adaptive modes must use the **same exogenous arrival plan**. Confirm `scenario.arrival_plan.fingerprint_sha256` is stable across identical requests; the summary counts should also match. Their downstream transfer outcomes may differ because source service timing differs.
 
-8. Confirm `decision_context.emergency_context.active` and `decision_context.cooperative_control_active` are both false. No network link should change another signal phase in V025.
+### 6.3 Persistence / retrieval / CSV / delete
 
-9. `POST /api/traffic/network/reset` should restore `intersection_main` without deleting zones, signal scenarios, captures, analytics, models, or Simulation Lab runs.
+```powershell
+$runId = $run1.data.run_id
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments?limit=20" | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId" | ConvertTo-Json -Depth 15
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId/export.csv" -OutFile ".\v026_network_experiment.csv"
+```
 
-## 7. V025 Simulation Lab acceptance
+Confirm the CSV includes per-intersection queue/phase/service fields plus network transfer/pipeline/corridor fields, and the HTTP response contains `X-Request-ID`.
 
-1. Open Traffic → **Simulation Lab**.
-2. At a normal desktop window size, confirm setup controls, stored-run controls, tabs, and the selected data panel stay inside one workspace page. The page must not render all metric groups as a long vertical dashboard.
-3. Confirm setup controls include Density, Duration, Signal profile, Seed, Sample interval, optional Run label, and Run comparison.
-4. Start/observe the normal Camera Sources simulation, note its current scene/phase, then run a Simulation Lab comparison. Confirm the live simulation is not reset or switched.
-5. Run Normal profile / Normal density / 300 seconds / seed `25025` twice. Values inside Fixed, Adaptive, and Comparison should repeat for identical configuration even though run IDs/timestamps differ.
-6. Create/save a zone-based scenario whose condition can occur in the synthetic junction, then run Simulation Lab. Confirm the stored experiment scenario metadata includes the zone snapshot and Adaptive scenario-application telemetry can include that scenario.
-7. Summary: confirm compact cards show Fixed, Adaptive, and percent/absolute change with preferred-direction semantics.
-8. Waiting & queues: confirm average/median/p95/max wait, queue average/p95/peak, queue-seconds, queue-active percentage, and simultaneous queue time are available.
-9. Throughput: confirm total and per-minute vehicle/pedestrian service, combined service rate, and vehicle passages per green minute.
-10. Signal behavior: confirm phase utilization, transitions/cycles, clearance time, adaptive scenario application counts, timing extension/reduction totals, and conflict-overlap diagnostic.
-11. Raw samples: switch Fixed/Adaptive toggle; change 25/50/100 row selection; use Previous/Next. The table should stay internally scrollable/paginated instead of growing the page.
-12. Stored run dropdown: select an older result and confirm all tabs update to that run.
-13. Export CSV and confirm aligned `fixed_*` and `adaptive_*` queue/service/phase/scenario columns exist (compatibility field names may still use `active_rules`).
-14. Restart PC Studio/backend and confirm stored experiment JSON is still selectable.
-15. Delete one disposable run. Confirm only that experiment result is removed; occupancy/flow history, signal scenario config/history, captures, zones, settings, models, and training data remain.
-16. Confirm the page describes experiment data as local simulation results, not proof of general/public-road performance or safety.
+Restart the backend and confirm the stored `netexp_*` result can still be retrieved. Then delete one disposable run:
 
-## 8. Inherited functional checks
+```powershell
+Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId"
+```
 
-Re-run representative V024 acceptance checks: persistence, zone/model registry synchronization, serial polling, protected signal phase order, camera simulation behavior, occupancy vs flow separation, tracking/counting lines, capture/delete/label/training/models/settings/logs. Also re-run `test_signal_rules_service.py` to confirm the migrated default scenarios preserve inherited V023 controller behavior. Confirm no feature connects to physical/public-road traffic-light control.
+Deletion must not remove single-junction `exp_*` runs, zones, signal scenarios, topology config, captures, analytics, training results, or models.
 
-## 9. Repository/ZIP checks
+### 6.4 Negative link check
+
+Run with a missing/disabled `link_id`. Confirm the request fails with `ATL-TRAFFIC-013` (`TRAFFIC_NETWORK_INVALID`) and does not write a valid network experiment result.
+
+## 7. Inherited single-junction acceptance
+
+Re-run representative V025 checks:
+
+- ranked scenario rank/arbitration, ALL/ANY, zone/class observations, persistence/cooldown, protected phase bounds, stale fallback, preview/history;
+- topology/source identity and structured `decision_context`;
+- single-junction Simulation Lab repeatability, persistence, CSV, and UI grouping;
+- occupancy vs flow separation and tracking/counting lines;
+- camera receiver/simulation, dataset capture/delete/label, training, model registry, settings/logs;
+- atomic persistence and serial polling.
+
+The existing `/api/traffic/experiments` endpoints must still work unchanged.
+
+## 8. V026 interpretation / safety checks
+
+Confirm the candidate does **not** claim any of the following:
+
+- cooperative green-wave timing;
+- neighbour-informed phase adjustment;
+- emergency pre-emption;
+- live measured vehicle transfer between configured cameras;
+- calibrated public-road performance/safety.
+
+V026 transfer events exist only inside the isolated synthetic network experiment. Live `config/intersections.json` links remain topology metadata.
+
+## 9. Repository / ZIP checks
+
+From the complete repository:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
@@ -205,15 +206,10 @@ git diff --check
 git status --short
 ```
 
-From `AI_Traffic_Light`, validate the supplied ZIP with `python .\scripts\validate_patch_zip.py <zip>` and compare its member list with the supplied manifest. Only explicit owner acceptance may promote V025.
+From `AI_Traffic_Light`, validate the supplied ZIP:
 
+```powershell
+python .\scripts\validate_patch_zip.py <V026-patch.zip>
+```
 
-## Documentation consistency acceptance
-
-1. Read root `VERSION`; confirm `START_HERE.md`, README, current patch/testing/checklist docs agree with its candidate/baseline state.
-2. Open `DOCUMENTATION_MAP.md`; confirm long-lived guides point to `VERSION` rather than owning a stale current-version snapshot.
-3. Open `PROJECT_SCOPE.md`; confirm multi-intersection cooperation is foundation/planned active behavior, emergency priority is planned, pedestrian/class/explainability statuses are not overstated.
-4. Confirm `HUMAN_GUIDE.md`, `DEVELOPMENT_WORKFLOW.md`, and `VERSIONING.md` contain durable workflow rules rather than obsolete V0xx "current state" sections.
-5. Confirm configured network links are described as metadata/foundation and not measured transfer/cooperative control.
-6. Confirm manual/synthetic emergency/accessibility inputs are not described as live AI perception.
-7. Confirm historical `PATCH_*`/changelog sections retain historical release values; do not "fix" them to the current version.
+Compare ZIP members against the supplied manifest. Only explicit owner acceptance may change `passed_baseline`.

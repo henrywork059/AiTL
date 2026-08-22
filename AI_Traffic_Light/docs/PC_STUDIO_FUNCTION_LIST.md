@@ -1,8 +1,8 @@
 # PC Studio Function List
 
-This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for candidate state and `PROJECT_SCOPE.md` for planned-capability status.
+This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for candidate state and `PROJECT_SCOPE.md` for implemented/foundation/planned capability status.
 
-## Camera / simulation
+## Camera / live simulation
 
 - receive JPEG/PNG device frames;
 - signal-aware synthetic single-junction scene with vehicle queues and pedestrian WALK behavior;
@@ -24,7 +24,7 @@ This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for ca
 - persistence, cooldown, demand memory, stale fallback, phase/cycle bounds, incident recovery;
 - persistent runtime signal-decision history.
 
-## Simulation Lab
+## Single-junction Simulation Lab
 
 - isolated Fixed-vs-Adaptive seeded comparisons without resetting live camera/controller state;
 - configured zone snapshot and synthetic per-zone/per-class observations;
@@ -32,6 +32,20 @@ This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for ca
 - phase utilization, transitions/cycles, clearance, scenario applications, timing changes, conflict diagnostic;
 - bounded persisted experiment history, reopen/delete, CSV export;
 - grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
+
+## V026 two-intersection network experiment
+
+- API/test-first isolated network benchmark using one enabled directed configured link;
+- two simultaneously modeled intersections with **separate** signal-controller runtime;
+- Fixed and Adaptive modes receive the same deterministic exogenous arrival plan for a given seed/configuration;
+- selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
+- transfer evidence records vehicle/class, departure time, scheduled arrival, and delivered arrival;
+- per-intersection wait, queue, throughput, signal-use, and scenario-application telemetry;
+- network transfer/pipeline/corridor-completion/end-to-end travel telemetry;
+- persisted `netexp_*` runs with list/get/delete and aligned CSV export;
+- explicit `cooperative_control_active: false` and `emergency_priority_active: false`.
+
+The V026 network experiment is the **independent-control baseline** for later cooperation. It does not feed neighbour arrivals into scenario arbitration and therefore does not claim cooperative timing. The current PC Studio Simulation Lab UI remains single-junction in V026; network experiments are backend/API/test-first.
 
 ## Network / explanation foundation
 
@@ -42,7 +56,7 @@ This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for ca
 - enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
 - explicit inactive flags for cooperative control and emergency priority.
 
-**Not currently implemented:** simultaneous multi-intersection live/synthetic control, vehicle transfer between intersections, predicted arrivals, cooperative green coordination, or emergency pre-emption.
+Live configured links remain topology metadata. Synthetic transfer exists only inside the V026 isolated network experiment.
 
 ## Inference / zones / analytics
 
@@ -71,9 +85,9 @@ This is a current capability catalog. Read root `VERSION`/`START_HERE.md` for ca
 
 ## Planned capability families
 
-See `PROJECT_SCOPE.md`/`ROADMAP.md`:
+See `PROJECT_SCOPE.md` / `ROADMAP.md`:
 
-- multi-intersection cooperation;
+- bounded multi-intersection cooperation using neighbour/arrival context;
 - emergency priority;
 - stronger pedestrian-aware control;
 - broader vehicle-class behavior;
@@ -81,4 +95,4 @@ See `PROJECT_SCOPE.md`/`ROADMAP.md`:
 
 ## Limitations
 
-Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Configured network links are metadata. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.
+Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V026 transfer events are simulator-generated evidence, not measured vehicle movement. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.

@@ -26,14 +26,16 @@ Services own schemas, validation, locks, logging, and stable error mapping. When
 
 Multi-step state transitions that can race inside one process need service-level synchronization. Zone save/read uses one lock; model-registry discovery/default/delete/metadata transitions use a re-entrant lock; intersection/network config validation/cache/persistence uses a re-entrant lock.
 
-### V025 network/explanation ownership
+### Network/explanation ownership
 
 - `services/intersection_network.py` owns generic intersection ids, source mappings, directed links, topology validation, and runtime `config/intersections.json` persistence.
 - `services/decision_context.py` is a non-controlling projection that turns current traffic/signal/network state into structured live explanation context.
-- `routes/traffic.py` may attach that service-owned context to `/api/traffic/state`, but it must not implement topology validation, signal arbitration, cooperation algorithms, or emergency pre-emption.
+- `services/network_simulation_experiments.py` owns V026's isolated two-intersection independent-controller experiment, synthetic link-transfer pipeline, network metrics, persistence, and CSV export.
+- `routes/traffic.py` may attach service-owned network/decision context to `/api/traffic/state`, but it must not implement topology validation, signal arbitration, cooperation algorithms, or emergency pre-emption.
+- `routes/experiments.py` remains HTTP translation for both single-junction and network experiment services.
 - `services/signal_rules.py` remains the sole owner of ranked scenario arbitration and protected phase/timing behavior.
 
-The network foundation is configuration-only in V025. Do not silently create per-intersection signal authority or claim cooperative control from configured links alone.
+V026 synthetic transfer is explicit simulator evidence. It does not make live topology links measured flow and does not activate neighbour-informed cooperation.
 
 ## Frontend
 
@@ -60,7 +62,7 @@ Do not use `setInterval` for async work when a new tick can start before the pre
 
 Canonical boxes use original-image coordinates; zones use the validated reference coordinates; display scaling is presentation-only. Occupancy remains per-frame. Unique passage comes only from stable track identity plus counting-line events.
 
-Network links are configuration metadata, not observed flow. A later multi-intersection simulator must use explicit transfer/arrival events rather than treating configured travel time as measured throughput.
+Live network links are configuration metadata, not observed flow. V026 network experiments use explicit synthetic departure/arrival events over a selected link; configured travel time remains a simulation input rather than measured throughput or learned travel time.
 
 Observation provenance must not overclaim perception: simulated/manual events stay labeled as such; AI-derived labels are only what the active detector actually returns.
 

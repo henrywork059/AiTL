@@ -67,9 +67,9 @@ app/core/         envelopes, errors, logging, middleware, version metadata, shar
 
 Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
 
-Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state.
+Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated V026 two-intersection independent-control benchmark and must not mutate live camera/controller state.
 
-Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. A configured neighbour link does not imply cooperative control, measured vehicle transfer, emergency priority, or a second live controller.
+Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V026 synthetic network-experiment transfer is simulator evidence only; a configured/live neighbour link still does not imply observed real transfer, cooperative control, emergency priority, or multi-camera live-controller operation.
 
 ### Frontend
 
@@ -94,7 +94,7 @@ Preserve these distinctions unless the task explicitly changes them:
 - **flow** = track-derived line/region events;
 - **zone/class counts** = per-frame detector observations for scenario conditions;
 - **experiment telemetry** = isolated synthetic simulator/controller output;
-- **network links** = configured topology metadata until an explicit simulator/transfer mechanism exists;
+- **network links** = configured topology metadata in live state; V026 `network-experiments` may generate explicit synthetic transfer events over a selected link;
 - **observation provenance** must identify simulation/manual sources rather than presenting them as AI detections.
 
 Canonical boxes remain in original-image coordinates. Zone geometry remains in the validated reference coordinate system; display scaling is presentation-only.

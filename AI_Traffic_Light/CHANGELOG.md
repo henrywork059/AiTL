@@ -1,5 +1,19 @@
 # Changelog
 
+## 0_2_6 — Deterministic two-intersection network simulation
+
+- Created V026 / `0_2_6` at the owner's explicit request while V025 remained unaccepted; `previous_version` is `0_2_5` and the owner-confirmed `passed_baseline` remains V024 / `0_2_4`.
+- Added an isolated deterministic two-intersection network experiment service that selects one enabled directed topology link and models its configured upstream/downstream intersections simultaneously.
+- Each simulated intersection owns a separate signal-controller runtime using the existing ranked-scenario/phase implementation; V026 does not relabel one global controller as two intersections.
+- Fixed and Adaptive network runs receive the same seeded exogenous vehicle/pedestrian arrival plan; the stored scenario includes demand counts and a SHA-256 plan fingerprint for auditability. Upstream policy outcomes may change when transfer candidates are discharged, which intentionally changes downstream transfer-arrival timing as an experiment outcome.
+- Added synthetic A→B vehicle transfer over the configured link travel time, including bounded per-vehicle departure/scheduled-arrival/arrival evidence and transfer-pipeline occupancy telemetry.
+- Added per-intersection wait/queue/throughput/signal/scenario metrics plus network corridor completions, end-to-end corridor travel-time distribution, total vehicle wait/queue pressure, and Fixed-vs-Adaptive network comparisons.
+- Added persistent `netexp_*.json` results and aligned timeline CSV export under the existing ignored `outputs/simulation_experiments/` runtime area.
+- Added `POST/GET /api/traffic/network-experiments`, `GET /api/traffic/network-experiments/{run_id}`, `GET /api/traffic/network-experiments/{run_id}/export.csv`, and `DELETE /api/traffic/network-experiments/{run_id}` with existing request-ID/envelope conventions and experiment/network error paths.
+- Added focused deterministic regression coverage for arrival-plan repeatability, two independent intersection states, exact configured link travel time, transfer evidence, persistence/list/get/delete/CSV, and missing-link rejection.
+- The existing PC Studio Simulation Lab UI remains the single-junction Fixed-vs-Adaptive surface in V026; the network experiment is API/test-first so the next cooperation patch can compare against a stable independent-control baseline.
+- Cooperative neighbour-informed timing, emergency priority, real emergency perception, and physical/public-road traffic control remain disabled.
+
 ## 0_2_5 — Ranked signal scenarios and simulation telemetry
 
 - Same-candidate documentation hardening: added `docs/DOCUMENTATION_MAP.md` and `docs/PROJECT_SCOPE.md`, removed stale current-version/placeholder ownership from durable human/agent/workflow/versioning/debugging/UI guides and PC Studio app READMEs, refreshed data semantics, and clarified documentation authority/maintenance rules.

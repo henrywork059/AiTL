@@ -75,7 +75,7 @@ A link contains:
 }
 ```
 
-The travel-time field is configured prototype metadata; V025 does not yet predict arrivals or coordinate green windows from it.
+For live/runtime topology this travel-time field remains configured prototype metadata. V026 isolated network experiments consume it as deterministic synthetic link travel time; it is not a measured or learned road travel-time estimate, and it does not coordinate green windows.
 
 ### `PUT /api/traffic/network`
 
@@ -144,6 +144,58 @@ The benchmark uses an isolated controller/simulator instance, snapshots configur
 - `GET /api/traffic/experiments/{run_id}/export.csv` — export aligned Fixed/Adaptive timeline samples; preserves `X-Request-ID`.
 
 Runtime JSON is stored under `outputs/simulation_experiments/` and excluded from source patches. Retention is bounded to the newest 200 runs.
+
+## V026 two-intersection network experiments
+
+### `POST /api/traffic/network-experiments`
+
+Runs one isolated Fixed-vs-Adaptive **two-intersection independent-control** comparison over one enabled directed network link. Request body:
+
+```json
+{
+  "duration_seconds": 300,
+  "density": "normal",
+  "seed": 26026,
+  "sample_interval_seconds": 1,
+  "profile": null,
+  "label": "A to B independent baseline",
+  "link_id": "a_to_b",
+  "transfer_share_percent": 70
+}
+```
+
+Rules:
+
+- duration: 30-1800 seconds;
+- density: `light | normal | busy`;
+- `transfer_share_percent`: 0-100;
+- `link_id` is optional; when omitted the first enabled link by id is used;
+- the selected link must connect two enabled configured intersections;
+- when `profile` is null, each intersection uses its configured `signal_profile`; a supplied profile overrides both and must exist in saved signal config.
+
+The result contains `fixed`, `adaptive`, and `comparison`. `scenario.arrival_plan` exposes bounded demand counts plus a SHA-256 fingerprint of the deterministic exogenous plan so identical runs can be audited without storing a second full event list. Each mode contains:
+
+- `intersections` keyed by source/destination intersection id, each with waiting/queue/throughput/signal metrics and its own final signal;
+- `network_metrics` with transfers departed/arrived, configured link travel time, transfer-pipeline occupancy, corridor completions, end-to-end corridor travel distribution, total vehicle wait and total vehicle queue pressure;
+- `timeline` samples containing both intersections plus transfer-pipeline counts;
+- `transfer_events` with synthetic vehicle id/class, departure time, scheduled arrival and simulated arrival;
+- `observation_provenance: simulation`;
+- `transfer_provenance: synthetic_network_simulation`;
+- `cooperative_control_active: false`;
+- `emergency_priority_active: false`.
+
+Fixed and Adaptive receive the same seeded **exogenous** arrival plan. Policy-dependent upstream discharge may change when transfer candidates enter the link, so downstream transfer-arrival timing may differ between modes as an experiment outcome.
+
+Network transfer is synthetic simulator evidence. Configured travel time is an experiment input, not measured/predicted road travel time. Neighbour context does not alter either controller in V026.
+
+### Stored network experiment runs
+
+- `GET /api/traffic/network-experiments?limit=50` — list compact network-run summaries.
+- `GET /api/traffic/network-experiments/{run_id}` — load one complete `netexp_*` result.
+- `DELETE /api/traffic/network-experiments/{run_id}` — delete one stored network result.
+- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned Fixed/Adaptive source/destination phase, vehicle/pedestrian queue, service/scenario, pipeline, transfer, and corridor timeline fields; preserves `X-Request-ID`.
+
+Network experiment JSON is stored as `netexp_*.json` under the same ignored runtime `outputs/simulation_experiments/` directory. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
 
 ## V025 ranked signal-scenario configuration
 
@@ -243,4 +295,4 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V025 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V026 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.

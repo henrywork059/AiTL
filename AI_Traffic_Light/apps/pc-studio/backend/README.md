@@ -11,7 +11,8 @@ FastAPI backend for the local AiTL computer-vision and traffic-light simulation 
 - lightweight cross-frame tracking and flow events;
 - ranked simulated signal scenarios and protected phase timing;
 - signal decision history/preview/Test inputs;
-- isolated deterministic Simulation Lab experiments;
+- isolated deterministic single-junction Simulation Lab experiments;
+- isolated deterministic two-intersection network experiments with synthetic A→B transfer;
 - runtime settings/logging;
 - generic intersection/source/topology foundation;
 - structured non-controlling live decision context.
@@ -28,7 +29,7 @@ app/models.py     Pydantic contracts
 app/core/         envelopes/errors/logging/middleware/version/persistence helpers
 ```
 
-Do not move signal arbitration into routes/network/explanation services. `services/signal_rules.py` owns ranked scenario arbitration and protected simulated timing. `services/simulation_experiments.py` owns isolated experiment runs. `services/intersection_network.py` owns topology/source identity. `services/decision_context.py` projects explanation context but does not control the signal.
+Do not move signal arbitration into routes/network/explanation services. `services/signal_rules.py` owns ranked scenario arbitration and protected simulated timing. `services/simulation_experiments.py` owns isolated single-junction experiments. `services/network_simulation_experiments.py` owns isolated V026 two-intersection network experiments. `services/intersection_network.py` owns topology/source identity. `services/decision_context.py` projects explanation context but does not control the signal.
 
 ## API conventions
 
@@ -53,14 +54,17 @@ Important semantic distinctions:
 - occupancy = sampled presence;
 - flow = track-derived events;
 - zone/class counts = per-frame scenario observations;
-- experiment telemetry = isolated synthetic simulator output;
-- network links = configured topology metadata.
+- single-junction experiment telemetry = isolated synthetic simulator output;
+- network-experiment telemetry = isolated synthetic two-intersection output;
+- live network links = configured topology metadata; V026 transfer events exist only inside the isolated network experiment.
 
-## Network/explanation foundation
+## Network simulation / explanation
 
-The current foundation can persist generic intersections/links, resolve source IDs to intersection identity, and expose neighbour/decision context. It does **not** yet run simultaneous multi-intersection controllers, transfer vehicles between intersections, coordinate green phases, or implement emergency pre-emption.
+The live/runtime foundation can persist generic intersections/links, resolve source IDs to intersection identity, and expose neighbour/decision context. Live camera processing still uses the existing single active traffic/controller path.
 
-Future network behavior should create explicit per-intersection runtime/controller state and transfer/arrival context while reusing the existing ranked-scenario controller.
+V026 adds an **isolated network experiment** that instantiates separate controller runtime for two configured intersections, feeds both modes the same seeded exogenous arrivals, and transfers selected synthetic vehicles from the upstream junction to the downstream junction after the configured link travel time. It records transfer evidence and per-intersection/network telemetry without mutating the live camera/controller runtime.
+
+This is an independent-control baseline. Neighbour context does **not** alter phase timing yet, so cooperative control remains inactive. Emergency priority/pre-emption is also not implemented.
 
 ## Local backend run
 
