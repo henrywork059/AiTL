@@ -30,12 +30,12 @@ Multi-step state transitions that can race inside one process need service-level
 
 - `services/intersection_network.py` owns generic intersection ids, source mappings, directed links, topology validation, and runtime `config/intersections.json` persistence.
 - `services/decision_context.py` is a non-controlling projection that turns current traffic/signal/network state into structured live explanation context.
-- `services/network_simulation_experiments.py` owns V026's isolated two-intersection independent-controller experiment, synthetic link-transfer pipeline, network metrics, persistence, and CSV export.
+- `services/network_simulation_experiments.py` owns V027's isolated two-intersection Fixed / Independent Adaptive / Cooperative Adaptive experiment, synthetic transfer/predicted-arrival pipeline, bounded simulation-only coordinator, network/coordination metrics, persistence, and CSV export.
 - `routes/traffic.py` may attach service-owned network/decision context to `/api/traffic/state`, but it must not implement topology validation, signal arbitration, cooperation algorithms, or emergency pre-emption.
 - `routes/experiments.py` remains HTTP translation for both single-junction and network experiment services.
 - `services/signal_rules.py` remains the sole owner of ranked scenario arbitration and protected phase/timing behavior.
 
-V026 synthetic transfer is explicit simulator evidence. It does not make live topology links measured flow and does not activate neighbour-informed cooperation.
+V027 synthetic transfer and neighbour-informed coordination are explicit simulator evidence. They do not make live topology links measured flow and do not activate live multi-camera cooperation.
 
 ## Frontend
 
@@ -62,7 +62,7 @@ Do not use `setInterval` for async work when a new tick can start before the pre
 
 Canonical boxes use original-image coordinates; zones use the validated reference coordinates; display scaling is presentation-only. Occupancy remains per-frame. Unique passage comes only from stable track identity plus counting-line events.
 
-Live network links are configuration metadata, not observed flow. V026 network experiments use explicit synthetic departure/arrival events over a selected link; configured travel time remains a simulation input rather than measured throughput or learned travel time.
+Live network links are configuration metadata, not observed flow. V027 network experiments use explicit synthetic departure/arrival/predicted-arrival/coordination events over a selected link; configured travel time remains a simulation input rather than measured throughput or learned travel time.
 
 Observation provenance must not overclaim perception: simulated/manual events stay labeled as such; AI-derived labels are only what the active detector actually returns.
 

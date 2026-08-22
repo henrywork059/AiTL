@@ -158,12 +158,15 @@ class SimulationExperimentRunRequest(BaseModel):
 class NetworkSimulationExperimentRunRequest(BaseModel):
     duration_seconds: int = Field(default=300, ge=30, le=1800)
     density: Literal["light", "normal", "busy"] = "normal"
-    seed: int = Field(default=26026, ge=0, le=2_147_483_647)
+    seed: int = Field(default=27027, ge=0, le=2_147_483_647)
     sample_interval_seconds: int = Field(default=1, ge=1, le=10)
     profile: str | None = Field(default=None, min_length=1, max_length=64)
     label: str = Field(default="", max_length=80)
     link_id: str | None = Field(default=None, min_length=1, max_length=64)
     transfer_share_percent: int = Field(default=70, ge=0, le=100)
+    cooperation_lookahead_seconds: float = Field(default=12.0, ge=1.0, le=60.0)
+    cooperation_max_extension_seconds: float = Field(default=5.0, ge=0.0, le=20.0)
+    cooperation_min_incoming_vehicles: int = Field(default=1, ge=1, le=20)
 
 
 class InferenceLoadRequest(BaseModel):

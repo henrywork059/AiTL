@@ -21,7 +21,7 @@ from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 from app.services.intersection_network import intersection_network_service
-from app.services.signal_rules import SignalRulesService, signal_rules_service
+from app.services.signal_rules import PHASE_SEQUENCE, SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
 
 logger = get_logger(__name__)
@@ -34,9 +34,10 @@ STEP_SECONDS = 0.5
 MAX_STORED_RUNS = 100
 
 # Exogenous demand remains intentionally simple and deterministic. The same
-# generated arrival plan is supplied to Fixed and Adaptive. Policy-dependent
-# upstream service can still change the timing of transferred arrivals at the
-# downstream intersection; that is an experiment outcome, not a changed input.
+# generated arrival plan is supplied to Fixed, Independent Adaptive, and
+# Cooperative Adaptive. Policy-dependent upstream service can still change the
+# timing of transferred arrivals at the downstream intersection; that is an
+# experiment outcome, not a changed input.
 VEHICLE_RATES_PER_MINUTE = {
     "light": (5.0, 2.5),
     "normal": (10.0, 5.0),
@@ -49,6 +50,7 @@ PEDESTRIAN_RATES_PER_MINUTE = {
 }
 VEHICLE_SERVICE_PER_SECOND = 0.9
 PEDESTRIAN_SERVICE_PER_SECOND = 1.6
+COOPERATION_SERVICE_BUFFER_SECONDS = 2.0
 
 
 @dataclass
@@ -145,6 +147,113 @@ class _BenchmarkSignalRulesService(SignalRulesService):
         fallback_reason = None if fresh else "Adaptive observations are stale or unavailable; normal configured timing is active."
         return base, fresh, fallback_reason
 
+    def apply_network_coordination(
+        self,
+        *,
+        clock_s: float,
+        incoming_vehicle_count: int,
+        earliest_arrival_eta_seconds: float | None,
+        lookahead_seconds: float,
+        max_extension_seconds: float,
+        local_pedestrians_waiting: int,
+        link_id: str,
+        source_intersection_id: str,
+        destination_intersection_id: str,
+    ) -> dict[str, Any]:
+        """Apply one bounded simulation-only neighbour timing advisory.
+
+        The coordinator never changes phase order. During vehicle green it may
+        extend the current phase only inside the saved phase/cycle caps. During
+        non-vehicle phases it may request earlier protected progression by
+        reducing only the current phase toward its configured minimum. Active
+        pedestrian demand prevents shortening pedestrian WALK/CLEAR phases.
+        """
+
+        incoming = max(0, int(incoming_vehicle_count))
+        eta = None if earliest_arrival_eta_seconds is None else max(0.0, float(earliest_arrival_eta_seconds))
+        result = {
+            "applied": False,
+            "action": "none",
+            "reason": "no incoming vehicles inside the cooperation lookahead",
+            "incoming_vehicle_count": incoming,
+            "earliest_arrival_eta_seconds": round(eta, 1) if eta is not None else None,
+            "timing_delta_seconds": 0.0,
+        }
+        if incoming <= 0 or eta is None or eta > float(lookahead_seconds) + 1e-9:
+            return result
+
+        with self._lock:
+            config = self._load_config_locked()
+            profile = self._active_profile_locked(config)
+            if self._incident_hold:
+                result["reason"] = "incident hold blocks network timing coordination"
+                return result
+
+            phase_key, _phase = PHASE_SEQUENCE[self._phase_index]
+            elapsed = max(0.0, float(clock_s) - self._phase_started_clock)
+            phase_limits = profile["phases"][phase_key]
+            previous = float(self._phase_duration_seconds)
+            changed = False
+
+            if phase_key == "vehicle_green":
+                target_duration = elapsed + eta + COOPERATION_SERVICE_BUFFER_SECONDS
+                phase_cap = min(float(phase_limits["max_seconds"]), self._cycle_phase_cap_locked(profile, phase_key))
+                cooperation_cap = min(
+                    phase_cap,
+                    float(self._phase_base_seconds) + max(0.0, float(max_extension_seconds)),
+                )
+                bounded_extension_target = min(cooperation_cap, target_duration)
+                self._phase_duration_seconds = max(previous, bounded_extension_target)
+                changed = self._phase_duration_seconds > previous + 0.05
+                result["action"] = "extend_vehicle_green" if changed else "vehicle_green_already_sufficient"
+                result["reason"] = (
+                    "extended downstream vehicle green for predicted upstream arrivals"
+                    if changed
+                    else "current downstream vehicle green already covers the predicted arrival window within configured bounds"
+                )
+            else:
+                pedestrian_phase = phase_key in {"pedestrian_green", "pedestrian_flashing"}
+                if pedestrian_phase and int(local_pedestrians_waiting) > 0:
+                    result["action"] = "protect_pedestrian_service"
+                    result["reason"] = "pedestrian demand is active, so cooperation does not shorten the protected pedestrian phase"
+                else:
+                    minimum = float(phase_limits["min_seconds"])
+                    requested_duration = max(minimum, elapsed + 0.2)
+                    requested_duration = min(previous, requested_duration)
+                    self._phase_duration_seconds = requested_duration
+                    self._pending_request = "vehicle"
+                    changed = self._phase_duration_seconds < previous - 0.05
+                    result["action"] = "request_protected_vehicle_progression" if changed else "vehicle_progression_pending"
+                    result["reason"] = (
+                        "shortened only the current protected phase toward its configured minimum for predicted upstream arrivals"
+                        if changed
+                        else "vehicle service is requested, but the current phase cannot be shortened further within protected bounds"
+                    )
+
+            delta = float(self._phase_duration_seconds) - previous
+            result["applied"] = changed
+            result["timing_delta_seconds"] = round(delta, 1)
+            result["phase_key"] = phase_key
+            result["previous_duration_seconds"] = round(previous, 1)
+            result["effective_duration_seconds"] = round(float(self._phase_duration_seconds), 1)
+            if changed:
+                self._record_event_locked(
+                    "network_coordination_applied",
+                    {
+                        "link_id": link_id,
+                        "source_intersection_id": source_intersection_id,
+                        "destination_intersection_id": destination_intersection_id,
+                        "action": result["action"],
+                        "phase_key": phase_key,
+                        "incoming_vehicle_count": incoming,
+                        "earliest_arrival_eta_seconds": result["earliest_arrival_eta_seconds"],
+                        "previous_duration_seconds": result["previous_duration_seconds"],
+                        "effective_duration_seconds": result["effective_duration_seconds"],
+                        "simulation_clock_seconds": round(float(clock_s), 1),
+                    },
+                )
+            return result
+
 
 class _IntersectionRuntime:
     def __init__(
@@ -165,7 +274,7 @@ class _IntersectionRuntime:
         self.zone_types = dict(zone_types)
 
         config = deepcopy(policy_config)
-        config["mode"] = mode
+        config["mode"] = "adaptive" if mode == "cooperative" else mode
         config["dry_run"] = False
         config["active_profile"] = profile
         config_path = temp_root / f"{mode}_{self.intersection_id}_policy.json"
@@ -256,6 +365,18 @@ class _IntersectionRuntime:
             self.controller.set_benchmark_clock(clock_s)
         self.controller.observe(self.observation())
         return self.controller.signal_state(clock_s)
+
+    def apply_coordination(self, *, clock_s: float, advisory: dict[str, Any]) -> dict[str, Any]:
+        if self.mode != "cooperative":
+            return {"applied": False, "action": "disabled", "reason": "cooperative mode is not active"}
+        method = getattr(self.controller, "apply_network_coordination", None)
+        if method is None:
+            return {"applied": False, "action": "unsupported", "reason": "controller does not support network coordination"}
+        return method(
+            clock_s=clock_s,
+            local_pedestrians_waiting=len(self.pedestrian_queue),
+            **advisory,
+        )
 
     def advance_signal_metrics(self, signal: dict[str, Any], dt: float) -> None:
         phase = str(signal.get("phase") or "unknown")
@@ -409,11 +530,17 @@ class _NetworkModeSimulation:
         destination_pedestrian_arrivals: list[_PedestrianArrival],
         temp_root: Path,
         controller_factory: Callable[[Path, Path], Any] | None = None,
+        cooperation_lookahead_seconds: float = 12.0,
+        cooperation_max_extension_seconds: float = 5.0,
+        cooperation_min_incoming_vehicles: int = 1,
     ) -> None:
         self.mode = mode
         self.duration_seconds = duration_seconds
         self.sample_interval_seconds = sample_interval_seconds
         self.link = deepcopy(link)
+        self.cooperation_lookahead_seconds = float(cooperation_lookahead_seconds)
+        self.cooperation_max_extension_seconds = float(cooperation_max_extension_seconds)
+        self.cooperation_min_incoming_vehicles = int(cooperation_min_incoming_vehicles)
         self.source_vehicle_arrivals = source_vehicle_arrivals
         self.destination_vehicle_arrivals = destination_vehicle_arrivals
         self.source_pedestrian_arrivals = source_pedestrian_arrivals
@@ -430,6 +557,21 @@ class _NetworkModeSimulation:
         self.corridor_completed = 0
         self.corridor_travel_times: list[float] = []
         self.timeline: list[dict[str, Any]] = []
+        self.coordination_evaluations = 0
+        self.coordination_triggered = 0
+        self.coordination_applied = 0
+        self.coordination_green_extensions = 0
+        self.coordination_progression_requests = 0
+        self.coordination_pedestrian_protections = 0
+        self.coordination_seconds_added = 0.0
+        self.coordination_seconds_reduced = 0.0
+        self.coordination_events: list[dict[str, Any]] = []
+        self._latest_coordination: dict[str, Any] = {
+            "active": False,
+            "incoming_vehicle_count": 0,
+            "earliest_arrival_eta_seconds": None,
+            "action": "none",
+        }
         self._sample_at_s = 0.0
 
         profiles = policy_config.get("profiles") if isinstance(policy_config, dict) else None
@@ -480,6 +622,11 @@ class _NetworkModeSimulation:
 
             source_signal = self.source.signal(clock)
             destination_signal = self.destination.signal(clock)
+            if self.mode == "cooperative":
+                self._evaluate_cooperation(clock, destination_signal)
+                # Re-read after a timing advisory so the served phase/remaining
+                # time reflect the bounded mutation performed by the controller.
+                destination_signal = self.destination.signal(clock)
             last_source_signal = source_signal
             last_destination_signal = destination_signal
             self.source.advance_signal_metrics(source_signal, dt)
@@ -539,6 +686,68 @@ class _NetworkModeSimulation:
         self.source.finalize_waits(self.duration_seconds)
         self.destination.finalize_waits(self.duration_seconds)
         return self._build_result(last_source_signal, last_destination_signal)
+
+    def _cooperation_advisory(self, clock_s: float) -> dict[str, Any]:
+        candidates = [
+            transfer for transfer in self.pipeline
+            if 0.0 <= transfer.arrive_at_s - clock_s <= self.cooperation_lookahead_seconds + 1e-9
+        ]
+        incoming_count = len(candidates)
+        earliest_eta = min((transfer.arrive_at_s - clock_s for transfer in candidates), default=None)
+        active = incoming_count >= self.cooperation_min_incoming_vehicles
+        return {
+            "incoming_vehicle_count": incoming_count if active else 0,
+            "earliest_arrival_eta_seconds": earliest_eta if active else None,
+            "lookahead_seconds": self.cooperation_lookahead_seconds,
+            "max_extension_seconds": self.cooperation_max_extension_seconds,
+            "link_id": str(self.link.get("id") or "link"),
+            "source_intersection_id": self.source.intersection_id,
+            "destination_intersection_id": self.destination.intersection_id,
+        }
+
+    def _evaluate_cooperation(self, clock_s: float, destination_signal: dict[str, Any]) -> None:
+        self.coordination_evaluations += 1
+        advisory = self._cooperation_advisory(clock_s)
+        incoming = int(advisory["incoming_vehicle_count"])
+        if incoming > 0:
+            self.coordination_triggered += 1
+        outcome = self.destination.apply_coordination(clock_s=clock_s, advisory=advisory)
+        event = {
+            "coordination_id": f"coord_{self.source.intersection_id}_{self.destination.intersection_id}_{int(round(clock_s * 1000.0))}",
+            "t": round(clock_s, 1),
+            "link_id": str(self.link.get("id") or "link"),
+            "source_intersection_id": self.source.intersection_id,
+            "destination_intersection_id": self.destination.intersection_id,
+            "provenance": "synthetic_predicted_arrivals",
+            "destination_phase_before": destination_signal.get("phase"),
+            "destination_phase_key_before": destination_signal.get("phase_key"),
+            "incoming_vehicle_count": incoming,
+            "earliest_arrival_eta_seconds": (
+                round(float(advisory["earliest_arrival_eta_seconds"]), 1)
+                if advisory["earliest_arrival_eta_seconds"] is not None
+                else None
+            ),
+            "action": outcome.get("action", "none"),
+            "applied": bool(outcome.get("applied")),
+            "reason": outcome.get("reason"),
+            "timing_delta_seconds": float(outcome.get("timing_delta_seconds", 0.0) or 0.0),
+        }
+        self._latest_coordination = {"active": incoming > 0, **event}
+        if incoming > 0 or event["applied"] or event["action"] == "protect_pedestrian_service":
+            self.coordination_events.append(event)
+        if event["applied"]:
+            self.coordination_applied += 1
+            delta = event["timing_delta_seconds"]
+            if delta > 0:
+                self.coordination_seconds_added += delta
+            elif delta < 0:
+                self.coordination_seconds_reduced += abs(delta)
+            if event["action"] == "extend_vehicle_green":
+                self.coordination_green_extensions += 1
+            elif event["action"] == "request_protected_vehicle_progression":
+                self.coordination_progression_requests += 1
+        elif event["action"] == "protect_pedestrian_service":
+            self.coordination_pedestrian_protections += 1
 
     def _inject_arrivals(self, clock_s: float) -> None:
         while (
@@ -611,6 +820,7 @@ class _NetworkModeSimulation:
                 "transfers_departed": self.transfers_departed,
                 "transfers_arrived": self.transfers_arrived,
                 "corridor_completed": self.corridor_completed,
+                "coordination": deepcopy(self._latest_coordination) if self.mode == "cooperative" else None,
             }
         )
 
@@ -652,22 +862,38 @@ class _NetworkModeSimulation:
                 else 0.0,
                 "total_vehicle_queue_p95": round(_percentile(total_queue_samples, 0.95), 2),
                 "total_vehicle_queue_peak": max(total_queue_samples, default=0),
+                "coordination": {
+                    "evaluations": self.coordination_evaluations,
+                    "triggered": self.coordination_triggered,
+                    "applied": self.coordination_applied,
+                    "green_extensions": self.coordination_green_extensions,
+                    "protected_progression_requests": self.coordination_progression_requests,
+                    "pedestrian_service_protections": self.coordination_pedestrian_protections,
+                    "timing_seconds_added": round(self.coordination_seconds_added, 1),
+                    "timing_seconds_reduced": round(self.coordination_seconds_reduced, 1),
+                    "lookahead_seconds": self.cooperation_lookahead_seconds,
+                    "max_extension_seconds": self.cooperation_max_extension_seconds,
+                    "min_incoming_vehicles": self.cooperation_min_incoming_vehicles,
+                },
             },
             "timeline": self.timeline,
             "transfer_events": [self.transfer_events[key] for key in sorted(self.transfer_events)],
+            "coordination_events": self.coordination_events,
             "observation_provenance": "simulation",
             "transfer_provenance": "synthetic_network_simulation",
-            "cooperative_control_active": False,
+            "coordination_provenance": "synthetic_predicted_arrivals" if self.mode == "cooperative" else None,
+            "cooperative_control_active": self.mode == "cooperative",
             "emergency_priority_active": False,
             "scope_note": (
-                "Two-intersection independent-controller simulation baseline. Vehicles can transfer over the configured link, "
-                "but neighbour context does not alter either controller in V026."
+                "Two-intersection cooperative simulation using predicted synthetic upstream arrivals and bounded protected timing advisories."
+                if self.mode == "cooperative"
+                else "Two-intersection independent-controller simulation baseline; neighbour context does not alter timing in this mode."
             ),
         }
 
 
 class NetworkSimulationExperimentService:
-    """Run/persist a deterministic two-intersection independent-control baseline."""
+    """Run/persist deterministic Fixed/Adaptive/Cooperative network comparisons."""
 
     def __init__(
         self,
@@ -695,6 +921,9 @@ class NetworkSimulationExperimentService:
         label: str = "",
         link_id: str | None = None,
         transfer_share_percent: int = 70,
+        cooperation_lookahead_seconds: float = 12.0,
+        cooperation_max_extension_seconds: float = 5.0,
+        cooperation_min_incoming_vehicles: int = 1,
     ) -> dict[str, Any]:
         density = density.strip().lower()
         if density not in DENSITIES:
@@ -705,6 +934,12 @@ class NetworkSimulationExperimentService:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Experiment sample interval must be between 1 and 10 seconds.", status_code=422)
         if not 0 <= int(transfer_share_percent) <= 100:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "transfer_share_percent must be between 0 and 100.", status_code=422)
+        if not 1.0 <= float(cooperation_lookahead_seconds) <= 60.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "cooperation_lookahead_seconds must be between 1 and 60.", status_code=422)
+        if not 0.0 <= float(cooperation_max_extension_seconds) <= 20.0:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "cooperation_max_extension_seconds must be between 0 and 20.", status_code=422)
+        if not 1 <= int(cooperation_min_incoming_vehicles) <= 20:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "cooperation_min_incoming_vehicles must be between 1 and 20.", status_code=422)
 
         network = deepcopy(self._network_provider())
         link, source_intersection, destination_intersection = self._resolve_pair(network, link_id)
@@ -738,6 +973,9 @@ class NetworkSimulationExperimentService:
                 zone_types=zone_types,
                 temp_root=temp_root,
                 controller_factory=self._controller_factory,
+                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
+                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
+                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
                 **arrivals,
             ).run()
             adaptive = _NetworkModeSimulation(
@@ -752,9 +990,42 @@ class NetworkSimulationExperimentService:
                 zone_types=zone_types,
                 temp_root=temp_root,
                 controller_factory=self._controller_factory,
+                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
+                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
+                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
+                **arrivals,
+            ).run()
+            cooperative = _NetworkModeSimulation(
+                mode="cooperative",
+                duration_seconds=int(duration_seconds),
+                sample_interval_seconds=int(sample_interval_seconds),
+                source_intersection=source_intersection,
+                destination_intersection=destination_intersection,
+                link=link,
+                policy_config=policy,
+                profile_override=profile,
+                zone_types=zone_types,
+                temp_root=temp_root,
+                controller_factory=self._controller_factory,
+                cooperation_lookahead_seconds=float(cooperation_lookahead_seconds),
+                cooperation_max_extension_seconds=float(cooperation_max_extension_seconds),
+                cooperation_min_incoming_vehicles=int(cooperation_min_incoming_vehicles),
                 **arrivals,
             ).run()
 
+        adaptive_vs_fixed = _network_comparison(fixed, adaptive)
+        cooperative_vs_fixed = _network_comparison(
+            fixed,
+            cooperative,
+            baseline_label="fixed",
+            candidate_label="cooperative",
+        )
+        cooperative_vs_adaptive = _network_comparison(
+            adaptive,
+            cooperative,
+            baseline_label="adaptive",
+            candidate_label="cooperative",
+        )
         result = {
             "run_id": run_id,
             "created_at_ms": created_at_ms,
@@ -767,20 +1038,32 @@ class NetworkSimulationExperimentService:
                 "sample_interval_seconds": int(sample_interval_seconds),
                 "profile_override": profile,
                 "transfer_share_percent": int(transfer_share_percent),
+                "cooperation": {
+                    "lookahead_seconds": float(cooperation_lookahead_seconds),
+                    "max_extension_seconds": float(cooperation_max_extension_seconds),
+                    "min_incoming_vehicles": int(cooperation_min_incoming_vehicles),
+                    "service_buffer_seconds": COOPERATION_SERVICE_BUFFER_SECONDS,
+                },
                 "link": deepcopy(link),
                 "source_intersection": _intersection_snapshot(source_intersection),
                 "destination_intersection": _intersection_snapshot(destination_intersection),
-                "comparison": ["fixed", "adaptive"],
+                "comparison": ["fixed", "adaptive", "cooperative"],
                 "arrival_plan": _arrival_plan_snapshot(arrivals),
-                "cooperative_control_active": False,
+                "cooperative_control_active": True,
             },
             "fixed": fixed,
             "adaptive": adaptive,
-            "comparison": _network_comparison(fixed, adaptive),
+            "cooperative": cooperative,
+            "comparison": adaptive_vs_fixed,
+            "comparisons": {
+                "adaptive_vs_fixed": adaptive_vs_fixed,
+                "cooperative_vs_fixed": cooperative_vs_fixed,
+                "cooperative_vs_adaptive": cooperative_vs_adaptive,
+            },
             "prototype_only": True,
             "scope_note": (
-                "Controlled local two-intersection simulation benchmark only. Vehicle transfer is synthetic; "
-                "V026 does not use neighbour context to coordinate signal timing."
+                "Controlled local two-intersection simulation benchmark only. Cooperative mode uses synthetic predicted arrivals "
+                "to request bounded downstream timing changes while preserving the protected phase sequence."
             ),
         }
         self._write_run(result)
@@ -810,7 +1093,7 @@ class NetworkSimulationExperimentService:
             "total": len(paths),
             "storage_path": self._relative_storage_root(),
             "prototype_only": True,
-            "cooperative_control_active": False,
+            "cooperative_control_active": True,
         }
 
     def get(self, run_id: str) -> dict[str, Any]:
@@ -860,84 +1143,73 @@ class NetworkSimulationExperimentService:
 
     def export_csv(self, run_id: str) -> str:
         result = self.get(run_id)
-        fixed_timeline = result.get("fixed", {}).get("timeline", [])
-        adaptive_timeline = result.get("adaptive", {}).get("timeline", [])
-        rows = max(len(fixed_timeline), len(adaptive_timeline))
+        timelines = {
+            mode: result.get(mode, {}).get("timeline", [])
+            for mode in ("fixed", "adaptive", "cooperative")
+        }
+        rows = max((len(items) for items in timelines.values()), default=0)
         output = StringIO()
         writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(
-            [
-                "t_seconds",
-                "fixed_source_phase",
-                "fixed_source_vehicle_queue",
-                "fixed_source_pedestrian_queue",
-                "fixed_source_vehicles_served",
-                "fixed_source_active_rules",
-                "fixed_destination_phase",
-                "fixed_destination_vehicle_queue",
-                "fixed_destination_pedestrian_queue",
-                "fixed_destination_vehicles_served",
-                "fixed_destination_active_rules",
-                "fixed_pipeline_count",
-                "fixed_transfers_departed",
-                "fixed_transfers_arrived",
-                "fixed_corridor_completed",
-                "adaptive_source_phase",
-                "adaptive_source_vehicle_queue",
-                "adaptive_source_pedestrian_queue",
-                "adaptive_source_vehicles_served",
-                "adaptive_source_active_rules",
-                "adaptive_destination_phase",
-                "adaptive_destination_vehicle_queue",
-                "adaptive_destination_pedestrian_queue",
-                "adaptive_destination_vehicles_served",
-                "adaptive_destination_active_rules",
-                "adaptive_pipeline_count",
-                "adaptive_transfers_departed",
-                "adaptive_transfers_arrived",
-                "adaptive_corridor_completed",
-            ]
-        )
-        for index in range(rows):
-            fixed = fixed_timeline[index] if index < len(fixed_timeline) else {}
-            adaptive = adaptive_timeline[index] if index < len(adaptive_timeline) else {}
-            fixed_source = fixed.get("source", {})
-            fixed_destination = fixed.get("destination", {})
-            adaptive_source = adaptive.get("source", {})
-            adaptive_destination = adaptive.get("destination", {})
-            writer.writerow(
+        header = ["t_seconds"]
+        for mode in ("fixed", "adaptive", "cooperative"):
+            header.extend(
                 [
-                    fixed.get("t", adaptive.get("t", "")),
-                    fixed_source.get("phase", ""),
-                    fixed_source.get("vehicle_queue", ""),
-                    fixed_source.get("pedestrian_queue", ""),
-                    fixed_source.get("vehicles_served", ""),
-                    "|".join(fixed_source.get("active_rules", [])),
-                    fixed_destination.get("phase", ""),
-                    fixed_destination.get("vehicle_queue", ""),
-                    fixed_destination.get("pedestrian_queue", ""),
-                    fixed_destination.get("vehicles_served", ""),
-                    "|".join(fixed_destination.get("active_rules", [])),
-                    fixed.get("pipeline_count", ""),
-                    fixed.get("transfers_departed", ""),
-                    fixed.get("transfers_arrived", ""),
-                    fixed.get("corridor_completed", ""),
-                    adaptive_source.get("phase", ""),
-                    adaptive_source.get("vehicle_queue", ""),
-                    adaptive_source.get("pedestrian_queue", ""),
-                    adaptive_source.get("vehicles_served", ""),
-                    "|".join(adaptive_source.get("active_rules", [])),
-                    adaptive_destination.get("phase", ""),
-                    adaptive_destination.get("vehicle_queue", ""),
-                    adaptive_destination.get("pedestrian_queue", ""),
-                    adaptive_destination.get("vehicles_served", ""),
-                    "|".join(adaptive_destination.get("active_rules", [])),
-                    adaptive.get("pipeline_count", ""),
-                    adaptive.get("transfers_departed", ""),
-                    adaptive.get("transfers_arrived", ""),
-                    adaptive.get("corridor_completed", ""),
+                    f"{mode}_source_phase",
+                    f"{mode}_source_vehicle_queue",
+                    f"{mode}_source_pedestrian_queue",
+                    f"{mode}_source_vehicles_served",
+                    f"{mode}_source_active_rules",
+                    f"{mode}_destination_phase",
+                    f"{mode}_destination_vehicle_queue",
+                    f"{mode}_destination_pedestrian_queue",
+                    f"{mode}_destination_vehicles_served",
+                    f"{mode}_destination_active_rules",
+                    f"{mode}_pipeline_count",
+                    f"{mode}_transfers_departed",
+                    f"{mode}_transfers_arrived",
+                    f"{mode}_corridor_completed",
+                    f"{mode}_coordination_action",
+                    f"{mode}_coordination_incoming_vehicle_count",
+                    f"{mode}_coordination_eta_seconds",
+                    f"{mode}_coordination_applied",
                 ]
             )
+        writer.writerow(header)
+        for index in range(rows):
+            samples = {
+                mode: timelines[mode][index] if index < len(timelines[mode]) else {}
+                for mode in timelines
+            }
+            t_value = next((sample.get("t") for sample in samples.values() if sample.get("t") is not None), "")
+            row: list[Any] = [t_value]
+            for mode in ("fixed", "adaptive", "cooperative"):
+                sample = samples[mode]
+                source = sample.get("source", {})
+                destination = sample.get("destination", {})
+                coordination = sample.get("coordination") if isinstance(sample.get("coordination"), dict) else {}
+                row.extend(
+                    [
+                        source.get("phase", ""),
+                        source.get("vehicle_queue", ""),
+                        source.get("pedestrian_queue", ""),
+                        source.get("vehicles_served", ""),
+                        "|".join(source.get("active_rules", [])),
+                        destination.get("phase", ""),
+                        destination.get("vehicle_queue", ""),
+                        destination.get("pedestrian_queue", ""),
+                        destination.get("vehicles_served", ""),
+                        "|".join(destination.get("active_rules", [])),
+                        sample.get("pipeline_count", ""),
+                        sample.get("transfers_departed", ""),
+                        sample.get("transfers_arrived", ""),
+                        sample.get("corridor_completed", ""),
+                        coordination.get("action", ""),
+                        coordination.get("incoming_vehicle_count", ""),
+                        coordination.get("earliest_arrival_eta_seconds", ""),
+                        coordination.get("applied", ""),
+                    ]
+                )
+            writer.writerow(row)
         return output.getvalue()
 
     @staticmethod
@@ -1011,16 +1283,20 @@ class NetworkSimulationExperimentService:
     def _summary(payload: dict[str, Any]) -> dict[str, Any]:
         scenario = payload.get("scenario") if isinstance(payload.get("scenario"), dict) else {}
         comparison = payload.get("comparison") if isinstance(payload.get("comparison"), dict) else {}
+        comparisons = payload.get("comparisons") if isinstance(payload.get("comparisons"), dict) else {}
+        cooperation = comparisons.get("cooperative_vs_adaptive") if isinstance(comparisons.get("cooperative_vs_adaptive"), dict) else {}
         return {
             "run_id": payload.get("run_id"),
             "created_at_ms": payload.get("created_at_ms"),
             "label": payload.get("label", ""),
             "scenario": scenario,
             "headline": {
-                "corridor_completed": comparison.get("corridor_completed"),
-                "corridor_travel_average": comparison.get("corridor_travel_average"),
-                "total_vehicle_wait": comparison.get("total_vehicle_wait"),
-                "total_vehicle_queue_average": comparison.get("total_vehicle_queue_average"),
+                "adaptive_vs_fixed_corridor_completed": comparison.get("corridor_completed"),
+                "adaptive_vs_fixed_total_vehicle_wait": comparison.get("total_vehicle_wait"),
+                "cooperative_vs_adaptive_corridor_completed": cooperation.get("corridor_completed"),
+                "cooperative_vs_adaptive_corridor_travel_average": cooperation.get("corridor_travel_average"),
+                "cooperative_vs_adaptive_total_vehicle_wait": cooperation.get("total_vehicle_wait"),
+                "cooperative_vs_adaptive_total_vehicle_queue_average": cooperation.get("total_vehicle_queue_average"),
             },
         }
 
@@ -1095,7 +1371,7 @@ def _arrival_plan_snapshot(arrivals: dict[str, list[Any]]) -> dict[str, Any]:
         "source_pedestrian_count": len(source_pedestrians),
         "destination_pedestrian_count": len(destination_pedestrians),
         "fingerprint_sha256": fingerprint,
-        "note": "Fixed and Adaptive receive this same seeded exogenous arrival plan; transfer departure timing remains policy-dependent.",
+        "note": "Fixed, Independent Adaptive, and Cooperative Adaptive receive this same seeded exogenous arrival plan; transfer departure timing remains policy-dependent.",
     }
 
 
@@ -1216,9 +1492,16 @@ def _queue_distribution(
     }
 
 
-def _delta(fixed: float, adaptive: float, *, lower_is_better: bool) -> dict[str, Any]:
-    difference = adaptive - fixed
-    percent_change = (difference / fixed * 100.0) if abs(fixed) > 1e-9 else None
+def _delta(
+    baseline: float,
+    candidate: float,
+    *,
+    lower_is_better: bool,
+    baseline_label: str = "fixed",
+    candidate_label: str = "adaptive",
+) -> dict[str, Any]:
+    difference = candidate - baseline
+    percent_change = (difference / baseline * 100.0) if abs(baseline) > 1e-9 else None
     if abs(difference) < 1e-9:
         direction = "same"
     elif (difference < 0) == lower_is_better:
@@ -1226,54 +1509,61 @@ def _delta(fixed: float, adaptive: float, *, lower_is_better: bool) -> dict[str,
     else:
         direction = "worse"
     return {
-        "fixed": round(fixed, 2),
-        "adaptive": round(adaptive, 2),
+        baseline_label: round(baseline, 2),
+        candidate_label: round(candidate, 2),
         "difference": round(difference, 2),
         "percent_change": round(percent_change, 1) if percent_change is not None else None,
-        "adaptive_direction": direction,
+        f"{candidate_label}_direction": direction,
         "lower_is_better": lower_is_better,
     }
 
 
-def _network_comparison(fixed: dict[str, Any], adaptive: dict[str, Any]) -> dict[str, Any]:
-    fixed_metrics = fixed["network_metrics"]
-    adaptive_metrics = adaptive["network_metrics"]
+def _network_comparison(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    baseline_label: str = "fixed",
+    candidate_label: str = "adaptive",
+) -> dict[str, Any]:
+    baseline_metrics = baseline["network_metrics"]
+    candidate_metrics = candidate["network_metrics"]
+
+    def delta(key_a: str, key_b: str | None = None, *, lower_is_better: bool) -> dict[str, Any]:
+        key_b = key_b or key_a
+        return _delta(
+            baseline_metrics[key_a],
+            candidate_metrics[key_b],
+            lower_is_better=lower_is_better,
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
+        )
+
     return {
         "corridor_completed": _delta(
-            fixed_metrics["corridor_completed_per_minute"],
-            adaptive_metrics["corridor_completed_per_minute"],
+            baseline_metrics["corridor_completed_per_minute"],
+            candidate_metrics["corridor_completed_per_minute"],
             lower_is_better=False,
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
         ),
         "corridor_travel_average": _delta(
-            fixed_metrics["corridor_travel_time"]["average_seconds"],
-            adaptive_metrics["corridor_travel_time"]["average_seconds"],
+            baseline_metrics["corridor_travel_time"]["average_seconds"],
+            candidate_metrics["corridor_travel_time"]["average_seconds"],
             lower_is_better=True,
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
         ),
         "corridor_travel_p95": _delta(
-            fixed_metrics["corridor_travel_time"]["p95_seconds"],
-            adaptive_metrics["corridor_travel_time"]["p95_seconds"],
+            baseline_metrics["corridor_travel_time"]["p95_seconds"],
+            candidate_metrics["corridor_travel_time"]["p95_seconds"],
             lower_is_better=True,
+            baseline_label=baseline_label,
+            candidate_label=candidate_label,
         ),
-        "total_vehicle_wait": _delta(
-            fixed_metrics["total_vehicle_wait_seconds"],
-            adaptive_metrics["total_vehicle_wait_seconds"],
-            lower_is_better=True,
-        ),
-        "total_vehicle_queue_average": _delta(
-            fixed_metrics["total_vehicle_queue_average"],
-            adaptive_metrics["total_vehicle_queue_average"],
-            lower_is_better=True,
-        ),
-        "total_vehicle_queue_p95": _delta(
-            fixed_metrics["total_vehicle_queue_p95"],
-            adaptive_metrics["total_vehicle_queue_p95"],
-            lower_is_better=True,
-        ),
-        "transfer_pipeline_average": _delta(
-            fixed_metrics["transfer_pipeline_average"],
-            adaptive_metrics["transfer_pipeline_average"],
-            lower_is_better=True,
-        ),
+        "total_vehicle_wait": delta("total_vehicle_wait_seconds", lower_is_better=True),
+        "total_vehicle_queue_average": delta("total_vehicle_queue_average", lower_is_better=True),
+        "total_vehicle_queue_p95": delta("total_vehicle_queue_p95", lower_is_better=True),
+        "transfer_pipeline_average": delta("transfer_pipeline_average", lower_is_better=True),
     }
 
 

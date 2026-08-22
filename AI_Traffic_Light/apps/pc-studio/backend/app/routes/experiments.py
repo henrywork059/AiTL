@@ -72,7 +72,8 @@ def run_network_simulation_experiment(payload: NetworkSimulationExperimentRunReq
             "duration_seconds": payload.duration_seconds,
             "density": payload.density,
             "link_id": scenario.get("link", {}).get("id"),
-            "cooperative_control_active": False,
+            "cooperative_control_active": True,
+            "comparison_modes": scenario.get("comparison"),
         },
     )
     return ok(data, request_id=request.state.request_id)

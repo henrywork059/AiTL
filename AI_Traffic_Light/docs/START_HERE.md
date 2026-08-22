@@ -1,74 +1,63 @@
-# Start Here — current V026 candidate
+# Start Here — current V027 candidate
 
-Read root `VERSION` first. At this documentation update, V026 / `0_2_6` is the current unaccepted candidate. V025 / `0_2_5` is the previous version, and V024 / `0_2_4` remains the owner-confirmed passed baseline because the owner explicitly requested V026 before separately accepting V025.
+Read root `VERSION` first. V027 / `0_2_7` is the current unaccepted candidate by explicit owner request. V026 / `0_2_6` is the previous version. V024 / `0_2_4` remains the owner-confirmed passed baseline until the owner explicitly accepts a later candidate.
 
-## What V026 adds
+## What V027 adds
 
-### Deterministic two-intersection network experiment
+### Bounded cooperative two-intersection simulation
 
-V026 turns the V025 topology foundation into an actual isolated two-intersection simulation baseline:
+V027 extends the V026 deterministic two-intersection experiment from two modes to three:
 
-- select one enabled directed network link;
-- model its configured upstream and downstream intersections simultaneously;
-- create a separate signal-controller runtime for each intersection;
-- generate one deterministic exogenous vehicle/pedestrian arrival plan from density + seed and store a compact count/fingerprint snapshot;
-- supply the same exogenous plan to Fixed and Adaptive network runs;
-- discharge vehicles from the upstream queue according to that intersection's simulated signal state;
-- move configured transfer candidates through a synthetic travel pipeline;
-- deliver them to the downstream queue after the link's configured `travel_time_seconds`;
-- retain per-vehicle transfer evidence with departure/scheduled-arrival/arrival time;
-- calculate per-intersection and network aggregate telemetry;
-- persist/list/reopen/delete/export network experiment results.
+1. **Fixed** — configured normal timing only.
+2. **Independent Adaptive** — each intersection uses its own ranked local scenario controller with no neighbour timing influence.
+3. **Cooperative Adaptive** — both intersections retain independent controller state, while downstream B may consume predicted synthetic A→B arrivals from the configured-link transfer pipeline.
 
-This is intentionally an **independent-controller baseline**. V026 does not feed neighbour arrival context into either controller, so `cooperative_control_active` remains false.
+All three modes receive the same seeded exogenous demand and the same configured source/destination/link snapshot.
 
-## New API surface
+### Cooperation behavior
 
-- `POST /api/traffic/network-experiments`
-- `GET /api/traffic/network-experiments`
-- `GET /api/traffic/network-experiments/{run_id}`
-- `GET /api/traffic/network-experiments/{run_id}/export.csv`
-- `DELETE /api/traffic/network-experiments/{run_id}`
+For Cooperative Adaptive only:
 
-The existing `/api/traffic/experiments` single-junction Fixed-vs-Adaptive benchmark remains unchanged.
+- B examines synthetic transfers already discharged from A and scheduled to arrive within a configurable lookahead;
+- when B is already in vehicle green, cooperation may extend that green only inside the saved phase maximum and maximum-cycle cap;
+- when B is in another protected phase, cooperation may request earlier protected progression by reducing only the current phase toward its configured minimum;
+- active local pedestrian demand prevents cooperation from shortening pedestrian WALK/CLEAR phases;
+- phase order is never changed or skipped;
+- cooperation decisions are recorded as structured events with incoming count, ETA, action, reason, and timing delta;
+- coordination telemetry records evaluations, triggers, applied advisories, green extensions, progression requests, pedestrian-service protections, and timing seconds added/reduced.
 
-## V025 capabilities retained
+This is **simulation-only cooperation**. It is not live multi-camera cooperation and is not public-road control.
 
-V026 keeps the V025 ranked scenario engine, protected phase/timing guards, single-junction Simulation Lab, intersection/source/topology configuration, observation provenance, and structured live decision context.
+## Comparison evidence
 
-It also retains all earlier camera, inference, zones, occupancy, flow, dataset, training, model, settings, logging, and patch-safety behavior.
+Each `netexp_*` result now contains:
 
-## Important V026 interpretation rules
+- `fixed`;
+- `adaptive`;
+- `cooperative`;
+- backward-compatible `comparison` for Adaptive vs Fixed;
+- `comparisons.adaptive_vs_fixed`;
+- `comparisons.cooperative_vs_fixed`;
+- `comparisons.cooperative_vs_adaptive`.
 
-- Network transfer events are **synthetic simulator events**, not observed live vehicle movement.
-- Configured link travel time is a deterministic experiment input, not a learned/predicted road travel time.
-- Fixed and Adaptive share exogenous demand, but policy-dependent upstream discharge can change downstream transfer-arrival timing; that difference is an experiment outcome.
-- A transfer pipeline does not mean cooperation. Cooperation requires neighbour-informed controller decisions.
-- The current PC Studio Simulation Lab UI remains the single-junction experiment view; V026 network experiments are API/test-first.
+The same seeded arrival-plan fingerprint remains available so the three modes can be audited against identical exogenous demand.
+
+## Inherited capability
+
+V027 retains V026 two-intersection transfer/persistence/CSV, V025 ranked scenarios, protected signal timing, single-junction Simulation Lab, intersection/topology identity, decision context/provenance, V024 persistence/polling hardening, V022 flow tracking, V021 occupancy, and the existing dataset/training/inference/model workflow.
+
+## Important interpretation rules
+
+- Cooperation is driven by **synthetic predicted arrivals** from the experiment transfer pipeline, not live camera tracking across intersections.
+- Configured link travel time is a simulation input, not a learned or measured road travel time.
+- Cooperative mode may improve or worsen a metric depending on the selected simulated demand/configuration; no universal superiority claim is valid.
 - Emergency priority remains inactive.
+- Existing PC Studio Simulation Lab remains the single-junction GUI; V027 network/cooperation experiments remain backend/API/test-first.
 
-## Planned next dependency
+## Recommended next step
 
-The next logical capability is bounded **multi-intersection cooperation** using predicted/scheduled incoming demand from the now-testable transfer pipeline. That later work should compare:
-
-1. Fixed;
-2. Independent Adaptive;
-3. Cooperative Adaptive.
-
-The cooperation decision must remain integrated with the ranked scenario/protected phase architecture and record the neighbour evidence used.
-
-## Recommended validation order
-
-```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
-$py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
-& $py -m compileall ".\apps\pc-studio\backend\app" ".\scripts"
-& $py ".\scripts\check_structure.py"
-& $py ".\scripts\test_network_simulation_experiments.py"
-```
-
-Then run the full inherited backend regression set, live backend smoke, and frontend `npm ci`, `npm run typecheck`, `npm run build` as described in `LOCAL_TESTING.md`.
+After V027 acceptance, the next logical feature is stronger **pedestrian-aware service evidence** or simulated **emergency priority** built on the same network/explanation architecture. Do not create a separate controller.
 
 ## Safety boundary
 
-AiTL remains a supervised local simulation/computer-vision prototype. V026 network transfer, queues, timings, and metrics are synthetic experiment data and are not connected to physical/public-road signal infrastructure.
+AiTL remains a supervised local simulation/computer-vision prototype. V027 cooperation, transfers, queues, timings, and comparison metrics are synthetic experiment evidence only and are not connected to physical/public-road signal infrastructure.

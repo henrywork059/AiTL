@@ -1,6 +1,6 @@
-# Local Testing Notes (V026)
+# Local Testing Notes (V027)
 
-V026 / `0_2_6` is the current candidate by explicit owner request. V025 / `0_2_5` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks never promote a candidate.
+V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks never promote a candidate.
 
 ## 1. Safe Windows update
 
@@ -13,15 +13,15 @@ git pull --ff-only origin main
 Get-Content .\AI_Traffic_Light\VERSION
 ```
 
-Expected release fields:
+Expected:
 
 ```text
-version: 0_2_6
-previous_version: 0_2_5
+version: 0_2_7
+previous_version: 0_2_6
 passed_baseline: 0_2_4
 ```
 
-Do not use `git clean -fd`. Preserve datasets, outputs, trained models, labels, runtime zones/settings/signal rules, `config/intersections.json`, occupancy/flow/signal history, and all experiment results.
+Do not use `git clean -fd`. Preserve datasets, outputs, models, labels, runtime zones/settings/signal rules, `config/intersections.json`, histories, and all experiment results.
 
 ## 2. Backend compile / structure / regression
 
@@ -35,7 +35,7 @@ $py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
 & $py ".\scripts\test_network_simulation_experiments.py"
 ```
 
-Then run the complete non-live regression set:
+Then run all non-live regression scripts:
 
 ```powershell
 $tests = Get-ChildItem ".\scripts\test_*.py" | Where-Object { $_.Name -ne "test_backend_smoke.py" }
@@ -46,13 +46,11 @@ foreach ($test in $tests) {
 }
 ```
 
-Important inherited tests include `test_intersection_network.py`, `test_simulation_experiments.py`, `test_signal_scenarios.py`, `test_signal_rules_service.py`, camera/simulation, tracking/flow, persistence, dataset/training/model, frontend polling structure, and update-runner regressions.
+The V027-focused network regression must verify deterministic demand, separate A/B controller state, transfer timing, three-mode repeatability, coordination events/telemetry, persistence/list/get/delete/CSV, request validation, API request IDs, and invalid-link rejection.
 
-`test_network_simulation_experiments.py` is the V026-focused regression. It checks deterministic seeded demand, separate A/B controller/runtime state, explicit transfer timing, persistence/list/get/delete/CSV, and invalid-link rejection.
+## 3. Frontend validation
 
-## 3. Frontend release validation
-
-V026 does not add a dedicated network-experiment page. The existing Simulation Lab UI remains the single-junction experiment surface, but frontend release metadata still changes to `0_2_6`.
+V027 does not add a dedicated network dashboard. Existing PC Studio Simulation Lab remains the single-junction surface; network cooperation is backend/API/test-first.
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\pc-studio\frontend"
@@ -78,11 +76,9 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\apps\pc-studio\backend\.venv\Scripts\python.exe .\scripts\test_backend_smoke.py
 ```
 
-Confirm health/smoke/template/version surfaces report `0_2_6` and retain request IDs.
+Confirm health/smoke/template/version surfaces report `0_2_7` and preserve request IDs.
 
 ## 5. Prepare a two-intersection topology
-
-Keep the backend running. The example below creates two enabled intersections and one A→B link with a deterministic 7.5-second synthetic link travel time.
 
 ```powershell
 $networkBody = @{
@@ -102,103 +98,109 @@ $networkBody = @{
 Invoke-RestMethod -Method Put -ContentType "application/json" -Body $networkBody -Uri "http://127.0.0.1:8000/api/traffic/network" | ConvertTo-Json -Depth 12
 ```
 
-Confirm the saved topology contains the two intersections and enabled `a_to_b` link. This remains runtime config and must not be packaged in a source patch.
+## 6. V027 cooperative network acceptance
 
-## 6. V026 network-experiment API acceptance
-
-### 6.1 Run a deterministic network comparison
+### 6.1 Run the three-mode comparison
 
 ```powershell
 $runBody = @{
   duration_seconds = 180
   density = "normal"
-  seed = 26026
+  seed = 27027
   sample_interval_seconds = 1
   profile = "Normal"
-  label = "V026 acceptance"
+  label = "V027 acceptance"
   link_id = "a_to_b"
   transfer_share_percent = 70
+  cooperation_lookahead_seconds = 12.0
+  cooperation_max_extension_seconds = 5.0
+  cooperation_min_incoming_vehicles = 1
 } | ConvertTo-Json
 
 $run1 = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $runBody -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
-$run1.data | ConvertTo-Json -Depth 15
+$run1.data | ConvertTo-Json -Depth 18
 ```
 
 Confirm:
 
-1. `scenario.kind` is `two_intersection_network`.
-2. `scenario.link.id` is `a_to_b` and its travel time is `7.5` seconds.
-3. `fixed.intersections` and `adaptive.intersections` both contain `intersection_a` and `intersection_b`.
-4. Each mode reports `cooperative_control_active: false` and `emergency_priority_active: false`.
-5. Transfer counts are non-zero for this normal-density/180-second acceptance run.
-6. At least one transfer event has `arrived_at_s`; for every arrived event, `arrived_at_s - departed_at_s` equals the configured link travel time (allow only normal displayed rounding).
-7. Per-intersection waiting/queue/throughput/signal metrics exist.
-8. Network metrics include transfers departed/arrived, transfer pipeline average/peak, corridor completion, end-to-end corridor travel, and aggregate vehicle wait/queue measures.
-9. The response labels observations/transfers as synthetic experiment data rather than AI-detected live transfer.
+1. `scenario.comparison` is `fixed`, `adaptive`, `cooperative`.
+2. Fixed and Adaptive report `cooperative_control_active: false`; Cooperative reports `true`.
+3. All three modes contain the same source/destination intersection IDs.
+4. `scenario.arrival_plan.fingerprint_sha256` exists and is 64 hex characters.
+5. Transfer events remain synthetic and arrived transfers obey the configured 7.5-second link travel time.
+6. `cooperative.coordination_provenance` is `synthetic_predicted_arrivals`.
+7. `cooperative.network_metrics.coordination.triggered` is non-zero for the acceptance run.
+8. At least one coordination advisory is applied under this demand/settings combination.
+9. Coordination events expose deterministic coordination ID, link/source/destination identity, provenance, incoming count, earliest ETA, action, reason, applied flag and timing delta.
+10. Any vehicle-green extension stays within saved phase maximum and maximum-cycle bounds.
+11. Any non-vehicle progression request only shortens the current phase toward its configured minimum; phase order is not skipped.
+12. When local pedestrian demand is present during WALK/CLEAR, cooperation does not shorten that pedestrian phase and may record `protect_pedestrian_service`.
+13. Emergency priority remains inactive.
 
-### 6.2 Verify same-seed repeatability
+Do **not** require Cooperative to beat Independent Adaptive on every metric. The acceptance condition is correct bounded neighbour-informed behavior and valid evidence, not guaranteed superiority.
 
-Run exactly the same POST body again:
+### 6.2 Compare all three modes
+
+Confirm:
+
+- `comparison` remains the backward-compatible Adaptive-vs-Fixed structure;
+- `comparisons.adaptive_vs_fixed` matches it;
+- `comparisons.cooperative_vs_fixed` exists;
+- `comparisons.cooperative_vs_adaptive` exists;
+- cooperative comparison entries use `cooperative` values/direction labels rather than mislabeling them as Adaptive.
+
+### 6.3 Same-seed repeatability
+
+Run the exact POST body again:
 
 ```powershell
 $run2 = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $runBody -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
 ```
 
-The run IDs/creation timestamps will differ. Compare the scenario arrival plan and Fixed/Adaptive/comparison payloads; they should otherwise be repeatable for the same topology, policy, zones, seed, density, duration, interval, link, and transfer share.
+Ignoring run ID/creation timestamp, `scenario`, `fixed`, `adaptive`, `cooperative`, `comparison`, and `comparisons` should repeat exactly for the same topology, signal config, zones and request.
 
-The Fixed and Adaptive modes must use the **same exogenous arrival plan**. Confirm `scenario.arrival_plan.fingerprint_sha256` is stable across identical requests; the summary counts should also match. Their downstream transfer outcomes may differ because source service timing differs.
-
-### 6.3 Persistence / retrieval / CSV / delete
+### 6.4 Persistence / retrieval / CSV / delete
 
 ```powershell
 $runId = $run1.data.run_id
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments?limit=20" | ConvertTo-Json -Depth 8
-Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId" | ConvertTo-Json -Depth 15
-Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId/export.csv" -OutFile ".\v026_network_experiment.csv"
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments?limit=20" | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId" | ConvertTo-Json -Depth 18
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId/export.csv" -OutFile ".\v027_network_experiment.csv"
 ```
 
-Confirm the CSV includes per-intersection queue/phase/service fields plus network transfer/pipeline/corridor fields, and the HTTP response contains `X-Request-ID`.
+Confirm CSV contains Fixed, Adaptive and Cooperative fields, including `cooperative_coordination_action`, and the response preserves `X-Request-ID`.
 
-Restart the backend and confirm the stored `netexp_*` result can still be retrieved. Then delete one disposable run:
+Restart the backend and reopen the stored result. Delete one disposable run and confirm unrelated runtime data remains untouched.
 
-```powershell
-Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId"
-```
+### 6.5 Negative validation
 
-Deletion must not remove single-junction `exp_*` runs, zones, signal scenarios, topology config, captures, analytics, training results, or models.
+Confirm these fail cleanly without storing a valid result:
 
-### 6.4 Negative link check
+- missing/disabled `link_id` → `ATL-TRAFFIC-013`;
+- cooperation lookahead below 1 or above 60;
+- max extension below 0 or above 20;
+- min incoming vehicles below 1 or above 20.
 
-Run with a missing/disabled `link_id`. Confirm the request fails with `ATL-TRAFFIC-013` (`TRAFFIC_NETWORK_INVALID`) and does not write a valid network experiment result.
+## 7. Inherited regression
 
-## 7. Inherited single-junction acceptance
+Re-run representative V026/V025/V024/V022/V021 checks: independent network transfer, ranked scenarios, protected phase timing, single-junction Simulation Lab, topology/decision context, occupancy vs flow, tracking/counting lines, camera receiver/simulation, dataset/training/models/settings/logs, atomic persistence and serial polling.
 
-Re-run representative V025 checks:
+Existing `/api/traffic/experiments` behavior must remain unchanged.
 
-- ranked scenario rank/arbitration, ALL/ANY, zone/class observations, persistence/cooldown, protected phase bounds, stale fallback, preview/history;
-- topology/source identity and structured `decision_context`;
-- single-junction Simulation Lab repeatability, persistence, CSV, and UI grouping;
-- occupancy vs flow separation and tracking/counting lines;
-- camera receiver/simulation, dataset capture/delete/label, training, model registry, settings/logs;
-- atomic persistence and serial polling.
+## 8. Interpretation / safety
 
-The existing `/api/traffic/experiments` endpoints must still work unchanged.
+Confirm documentation/UI/API do not imply:
 
-## 8. V026 interpretation / safety checks
+- live cross-camera identity matching;
+- measured/learned road travel time;
+- emergency priority;
+- general N-intersection live cooperation;
+- guaranteed cooperative performance improvement;
+- public-road readiness, authority or safety certification.
 
-Confirm the candidate does **not** claim any of the following:
-
-- cooperative green-wave timing;
-- neighbour-informed phase adjustment;
-- emergency pre-emption;
-- live measured vehicle transfer between configured cameras;
-- calibrated public-road performance/safety.
-
-V026 transfer events exist only inside the isolated synthetic network experiment. Live `config/intersections.json` links remain topology metadata.
+V027 cooperation exists only in isolated synthetic network experiments.
 
 ## 9. Repository / ZIP checks
-
-From the complete repository:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
@@ -206,10 +208,10 @@ git diff --check
 git status --short
 ```
 
-From `AI_Traffic_Light`, validate the supplied ZIP:
+From `AI_Traffic_Light`:
 
 ```powershell
-python .\scripts\validate_patch_zip.py <V026-patch.zip>
+python .\scripts\validate_patch_zip.py <V027-patch.zip>
 ```
 
-Compare ZIP members against the supplied manifest. Only explicit owner acceptance may change `passed_baseline`.
+Compare ZIP members with the supplied manifest. Only explicit owner acceptance may change `passed_baseline`.

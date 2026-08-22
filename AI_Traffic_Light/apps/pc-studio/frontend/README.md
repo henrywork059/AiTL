@@ -41,11 +41,11 @@ Synthetic results must be labeled as local simulation evidence, not public-road 
 
 ## Network/explanation direction
 
-V026 adds a backend/API-first **two-intersection synthetic network experiment**. The existing PC Studio Simulation Lab UI remains the single-junction Fixed-vs-Adaptive surface in this candidate; no new network-experiment editor/dashboard is required for V026 acceptance.
+V027 adds backend/API-first **two-intersection cooperative simulation** with Fixed / Independent Adaptive / Cooperative Adaptive comparison. The existing PC Studio Simulation Lab UI remains the single-junction surface; no new network-experiment editor/dashboard is required for V027 acceptance.
 
-A later UI may expose network-run setup, per-intersection results, transfer evidence, and eventually Fixed / Independent Adaptive / Cooperative Adaptive comparison. It should remain generic enough for more than two configured intersections even when a particular experiment selects one directed pair.
+A later UI may expose network-run setup, per-intersection results, transfer evidence, coordination events, and the existing Fixed / Independent Adaptive / Cooperative Adaptive comparison. It should remain generic enough for more than two configured intersections even when a particular experiment selects one directed pair.
 
-Do not present live configured links as measured traffic transfer. V026 transfer events are explicit synthetic experiment events. Structured decision details should show neighbour/emergency/pedestrian/class context with provenance where appropriate.
+Do not present live configured links as measured traffic transfer. V027 transfer and cooperation events are explicit synthetic experiment events. Structured decision details should show neighbour/emergency/pedestrian/class context with provenance where appropriate.
 
 ## Frontend ownership
 

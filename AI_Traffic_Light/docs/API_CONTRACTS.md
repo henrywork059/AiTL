@@ -29,7 +29,7 @@ This same-candidate network-foundation update also adds:
 - `network_context` — the configured intersection plus inbound/outbound neighbour links;
 - `decision_context` — deterministic decision id, category, source/intersection identity, winning scenario and observed conditions when available, requested service, timing, pedestrian/vehicle context, explicit emergency-placeholder state, neighbour context, and a readable explanation.
 
-The decision context is a live explanation projection. Existing signal-rule history remains the persisted controller-event audit. `cooperative_control_active` is false in V025.
+The decision context is a live explanation projection. Existing signal-rule history remains the persisted controller-event audit. Live/runtime `cooperative_control_active` remains false; V027 cooperation exists only inside isolated network experiments.
 
 Occupancy remains sampled per-frame data. Track-derived flow and V025 experiment telemetry remain separate.
 
@@ -75,7 +75,7 @@ A link contains:
 }
 ```
 
-For live/runtime topology this travel-time field remains configured prototype metadata. V026 isolated network experiments consume it as deterministic synthetic link travel time; it is not a measured or learned road travel-time estimate, and it does not coordinate green windows.
+For live/runtime topology this travel-time field remains configured prototype metadata. V027 isolated network experiments consume it as deterministic synthetic link travel time and use it to schedule predicted synthetic arrivals; it is not a measured or learned road travel-time estimate.
 
 ### `PUT /api/traffic/network`
 
@@ -111,7 +111,7 @@ Returns the selected/active intersection and normalized inbound/outbound neighbo
 }
 ```
 
-No V025 network endpoint changes signal timing at another intersection or sends physical traffic commands.
+No live/runtime network endpoint changes signal timing at another intersection or sends physical traffic commands. V027 neighbour-informed timing is confined to the isolated network experiment service.
 
 ## V025 simulation experiments
 
@@ -145,22 +145,25 @@ The benchmark uses an isolated controller/simulator instance, snapshots configur
 
 Runtime JSON is stored under `outputs/simulation_experiments/` and excluded from source patches. Retention is bounded to the newest 200 runs.
 
-## V026 two-intersection network experiments
+## V027 two-intersection cooperative network experiments
 
 ### `POST /api/traffic/network-experiments`
 
-Runs one isolated Fixed-vs-Adaptive **two-intersection independent-control** comparison over one enabled directed network link. Request body:
+Runs one isolated three-mode comparison over one enabled directed network link:
 
 ```json
 {
   "duration_seconds": 300,
   "density": "normal",
-  "seed": 26026,
+  "seed": 27027,
   "sample_interval_seconds": 1,
   "profile": null,
-  "label": "A to B independent baseline",
+  "label": "A to B cooperation comparison",
   "link_id": "a_to_b",
-  "transfer_share_percent": 70
+  "transfer_share_percent": 70,
+  "cooperation_lookahead_seconds": 12.0,
+  "cooperation_max_extension_seconds": 5.0,
+  "cooperation_min_incoming_vehicles": 1
 }
 ```
 
@@ -169,33 +172,46 @@ Rules:
 - duration: 30-1800 seconds;
 - density: `light | normal | busy`;
 - `transfer_share_percent`: 0-100;
-- `link_id` is optional; when omitted the first enabled link by id is used;
+- cooperation lookahead: 1-60 seconds;
+- cooperation max extension: 0-20 seconds;
+- minimum predicted incoming vehicles: 1-20;
+- `link_id` is optional; when omitted the first enabled link by id is selected;
 - the selected link must connect two enabled configured intersections;
-- when `profile` is null, each intersection uses its configured `signal_profile`; a supplied profile overrides both and must exist in saved signal config.
+- a supplied `profile` overrides both intersection profiles and must exist in the saved signal config.
 
-The result contains `fixed`, `adaptive`, and `comparison`. `scenario.arrival_plan` exposes bounded demand counts plus a SHA-256 fingerprint of the deterministic exogenous plan so identical runs can be audited without storing a second full event list. Each mode contains:
+The result preserves V026 compatibility and adds a third mode:
 
-- `intersections` keyed by source/destination intersection id, each with waiting/queue/throughput/signal metrics and its own final signal;
-- `network_metrics` with transfers departed/arrived, configured link travel time, transfer-pipeline occupancy, corridor completions, end-to-end corridor travel distribution, total vehicle wait and total vehicle queue pressure;
-- `timeline` samples containing both intersections plus transfer-pipeline counts;
-- `transfer_events` with synthetic vehicle id/class, departure time, scheduled arrival and simulated arrival;
-- `observation_provenance: simulation`;
-- `transfer_provenance: synthetic_network_simulation`;
-- `cooperative_control_active: false`;
-- `emergency_priority_active: false`.
+- `fixed`;
+- `adaptive` = Independent Adaptive;
+- `cooperative` = Cooperative Adaptive;
+- `comparison` = backward-compatible Adaptive-vs-Fixed comparison;
+- `comparisons.adaptive_vs_fixed`;
+- `comparisons.cooperative_vs_fixed`;
+- `comparisons.cooperative_vs_adaptive`.
 
-Fixed and Adaptive receive the same seeded **exogenous** arrival plan. Policy-dependent upstream discharge may change when transfer candidates enter the link, so downstream transfer-arrival timing may differ between modes as an experiment outcome.
+`scenario.arrival_plan` contains deterministic exogenous-demand counts plus a SHA-256 fingerprint. All three modes receive the same external arrival plan. `scenario.cooperation` snapshots lookahead/max-extension/min-incoming settings.
 
-Network transfer is synthetic simulator evidence. Configured travel time is an experiment input, not measured/predicted road travel time. Neighbour context does not alter either controller in V026.
+Each mode contains per-intersection waiting/queue/throughput/signal metrics, network transfer/corridor telemetry, a bounded timeline, and synthetic transfer evidence. Cooperative mode additionally contains:
+
+- `cooperative_control_active: true`;
+- `coordination_provenance: synthetic_predicted_arrivals`;
+- `coordination_events` with deterministic coordination ID, link/source/destination identity, provenance, time, destination phase before advisory, incoming count, earliest ETA, action, applied flag, reason, and timing delta;
+- `network_metrics.coordination` with evaluation/trigger/application counts, green extensions, protected progression requests, pedestrian-service protections, timing seconds added/reduced, and cooperation settings.
+
+Fixed and Independent Adaptive report `cooperative_control_active: false`.
+
+The coordinator uses transfers already discharged from the upstream intersection and scheduled inside the lookahead. During downstream vehicle green it may extend only within the saved phase maximum and maximum-cycle cap. During other phases it may request earlier protected progression by reducing only the current phase toward its configured minimum. It does not shorten pedestrian WALK/CLEAR while local pedestrian demand is active. Protected phase order is never skipped.
+
+Network transfer, predicted arrivals, and cooperation are synthetic simulator evidence. Configured travel time is an experiment input, not measured/learned road travel time. Cooperative results may be better or worse for a selected synthetic scenario; the API makes no universal performance claim.
 
 ### Stored network experiment runs
 
-- `GET /api/traffic/network-experiments?limit=50` — list compact network-run summaries.
-- `GET /api/traffic/network-experiments/{run_id}` — load one complete `netexp_*` result.
+- `GET /api/traffic/network-experiments?limit=50` — list compact `netexp_*` summaries.
+- `GET /api/traffic/network-experiments/{run_id}` — load one complete result.
 - `DELETE /api/traffic/network-experiments/{run_id}` — delete one stored network result.
-- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned Fixed/Adaptive source/destination phase, vehicle/pedestrian queue, service/scenario, pipeline, transfer, and corridor timeline fields; preserves `X-Request-ID`.
+- `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned Fixed / Adaptive / Cooperative source/destination queue/service/signal fields plus transfer and cooperation timeline fields; preserves `X-Request-ID`.
 
-Network experiment JSON is stored as `netexp_*.json` under the same ignored runtime `outputs/simulation_experiments/` directory. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
+Network experiment JSON remains under ignored runtime `outputs/simulation_experiments/`. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
 
 ## V025 ranked signal-scenario configuration
 
@@ -295,4 +311,4 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V026 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V027 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.

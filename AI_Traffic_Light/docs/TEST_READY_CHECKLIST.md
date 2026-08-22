@@ -1,83 +1,66 @@
-# V026 Acceptance Checklist
+# V027 Acceptance Checklist
 
-V026 / `0_2_6` is the current candidate by explicit owner request. V025 / `0_2_5` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks do not promote V026.
+V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6` is the previous unaccepted candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks do not promote V027.
 
 ## Release / packaging
 
-1. `VERSION` reports `version: 0_2_6`, `previous_version: 0_2_5`, `passed_baseline: 0_2_4`, and candidate status.
-2. Frontend shared project version reports only `0_2_6`.
-3. `docs/PATCH_0_2_6.md` and the `CHANGELOG.md` V026 section exist.
-4. Python compile, `check_structure.py`, relevant regressions, frontend typecheck/build, live smoke, and `git diff --check` pass locally.
-5. Patch ZIP is changed-files-only, every member begins `AI_Traffic_Light/`, and no runtime/generated/model data is included.
+1. `VERSION` reports `0_2_7`, previous `0_2_6`, passed baseline `0_2_4`, and candidate status.
+2. `docs/PATCH_0_2_7.md` and a V027 changelog section exist.
+3. Changed-files ZIP contains only `AI_Traffic_Light/` paths and excludes runtime/generated data.
+4. Python compile, structure checks, relevant regressions, frontend typecheck/build, live smoke, `git diff --check`, and ZIP validation pass locally.
 
-## V026 two-intersection network experiment
+## Three-mode network experiment
 
-6. At least two enabled intersections and one valid enabled directed link can be configured using the inherited V025 topology API.
-7. `POST /api/traffic/network-experiments` accepts duration, density, seed, sample interval, optional profile/label/link id, and transfer share.
-8. A network experiment selects exactly one valid directed source→destination link but does not change the generic N-intersection topology schema.
-9. Source and destination each have a separate signal-controller runtime inside each experiment mode.
-10. Fixed and Adaptive receive the same deterministic exogenous arrival plan for identical configuration/seed.
-11. Repeating the same request produces repeatable scenario/Fixed/Adaptive/comparison data apart from run metadata.
-12. Selected source vehicles may enter an explicit synthetic transfer pipeline after upstream service.
-13. An arrived transfer event records vehicle/class, upstream departure, scheduled arrival, and delivered arrival.
-14. For each arrived transfer, delivered/scheduled link arrival time reflects the configured `travel_time_seconds`.
-15. Downstream transferred demand is not fabricated from a live camera source and is labeled as synthetic experiment data.
-16. Fixed and Adaptive transfer outcomes may differ only because their independent source service timing differs; exogenous demand remains common.
-17. Each mode exposes per-intersection vehicle/pedestrian wait, queues, throughput, signal-use, and scenario-application telemetry.
-18. Network metrics expose transfer departure/arrival, transfer pipeline average/peak, corridor completion/rate, end-to-end corridor travel distribution, and aggregate vehicle wait/queue evidence.
-19. Corridor travel is defined as source external arrival through downstream service, not as the configured link travel time.
-20. `cooperative_control_active` remains `false`.
-21. `emergency_priority_active` remains `false`.
-22. Neighbour/link context does not alter ranked-scenario arbitration in V026.
-23. V026 does not claim green-wave/cooperative timing merely because agents transfer between intersections.
+5. `POST /api/traffic/network-experiments` accepts Fixed/Adaptive/Cooperative comparison parameters through one request.
+6. Same seed/config produces the same exogenous arrival-plan fingerprint across repeated runs.
+7. Fixed, Independent Adaptive and Cooperative Adaptive each have separate A/B experiment runtime state.
+8. Synthetic transfer timing remains explicit and deterministic over the selected configured link.
+9. Fixed and Adaptive report cooperation inactive; Cooperative reports cooperation active.
+10. Existing backward-compatible `comparison` still represents Adaptive vs Fixed.
+11. `comparisons` additionally contains Adaptive vs Fixed, Cooperative vs Fixed, and Cooperative vs Adaptive.
 
-## Network-experiment persistence / API
+## Cooperation behavior
 
-24. Network runs persist as bounded `netexp_*` result files under `outputs/simulation_experiments/`.
-25. `GET /api/traffic/network-experiments` lists network runs without conflating them with single-junction `exp_*` runs.
-26. `GET /api/traffic/network-experiments/{run_id}` retrieves one stored network run.
-27. CSV export contains aligned per-intersection and network transfer/pipeline/corridor evidence and preserves `X-Request-ID`.
-28. Deleting a network run removes only that `netexp_*` result.
-29. Missing/disabled/invalid link selection fails with the stable network validation path and does not write a valid run.
-30. Existing `/api/traffic/experiments` single-junction endpoints remain backward-compatible.
+12. Cooperative mode derives predicted incoming demand only from synthetic transfers already in the configured-link pipeline.
+13. Lookahead, max-extension and minimum-incoming settings are snapshotted in the result.
+14. Downstream vehicle green may be extended only within saved phase maximum and maximum-cycle caps.
+15. Cooperation never reorders or skips the protected phase sequence.
+16. Earlier vehicle preparation may reduce only the current protected phase toward its configured minimum.
+17. Active pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR.
+18. Coordination events record deterministic coordination ID, link/source/destination identity, provenance, time, pre-advisory destination phase, incoming count, earliest ETA, action, reason, applied flag and timing delta.
+19. Coordination telemetry records evaluations, triggers, applied advisories, green extensions, progression requests, pedestrian protections, and timing seconds added/reduced.
+20. Cooperation provenance is explicitly synthetic predicted-arrival evidence.
+21. No test requires Cooperative to outperform Independent Adaptive universally.
 
-## Inherited V025 network/explanation foundation
+## Persistence / API / CSV
 
-31. Generic topology remains able to describe more than two intersections.
-32. Source IDs resolve unambiguously to intersection identity; duplicate assignments remain rejected.
-33. Directed links still validate endpoints, approaches, uniqueness, self-link prohibition, and travel-time bounds.
-34. Network config persists atomically under ignored runtime `config/intersections.json`.
-35. `/api/traffic/state` still exposes `intersection_id`, observation provenance, network context, and structured decision context.
-36. Live configured links remain topology metadata and are not described as measured transfer.
-37. Structured decision context still exposes scenario/observed/timing/pedestrian/vehicle/neighbour context without becoming a second controller.
+22. `netexp_*` list/get/delete remains functional.
+23. JSON responses preserve standard envelopes/request IDs.
+24. CSV export preserves `X-Request-ID`.
+25. CSV includes aligned Fixed, Adaptive and Cooperative source/destination/network fields plus cooperative coordination columns.
+26. Deleting a network run does not remove single-junction runs or other runtime/user data.
 
-## Inherited ranked scenarios / signal protection
+## Validation / negative paths
 
-38. Rank `1` remains highest; multiple triggered scenarios still execute only one highest-ranked eligible winner per evaluation.
-39. ALL/ANY, controller-metric and zone/class conditions, missing-zone availability, persistence, cooldown, and target-phase eligibility remain functional.
-40. Protected phase sequence/minimums/maximums/cycle bounds remain enforced.
-41. Fixed mode performs no adaptive scenario applications.
-42. Test-only accessibility/incident inputs remain explicit manual simulation inputs and do not imply perception support.
-43. Signal preview remains non-mutating and history remains available.
+27. Invalid/missing selected link is rejected with the existing network validation error path.
+28. Cooperation lookahead outside 1-60 seconds is rejected.
+29. Cooperation max extension outside 0-20 seconds is rejected.
+30. Cooperation minimum incoming count outside 1-20 is rejected.
 
-## Inherited single-junction Simulation Lab
+## Inherited signal/network invariants
 
-44. Existing Fixed-vs-Adaptive single-junction Simulation Lab remains isolated from live runtime.
-45. Same-seed single-junction repeatability and zone/class scenario behavior remain intact.
-46. Existing wait/queue/throughput/signal/diagnostic telemetry and `exp_*` persistence/CSV remain intact.
-47. Current PC Studio Simulation Lab UI remains the single-junction experiment surface in V026; absence of a new network dashboard is not a V026 failure.
+31. V026 independent network transfer semantics remain available inside Fixed/Adaptive results.
+32. V025 ranked scenario one-winner arbitration remains intact.
+33. Protected phase minimum/maximum/cycle constraints remain controller-owned.
+34. Single-junction Simulation Lab remains unchanged and isolated from live runtime.
+35. Live configured network links remain topology metadata rather than observed cross-camera flow.
+36. Existing occupancy, flow/tracking, dataset/training/inference/model/settings/logging features show no regression.
 
-## Other inherited regression
+## Claims / safety
 
-48. V024 atomic persistence and serial polling remain intact.
-49. V022 tracking/counting-line flow and V021 sampled occupancy remain distinct and functional.
-50. Camera receiver/simulation, inference, zones, capture/delete/labels, training, model registry, settings, and logs show no regression.
-
-## Claims / documentation / safety
-
-51. `PROJECT_SCOPE.md` labels multi-intersection simulation as implemented but cooperation as still planned.
-52. Documentation distinguishes exogenous arrivals, synthetic transfer events, configured link time, end-to-end corridor time, occupancy, flow, and AI detections.
-53. No document claims emergency vehicle recognition, wheelchair/mobility recognition, or fall recognition without a compatible perception source.
-54. V026 results are described as seeded synthetic evidence, not calibrated public-road performance or safety evidence.
-55. Nothing in V026 controls or connects to physical/public-road traffic-signal infrastructure.
-56. Owner explicitly confirms V026 passed before any future update changes `passed_baseline`.
+37. V027 is described as isolated synthetic two-intersection cooperation, not general live N-intersection cooperation.
+38. Configured travel time is described as a simulation input, not a measured/learned road estimate.
+39. Emergency priority remains inactive.
+40. No unsupported emergency/wheelchair/fall perception claim is introduced.
+41. Nothing controls or connects to physical/public-road traffic-signal infrastructure.
+42. Owner explicitly confirms V027 passed before `passed_baseline` changes.

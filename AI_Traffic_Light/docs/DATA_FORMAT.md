@@ -150,7 +150,7 @@ Representative normalized shape:
 }
 ```
 
-A live/configured link is a directed topology/configuration relationship. It is **not** an observed vehicle-transfer record, measured travel time, or cooperative-control action. V026 network experiments may explicitly generate synthetic transfer events over one selected link; those events remain simulator evidence.
+A live/configured link is a directed topology/configuration relationship. It is **not** an observed vehicle-transfer record, measured travel time, or live cooperative-control action. V027 network experiments may explicitly generate synthetic transfer, predicted-arrival, and cooperation events over one selected link; those events remain simulator evidence.
 
 ## Structured live decision context
 
@@ -186,9 +186,11 @@ Exact fields may be extended by the API model, but semantics remain:
 - emergency context must state inactive/not implemented until an emergency feature exists;
 - the persisted signal-rule event history remains distinct from the live explanation projection.
 
-## V026 network experiment transfer format
+## V027 network experiment transfer and cooperation format
 
-Stored network experiments use `netexp_*.json` under ignored `outputs/simulation_experiments/`. A representative transfer event is:
+Stored network experiments use `netexp_*.json` under ignored `outputs/simulation_experiments/`.
+
+A representative synthetic transfer event remains:
 
 ```json
 {
@@ -200,48 +202,70 @@ Stored network experiments use `netexp_*.json` under ignored `outputs/simulation
 }
 ```
 
-For an arrived transfer:
+For an arrived transfer, `arrived_at_s - departed_at_s` equals the configured link travel time in simulator time. This is not a measured road travel-time observation.
 
-```text
-arrived_at_s - departed_at_s = configured link travel_time_seconds
-```
+The scenario keeps the deterministic arrival-plan count summary and SHA-256 fingerprint. Fixed, Independent Adaptive, and Cooperative Adaptive receive the same seeded exogenous demand plan; policy-dependent upstream discharge may still change transfer departure/arrival timing.
 
-within the simulator's deterministic time representation. A transfer that is still in the pipeline when the experiment ends may keep `arrived_at_s: null`.
-
-The network `scenario` also includes an `arrival_plan` summary with exogenous event counts, transfer-candidate count, and a deterministic `fingerprint_sha256`. It is evidence that Fixed and Adaptive were seeded from the same external demand plan without duplicating the complete event list.
-
-Each Fixed/Adaptive network result contains:
+A representative V027 cooperation event is:
 
 ```json
 {
-  "intersections": {
-    "intersection_a": {"metrics": {}, "final_signal": {}},
-    "intersection_b": {"metrics": {}, "final_signal": {}}
-  },
-  "network_metrics": {
-    "transfers_departed": 12,
-    "transfers_arrived": 11,
-    "configured_link_travel_time_seconds": 7.5,
-    "transfer_pipeline_average": 1.2,
-    "transfer_pipeline_peak": 3,
-    "corridor_completed": 9,
-    "corridor_travel_time": {},
-    "total_vehicle_wait_seconds": 184.5,
-    "total_vehicle_queue_average": 2.1,
-    "total_vehicle_queue_p95": 5.0,
-    "total_vehicle_queue_peak": 7
-  },
-  "timeline": [],
-  "transfer_events": [],
-  "observation_provenance": "simulation",
-  "transfer_provenance": "synthetic_network_simulation",
-  "cooperative_control_active": false
+  "coordination_id": "coord_intersection_a_intersection_b_44000",
+  "t": 44.0,
+  "link_id": "a_to_b",
+  "source_intersection_id": "intersection_a",
+  "destination_intersection_id": "intersection_b",
+  "provenance": "synthetic_predicted_arrivals",
+  "destination_phase_before": "vehicle_green",
+  "destination_phase_key_before": "vehicle_green",
+  "incoming_vehicle_count": 2,
+  "earliest_arrival_eta_seconds": 5.0,
+  "action": "extend_vehicle_green",
+  "applied": true,
+  "reason": "extended downstream vehicle green for predicted upstream arrivals",
+  "timing_delta_seconds": 3.0
 }
 ```
 
-`corridor_travel_time` is **end-to-end simulated corridor time** from original upstream external arrival to downstream service. It can include upstream waiting, configured link travel, and downstream waiting. Do not confuse it with the configured link travel time.
+Possible cooperation actions include:
 
-The network timeline records both intersections and transfer-pipeline counts. These are isolated synthetic experiment values, not live occupancy/flow events.
+- `extend_vehicle_green`;
+- `vehicle_green_already_sufficient`;
+- `request_protected_vehicle_progression`;
+- `vehicle_progression_pending`;
+- `protect_pedestrian_service`;
+- `none`/`unsupported` where applicable.
+
+A Cooperative result includes:
+
+```json
+{
+  "cooperative_control_active": true,
+  "coordination_provenance": "synthetic_predicted_arrivals",
+  "network_metrics": {
+    "coordination": {
+      "evaluations": 600,
+      "triggered": 42,
+      "applied": 9,
+      "green_extensions": 5,
+      "protected_progression_requests": 4,
+      "pedestrian_service_protections": 3,
+      "timing_seconds_added": 13.0,
+      "timing_seconds_reduced": 8.0,
+      "lookahead_seconds": 12.0,
+      "max_extension_seconds": 5.0,
+      "min_incoming_vehicles": 1
+    }
+  },
+  "coordination_events": []
+}
+```
+
+The numbers above are format examples, not expected benchmark results.
+
+`corridor_travel_time` remains end-to-end simulated corridor time from original upstream external arrival to downstream service and can include upstream wait + configured link travel + downstream wait.
+
+The network timeline records both intersections, transfer pipeline counts, and Cooperative coordination snapshot where active. These are isolated synthetic experiment values, not live occupancy/flow events or AI-detected cross-intersection identity.
 
 ## Traffic history sample
 
@@ -270,7 +294,7 @@ A completed region exit may additionally contain `region_id`, `region_label`, `r
 - **Unique passage** — one prototype track crossing one configured counting line, deduplicated according to current tracker/session logic.
 - **Region dwell** — starts on track entry/first observation inside and finalizes on exit.
 - **Simulation telemetry** — generated by the isolated numeric simulator/controller and separate from live occupancy/flow history.
-- **Network link** — configured directed metadata; V026 network experiments may generate explicit synthetic transfer events over it, but live topology is still not observed flow.
+- **Network link** — configured directed metadata; V027 network experiments may generate explicit synthetic transfer and cooperation evidence over it, but live topology is still not observed flow.
 
 Track IDs are lightweight centroid/IoU prototype identities; heavy occlusion/crowding can cause loss/swaps.
 

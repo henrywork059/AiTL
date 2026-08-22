@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_2_7 — Bounded cooperative two-intersection network simulation
+
+- Created V027 / `0_2_7` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline; V026 remains the previous unaccepted candidate.
+- Extended the V026 deterministic two-intersection network experiment from Fixed/Adaptive to Fixed / Independent Adaptive / Cooperative Adaptive using the same seeded exogenous demand and topology/policy snapshots.
+- Added simulation-only predicted-arrival cooperation: downstream B consumes synthetic A→B transfers already in the configured-link pipeline and evaluates incoming count/earliest ETA inside a bounded lookahead.
+- Added protected cooperative timing advisories: bounded vehicle-green extension within saved phase/cycle caps, or earlier protected progression by reducing only the current phase toward its configured minimum. Active local pedestrian demand prevents cooperation from shortening pedestrian WALK/CLEAR.
+- Added structured coordination events and network coordination telemetry for evaluations, triggers, applied advisories, green extensions, progression requests, pedestrian-service protections, and timing seconds added/reduced.
+- Preserved backward-compatible Adaptive-vs-Fixed `comparison` and added pairwise `comparisons` for Cooperative-vs-Fixed and Cooperative-vs-Independent-Adaptive.
+- Expanded network CSV export to aligned Fixed / Adaptive / Cooperative source/destination/network fields plus cooperation action/incoming/ETA/applied columns.
+- Added bounded request fields for cooperation lookahead, max extension, and minimum incoming vehicles; reused existing traffic-rule/network validation error paths.
+- Kept network experiments isolated from the live camera/controller runtime. Emergency priority, live cross-camera transfer/identity, measured travel-time prediction, general N-intersection cooperative orchestration, and physical/public-road traffic control remain outside V027.
+
 ## 0_2_6 — Deterministic two-intersection network simulation
 
 - Created V026 / `0_2_6` at the owner's explicit request while V025 remained unaccepted; `previous_version` is `0_2_5` and the owner-confirmed `passed_baseline` remains V024 / `0_2_4`.

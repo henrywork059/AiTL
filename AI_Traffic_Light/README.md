@@ -4,9 +4,9 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V026 / `0_2_6` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V025 is the previous version because the owner explicitly requested V026 before separately accepting V025. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. At this update, V027 / `0_2_7` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V026 is the previous version because the owner explicitly requested V027 before separately accepting V026. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
 
-V026 builds on the V025 ranked-scenario, Simulation Lab, network-identity, and explanation foundation with a deterministic two-intersection network experiment baseline and synthetic configured-link vehicle transfer.
+V027 builds on V026 with a third Cooperative Adaptive network mode. Downstream timing can use predicted synthetic upstream arrivals for bounded, protected timing advisories, allowing Fixed vs Independent Adaptive vs Cooperative Adaptive comparison under the same seeded demand.
 
 ## Documentation entry points
 
@@ -19,7 +19,7 @@ V026 builds on the V025 ranked-scenario, Simulation Lab, network-identity, and e
 | Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
 | Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
 | API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_2_6.md`](docs/PATCH_0_2_6.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
+| Current candidate acceptance | [`docs/PATCH_0_2_7.md`](docs/PATCH_0_2_7.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
 | What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Implemented prototype functions
@@ -37,7 +37,9 @@ V026 builds on the V025 ranked-scenario, Simulation Lab, network-identity, and e
 - isolated seeded Fixed-vs-Adaptive Simulation Lab with wait/queue/throughput/signal/scenario telemetry;
 - persistent experiment results and CSV export;
 - generic intersection/source identity and directed neighbour-link configuration;
-- deterministic two-intersection independent-controller network experiments with synthetic configured-link vehicle transfer;
+- deterministic two-intersection network experiments with synthetic configured-link vehicle transfer;
+- Fixed vs Independent Adaptive vs Cooperative Adaptive network comparison;
+- bounded downstream coordination using predicted synthetic upstream arrivals with protected pedestrian/timing guards;
 - structured live decision/explanation **foundation** with observation provenance.
 
 ## Important semantics
@@ -46,7 +48,7 @@ V026 builds on the V025 ranked-scenario, Simulation Lab, network-identity, and e
 - Flow is produced by prototype track/line/region events.
 - Zone/class counts are per-frame observations.
 - Simulation Lab data is synthetic experiment output, separate from live histories.
-- Live network links remain configuration metadata; V026 network-experiment transfer events are explicitly synthetic simulator evidence, not observed real traffic and not active cooperation.
+- Live network links remain configuration metadata; V027 cooperation exists only inside the isolated synthetic network experiment. Transfer and predicted-arrival evidence are simulator-generated, not observed real traffic.
 - Manual/synthetic events must remain labeled with their provenance.
 
 ## Planned invention capability areas

@@ -37,7 +37,7 @@ saved profile + zones + density + seed
 
 Experiment controllers/agents are separate from the live camera/controller runtime.
 
-## 3. Network/explanation foundation and V026 experiment path
+## 3. Network/explanation foundation and V027 experiment path
 
 ```text
 camera/source id
@@ -51,49 +51,48 @@ traffic API enrichment
 DecisionContext projection
 ```
 
-The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. Those live services still do not create a second live signal controller.
+The network service persists generic topology metadata under runtime `config/intersections.json`. The explanation service projects current traffic/signal/network state into structured context. These live services still do not create a second live signal controller.
 
-V026 adds a separate isolated experiment path:
+V027 keeps the isolated experiment path and adds a bounded cooperation layer:
 
 ```text
-seeded exogenous demand + configured directed link
+same seeded exogenous demand
               ↓
    Intersection A experiment runtime
       + SignalRulesService A
               ↓ synthetic serviced transfer
       deterministic travel pipeline
-              ↓
+              ↓ predicted arrival context
    Intersection B experiment runtime
       + SignalRulesService B
               ↓
- per-intersection + network telemetry
+ bounded protected coordination advisory
+              ↓
+ per-intersection + network + coordination telemetry
 ```
 
-`network_simulation_experiments.py` owns this path. It creates separate controller instances and explicit synthetic transfer events without touching the live camera/controller runtime.
+`network_simulation_experiments.py` owns this isolated path. It creates separate controller instances, explicit synthetic transfer events, and a simulation-only downstream coordinator without touching live camera/controller runtime.
 
-Live configured links remain **metadata**, not observed transfers. V026 experiment transfer is synthetic simulator evidence. Cooperative/emergency-active flags remain false.
+### V027 comparison modes
 
-## 4. Planned cooperative multi-intersection architecture
+- **Fixed** — configured normal timing.
+- **Independent Adaptive** — local ranked scenarios only.
+- **Cooperative Adaptive** — the same local adaptive controller plus neighbour-informed bounded timing advisories at the downstream intersection.
 
-The next architecture step reuses the V026 independent baseline instead of creating a parallel controller:
+The coordinator does not replace `SignalRulesService`, does not reorder phases, and does not write a second signal policy. It may extend vehicle green only within saved phase/cycle caps or request earlier protected progression toward vehicle service. Active pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR.
 
-```text
-Intersection A runtime ── predicted/scheduled arrival context ──► Intersection B runtime
-       │                                                          │
- SignalRulesService A                                        SignalRulesService B
-       │                                                          │
-       └──────────── explicit neighbour evidence layer ────────────┘
-                                ↓
-          Fixed / Independent Adaptive / Cooperative comparison
-```
+Live configured links remain **metadata**, not observed transfers. V027 transfer, predicted-arrival, and coordination events are synthetic simulator evidence. Emergency priority remains inactive.
 
-Requirements before cooperation is considered implemented:
+## 4. Later cooperative-network generalization
 
-- neighbour/arrival context enters bounded ranked-scenario evaluation;
-- protected local phase rules remain controller-owned;
-- decisions record the neighbour evidence used;
-- deterministic tests show neighbour context changes an eligible decision;
-- network metrics compare against the V026 independent-control baseline.
+V027 proves bounded cooperation for one selected directed pair. Later work may generalize experiment orchestration to multiple simultaneous links/intersections while preserving:
+
+- one independent controller runtime per intersection;
+- explicit neighbour evidence and provenance;
+- protected local phase ownership;
+- pedestrian/emergency guards;
+- deterministic comparisons against Fixed and Independent Adaptive baselines;
+- network-level metrics rather than only local wins.
 
 ## 5. Backend ownership
 
@@ -130,7 +129,7 @@ Dense experiment/explanation data should be grouped rather than rendered as an u
 - flow = track-derived events;
 - zone/class counts = per-frame scenario observations;
 - Simulation Lab telemetry = synthetic isolated output;
-- live network links = configuration metadata; V026 network-experiment transfer = synthetic simulator events over a selected configured link;
+- live network links = configuration metadata; V027 network-experiment transfer/predicted-arrival/coordination = synthetic simulator events over a selected configured link;
 - observation provenance = AI/simulation/manual/unavailable source classification.
 
 Do not silently convert one category into another.

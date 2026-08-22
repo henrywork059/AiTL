@@ -33,19 +33,23 @@ This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for 
 - bounded persisted experiment history, reopen/delete, CSV export;
 - grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
 
-## V026 two-intersection network experiment
+## V027 two-intersection cooperative network experiment
 
 - API/test-first isolated network benchmark using one enabled directed configured link;
-- two simultaneously modeled intersections with **separate** signal-controller runtime;
-- Fixed and Adaptive modes receive the same deterministic exogenous arrival plan for a given seed/configuration;
+- two simultaneously modeled intersections with separate signal-controller runtime;
+- Fixed, Independent Adaptive, and Cooperative Adaptive modes receive the same deterministic exogenous demand plan;
 - selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
-- transfer evidence records vehicle/class, departure time, scheduled arrival, and delivered arrival;
-- per-intersection wait, queue, throughput, signal-use, and scenario-application telemetry;
-- network transfer/pipeline/corridor-completion/end-to-end travel telemetry;
-- persisted `netexp_*` runs with list/get/delete and aligned CSV export;
-- explicit `cooperative_control_active: false` and `emergency_priority_active: false`.
+- Cooperative Adaptive consumes predicted transfer arrivals inside a configurable lookahead;
+- bounded downstream vehicle-green extension respects saved phase maximum/cycle cap;
+- earlier vehicle-service preparation may reduce only the current protected phase toward its minimum;
+- active local pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR;
+- structured cooperation events include predicted incoming count, ETA, action, reason, and timing delta;
+- per-intersection wait/queue/throughput/signal/scenario telemetry plus network transfer/corridor/coordination telemetry;
+- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed, Cooperative vs Adaptive;
+- persistent `netexp_*` list/get/delete and aligned three-mode CSV export;
+- emergency priority remains inactive.
 
-The V026 network experiment is the **independent-control baseline** for later cooperation. It does not feed neighbour arrivals into scenario arbitration and therefore does not claim cooperative timing. The current PC Studio Simulation Lab UI remains single-junction in V026; network experiments are backend/API/test-first.
+The current PC Studio Simulation Lab UI remains single-junction; V027 network/cooperation experiments are backend/API/test-first.
 
 ## Network / explanation foundation
 
@@ -56,7 +60,7 @@ The V026 network experiment is the **independent-control baseline** for later co
 - enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
 - explicit inactive flags for cooperative control and emergency priority.
 
-Live configured links remain topology metadata. Synthetic transfer exists only inside the V026 isolated network experiment.
+Live configured links remain topology metadata. Synthetic transfer and bounded cooperation exist only inside the V027 isolated network experiment.
 
 ## Inference / zones / analytics
 
@@ -95,4 +99,4 @@ See `PROJECT_SCOPE.md` / `ROADMAP.md`:
 
 ## Limitations
 
-Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V026 transfer events are simulator-generated evidence, not measured vehicle movement. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.
+Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V027 transfer/predicted-arrival/coordination events are simulator-generated evidence, not measured vehicle movement. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.

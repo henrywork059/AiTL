@@ -1,98 +1,75 @@
 # Roadmap
 
-This roadmap defines dependency order and evidence goals. Root `VERSION` defines the active candidate; `PROJECT_SCOPE.md` defines capability-status wording.
+Root `VERSION` defines the active candidate. This roadmap records dependency order, not acceptance state.
 
-## Current V026 foundation
+## Current V027 capability
 
-V026 combines:
+V027 provides the first bounded **simulation-only multi-intersection cooperation** evidence:
 
-- ranked simulated signal scenarios and deterministic one-winner arbitration;
-- isolated single-junction Fixed-vs-Adaptive Simulation Lab telemetry;
-- generic intersection/source identity and directed neighbour-link configuration;
-- structured live decision/explanation context;
-- deterministic **two-intersection** independent-control network experiments;
-- separate controller runtime per simulated intersection;
-- synthetic configured-link vehicle transfer A → B;
-- per-transfer departure/scheduled-arrival/arrival evidence;
-- per-intersection and network aggregate telemetry;
-- persistent network experiment JSON and CSV export.
+- deterministic two-intersection source→destination network experiment;
+- separate controller runtime per intersection;
+- explicit synthetic transfer pipeline and configured travel time;
+- Fixed, Independent Adaptive, and Cooperative Adaptive modes on the same seeded demand;
+- downstream predicted-arrival lookahead;
+- bounded green extension and protected progression requests;
+- pedestrian-service guard during WALK/CLEAR when local pedestrians are waiting;
+- structured coordination events and network telemetry;
+- pairwise network comparisons and persistent CSV/JSON results.
 
-V026 still reports `cooperative_control_active: false`. It is the baseline against which later cooperation should be measured.
+This is not yet a general live N-intersection cooperative controller. The generic topology schema remains N-intersection capable, while the V027 experiment deliberately selects one directed pair for controlled evidence.
 
-## Priority 1 — bounded multi-intersection cooperation
+## Priority 1 — strengthen pedestrian-aware control
 
-Goal: neighbour-informed simulated timing while preserving each intersection's protected local controller.
+Build on existing waiting/crossing zones, protected phases, dwell/wait metrics, ranked scenarios, and V027 cooperation:
 
-Minimum scope:
-
-- expose predicted/scheduled incoming demand from the V026 transfer pipeline;
-- make neighbour context an explicit controller/scenario condition/input, not hidden global state;
-- integrate bounded cooperation with the ranked scenario engine;
-- preserve protected phase order/min/max/cycle constraints;
-- decision evidence records the neighbour values that affected arbitration;
-- comparison modes: Fixed vs Independent Adaptive vs Cooperative Adaptive;
-- network metrics such as total/percentile delay, queues, throughput/service, transfer completion and corridor travel where semantics are valid.
-
-Evidence gate: same seeded demand must produce a deterministic decision difference attributable to neighbour context and a measurable network-level outcome difference.
-
-## Priority 2 — pedestrian service quality
-
-Strengthen the existing pedestrian-aware controller with:
-
-- explicit service request lifecycle;
-- longest individual wait where tracking supports it;
+- explicit service-request lifecycle;
+- longest individual waiting evidence where tracking quality supports it;
 - missed-service/starvation prevention;
-- service frequency;
-- crossing-clearance evidence;
-- interaction with network cooperation;
-- pedestrian-specific experiment summaries.
+- service frequency and clearance evidence;
+- interaction with cooperation without silently sacrificing pedestrian service.
 
-Do not call per-frame person counts unique throughput.
+## Priority 2 — simulated emergency priority
 
-## Priority 3 — simulated emergency priority
+Add an explicit simulated/configured emergency event lifecycle:
 
-Begin with explicit simulated/configured emergency events, not an unsupported perception claim.
+- event/vehicle ID, type, source intersection, approach/direction, timestamp and provenance;
+- priority request, grant/deny explanation, protected transition path and recovery;
+- downstream preparation over configured links;
+- emergency-specific delay/recovery telemetry;
+- no claim of live emergency recognition unless a compatible detector is added.
 
-Minimum scope:
+## Priority 3 — broaden vehicle-class behavior
 
-- event ID/type/source/approach/time/provenance/lifecycle;
-- bounded priority request through protected transitions;
-- grant/deny reason;
-- downstream preparation over configured path/link context;
-- recovery to normal operation;
-- event/decision timing metrics and structured explanation.
+Build on retained detector class names and synthetic car/bus network transfer:
 
-Only add real emergency perception later if a compatible detector/source is separately implemented and evaluated.
-
-## Priority 4 — broader vehicle-class behavior
-
-Build on existing class retention/zone-class scenarios and V026 synthetic car/bus transfer evidence:
-
-- explicit class taxonomy/fallback;
+- explicit class taxonomy including `unknown/other`;
 - additional synthetic classes where useful;
-- class-aware scenario metrics/weighting only when clearly configured;
-- class/provenance visibility in experiments/explanations;
-- per-class evaluation where it helps demonstrate behavior.
+- optional configured class weighting/priority with clear rationale;
+- class-aware metrics and provenance.
 
 ## Cross-cutting — explainable decisions
 
-Every future adaptive/cooperative/emergency feature should improve the same explanation model rather than add ad-hoc strings.
+Every adaptive/cooperative/emergency feature should improve the same explanation model:
 
-Target persistent decision evidence includes decision/intersection IDs, trigger category, winning scenario, observed values, neighbour/pedestrian/emergency context, resulting simulated phase/action, before/after timing, provenance, and readable explanation.
+- decision/event ID;
+- intersection ID;
+- trigger category;
+- local observations;
+- neighbour/predicted-arrival context;
+- pedestrian/emergency context;
+- action and timing before/after;
+- provenance and readable explanation.
 
-## Evidence/reporting improvements
+## Later network work
 
-After core behavior is stable:
+After the two-intersection evidence is stable:
 
-- PC Studio network-experiment UI integrated into the existing grouped Simulation Lab presentation;
-- model/dataset quality metrics (precision, recall, mAP, class distribution, confusion/error review);
-- scenario diagnostics (activation/winner/suppression/cooldown/unavailable counts);
-- experiment/session reports with policy/config/topology snapshots;
-- stronger tracking/motion prediction diagnostics;
-- scenario import/export/templates;
-- richer exogenous arrival-rate demand generators;
-- device-camera workflow completion where useful to the model demonstration.
+- generalize experiment orchestration to more than one directed link;
+- compare corridor/network objectives against local objectives;
+- add richer arrival prediction and travel-time uncertainty;
+- expose network experiments in a compact PC Studio page without creating a long dashboard;
+- investigate live multi-source retention/tracking only as a separate prototype step.
 
 ## Explicitly outside scope
 
-Physical/public-road traffic control, cabinet integration, safety-interlock bypass, and production autonomous signal authority remain outside AiTL. Simulation results are not public-road safety certification evidence.
+Physical/public-road signal control, traffic-cabinet integration, bypassing safety systems, production autonomous authority, and safety certification remain outside this project.

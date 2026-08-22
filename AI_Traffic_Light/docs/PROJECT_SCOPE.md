@@ -35,36 +35,22 @@ Exact candidate details belong in `START_HERE.md` and the current patch document
 
 ## 3. Planned invention capability: multi-intersection cooperation
 
-**Status: multi-intersection simulation implemented / cooperative control still planned. Highest next architecture priority.**
+**Status: bounded two-intersection cooperation implemented in isolated simulation; broader/live cooperation remains planned.**
 
-V026 now provides evidence foundations that were missing in V025:
+V027 now satisfies the minimum evidence for a simulation-only cooperation claim:
 
-- at least two intersections can be modeled simultaneously in an isolated network experiment;
-- each intersection owns a separate signal-controller runtime;
-- one enabled directed link can transfer synthetic vehicles from upstream to downstream;
-- transfer arrival time is tied deterministically to configured link travel time;
-- Fixed and Adaptive share the same seeded exogenous demand plan;
-- per-intersection and network aggregate metrics are persisted/exportable.
+- two intersections are modeled simultaneously;
+- each has separate controller/runtime state;
+- explicit synthetic A→B transfers create predicted downstream arrival context;
+- Cooperative Adaptive timing can change because of neighbour arrival context;
+- timing changes remain bounded by protected phase minimum/maximum/cycle rules;
+- active pedestrian service is protected from cooperation-driven shortening;
+- coordination events record incoming count, ETA, action, reason and timing delta;
+- the same seeded demand is compared across Fixed, Independent Adaptive and Cooperative Adaptive modes.
 
-These capabilities are **not cooperation**. In V026, neighbour/transfer context does not alter either controller and `cooperative_control_active` remains false.
+The claim must remain qualified as **isolated synthetic two-intersection cooperation**. It does not establish live multi-camera cooperation, measured road travel-time prediction, general N-intersection coordination, public-road performance, or safety.
 
-Target cooperation concept:
-
-- an upstream intersection exposes predicted/scheduled incoming demand to a downstream intersection;
-- downstream timing can prepare for predicted incoming traffic while respecting protected local timing;
-- neighbour context is explicit evidence in ranked arbitration/decision history;
-- the design generalizes beyond one selected two-node link;
-- network-level results compare Fixed, Independent Adaptive, and Cooperative Adaptive.
-
-Minimum evidence before claiming "cooperation implemented":
-
-1. bounded neighbour-informed condition/input integrated with the existing controller;
-2. deterministic test showing neighbour context changes an otherwise eligible simulated decision;
-3. structured decision evidence records the neighbour values used;
-4. comparison against the V026 independent-control baseline;
-5. network metrics show the resulting outcome under the same seeded demand.
-
-Synthetic transfer alone is **not** cooperation.
+Future strengthening includes multiple simultaneous links/intersections, richer arrival prediction, uncertainty handling, network objectives, and a compact PC Studio network experiment surface.
 
 ## 4. Planned invention capability: emergency priority
 

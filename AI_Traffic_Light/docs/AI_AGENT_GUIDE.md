@@ -51,7 +51,7 @@ configured directed link + seeded exogenous arrivals
 → per-intersection + network telemetry
 ```
 
-The V026 network experiment is an **independent-control baseline**. It is not cooperation because neighbour context does not yet change either controller's decision.
+V027 adds a **simulation-only cooperative mode** on top of the V026 independent-control baseline. Cooperation is claimable only for the isolated two-intersection experiment because predicted synthetic neighbour arrivals can change bounded downstream timing.
 
 No path converts these outputs into public-road signal commands.
 
@@ -120,7 +120,7 @@ Inspect nearby modules before adding a new abstraction. Reuse existing services/
 
 Prefer the smallest cohesive change. Refactor when duplication or ownership ambiguity materially blocks the request, not merely because a file is long.
 
-For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. V026 establishes deterministic two-intersection transfer evidence as an isolated benchmark; the next cooperation layer should consume explicit neighbour/arrival context while preserving independent per-intersection controller state. Do not hard-code exactly two intersections into generic topology services.
+For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. V027 consumes explicit synthetic neighbour/arrival context while preserving independent per-intersection controller state. Future network work should generalize this evidence without creating a second controller architecture. Do not hard-code exactly two intersections into generic topology services.
 
 ## 7. Backend implementation protocol
 
