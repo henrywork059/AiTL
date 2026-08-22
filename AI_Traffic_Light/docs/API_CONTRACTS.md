@@ -149,7 +149,7 @@ Runtime JSON is stored under `outputs/simulation_experiments/` and excluded from
 
 ### `POST /api/traffic/network-experiments`
 
-Runs one isolated multi-mode comparison over one enabled directed network link. V027 introduced three modes; V028/V029/V030 extend the same endpoint while preserving those fields:
+Runs one isolated multi-mode comparison over one enabled directed network link. V027 introduced three modes; V028/V029/V030 extend the same endpoint while V031 preserves all seven modes and adds normalized evidence surfaces:
 
 ```json
 {
@@ -210,8 +210,46 @@ Network transfer, predicted arrivals, and cooperation are synthetic simulator ev
 - `GET /api/traffic/network-experiments/{run_id}` — load one complete result.
 - `DELETE /api/traffic/network-experiments/{run_id}` — delete one stored network result.
 - `GET /api/traffic/network-experiments/{run_id}/export.csv` — export aligned current-mode source/destination queue/service/signal fields plus transfer, cooperation, pedestrian-awareness, V030 vehicle-class-priority, and V029 emergency timeline fields; preserves `X-Request-ID`.
+- `GET /api/traffic/network-experiments/{run_id}/evidence` — return V031 schema-v1 normalized decision evidence. If an older stored run lacks the persisted V031 block, the service projects it from available detailed histories without rewriting the run.
+- `GET /api/traffic/network-experiments/{run_id}/evidence.csv` — export the normalized evidence ledger; preserves `X-Request-ID`.
 
 Network experiment JSON remains under ignored runtime `outputs/simulation_experiments/`. Existing experiment storage errors `ATL-TRAFFIC-010..012` and network validation error `ATL-TRAFFIC-013` are reused.
+
+
+## V031 persistent normalized decision evidence
+
+New V031 network runs persist an additive `decision_evidence` object while preserving all detailed mode-specific histories. The normalized object has:
+
+```json
+{
+  "schema_version": 1,
+  "record_count": 42,
+  "applied_count": 11,
+  "categories": {"scenario": 4, "cooperation": 8},
+  "decisions": {"grant": 7, "defer": 4, "observe": 31},
+  "records": []
+}
+```
+
+Each record includes:
+
+- deterministic `evidence_id` and original `trigger_id`;
+- `mode`, `t_seconds`, intersection/source/destination/link identity;
+- `trigger_category`: `scenario | cooperation | pedestrian | vehicle_class | emergency_priority | emergency_lifecycle`;
+- normalized `decision`: `grant | deny | defer | observe`;
+- `action`, `applied`, `phase_before`, `phase_key_before`;
+- `timing.delta_seconds` and available previous/effective duration;
+- grouped `context.local`, `context.neighbour`, `context.pedestrian`, `context.vehicle_class`, `context.emergency`;
+- `provenance`, `reason`, concise `explanation`;
+- `source_ref` pointing back to the preserved detailed mode-specific history.
+
+Individual records intentionally omit the random experiment `run_id`; the enclosing result/endpoint already identifies the run and omission preserves deterministic same-seed result comparison after normal run metadata is excluded. Evidence IDs are stable within equivalent runs.
+
+V031+ network scenario snapshots add the active ranked scenario/winner, local observations and available base/effective timing to each intersection result under `scenario_evidence_events`. This is evidence capture only and does not change scenario arbitration.
+
+Historical stored runs are not rewritten by `GET .../evidence`. The projection can only expose information actually present in the stored raw histories; for example, pre-V031 runs cannot recover scenario observation snapshots that were never persisted.
+
+No new stable error code is introduced; ordinary stored-experiment read errors remain `ATL-TRAFFIC-010`.
 
 ## V025 ranked signal-scenario configuration
 
@@ -311,7 +349,7 @@ Existing endpoints remain unchanged, including training status/start, inference 
 
 ## Safety boundary
 
-No API in V030 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
+No API in V031 sends commands to physical/public-road traffic infrastructure. Signal scenarios, network topology, decision context, and experiments affect local simulation/recommendation/evaluation surfaces only.
 
 ## V028 pedestrian-aware network experiment request fields
 
@@ -348,7 +386,7 @@ Rules:
 - emergency downstream lookahead: 1–120 seconds;
 - emergency maximum vehicle-green extension: 0–30 seconds.
 
-Current `scenario.comparison` order in V030 is:
+Current `scenario.comparison` order retained in V031 is:
 
 1. `fixed`;
 2. `adaptive`;

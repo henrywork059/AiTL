@@ -107,3 +107,8 @@ V029 adds backend/API/test-first matched emergency baseline and emergency-priori
 ## V030 network note
 
 V030 adds backend/API/test-first regular vehicle-class profiles, per-class telemetry, and a Class-aware Cooperative comparison. The existing PC Studio Simulation Lab UI remains single-junction; no class-priority or network-control dashboard is added. A later UI should label class data as synthetic experiment evidence, expose configured class/weight/provenance, and avoid implying live detector accuracy or physical signal authority.
+
+
+## V031 network evidence note
+
+V031 remains backend/API/test-first and adds no new network-control dashboard. A later UI can consume the normalized decision-evidence JSON/CSV surfaces instead of hard-coding each mode-specific event shape. It should still expose provenance/source references and allow drill-down to detailed raw histories rather than presenting the compact ledger as physical/public-road control evidence.

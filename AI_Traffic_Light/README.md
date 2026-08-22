@@ -4,9 +4,9 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V030 / `0_3_0` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V029 is the previous version because the owner explicitly requested V030 before separately accepting V029. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. At this update, V031 / `0_3_1` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V030 is the previous version because the owner explicitly requested V031 before separately accepting V030. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
 
-V030 preserves the V029 emergency/cooperation/pedestrian stack and adds explicit regular vehicle classes, deterministic class-mix profiles, per-class telemetry, and a seventh Class-aware Cooperative mode. Class-aware timing is bounded, configurable, and explicitly synthetic; the V029 matched emergency pair remains separate.
+V031 preserves all seven V030 network modes and adds persistent schema-versioned normalized decision evidence. Scenario, cooperation, pedestrian, vehicle-class and emergency histories now share one compact trace format with context, timing, reason, provenance, explanations and source references; existing detailed histories remain available.
 
 ## Documentation entry points
 
@@ -19,7 +19,7 @@ V030 preserves the V029 emergency/cooperation/pedestrian stack and adds explicit
 | Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
 | Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
 | API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_3_0.md`](docs/PATCH_0_3_0.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
+| Current candidate acceptance | [`docs/PATCH_0_3_1.md`](docs/PATCH_0_3_1.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
 | What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Implemented prototype functions
@@ -43,7 +43,8 @@ V030 preserves the V029 emergency/cooperation/pedestrian stack and adds explicit
 - bounded downstream coordination using predicted synthetic upstream arrivals with protected pedestrian/timing guards;
 - explicit simulated emergency-event lifecycle, matched no-priority baseline, protected grant/deny/defer priority, downstream preparation, recovery, and emergency wait/travel telemetry;
 - regular synthetic class taxonomy, deterministic class profiles, per-class arrival/service/wait/queue evidence, and bounded configurable class-priority events;
-- structured live decision/explanation **foundation** with observation provenance.
+- structured live decision/explanation **foundation** with observation provenance;
+- V031 persistent normalized network decision-evidence ledger plus JSON/CSV evidence export and historical-run projection.
 
 ## Important semantics
 
@@ -51,7 +52,7 @@ V030 preserves the V029 emergency/cooperation/pedestrian stack and adds explicit
 - Flow is produced by prototype track/line/region events.
 - Zone/class counts are per-frame observations.
 - Simulation Lab data is synthetic experiment output, separate from live histories.
-- Live network links remain configuration metadata; V030 cooperation, pedestrian-aware service guards, class-aware behavior, and emergency priority exist only inside the isolated synthetic network experiment. Transfer/predicted-arrival/class/emergency evidence is simulator-generated, not observed real traffic or live recognition.
+- Live network links remain configuration metadata; V031 network evidence still describes only the isolated synthetic experiment. Cooperation, pedestrian-aware service guards, class-aware behavior, and emergency priority are not live road-control actions. Transfer/predicted-arrival/class/emergency evidence is simulator-generated, not observed real traffic or live recognition.
 - Manual/synthetic events must remain labeled with their provenance.
 
 ## Planned invention capability areas
@@ -62,7 +63,7 @@ The project scope explicitly includes:
 2. emergency priority (V029 synthetic/configured implementation, live evidence planned);
 3. pedestrian-aware control (V028 synthetic implementation, live-evidence strengthening planned);
 4. different vehicle classes (V030 synthetic class-aware implementation, live-evidence strengthening planned);
-5. explainable decisions.
+5. explainable decisions (V031 persistent normalized network evidence implemented; live/generalized explanation strengthening remains planned).
 
 Their completion levels differ. See [`docs/PROJECT_SCOPE.md`](docs/PROJECT_SCOPE.md) before making capability claims and [`docs/ROADMAP.md`](docs/ROADMAP.md) for dependency order.
 

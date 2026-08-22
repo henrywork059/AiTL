@@ -102,3 +102,17 @@ See `PROJECT_SCOPE.md` / `ROADMAP.md`:
 ## Limitations
 
 Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V027 transfer/predicted-arrival/coordination events are simulator-generated evidence, not measured vehicle movement. Synthetic vehicle-class profiles are not live detector evidence. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.
+
+## V031 persistent normalized decision evidence
+
+Network experiments now persist an additive schema-v1 `decision_evidence` ledger while retaining all detailed mode-specific histories. The ledger normalizes ranked scenario, cooperation, pedestrian, regular vehicle-class, emergency-priority, and emergency-lifecycle evidence into common identity/decision/action/timing/context/provenance/reason/explanation fields with `source_ref` drill-down pointers.
+
+Additional backend/API functions:
+
+- capture V031+ network scenario winner snapshots with local observations and available timing context;
+- return persisted normalized evidence for new runs;
+- project normalized evidence on demand for older stored network runs without rewriting them;
+- export normalized evidence as CSV with request-ID propagation;
+- include compact evidence record/applied counts in stored-run summaries.
+
+The existing PC Studio Simulation Lab UI remains single-junction. V031 adds no physical/network-control frontend and no public-road authority.

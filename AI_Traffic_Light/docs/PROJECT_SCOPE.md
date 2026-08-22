@@ -32,6 +32,7 @@ AiTL currently includes local prototype capability in these families:
 - simulation-only pedestrian request/clearance protection;
 - simulation-only matched emergency-event baseline and bounded emergency priority with downstream preparation/recovery evidence;
 - simulation-only explicit regular vehicle-class taxonomy, class-rich demand, per-class telemetry, and bounded configured class-aware cooperative timing;
+- persistent schema-v1 normalized network decision evidence with JSON/CSV projection and source references;
 - structured live decision/explanation **foundation**.
 
 Exact candidate details belong in `START_HERE.md` and the current patch document.
@@ -121,26 +122,29 @@ Future strengthening should focus on compatible live class provenance/confidence
 
 ## 7. Planned invention capability: explainable decisions
 
-**Status: partial implementation / foundation.**
+**Status: persistent network-experiment implementation / live-generalized strengthening planned.**
 
-Current scenario status/history already exposes winner/suppression reasons and observed values, and the network-foundation update adds structured live decision context.
+V031 implements the first stable persistent explainability/evidence layer for the isolated network benchmark. New runs persist `decision_evidence.schema_version: 1`, while older stored runs can project the same schema on demand from the raw evidence they already contain.
 
-Target structured explanation should support:
+Current V031 normalized records support:
 
-- decision ID and timestamp;
-- intersection ID;
-- trigger category;
-- winning scenario/rule;
-- relevant observed values;
-- neighbour context;
-- pedestrian context;
-- emergency context;
-- resulting simulated phase/action;
-- timing before/after;
-- concise human-readable explanation;
-- provenance sufficient to distinguish AI, simulation, and manual inputs.
+- deterministic evidence ID and simulation time;
+- mode and intersection/link identity;
+- trigger categories for ranked scenario, cooperation, pedestrian, regular vehicle class, emergency priority and emergency lifecycle;
+- relevant local observations for V031+ scenario snapshots;
+- neighbour predicted-arrival context;
+- pedestrian wait/crossing context;
+- configured vehicle-class demand/weight context;
+- configured simulated emergency context;
+- resulting action plus grant/deny/defer/observe decision and applied flag;
+- available timing before/after and timing delta;
+- explicit reason, concise explanation and provenance;
+- `source_ref` back to the preserved detailed mode-specific event history;
+- normalized JSON and CSV export.
 
-Before claiming persistent explainability/evidence, decision records should be stored in a stable history format that can reconstruct why a simulated action occurred.
+The claim must remain **persistent explainability/evidence for the isolated synthetic network experiment**. V031 does not yet provide a universal live-runtime audit log, does not reconstruct observations that older stored runs never captured, and does not turn explanations into physical/public-road control authority. `decision_evidence.py` is a projection/export service only and must never own signal arbitration.
+
+Future strengthening should generalize this evidence schema across N-intersection runs and any later compatible live sources while preserving provenance/confidence boundaries.
 
 ## 8. Evidence hierarchy
 

@@ -343,3 +343,79 @@ $run.data.comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative | 
 ```
 
 Confirm `scenario.comparison` contains seven documented modes, class counts/fingerprint are present, class-priority evidence is synthetic, and no result claims live detector accuracy or physical/public-road authority. Repeat with `vehicle_class_priority_weight = 1.0` or `vehicle_class_priority_enabled = $false`; class-aware timing must not change because of the class layer.
+
+## V031 focused persistent decision-evidence test
+
+Run after the retained V027/V028/V029/V030 focused regressions:
+
+```powershell
+python .\scripts\test_decision_evidence_network_simulation.py
+```
+
+The V031 focused regression must confirm:
+
+- schema version `1` and deterministic evidence IDs;
+- normalized scenario/cooperation/pedestrian/vehicle-class/emergency-priority/emergency-lifecycle categories;
+- local scenario observations and class-zone context can be projected when stored by V031+ runs;
+- normalized grant/deny/defer/observe decisions, action, timing, reason, explanation, provenance and `source_ref` fields;
+- individual records contain no volatile random `run_id` that would break seeded repeatability;
+- new network runs persist `decision_evidence`;
+- `service.evidence(run_id)` returns the persisted ledger;
+- older stored results without the V031 block are projected on demand without rewriting the JSON file;
+- `GET /api/traffic/network-experiments/{run_id}/evidence` uses the standard envelope/request ID;
+- `GET /api/traffic/network-experiments/{run_id}/evidence.csv` preserves `X-Request-ID`.
+
+### V031 API acceptance example
+
+Create any network experiment that exercises multiple evidence categories. For example, reuse the V030 mixed-urban/class-aware body and enable the simulated V029 emergency event:
+
+```powershell
+$body = @{
+  duration_seconds = 180
+  density = "busy"
+  seed = 31031
+  sample_interval_seconds = 2
+  label = "V031 decision evidence acceptance"
+  link_id = "A_to_B"
+  transfer_share_percent = 70
+  cooperation_lookahead_seconds = 12
+  cooperation_max_extension_seconds = 5
+  cooperation_min_incoming_vehicles = 1
+  pedestrian_max_wait_seconds = 25
+  pedestrian_crossing_clearance_seconds = 6
+  pedestrian_clearance_reserve_seconds = 3
+  vehicle_class_profile = "mixed_urban"
+  vehicle_class_priority_enabled = $true
+  vehicle_class_priority_class = "bus"
+  vehicle_class_priority_weight = 2.0
+  vehicle_class_priority_min_waiting = 1
+  vehicle_class_priority_max_extension_seconds = 4.0
+  emergency_event_enabled = $true
+  emergency_event_at_seconds = 15
+  emergency_vehicle_type = "ambulance"
+  emergency_priority_lookahead_seconds = 12
+  emergency_priority_max_extension_seconds = 5
+} | ConvertTo-Json
+
+$run = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $body -Uri "http://127.0.0.1:8000/api/traffic/network-experiments"
+$runId = $run.data.run_id
+$run.data.decision_evidence | ConvertTo-Json -Depth 12
+$evidence = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId/evidence"
+$evidence.data | ConvertTo-Json -Depth 12
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/traffic/network-experiments/$runId/evidence.csv" -OutFile ".\outputs\v031_evidence.csv"
+```
+
+Acceptance checks:
+
+1. `decision_evidence.schema_version == 1` and `record_count == records.Count`.
+2. Every record has `evidence_id`, `mode`, `trigger_category`, `decision`, `action`, `applied`, `timing`, `context`, `provenance`, `reason`, `explanation`, and `source_ref`.
+3. Evidence IDs are unique within the run.
+4. Scenario records on V031+ runs include local observations when a ranked scenario is active.
+5. Cooperation records show predicted incoming/ETA context; pedestrian records show wait/crossing context; class records show class/weight context; emergency records retain explicit simulated/configured provenance.
+6. `source_ref` resolves conceptually to an existing preserved detailed history path in the same result.
+7. Repeating the same seeded/configured run produces identical control-mode/evidence contents except normal experiment metadata such as top-level `run_id`/creation time.
+8. JSON and CSV evidence reads succeed after backend restart because the experiment JSON is persisted.
+9. An older stored V030 run can be read through `/evidence` without the historical file being silently rewritten.
+10. The evidence service never changes protected phase order/timing and no output claims public-road authority.
+
+After focused checks, run the normal complete-repository validation: Python compilation, all backend/service tests, live API smoke, frontend typecheck/build, `scripts/check_structure.py`, and full-repository `git diff --check`.

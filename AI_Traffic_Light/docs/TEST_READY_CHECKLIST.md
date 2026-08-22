@@ -126,3 +126,23 @@ V027 / `0_2_7` is the current candidate by explicit owner request. V026 / `0_2_6
 93. V030 is described only as synthetic class-aware evidence; no live detector-accuracy, real transit/freight priority, hardware/public-road control, or safety claim is introduced.
 94. Full inherited regression, structure check, backend live smoke, frontend typecheck/build, and repository `git diff --check` pass on the complete checkout.
 95. Owner explicitly confirms V030 passed before `passed_baseline` changes.
+
+## V031 persistent decision-evidence acceptance
+
+96. `VERSION` reports `0_3_1`, previous `0_3_0`, passed baseline `0_2_4`, candidate status.
+97. `docs/PATCH_0_3_1.md` and a V031 changelog section exist.
+98. Retained V027 cooperation, V028 pedestrian-aware, V029 emergency-priority, V030 class-aware, and V031 decision-evidence focused regressions pass.
+99. New network runs contain `decision_evidence.schema_version == 1`.
+100. `record_count` equals the number of normalized records and `applied_count` is internally consistent.
+101. Evidence IDs are unique/deterministic and individual records do not embed volatile random run IDs.
+102. Trigger categories include applicable `scenario`, `cooperation`, `pedestrian`, `vehicle_class`, `emergency_priority`, and `emergency_lifecycle` records.
+103. V031+ scenario evidence retains local observations when an active ranked scenario is exposed by the controller.
+104. Each normalized record includes action/decision/applied, timing, grouped context, provenance, reason, explanation and `source_ref`.
+105. `GET /api/traffic/network-experiments/{run_id}/evidence` returns the standard envelope and request ID.
+106. `GET /api/traffic/network-experiments/{run_id}/evidence.csv` returns CSV with `X-Request-ID`.
+107. Detailed mode-specific histories remain present; V031 does not replace/delete them.
+108. An older stored V030 result without a V031 block can be projected through the evidence service without rewriting the historical JSON.
+109. Same-seed/config repeated network runs preserve V030 repeatability semantics except normal top-level run metadata.
+110. No V031 evidence code performs signal arbitration, changes phase order/timing, mutates live camera/controller state, or introduces physical/public-road signal authority.
+111. Full inherited backend regression, live API smoke, frontend typecheck/build, structure check, and full-repository `git diff --check` pass on the owner checkout.
+112. Owner explicitly confirms V031 passed before `passed_baseline` changes.

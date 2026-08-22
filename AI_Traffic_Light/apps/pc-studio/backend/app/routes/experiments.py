@@ -64,6 +64,7 @@ def delete_simulation_experiment(run_id: str, request: Request) -> dict:
 def run_network_simulation_experiment(payload: NetworkSimulationExperimentRunRequest, request: Request) -> dict:
     data = network_simulation_experiment_service.run(**payload.model_dump())
     scenario = data.get("scenario", {})
+    evidence = data.get("decision_evidence", {})
     logger.info(
         "Two-intersection network simulation experiment completed",
         extra={
@@ -74,6 +75,7 @@ def run_network_simulation_experiment(payload: NetworkSimulationExperimentRunReq
             "link_id": scenario.get("link", {}).get("id"),
             "cooperative_control_active": True,
             "comparison_modes": scenario.get("comparison"),
+            "decision_evidence_records": evidence.get("record_count") if isinstance(evidence, dict) else None,
         },
     )
     return ok(data, request_id=request.state.request_id)
@@ -82,6 +84,24 @@ def run_network_simulation_experiment(payload: NetworkSimulationExperimentRunReq
 @router.get("/network-experiments")
 def list_network_simulation_experiments(request: Request, limit: int = Query(default=50, ge=1, le=100)) -> dict:
     return ok(network_simulation_experiment_service.list(limit), request_id=request.state.request_id)
+
+
+@router.get("/network-experiments/{run_id}/evidence.csv")
+def export_network_simulation_evidence(run_id: str, request: Request) -> Response:
+    csv_text = network_simulation_experiment_service.export_evidence_csv(run_id)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="aitl_{run_id}_decision_evidence.csv"',
+            "X-Request-ID": request.state.request_id,
+        },
+    )
+
+
+@router.get("/network-experiments/{run_id}/evidence")
+def get_network_simulation_evidence(run_id: str, request: Request) -> dict:
+    return ok(network_simulation_experiment_service.evidence(run_id), request_id=request.state.request_id)
 
 
 @router.get("/network-experiments/{run_id}/export.csv")

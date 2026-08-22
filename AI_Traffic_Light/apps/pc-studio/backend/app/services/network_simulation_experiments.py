@@ -20,6 +20,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
+from app.services.decision_evidence import build_network_decision_evidence, export_network_decision_evidence_csv
 from app.services.intersection_network import intersection_network_service
 from app.services.signal_rules import PHASE_SEQUENCE, SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
@@ -728,6 +729,8 @@ class _IntersectionRuntime:
         self._previous_phase_key: str | None = None
         self._vehicle_service_credit = 0.0
         self._pedestrian_service_credit = 0.0
+        self.scenario_evidence_events: list[dict[str, Any]] = []
+        self._last_scenario_evidence_signature: tuple[str, str] | None = None
 
     def enqueue_external_vehicle(self, event: _VehicleArrival) -> None:
         self.vehicle_queue.append(
@@ -795,8 +798,64 @@ class _IntersectionRuntime:
     def signal(self, clock_s: float) -> dict[str, Any]:
         if hasattr(self.controller, "set_benchmark_clock"):
             self.controller.set_benchmark_clock(clock_s)
-        self.controller.observe(self.observation())
-        return self.controller.signal_state(clock_s)
+        observation = self.observation()
+        self.controller.observe(observation)
+        signal = self.controller.signal_state(clock_s)
+        self._capture_scenario_evidence(clock_s, signal, observation)
+        return signal
+
+    def _capture_scenario_evidence(
+        self,
+        clock_s: float,
+        signal: dict[str, Any],
+        observation: dict[str, Any],
+    ) -> None:
+        active_rules = signal.get("active_rules") if isinstance(signal.get("active_rules"), list) else []
+        winner_id = signal.get("winning_scenario_id") or (active_rules[0] if active_rules else None)
+        if not winner_id:
+            self._last_scenario_evidence_signature = None
+            return
+        phase_key = str(signal.get("phase_key") or signal.get("phase") or "unknown")
+        signature = (phase_key, str(winner_id))
+        if signature == self._last_scenario_evidence_signature:
+            return
+        self._last_scenario_evidence_signature = signature
+
+        statuses = signal.get("scenario_status") if isinstance(signal.get("scenario_status"), list) else signal.get("rule_status")
+        winner_status: dict[str, Any] = {}
+        if isinstance(statuses, list):
+            for status in statuses:
+                if not isinstance(status, dict):
+                    continue
+                status_id = status.get("scenario_id") or status.get("rule_id")
+                if str(status_id) == str(winner_id):
+                    winner_status = status
+                    break
+        action_data = winner_status.get("action") if isinstance(winner_status.get("action"), dict) else {}
+        action = str(action_data.get("type") or "scenario_active")
+        base_duration = signal.get("base_duration_seconds")
+        effective_duration = signal.get("effective_duration_seconds")
+        delta = 0.0
+        if isinstance(base_duration, (int, float)) and isinstance(effective_duration, (int, float)):
+            delta = float(effective_duration) - float(base_duration)
+        self.scenario_evidence_events.append(
+            {
+                "scenario_id": str(winner_id),
+                "t": round(float(clock_s), 1),
+                "phase": signal.get("phase"),
+                "phase_key": phase_key,
+                "action": action,
+                "applied": True,
+                "reason": winner_status.get("reason") or "ranked scenario is active for the current protected phase",
+                "observations": deepcopy(signal.get("observations"))
+                if isinstance(signal.get("observations"), dict)
+                else deepcopy(observation),
+                "base_duration_seconds": float(base_duration) if isinstance(base_duration, (int, float)) else None,
+                "effective_duration_seconds": float(effective_duration) if isinstance(effective_duration, (int, float)) else None,
+                "timing_delta_seconds": round(delta, 1),
+                "provenance": "simulation_signal_controller",
+            }
+        )
 
     def apply_coordination(self, *, clock_s: float, advisory: dict[str, Any]) -> dict[str, Any]:
         if self.mode not in COOPERATIVE_MODES:
@@ -1010,6 +1069,62 @@ class _IntersectionRuntime:
         for queued_at_s in self.pedestrian_queue:
             self.pedestrian_waits.append(max(0.0, clock_s - queued_at_s))
 
+    def scenario_evidence(self) -> list[dict[str, Any]]:
+        """Return exact applied-scenario timing evidence when controller history exists.
+
+        Live/fake focused controllers may not emit history; in that case the
+        read-only active-winner snapshots captured from signal state are kept.
+        """
+        if not self.history_path.is_file():
+            return deepcopy(self.scenario_evidence_events)
+        applied: list[dict[str, Any]] = []
+        try:
+            lines = self.history_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return deepcopy(self.scenario_evidence_events)
+        for line in lines:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("event_type") != "rule_applied":
+                continue
+            details = event.get("details") if isinstance(event.get("details"), dict) else {}
+            scenario_id = str(details.get("scenario_id") or details.get("rule_id") or "unknown")
+            clock_s = details.get("simulation_clock_seconds")
+            matching = [
+                snapshot
+                for snapshot in self.scenario_evidence_events
+                if str(snapshot.get("scenario_id")) == scenario_id
+            ]
+            snapshot = min(
+                matching,
+                key=lambda item: abs(float(item.get("t", 0.0) or 0.0) - float(clock_s or 0.0)),
+                default={},
+            )
+            previous = float(details.get("previous_duration_seconds", 0.0) or 0.0)
+            effective = float(details.get("effective_duration_seconds", previous) or previous)
+            applied.append(
+                {
+                    "scenario_id": scenario_id,
+                    "t": round(float(clock_s or snapshot.get("t", 0.0) or 0.0), 1),
+                    "phase": snapshot.get("phase"),
+                    "phase_key": details.get("phase_key") or snapshot.get("phase_key"),
+                    "action": details.get("action") or snapshot.get("action") or "scenario_active",
+                    "applied": True,
+                    "reason": snapshot.get("reason") or "ranked scenario was applied by the protected signal controller",
+                    "observations": deepcopy(snapshot.get("observations"))
+                    if isinstance(snapshot.get("observations"), dict)
+                    else {},
+                    "base_duration_seconds": snapshot.get("base_duration_seconds"),
+                    "previous_duration_seconds": round(previous, 1),
+                    "effective_duration_seconds": round(effective, 1),
+                    "timing_delta_seconds": round(effective - previous, 1),
+                    "provenance": "simulation_signal_controller",
+                }
+            )
+        return applied or deepcopy(self.scenario_evidence_events)
+
     def controller_stats(self) -> dict[str, Any]:
         applications: dict[str, int] = {}
         extension_seconds = 0.0
@@ -1096,6 +1211,7 @@ class _IntersectionRuntime:
                 },
             },
             "final_signal": last_signal,
+            "scenario_evidence_events": self.scenario_evidence(),
         }
 
 
@@ -2275,14 +2391,25 @@ class NetworkSimulationExperimentService:
             },
             "prototype_only": True,
             "scope_note": (
-                "Controlled local two-intersection simulation benchmark only. V030 adds explicit synthetic regular vehicle-class taxonomy, "
-                "class-rich seeded demand, per-class evidence and a bounded class-aware cooperative comparison while preserving V029 emergency priority. "
-                "Synthetic class labels are not presented as live AI detection, and no physical/public-road control is enabled."
+                "Controlled local two-intersection simulation benchmark only. V031 preserves the V030 class-aware/cooperation/pedestrian/emergency "
+                "policy stack and adds persistent normalized decision evidence without adding another control mode. Synthetic class/emergency/network "
+                "context is not presented as live AI detection, and no physical/public-road control is enabled."
             ),
         }
+        result["decision_evidence"] = build_network_decision_evidence(result)
         self._write_run(result)
         self._trim_old_runs()
         return result
+
+    def evidence(self, run_id: str) -> dict[str, Any]:
+        result = self.get(run_id)
+        evidence = result.get("decision_evidence")
+        if isinstance(evidence, dict) and int(evidence.get("schema_version", 0) or 0) == 1:
+            return evidence
+        return build_network_decision_evidence(result)
+
+    def export_evidence_csv(self, run_id: str) -> str:
+        return export_network_decision_evidence_csv(self.evidence(run_id))
 
     def list(self, limit: int = 50) -> dict[str, Any]:
         limit = max(1, min(int(limit), 100))
@@ -2568,6 +2695,17 @@ class NetworkSimulationExperimentService:
             "created_at_ms": payload.get("created_at_ms"),
             "label": payload.get("label", ""),
             "scenario": scenario,
+            "decision_evidence": {
+                "schema_version": (payload.get("decision_evidence") or {}).get("schema_version")
+                if isinstance(payload.get("decision_evidence"), dict)
+                else None,
+                "record_count": (payload.get("decision_evidence") or {}).get("record_count")
+                if isinstance(payload.get("decision_evidence"), dict)
+                else None,
+                "applied_count": (payload.get("decision_evidence") or {}).get("applied_count")
+                if isinstance(payload.get("decision_evidence"), dict)
+                else None,
+            },
             "headline": {
                 "adaptive_vs_fixed_corridor_completed": comparison.get("corridor_completed"),
                 "adaptive_vs_fixed_total_vehicle_wait": comparison.get("total_vehicle_wait"),

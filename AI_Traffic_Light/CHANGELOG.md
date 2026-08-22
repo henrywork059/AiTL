@@ -1,5 +1,17 @@
 # Changelog
 
+## 0_3_1 — Persistent normalized decision evidence
+
+- Created V031 / `0_3_1` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V030 as the previous unaccepted candidate.
+- Preserved all seven V030 network comparison modes and existing protected timing behavior; V031 is an additive evidence/traceability layer rather than a new control mode.
+- Added schema-versioned (`schema_version: 1`) normalized decision evidence covering ranked scenarios, neighbour cooperation, pedestrian-awareness guards, vehicle-class priority, emergency priority, and emergency lifecycle records.
+- Added deterministic evidence IDs and normalized fields for mode/time/intersection/link/trigger category, grant/deny/defer/observe decision, action, applied flag, before/after timing, reason, concise explanation, relevant local/neighbour/pedestrian/class/emergency context, provenance, and a source reference back to the detailed mode-specific history.
+- Added scenario evidence snapshots in the isolated network simulator so V031+ runs retain the local observations and ranked-winner context used by the simulated controller; historical V030 runs can still project all evidence available in their already-stored raw histories.
+- Preserved detailed mode-specific histories for backward compatibility and added a compact `decision_evidence` projection plus list-summary record/applied counts.
+- Added `GET /api/traffic/network-experiments/{run_id}/evidence` and `GET /api/traffic/network-experiments/{run_id}/evidence.csv`; CSV preserves `X-Request-ID`. Older stored runs without the V031 block are projected on demand without being rewritten.
+- Kept evidence records repeatable by excluding volatile random run IDs from record content while retaining deterministic source references/IDs.
+- Added focused V031 evidence regression and retained V027/V028/V029/V030 focused regressions. No new stable error code or physical/public-road control path was introduced.
+
 ## 0_3_0 — Vehicle-class-aware cooperative two-intersection simulation
 
 - Created V030 / `0_3_0` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V029 as the previous unaccepted candidate.

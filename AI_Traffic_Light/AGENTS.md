@@ -67,9 +67,9 @@ app/core/         envelopes, errors, logging, middleware, version metadata, shar
 
 Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
 
-Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated V028 Fixed / Independent Adaptive / Cooperative Adaptive / Pedestrian-aware Cooperative two-intersection benchmark, bounded simulation-only coordinator, and local pedestrian service/clearance guards; it must not mutate live camera/controller state.
+Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated current multi-mode two-intersection benchmark and protected simulation-only policy layers; it must not mutate live camera/controller state. `app/services/decision_evidence.py` owns the additive normalized V031 network evidence projection/export and must not perform signal arbitration.
 
-Network/topology identity belongs in `app/services/intersection_network.py`. Structured explanation projection belongs in `app/services/decision_context.py`. V030 network transfer, cooperation, pedestrian-aware, vehicle-class-aware, and V029 emergency evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, live class priority, emergency priority, or multi-camera live-controller operation.
+Network/topology identity belongs in `app/services/intersection_network.py`. Structured live explanation projection belongs in `app/services/decision_context.py`; normalized stored network-experiment evidence belongs in `app/services/decision_evidence.py`. V031 network transfer, cooperation, pedestrian-aware, vehicle-class-aware, scenario, and emergency evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, live class priority, emergency priority, or multi-camera live-controller operation.
 
 ### Frontend
 
@@ -215,6 +215,11 @@ Only pull when the working tree situation is understood. Preserve runtime data a
 ## 13. When uncertain
 
 Choose the smallest safe interpretation that preserves accepted behavior, current candidate state, data semantics, and the prototype-only safety boundary. If repository evidence and an old document disagree, prefer current code/contracts/`VERSION` and update the stale durable document as part of the patch when appropriate.
+
+### Persistent decision-evidence rule
+
+V031 `decision_evidence` is an additive schema-versioned projection over detailed experiment histories. Keep stable fields/context/provenance/source references, deterministic evidence IDs, and backward projection for older stored runs. Do not move arbitration or timing logic into `decision_evidence.py`, do not delete detailed mode-specific histories merely because the normalized ledger exists, and do not embed volatile random run IDs inside individual records when that would break seeded repeatability.
+
 ### Vehicle-class evidence rule
 
 V030 regular class generation is synthetic simulator input. Keep `synthetic_vehicle_class_demand` provenance on class-aware experiment evidence. Unknown/unmapped regular labels normalize to `other`. Do not present V030 class profiles or class-priority outcomes as detector accuracy, live transit priority, or public-road authority. A configured class weight of `1.0` is neutral; class-aware timing must remain within the existing protected phase/cycle bounds and must not shorten active pedestrian WALK/CLEAR demand.

@@ -15,7 +15,8 @@ FastAPI backend for the local AiTL computer-vision and traffic-light simulation 
 - isolated deterministic two-intersection network experiments with synthetic A→B transfer and bounded Cooperative Adaptive timing;
 - runtime settings/logging;
 - generic intersection/source/topology foundation;
-- structured non-controlling live decision context.
+- structured non-controlling live decision context;
+- persistent normalized network decision-evidence projection and JSON/CSV evidence export.
 
 See `../../../docs/PC_STUDIO_FUNCTION_LIST.md` for the current function catalog and `../../../docs/PROJECT_SCOPE.md` for implemented/foundation/planned capability status.
 
@@ -29,7 +30,7 @@ app/models.py     Pydantic contracts
 app/core/         envelopes/errors/logging/middleware/version/persistence helpers
 ```
 
-Do not move signal arbitration into routes/network/explanation services. `services/signal_rules.py` owns ranked scenario arbitration and protected simulated timing. `services/simulation_experiments.py` owns isolated single-junction experiments. `services/network_simulation_experiments.py` owns isolated V027 Fixed / Independent Adaptive / Cooperative Adaptive two-intersection experiments and the simulation-only bounded coordinator. `services/intersection_network.py` owns topology/source identity. `services/decision_context.py` projects explanation context but does not control the signal.
+Do not move signal arbitration into routes/network/explanation services. `services/signal_rules.py` owns ranked scenario arbitration and protected simulated timing. `services/simulation_experiments.py` owns isolated single-junction experiments. `services/network_simulation_experiments.py` owns the current seven-mode isolated two-intersection experiment, synthetic transfer, and bounded cooperation/pedestrian/class/emergency policy layers. `services/intersection_network.py` owns topology/source identity. `services/decision_context.py` projects live explanation context but does not control the signal. `services/decision_evidence.py` normalizes stored network experiment evidence and exports it; it also never controls signal timing.
 
 ## API conventions
 
@@ -56,15 +57,13 @@ Important semantic distinctions:
 - zone/class counts = per-frame scenario observations;
 - single-junction experiment telemetry = isolated synthetic simulator output;
 - network-experiment telemetry = isolated synthetic two-intersection output;
-- live network links = configured topology metadata; V027 transfer/predicted-arrival/coordination events exist only inside the isolated network experiment.
+- live network links = configured topology metadata; transfer/predicted-arrival/coordination/pedestrian/class/emergency evidence exists only inside the isolated network experiment.
 
 ## Network simulation / explanation
 
 The live/runtime foundation can persist generic intersections/links, resolve source IDs to intersection identity, and expose neighbour/decision context. Live camera processing still uses the existing single active traffic/controller path.
 
-V027 keeps the isolated two-intersection experiment and runs three modes from the same seeded demand: Fixed, Independent Adaptive, and Cooperative Adaptive. Cooperative mode uses predicted synthetic arrivals already in the A→B transfer pipeline to issue bounded timing advisories to the downstream simulation controller. It may extend vehicle green within saved phase/cycle caps or request earlier protected progression; it does not shorten pedestrian WALK/CLEAR while local pedestrian demand is active.
-
-This cooperation is simulation-only and does not mutate live camera/controller runtime. Emergency priority/pre-emption remains unimplemented.
+The isolated two-intersection experiment now retains seven V030 comparison modes over the same seeded demand families. Cooperative/pedestrian/class/emergency policy layers remain bounded by the existing protected controller and do not mutate live camera/controller runtime. V031 adds only normalized evidence projection/export; it does not add another control mode.
 
 ## Local backend run
 
@@ -93,3 +92,8 @@ The isolated network experiment now adds `pedestrian_aware_cooperative` beside F
 ## V030 vehicle-class-aware network evidence
 
 `POST /api/traffic/network-experiments` now generates class-rich seeded regular traffic using `legacy`, `mixed_urban`, or `freight_heavy` profiles and adds `class_aware_cooperative`. Per-class arrival/transfer/service/wait/queue metrics and class-priority events use explicit `synthetic_vehicle_class_demand` provenance. The selected class weight is configurable; weight `1.0` is neutral, and any timing action remains inside the existing protected phase/cycle bounds with active pedestrian WALK/CLEAR protection. This is simulator evidence, not live detector accuracy or public-road transit/freight priority.
+
+
+## V031 persistent decision evidence
+
+Every new network experiment stores a `decision_evidence` schema-v1 projection while preserving the detailed scenario/cooperation/pedestrian/class/emergency histories. `GET /api/traffic/network-experiments/{run_id}/evidence` returns the normalized ledger and `/evidence.csv` exports it with `X-Request-ID`. Older stored runs without the V031 block are projected on demand and are not silently rewritten.

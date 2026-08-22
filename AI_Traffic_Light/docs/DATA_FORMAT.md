@@ -414,3 +414,78 @@ Representative class-priority event:
 ```
 
 Possible class actions include `extend_vehicle_green_for_class`, `request_protected_vehicle_service_for_class`, `protect_pedestrian_service`, `neutral_class_weight`, pending/bounded variants, or `none`. These are simulator policy records and must not be interpreted as live AI classification or real transit/freight priority.
+
+## V031 normalized decision-evidence format
+
+New V031 network experiment results persist an additive `decision_evidence` object. Detailed mode-specific histories remain present and authoritative for drill-down.
+
+Top-level normalized shape:
+
+```json
+{
+  "schema_version": 1,
+  "record_count": 3,
+  "applied_count": 2,
+  "categories": {
+    "scenario": 1,
+    "cooperation": 1,
+    "emergency_priority": 1
+  },
+  "decisions": {
+    "grant": 2,
+    "deny": 1
+  },
+  "records": []
+}
+```
+
+Representative record:
+
+```json
+{
+  "evidence_id": "evidence_cooperative_cooperation_B_coord_A_B_5000_coordination_events_0_",
+  "mode": "cooperative",
+  "t_seconds": 5.0,
+  "trigger_category": "cooperation",
+  "trigger_id": "coord_A_B_5000",
+  "intersection_id": "B",
+  "source_intersection_id": "A",
+  "destination_intersection_id": "B",
+  "link_id": "A_to_B",
+  "decision": "grant",
+  "action": "extend_vehicle_green",
+  "applied": true,
+  "phase_before": "vehicle_green",
+  "phase_key_before": "vehicle_green",
+  "timing": {
+    "delta_seconds": 2.0,
+    "previous_duration_seconds": null,
+    "effective_duration_seconds": null
+  },
+  "context": {
+    "local": {},
+    "neighbour": {
+      "incoming_vehicle_count": 2,
+      "earliest_arrival_eta_seconds": 6.0
+    },
+    "pedestrian": {"protected": false},
+    "vehicle_class": {},
+    "emergency": {}
+  },
+  "provenance": "synthetic_predicted_arrivals",
+  "reason": "predicted arrivals",
+  "explanation": "Neighbour cooperation extend_vehicle_green; predicted arrivals",
+  "source_ref": "cooperative.coordination_events[0]",
+  "prototype_only": true
+}
+```
+
+The exact evidence-ID suffix is an implementation detail; callers should treat `evidence_id` as opaque/stable within equivalent runs rather than parse it for meaning.
+
+Trigger categories are `scenario`, `cooperation`, `pedestrian`, `vehicle_class`, `emergency_priority`, and `emergency_lifecycle`. Normalized decisions are `grant`, `deny`, `defer`, or `observe` according to the source event semantics.
+
+Individual normalized records intentionally omit the random experiment `run_id`; the enclosing experiment identifies the run. This prevents volatile metadata from breaking same-seed repeatability comparisons.
+
+For V031+ runs, each simulated intersection may also contain `scenario_evidence_events`. These store a ranked winner/active-rule snapshot, phase, reason/action, local observations, and available base/effective timing when the active scenario changes for a protected phase. Pre-V031 stored runs cannot retroactively recover scenario observation snapshots that were never persisted.
+
+`source_ref` points to the detailed source record (for example `class_aware_cooperative.vehicle_class_priority_events[4]`). The detailed histories are preserved to avoid making the compact normalized projection the only evidence source.

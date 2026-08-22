@@ -2,52 +2,47 @@
 
 Root `VERSION` defines the active candidate. This roadmap records dependency order, not acceptance state.
 
-## 0_3_0 — vehicle-class-aware cooperative network candidate
+## 0_3_1 — persistent normalized decision evidence candidate
 
-V030 adds the first explicit regular vehicle-class evidence layer on top of V029:
+V031 consolidates existing V030 evidence without adding another signal-control mode:
 
-- regular taxonomy `car | bus | truck | motorcycle | bicycle | other` plus separate V029 `emergency` special class;
-- deterministic `legacy`, `mixed_urban`, and `freight_heavy` synthetic class profiles;
-- unknown/unmapped regular labels fall back to `other`;
-- per-class arrival/transfer/service/wait/queue evidence;
-- seventh `class_aware_cooperative` mode;
-- configurable selected class, weight, minimum waiting threshold, and bounded extension;
-- neutral weight `1.0` / disabled priority causes no class timing effect;
-- active pedestrian WALK/CLEAR protection;
-- structured class-priority events and matched Class-aware-vs-Pedestrian-aware comparison;
-- explicit synthetic provenance, with no live class-accuracy claim.
+- schema-versioned normalized decision/event ledger;
+- scenario, cooperation, pedestrian, regular vehicle-class, emergency-priority and emergency-lifecycle trigger categories;
+- deterministic evidence IDs and stable source references;
+- local/neighbour/pedestrian/class/emergency context where available;
+- action, grant/deny/defer/observe decision, timing before/after, reason and concise explanation;
+- explicit provenance;
+- JSON/CSV evidence surfaces;
+- on-demand projection for older stored network runs without rewriting them;
+- detailed legacy histories retained for drill-down/backward compatibility.
 
-## Priority 1 — persistent explainability/evidence
-
-Consolidate scenario, cooperation, pedestrian, vehicle-class, and emergency evidence into a stable persistent decision/event record that can reconstruct:
-
-- decision/event ID;
-- intersection ID;
-- trigger category;
-- local observations;
-- neighbour/predicted-arrival context;
-- pedestrian/emergency/vehicle-class context;
-- action and timing before/after;
-- grant/deny/suppression reason;
-- provenance and concise explanation.
-
-The consolidated format should avoid duplicating mode-specific evidence while preserving the current detailed event histories.
-
-## Priority 2 — generalize network orchestration
+## Priority 1 — generalize network orchestration
 
 After the selected two-intersection evidence is stable:
 
 - support multiple simultaneous directed links/intersections;
+- generic N-intersection run selection and topology validation;
 - richer arrival prediction and travel-time uncertainty;
 - network/corridor objectives alongside local objectives;
 - multi-link emergency route context;
 - multi-link class-aware objectives only where explicitly configured;
-- compact PC Studio network experiment UI;
-- live multi-source retention/tracking only as a separate prototype step.
+- keep V031 evidence schema generic enough that records do not depend on A/B-only assumptions.
+
+## Priority 2 — compact PC Studio network experiment UI
+
+Expose the backend experiment/evidence work without turning the frontend into an unbounded telemetry dump:
+
+- network run setup and topology/link selection;
+- per-mode/per-intersection summary tabs;
+- pairwise comparison panels;
+- normalized evidence filters by mode/category/intersection/decision/provenance;
+- drill-down from V031 normalized records to detailed raw histories;
+- CSV export access;
+- strong synthetic/prototype-only labeling.
 
 ## Priority 3 — live-evidence strengthening
 
-Only after compatible perception sources exist should the project explore live emergency recognition or reliable live class/pedestrian identity. Any such source must expose explicit provenance/confidence and be evaluated separately from deterministic simulation evidence.
+Only after compatible perception sources exist should the project explore live emergency recognition, reliable live class/pedestrian identity, or live multi-source retention/tracking. Any such source must expose explicit provenance/confidence and be evaluated separately from deterministic simulation evidence.
 
 ## Explicitly outside scope
 
