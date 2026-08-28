@@ -105,3 +105,7 @@ At the owner's request, V036 now supports multiple ESP32-CAM devices without pro
 - Connection/socket state is deliberately not persisted across PC Studio restart; only addresses/settings/selection are restored.
 
 - Same-candidate UI repair: Camera Sources now displays OV2640 resolution choices and fallback status as numeric pixel dimensions (for example `640 × 480`) instead of format aliases such as `VGA`; the internal firmware/API frame-size enum is unchanged.
+
+## Same-candidate ESP send-stall repair
+
+Hardware logs showed 1–4 KiB JPEG frames sometimes spending 300–1100 ms inside the ESP TCP send path, causing repeated reconnects, stale frames, and temporary `/status` failures even with acceptable Wi-Fi RSSI. V036 now waits for socket writability with `select()` and sends with `MSG_DONTWAIT`, retrying partial/EAGAIN writes only until the absolute per-frame deadline. The freshness deadline is 120 ms. A partial/stalled frame still closes the TCP session so the PC never consumes a truncated JPEG as a complete frame. The wire protocol remains `aitl-tcp-jpeg-v1`; PC API compatibility is unchanged, but ESP firmware must be reflashed for this repair.

@@ -1,4 +1,4 @@
-AiTL V036 full reviewed patch R3 manifest
+AiTL V036 full reviewed patch R4 manifest
 
 PATCH_APPLY_INSTRUCTIONS_0_3_6.txt
 PATCH_MANIFEST_0_3_6.txt
@@ -35,5 +35,6 @@ scripts/apply_v036_full_patch.ps1
 scripts/test_remote_camera_multi.py
 scripts/test_remote_camera_pull.py
 scripts/test_remote_camera_session.py
+scripts/test_v036_firmware_send_structure.py
 scripts/test_v036_metadata_runner.py
 scripts/update_test_run.ps1

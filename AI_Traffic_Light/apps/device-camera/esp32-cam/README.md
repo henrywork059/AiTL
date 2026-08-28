@@ -83,3 +83,6 @@ Legacy `POST /api/camera/frame` remains available in PC Studio for other device 
 ## Prototype boundary
 
 This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.
+
+### V036 same-candidate send repair
+The TCP JPEG sender now uses `select()` + `MSG_DONTWAIT` with a 120 ms absolute frame deadline. This prevents one blocked socket write from freezing HTTP control/status handling. Reflash the ESP after applying this repair; the wire protocol and PC IP workflow are unchanged.

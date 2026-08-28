@@ -64,3 +64,7 @@ PC Studio can save up to 12 ESP camera profiles. Each profile retains its privat
 Each connected/started ESP has its own independent port-81 TCP worker and newest-frame cache. Multiple ESP streams can remain active at the same time. The Camera Sources page selects which source is forwarded into `CameraFrameService`; non-selected streams are received/cached but cannot overwrite the active AI/capture frame. Switching to an already-running ESP promotes its cached newest frame only when it is recent and then follows live frames. If the cache is stale, PC Studio clears the previous physical source and waits for a fresh frame instead of re-stamping old JPEG bytes as new.
 
 Simulation still pauses all physical ESP image transports and they resume automatically afterward.
+
+## V036 send-path behavior
+
+The ESP stream socket uses TCP_NODELAY/keepalive plus a freshness-first non-blocking send loop. Before each write the firmware waits for socket writability with `select()`, then uses `send(..., MSG_DONTWAIT)`. Partial writes are completed only while the absolute frame deadline remains. If the frame cannot be completed within 120 ms, the socket is closed and the PC reconnects to a fresh frame rather than preserving a stale/partial image.

@@ -22,3 +22,6 @@ Low-latency protections include:
 Connect still transfers zero image bytes. Camera settings remain PC-owned and are applied before Start Stream. Switching the selected ESP changes the source used by Live AI, Dataset Capture, zones and analytics without forcing other ESP streams to stop. The previous physical frame is cleared during a source change, and only a recent target cache may be promoted.
 
 Physical/public-road traffic-signal control remains outside scope.
+
+### V036 same-candidate hardware repair
+The current V036 patch includes a non-blocking ESP TCP send repair (`select()` + `MSG_DONTWAIT`) after hardware logs showed blocking writes causing reconnect storms. Reflash the included V036 ESP firmware when applying the latest full patch.

@@ -69,3 +69,7 @@ If measured FPS is low, compare ESP telemetry:
 4. Switch the Saved ESP camera selector between them. The preview, `active_source_id`, Live AI and Dataset Capture source must follow the selected ESP only.
 5. Stop or disconnect one camera and confirm the other keeps streaming.
 6. Restart PC Studio. Confirm both IPs and each camera's FPS/OV2640 settings are restored, while connection state correctly returns to disconnected until Connect is pressed.
+
+### ESP send-stall diagnostic
+
+For VGA/QVGA/HQVGA on a healthy local Wi-Fi link, repeated serial telemetry such as `send=300ms`, `send=700ms`, or `send=1100ms` together with rapidly increasing `failures`/PC reconnect counts indicates the stream socket is stalling and is not acceptable 15 FPS behavior. After the V036 same-candidate non-blocking send repair, reflash the ESP and verify `last_send_ms` is normally small, reconnect/failure counts remain stable, and PC measured FPS approaches the configured target. Do not diagnose this pattern as weak signal solely from RSSI when RSSI is around -55 to -65 dBm.

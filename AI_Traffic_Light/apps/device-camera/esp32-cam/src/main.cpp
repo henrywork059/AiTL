@@ -1,4 +1,6 @@
+// AiTL V036 PlatformIO firmware (same-candidate non-blocking TCP send repair).
 #include <Arduino.h>
+#include <errno.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <esp_camera.h>
@@ -130,17 +132,48 @@ void putU32be(uint8_t* out, uint32_t value) {
   out[3] = static_cast<uint8_t>(value & 0xFF);
 }
 
+bool waitSocketWritableUntil(int fd, uint32_t deadlineMs) {
+  while (true) {
+    const int32_t remainingMs = static_cast<int32_t>(deadlineMs - millis());
+    if (remainingMs <= 0) return false;
+
+    fd_set writeSet;
+    FD_ZERO(&writeSet);
+    FD_SET(fd, &writeSet);
+
+    timeval timeout{};
+    const uint32_t remaining = static_cast<uint32_t>(remainingMs);
+    const uint32_t boundedMs = remaining < AITL_STREAM_SEND_TIMEOUT_MS ? remaining : AITL_STREAM_SEND_TIMEOUT_MS;
+    timeout.tv_sec = boundedMs / 1000U;
+    timeout.tv_usec = (boundedMs % 1000U) * 1000U;
+
+    const int ready = select(fd + 1, nullptr, &writeSet, nullptr, &timeout);
+    if (ready > 0) return FD_ISSET(fd, &writeSet);
+    if (ready == 0) continue;
+    if (errno == EINTR) continue;
+    return false;
+  }
+}
+
 bool sendAllWithDeadline(int fd, const uint8_t* data, size_t length, uint32_t deadlineMs) {
   size_t sent = 0;
   while (sent < length) {
-    if (static_cast<int32_t>(millis() - deadlineMs) >= 0) {
-      return false;
+    if (!waitSocketWritableUntil(fd, deadlineMs)) return false;
+
+    // Match Espressif's current NetworkClient strategy: after select() reports
+    // writability, use MSG_DONTWAIT so a single send() cannot block the camera
+    // loop past our freshness deadline. Partial writes are expected and retried.
+    const int result = ::send(fd, data + sent, length - sent, MSG_DONTWAIT);
+    if (result > 0) {
+      sent += static_cast<size_t>(result);
+      continue;
     }
-    const int result = ::send(fd, data + sent, length - sent, 0);
-    if (result <= 0) {
-      return false;
+    if (result == 0) return false;
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+      yield();
+      continue;
     }
-    sent += static_cast<size_t>(result);
+    return false;
   }
   return true;
 }

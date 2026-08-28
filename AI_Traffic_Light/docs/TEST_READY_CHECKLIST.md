@@ -33,3 +33,5 @@
 31. Backend shutdown disconnects every active ESP session.
 32. `config/remote_cameras.json` remains ignored runtime/user data and is never included in a patch ZIP.
 
+
+- [ ] Reflash the V036 ESP firmware containing the non-blocking send repair and confirm a 10-minute 240×176 or 320×240 / 15 FPS run does not accumulate continuous stream reconnects or multi-hundred-millisecond send times.

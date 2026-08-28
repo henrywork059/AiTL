@@ -1,4 +1,4 @@
-AiTL V036 full reviewed multi-ESP patch (R3)
+AiTL V036 full reviewed multi-ESP patch (R4 - non-blocking ESP TCP send repair)
 
 1. Extract this ZIP at the repository root so AI_Traffic_Light/ overlays the existing project.
 2. Do not delete datasets, outputs, models, config runtime JSON, .venv, node_modules, or other local runtime/user data.
@@ -13,3 +13,7 @@ You may also run the finalizer manually first; it is idempotent:
    .\scripts\apply_v036_full_patch.ps1
 
 Candidate remains 0_3_6. passed_baseline remains 0_2_4 until explicit owner acceptance.
+
+IMPORTANT HARDWARE STEP FOR R4:
+- Reflash each ESP32-CAM with the included V036 Arduino/PlatformIO firmware. R4 changes the ESP send loop; PC-only extraction cannot apply that firmware repair.
+- Start testing at 240 x 176 or 320 x 240, JPEG quality 14, 15 FPS. Healthy serial `send=` values should normally be small rather than repeatedly hundreds of milliseconds.
