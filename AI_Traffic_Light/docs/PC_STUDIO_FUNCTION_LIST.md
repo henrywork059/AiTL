@@ -1,118 +1,65 @@
 # PC Studio Function List
 
-This is a current capability catalog. Read root `VERSION` / `START_HERE.md` for candidate state and `PROJECT_SCOPE.md` for implemented/foundation/planned capability status.
+This is a current capability catalog. Read root `VERSION` for candidate state and `PROJECT_SCOPE.md` for scope boundaries.
 
 ## Camera / live simulation
 
-- receive JPEG/PNG device frames;
-- signal-aware synthetic single-junction scene with vehicle queues and pedestrian WALK behavior;
-- Light / Normal / Busy density and pause/resume;
-- configurable protected simulated signal timing consumed by synthetic agents.
+- receive raw JPEG/PNG device uploads;
+- V032 connect to a stock Arduino ESP32-CAM CameraWebServer by private-LAN IPv4;
+- probe/pull `/capture` JPEG snapshots into the common PC frame pipeline;
+- direct `:81/stream` Camera Sources preview with backend-frame fallback;
+- remote connection/fetch telemetry and reconnect/disconnect;
+- pause remote ingestion while built-in simulation is active and resume afterward;
+- signal-aware synthetic single-junction scene with density and pause/resume controls.
 
-## Signal scenarios / traffic simulation
+## Inference / dataset / training
 
-- edit protected phase base/min/max durations;
-- Fixed, Adaptive, and Test modes plus dry-run preview;
-- named signal profiles;
-- create/duplicate/delete/enable/disable/rank scenarios (`1` highest);
-- 1–8 ALL/ANY conditions;
-- controller metrics and zone/class counts (`*` supported for all classes in a selected polygon zone);
-- bounded extend/reduce/hold/request-next-protected-service/Test incident actions;
-- protected target-phase selection and optional pedestrian/vehicle request;
-- one highest-ranked eligible winner per evaluation;
-- winner/suppressed/inactive/unavailable explanations and observed values;
-- persistence, cooldown, demand memory, stale fallback, phase/cycle bounds, incident recovery;
-- persistent runtime signal-decision history.
+- local trained-model inference on the common current camera frame;
+- capture/delete/review/manual-label frames;
+- managed YOLO train/validation dataset;
+- local Ultralytics training with convergence/early stopping;
+- model registry/load/default/delete.
 
-## Single-junction Simulation Lab
+## Zones / analytics
 
-- isolated Fixed-vs-Adaptive seeded comparisons without resetting live camera/controller state;
-- configured zone snapshot and synthetic per-zone/per-class observations;
-- wait distributions, queue pressure, throughput/service, vehicle-green efficiency;
-- phase utilization, transitions/cycles, clearance, scenario applications, timing changes, conflict diagnostic;
-- bounded persisted experiment history, reopen/delete, CSV export;
-- grouped Summary / Waiting & queues / Throughput / Signal behavior / Raw samples presentation with bounded pagination.
+- camera-aligned waiting/crossing/queue/counting/ignore regions and counting lines;
+- sampled occupancy history;
+- lightweight tracking;
+- directional line passages and region entry/exit/dwell;
+- separate occupancy and flow analytics with CSV export.
 
-## V030 cooperative / pedestrian-aware / vehicle-class-aware / emergency-priority network experiment
+## Traffic logic
 
-- API/test-first isolated network benchmark using one enabled directed configured link;
-- two simultaneously modeled intersections with separate signal-controller runtime;
-- Fixed, Independent Adaptive, Cooperative Adaptive, and Pedestrian-aware Cooperative preserve the earlier deterministic base-demand comparison;
-- V030 adds Class-aware Cooperative using the same seeded class-rich base demand;
-- V029 matched Emergency Baseline Cooperative and Emergency-priority Cooperative modes remain with the same configured emergency vehicle/event;
-- selected synthetic upstream vehicles enter an explicit transfer pipeline and arrive downstream after configured `travel_time_seconds`;
-- Cooperative Adaptive consumes predicted transfer arrivals inside a configurable lookahead;
-- bounded downstream vehicle-green extension respects saved phase maximum/cycle cap;
-- earlier vehicle-service preparation may reduce only the current protected phase toward its minimum;
-- active local pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR;
-- structured cooperation events include predicted incoming count, ETA, action, reason, and timing delta;
-- per-intersection wait/queue/throughput/signal/scenario telemetry plus network transfer/corridor/coordination telemetry;
-- pairwise comparisons: Adaptive vs Fixed, Cooperative vs Fixed/Adaptive, Pedestrian-aware vs Cooperative/Fixed, Class-aware vs Pedestrian-aware/Fixed, plus Emergency-priority vs Emergency-baseline;
-- pedestrian request age/lifecycle, service sessions, maximum observed wait, synthetic crossing occupancy, starvation-prevention and clearance-protection telemetry;
-- persistent `netexp_*` list/get/delete and aligned three-mode CSV export;
-- V030 class priority is active only in `class_aware_cooperative` when enabled/weighted above neutral; V029 emergency priority remains active only in `emergency_priority_cooperative`; both are isolated simulator behavior.
+- protected phase base/min/max timing;
+- Fixed/Adaptive/Test modes;
+- ranked ALL/ANY scenarios using metrics or zone/class counts;
+- bounded extend/reduce/hold/request-next/incident actions;
+- one highest-ranked eligible winner;
+- persistence/cooldown/stale fallback;
+- decision history/explanations.
 
-The current PC Studio Simulation Lab UI remains single-junction; V030 network/cooperation/pedestrian/class/emergency experiments are backend/API/test-first.
+## Simulation Lab / network evidence
+
+- isolated Fixed-vs-Adaptive single-junction experiments;
+- isolated two-intersection seeded network experiments;
+- Fixed, Independent Adaptive, Cooperative, Pedestrian-aware, Class-aware, Emergency Baseline and Emergency-priority comparison modes;
+- synthetic transfer/predicted-arrival/cooperation evidence;
+- pedestrian request/clearance evidence;
+- synthetic class profiles/per-class metrics;
+- configured simulated emergency lifecycle/priority evidence;
+- normalized persistent decision evidence JSON/CSV.
 
 ## Network / explanation foundation
 
-- configure generic intersection IDs, source IDs, labels, optional zone IDs/profile names;
-- configure directed neighbour links and prototype travel-time metadata;
-- resolve source ID to intersection;
-- query per-intersection neighbour context;
-- enrich live traffic state with intersection ID, observation provenance, network context, and structured decision context;
-- explicit inactive flags for cooperative control and emergency priority.
+- generic intersection/source identity;
+- directed neighbour links;
+- live neighbour/decision context;
+- explicit provenance and inactive live-cooperation/public-road-control boundaries.
 
-Live configured links remain topology metadata. Synthetic transfer, bounded cooperation, pedestrian-awareness and emergency priority exist only inside the isolated network experiment.
+## V032 limitation
 
-## Inference / zones / analytics
+The backend still keeps one latest non-simulation frame rather than simultaneous independent frame buffers for many ESP cameras. V032 establishes the physical camera input path; multi-camera live routing is a later extension.
 
-- local trained-model inference and prototype cross-frame track IDs;
-- camera-aligned waiting/crossing/queue/counting/ignore regions and counting lines;
-- sampled whole-frame/region occupancy history;
-- counting-line directional passage events;
-- region entry/exit/dwell and pedestrian waiting dwell;
-- separate Occupancy and Flow/Tracks analytics with CSV export.
+## Safety
 
-## Dataset / training / model management
-
-- capture/delete/review/manual-label frames;
-- managed YOLO train/validation dataset;
-- local Ultralytics training with convergence monitoring and patience-based early stopping;
-- model registry/load/default/delete.
-
-## System / development integrity
-
-- persistent runtime settings and recent logs;
-- root `VERSION` release metadata;
-- atomic JSON persistence for migrated runtime stores and intersection config;
-- non-overlapping App-level polling helper;
-- repository/version and patch-ZIP validation;
-- documentation authority/scope guides.
-
-## Planned capability families
-
-See `PROJECT_SCOPE.md` / `ROADMAP.md`:
-
-- generalize bounded cooperation beyond one selected two-intersection link;
-- stronger persistent structured explainability across scenario/cooperation/pedestrian/class/emergency decisions;
-- generalization beyond one selected directed intersection pair;
-- compatible live-evidence provenance for pedestrian/emergency features only when an actual perception source exists.
-
-## Limitations
-
-Experiment data is seeded synthetic evidence only. The tracker is lightweight. Zone/class counts are per-frame observations. Live configured network links are metadata; V027 transfer/predicted-arrival/coordination events are simulator-generated evidence, not measured vehicle movement. Synthetic vehicle-class profiles are not live detector evidence. Wheelchair/mobility/fall/emergency recognition must not be claimed without a compatible perception source. Physical/public-road traffic control is outside scope.
-
-## V031 persistent normalized decision evidence
-
-Network experiments now persist an additive schema-v1 `decision_evidence` ledger while retaining all detailed mode-specific histories. The ledger normalizes ranked scenario, cooperation, pedestrian, regular vehicle-class, emergency-priority, and emergency-lifecycle evidence into common identity/decision/action/timing/context/provenance/reason/explanation fields with `source_ref` drill-down pointers.
-
-Additional backend/API functions:
-
-- capture V031+ network scenario winner snapshots with local observations and available timing context;
-- return persisted normalized evidence for new runs;
-- project normalized evidence on demand for older stored network runs without rewriting them;
-- export normalized evidence as CSV with request-ID propagation;
-- include compact evidence record/applied counts in stored-run summaries.
-
-The existing PC Studio Simulation Lab UI remains single-junction. V031 adds no physical/network-control frontend and no public-road authority.
+Physical ESP camera input is implemented. Physical/public-road signal control is not.

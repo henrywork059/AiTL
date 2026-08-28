@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_3_2 — PC-pull ESP32-CAM integration
+
+- Created V032 / `0_3_2` at the owner's explicit request while V031 remained unaccepted; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Added private-LAN PC-pull integration for the stock Arduino ESP32 CameraWebServer: PC Studio probes `/capture`, continuously ingests JPEG snapshots into the existing CameraFrameService path, and exposes the `:81/stream` preview URL.
+- Added `GET /api/camera/remote/status`, `POST /api/camera/remote/connect`, and `POST /api/camera/remote/disconnect` with standard envelopes/request IDs.
+- Restricted remote camera targets to literal RFC1918 IPv4 ranges; no general arbitrary URL fetcher or public-IP camera fetch is introduced.
+- Added Camera Sources ESP IP/source controls, connect/reconnect/disconnect state, remote health telemetry, direct MJPEG preview with backend-frame fallback, and simulation coexistence.
+- Starting simulation pauses remote ESP ingestion and stopping simulation resumes it; the existing raw JPEG/PNG POST receiver remains backward compatible.
+- Added focused remote-camera regression coverage. No ESP-side inference, physical signal output, or public-road traffic-control authority is introduced.
+
 ## 0_3_1 — Persistent normalized decision evidence
 
 - Created V031 / `0_3_1` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V030 as the previous unaccepted candidate.
@@ -92,14 +102,14 @@
 - Owner explicitly accepted/promoted V024 / `0_2_4`; V025 now records `passed_baseline: 0_2_4` while remaining the current unaccepted candidate.
 - Same-candidate network-foundation update: added persistent generic intersection/topology metadata, source-to-intersection resolution, directed neighbour links, and runtime `config/intersections.json` without promoting V025 or enabling cooperative control.
 - Added `GET/PUT /api/traffic/network`, `POST /api/traffic/network/reset`, and `GET /api/traffic/network/context` with standard envelopes/request IDs, atomic persistence, validation, and stable `ATL-TRAFFIC-013..015` errors.
-- Enriched `GET /api/traffic/state` with `intersection_id`, explicit observation provenance, configured neighbour context, and structured live `decision_context` including deterministic decision id, trigger category, winning scenario/observed conditions, requested service, timing, pedestrian/vehicle context, emergency-placeholder state, and readable explanation.
+- Enriched `GET /api/traffic/state` with `intersection_id`, explicit observation provenance, configured neighbour context, and structured live `decision_context` including deterministic decision id, trigger category, winning scenario/observed conditions, requested service, timing, pedestrian/vehicle context, emergency-placeholder state, neighbour context, and a readable explanation.
 - Kept the current live camera/tracker/controller runtime single-junction: topology links do not coordinate timings, transfer simulated agents, predict arrivals, or implement emergency priority; the API explicitly reports those capabilities inactive.
 - Reworked Traffic Logic adaptive rules into editable ranked **scenarios**. Each scenario has an id/name, enable flag, rank (`1` highest), ALL/ANY condition matching, persistence/cooldown, bounded phase targets/action, and optional pedestrian/vehicle service request.
 - Added first-class zone/class conditions so a scenario can express cases such as `car > 5 in queue_a` or `person >= 3 in waiting_west`, including `*` for all detected classes in a configured polygon zone.
 - Extended traffic-state observations with `zone_class_counts`, preserving arbitrary detected class names for scenario evaluation while keeping occupancy and track-derived flow semantics separate.
 - Changed adaptive arbitration so multiple scenarios may trigger but only the highest-ranked **eligible** scenario executes per evaluation; disabled/stale/unavailable/current-phase-ineligible/cooldown scenarios are explained and do not block the next eligible scenario.
 - Migrates inherited V023 rule definitions into editable scenario definitions when an older saved config has no `scenarios` field, preserving default behavior and existing profile/timing data.
-- Kept protected phase order/minimums/max/cycle bounds and Test-mode incident/accessibility semantics; `request_next_phase` only requests earlier protected progression rather than directly jumping conflicting phases.
+- Kept protected phase order/minimums/max/cycle bounds and Test-mode incident/accessibility semantics; `request_next_phase` only requests earlier protected progression rather than directly jumping conflicting movement phases.
 - Rebuilt Traffic Logic as compact Live Decision / Signal Timing / Scenario Rules / Test & Safety / History tabs with zone/class selectors, rank controls, condition builders, action/phase selectors, winner explanations, and live observed values.
 - Added an isolated deterministic Simulation Lab that runs the selected saved signal profile in Fixed and Adaptive modes from the same requested density and seed without resetting the live Camera Sources simulation or live controller runtime.
 - Added richer experiment telemetry: vehicle/pedestrian wait count/average/median/p95/max/total, queue average/p95/peak/queue-seconds/active share, simultaneous queue time, vehicle/pedestrian/combined throughput, vehicle-green efficiency, phase utilization, clearance time/share, transitions/cycles, adaptive scenario applications, timing extensions/reductions, and a simulator conflict-overlap diagnostic.
@@ -152,12 +162,12 @@
 - Expanded Traffic Logic into Live Decision, Normal Timing, Adaptive Rules, Safety & Test, and Decision History tabs with live active/suppressed/inactive/unavailable rule explanations.
 - Added signal policy/status/config/test/preview/history APIs using the existing request-ID/envelope conventions.
 - Kept V022 tracking/flow, V021 occupancy, dataset/training/inference/model management, zones, settings/logs, and the prototype-only safety boundary intact.
-- Physical/public-road traffic control remains disabled.
+- Physical public-road traffic control remains disabled.
 
 ## 0_2_2 — Cross-frame tracking and flow analytics
 
 - Added a lightweight class-aware centroid/IoU tracker that assigns stable prototype `track_id` values across consecutive detection frames and deduplicates repeated processing of the same source frame.
-- Added `counting_line` geometry to the existing camera-aligned Zone Editor. Counting lines use exactly two points and remain analytics-only.
+- Added `counting_line` geometry to the existing camera-aligned Zone Editor. Counting lines use exactly two distinct points and remain analytics-only.
 - Added one directional passage event per tracked object/counting-line pair, with `left_to_right`, `right_to_left`, `top_to_bottom`, or `bottom_to_top` direction.
 - Added tracked region entry/exit events and completed dwell duration for configured non-ignore polygon regions, including pedestrian waiting-zone dwell summaries.
 - Added bounded persistent flow-event runtime storage under `outputs/traffic_flow/events.jsonl`, plus time/class/line/region filters, minute buckets, CSV export, and explicit flow-history clearing.
@@ -309,7 +319,7 @@
 - Added central frontend page and function registries.
 - Added backend placeholder route modules for camera, inference, zones, dataset, training, model registry, settings, logs, and template metadata.
 - Updated backend app wiring to expose the placeholder API structure.
-- Expanded error-code ranges for future camera, inference, zone, dataset, training, model, settings, and logging work.
+- Expanded error-code ranges for future camera, inference, zone, dataset, training, model, settings, logs and template metadata.
 - Added human/AI documentation for confirming the PC Studio function list and GUI layout before real implementation.
 
 ## 0_0_3 — Modular code, API contracts, logging, and error codes
@@ -324,7 +334,7 @@
 ## 0_0_2 — Human and AI-agent instruction docs
 
 - Added root-level `AGENTS.md` for AI agents and coding assistants.
-- Added `docs/AI_AGENT_GUIDE.md` with detailed project rules for AI agents.
+- Added `docs/AI_AGENT_GUIDE.md` with detailed AI development protocol.
 - Added `docs/HUMAN_GUIDE.md` with human-facing usage, upload, patch, and safety instructions.
 - Updated README documentation links.
 - Updated version metadata to **0_0_2**.

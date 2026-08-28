@@ -1,86 +1,78 @@
-# ESP32-CAM streaming integration
+# ESP32-CAM integration
 
-## Purpose
+## Recommended V032 path
 
-Provide a real hardware camera input for AiTL using the camera receiver that already exists in PC Studio.
+Use the stock Arduino ESP32 CameraWebServer example as the first hardware baseline.
 
-The implementation uses repeated raw-JPEG HTTP uploads rather than making PC Studio pull an MJPEG URL:
+The ESP32-CAM needs only its Wi-Fi credentials. It does **not** need the PC IP.
+
+After reset, Serial Monitor at 115200 should print:
 
 ```text
-ESP32-CAM
-  capture JPEG
-      |
-      v
-POST /api/camera/frame?source_id=esp32_cam_01
-Content-Type: image/jpeg
-      |
-      v
-PC Studio latest-frame receiver
+Camera Ready! Use 'http://192.168.x.x' to connect
 ```
 
-This matches the existing backend contract and keeps the ESP firmware small.
+Use that ESP IP in PC Studio → Camera Sources.
+
+## Endpoints used by AiTL
+
+For an ESP at `192.168.1.87`:
+
+```text
+Still JPEG:
+http://192.168.1.87/capture
+
+MJPEG:
+http://192.168.1.87:81/stream
+```
+
+V032 uses repeated `/capture` requests for the backend processing pipeline and may use `:81/stream` for direct Camera Sources preview.
+
+## PC Studio workflow
+
+1. Start AiTL PC Studio.
+2. Open Camera Sources.
+3. Enter the ESP IP only, for example `192.168.1.87`.
+4. Keep source ID as `esp32_cam_01` unless you need a different identity.
+5. Press Connect.
+6. Confirm status is connected and frames increase.
+7. Open Live AI / Dataset Capture / Zone Editor as required.
 
 ## Network requirements
 
-- ESP and PC must be able to reach each other on the same LAN or otherwise routable private network.
-- PC Studio backend listens on TCP port 8000 in the normal Windows launcher.
-- `AITL_SERVER_HOST` must be the PC's LAN address, not `127.0.0.1`.
-- Windows Firewall may need a Private-network inbound allowance for the Python/Uvicorn backend.
+The PC and ESP must be on the same reachable private LAN.
 
-## Firmware configuration
-
-Private/local settings live in:
+Accepted camera ranges:
 
 ```text
-apps/device-camera/esp32-cam/include/secrets.h
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
 ```
 
-That file is ignored by the device-camera `.gitignore` and should not be uploaded to GitHub.
+Hostnames and public IP addresses are intentionally not accepted by the V032 remote camera puller.
 
-The committed template is:
+## Simulation
 
-```text
-apps/device-camera/esp32-cam/include/secrets.example.h
-```
+Simulation remains available. Starting simulation pauses ESP snapshot ingestion without deleting the configured ESP address. Stopping simulation resumes ESP ingestion.
 
-## Data contract
+## Legacy push compatibility
 
-Firmware sends:
+The older device-camera transport remains supported:
 
 ```http
-POST /api/camera/frame?source_id=<id>
+POST /api/camera/frame?source_id=<camera_id>
 Content-Type: image/jpeg
-X-AiTL-Device: <id>
 
 <raw JPEG bytes>
 ```
 
-No base64 or multipart wrapper is used. The existing backend validates the image and returns its standard JSON success/error envelope.
+That mode requires the camera node to know the PC address. V032's preferred first-test path is PC → ESP pull because it matches the already-working Arduino CameraWebServer example.
 
-## Diagnostics
+## Multi-camera limitation
 
-Serial monitor: `115200` baud.
-
-ESP local status endpoint:
-
-```text
-GET http://<ESP-IP>/status
-```
-
-Key fields include Wi-Fi state, camera state, upload/failure counts, last HTTP status, last frame size/upload time, RSSI, heap, and uptime.
-
-Useful HTTP interpretation:
-
-- `2xx`: frame accepted.
-- `404`: wrong backend route/port.
-- `415`: wrong content type; firmware should always send JPEG.
-- `422`: source ID/image validation failed.
-- negative HTTPClient result: connection/DNS/socket failure; check PC IP, backend, Wi-Fi, and firewall.
-
-## Current multi-camera limitation
-
-The backend currently keeps one latest uploaded device frame, not one frame per `source_id`. Multiple senders can identify themselves, but simultaneous devices will overwrite the single latest-device-frame slot. Add per-source retention/routing before treating two ESP cameras as independent live PC Studio sources.
+The current backend keeps one latest non-simulation camera frame. V032 adds source identity and connection structure but does not yet provide simultaneous independent frame buffers for several live ESP cameras.
 
 ## Safety boundary
 
-This is a local/student prototype camera transport. It must not be described as a production or public-road traffic-control camera/control system.
+This camera path is for a local/student prototype and model-junction demonstration. It does not connect AiTL to public-road traffic-signal infrastructure.

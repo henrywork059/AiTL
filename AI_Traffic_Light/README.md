@@ -4,27 +4,26 @@ Local/student-scale computer-vision and adaptive traffic-light **simulation** pr
 
 ## Current release state
 
-Root [`VERSION`](VERSION) is authoritative. At this update, V031 / `0_3_1` is the current unaccepted candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. V030 is the previous version because the owner explicitly requested V031 before separately accepting V030. If this sentence ever disagrees with `VERSION`, follow `VERSION` and update this current-state summary.
+Root [`VERSION`](VERSION) is authoritative. V032 / `0_3_2` is the current unaccepted candidate. V031 / `0_3_1` is the previous candidate because the owner explicitly requested V032 before separately accepting V031. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
-V031 preserves all seven V030 network modes and adds persistent schema-versioned normalized decision evidence. Scenario, cooperation, pedestrian, vehicle-class and emergency histories now share one compact trace format with context, timing, reason, provenance, explanations and source references; existing detailed histories remain available.
+V032 adds PC-pull ESP32-CAM integration for the stock Arduino CameraWebServer example. The user enters the ESP private-LAN IP in PC Studio; the PC pulls `/capture` frames into the existing processing pipeline and can show the ESP `:81/stream` preview.
 
 ## Documentation entry points
 
 | Need | Read |
 | --- | --- |
-| What is current? | `VERSION`, [`docs/START_HERE.md`](docs/START_HERE.md) |
-| Which document is authoritative? | [`docs/DOCUMENTATION_MAP.md`](docs/DOCUMENTATION_MAP.md) |
-| What is implemented vs planned? | [`docs/PROJECT_SCOPE.md`](docs/PROJECT_SCOPE.md) |
-| AI/coding-agent rules | [`AGENTS.md`](AGENTS.md), [`docs/AI_AGENT_GUIDE.md`](docs/AI_AGENT_GUIDE.md) |
-| Human update/test workflow | [`docs/HUMAN_GUIDE.md`](docs/HUMAN_GUIDE.md), [`docs/LOCAL_TESTING.md`](docs/LOCAL_TESTING.md) |
-| Architecture/module ownership | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/CODE_STRUCTURE.md`](docs/CODE_STRUCTURE.md) |
-| API/errors/data semantics | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md), [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md), [`docs/DATA_FORMAT.md`](docs/DATA_FORMAT.md) |
-| Current candidate acceptance | [`docs/PATCH_0_3_1.md`](docs/PATCH_0_3_1.md), [`docs/TEST_READY_CHECKLIST.md`](docs/TEST_READY_CHECKLIST.md) |
-| What comes next? | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| Current candidate | `VERSION`, [`docs/START_HERE.md`](docs/START_HERE.md) |
+| Current patch | [`docs/PATCH_0_3_2.md`](docs/PATCH_0_3_2.md) |
+| Hardware camera | [`docs/ESP32_CAMERA_STREAMING.md`](docs/ESP32_CAMERA_STREAMING.md) |
+| Scope | [`docs/PROJECT_SCOPE.md`](docs/PROJECT_SCOPE.md) |
+| API | [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md) |
+| Agent rules | [`AGENTS.md`](AGENTS.md) |
 
 ## Implemented prototype functions
 
 - receive/simulate camera frames;
+- V032 private-LAN ESP32-CAM pull using stock CameraWebServer `/capture`, with direct `:81/stream` preview;
+- legacy raw JPEG/PNG device-frame upload;
 - local trained-model inference;
 - dataset capture/delete/review/manual labeling and managed YOLO training;
 - model registry/load/default/delete;
@@ -34,52 +33,19 @@ V031 preserves all seven V030 network modes and adds persistent schema-versioned
 - ranked adaptive scenarios using controller metrics or zone/class counts;
 - deterministic one-winner arbitration with bounded timing/protected phase order;
 - persistent signal decision history;
-- isolated seeded Fixed-vs-Adaptive Simulation Lab with wait/queue/throughput/signal/scenario telemetry;
-- persistent experiment results and CSV export;
-- generic intersection/source identity and directed neighbour-link configuration;
-- deterministic two-intersection network experiments with synthetic configured-link vehicle transfer;
-- seven-mode network evidence: Fixed, Independent Adaptive, Cooperative Adaptive, Pedestrian-aware Cooperative, Class-aware Cooperative, matched Emergency Baseline Cooperative, and Emergency-priority Cooperative;
-- pedestrian request-age, synthetic crossing occupancy, starvation-prevention, service-session, and clearance-protection telemetry;
-- bounded downstream coordination using predicted synthetic upstream arrivals with protected pedestrian/timing guards;
-- explicit simulated emergency-event lifecycle, matched no-priority baseline, protected grant/deny/defer priority, downstream preparation, recovery, and emergency wait/travel telemetry;
-- regular synthetic class taxonomy, deterministic class profiles, per-class arrival/service/wait/queue evidence, and bounded configurable class-priority events;
-- structured live decision/explanation **foundation** with observation provenance;
-- V031 persistent normalized network decision-evidence ledger plus JSON/CSV evidence export and historical-run projection.
+- isolated seeded single-junction and network simulation experiments;
+- synthetic two-intersection cooperation, pedestrian-aware, class-aware and emergency-priority comparison modes;
+- persistent normalized decision evidence for network experiments.
 
 ## Important semantics
 
 - Occupancy is sampled presence, not throughput.
-- Flow is produced by prototype track/line/region events.
+- Flow comes from prototype track/line/region events.
 - Zone/class counts are per-frame observations.
-- Simulation Lab data is synthetic experiment output, separate from live histories.
-- Live network links remain configuration metadata; V031 network evidence still describes only the isolated synthetic experiment. Cooperation, pedestrian-aware service guards, class-aware behavior, and emergency priority are not live road-control actions. Transfer/predicted-arrival/class/emergency evidence is simulator-generated, not observed real traffic or live recognition.
-- Manual/synthetic events must remain labeled with their provenance.
-
-## Planned invention capability areas
-
-The project scope explicitly includes:
-
-1. multi-intersection cooperation (two-intersection synthetic implementation, broader generalization planned);
-2. emergency priority (V029 synthetic/configured implementation, live evidence planned);
-3. pedestrian-aware control (V028 synthetic implementation, live-evidence strengthening planned);
-4. different vehicle classes (V030 synthetic class-aware implementation, live-evidence strengthening planned);
-5. explainable decisions (V031 persistent normalized network evidence implemented; live/generalized explanation strengthening remains planned).
-
-Their completion levels differ. See [`docs/PROJECT_SCOPE.md`](docs/PROJECT_SCOPE.md) before making capability claims and [`docs/ROADMAP.md`](docs/ROADMAP.md) for dependency order.
-
-## Development workflow
-
-The project uses incremental changed-files-only patches. An unaccepted candidate is normally repaired as the same candidate; automated tests never promote the passed baseline. Only explicit owner acceptance changes `passed_baseline`.
-
-Useful validation helpers:
-
-```powershell
-python .\scripts\check_structure.py
-python .\scripts\validate_patch_zip.py <patch.zip>
-```
-
-See [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) for the full process.
+- Network experiment evidence is synthetic simulation evidence.
+- V032 ESP frames are real camera input, but they do not by themselves prove detector accuracy or public-road control capability.
+- Manual/synthetic inputs remain labeled with provenance.
 
 ## Safety scope
 
-AiTL is for local simulation, classroom/model-junction work, computer-vision experiments, and supervised testing. Detections, analytics, scenario decisions, class/emergency priorities, timings, topology, explanations, and experiment results are **not connected to physical/public-road traffic infrastructure**. Production/public-road autonomous control is outside project scope.
+AiTL is for local simulation, classroom/model-junction work, computer-vision experiments, and supervised prototype testing. It does not send commands to physical/public-road traffic infrastructure.

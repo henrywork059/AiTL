@@ -1,71 +1,48 @@
 # Code Structure Rules
 
-AiTL should keep one clear owner for each behavior. Routes translate HTTP; services own behavior; UI pages coordinate page behavior; components/helpers own reusable mechanics.
+AiTL keeps one clear owner for each behavior. Routes translate HTTP; services own behavior; pages coordinate UI behavior; reusable mechanics stay in components/helpers.
 
 ## Backend
 
 ```text
 apps/pc-studio/backend/app/
-  main.py                 FastAPI creation/wiring only
-  models.py               Pydantic request/response models
+  main.py
+  models.py
   core/
-    api_response.py        envelope helpers
-    error_codes.py         stable errors
-    exceptions.py          AppError/handlers
-    json_store.py          shared atomic UTF-8 JSON read/write primitive
-    logging_config.py      structured logging
-    middleware.py          request IDs
-    project_version.py     validated root VERSION metadata
-  routes/                  thin HTTP handlers
-  services/                domain behavior/state/filesystem/model logic
+  routes/
+  services/
 ```
 
-### Persistence rule
+Relevant camera ownership:
 
-Services own schemas, validation, locks, logging, and stable error mapping. When a service needs replace-style JSON persistence, prefer `core/json_store.py` rather than duplicating temporary-file mechanics. The V024-migrated runtime-settings, zones, and model-registry services and the V025 intersection-network service use this shared atomic persistence path.
+- `services/camera_frames.py` — canonical latest-frame and built-in simulation state;
+- `services/remote_camera.py` — V032 private-LAN CameraWebServer probe/pull worker and remote health only;
+- `routes/camera.py` — thin camera HTTP surface;
+- `main.py` — stops the remote worker during application shutdown.
 
-Multi-step state transitions that can race inside one process need service-level synchronization. Zone save/read uses one lock; model-registry discovery/default/delete/metadata transitions use a re-entrant lock; intersection/network config validation/cache/persistence uses a re-entrant lock.
+Do not put inference or traffic policy into the remote transport service.
 
-### Network/explanation ownership
-
-- `services/intersection_network.py` owns generic intersection ids, source mappings, directed links, topology validation, and runtime `config/intersections.json` persistence.
-- `services/decision_context.py` is a non-controlling projection that turns current traffic/signal/network state into structured live explanation context.
-- `services/network_simulation_experiments.py` owns V027's isolated two-intersection Fixed / Independent Adaptive / Cooperative Adaptive experiment, synthetic transfer/predicted-arrival pipeline, bounded simulation-only coordinator, network/coordination metrics, persistence, and CSV export.
-- `routes/traffic.py` may attach service-owned network/decision context to `/api/traffic/state`, but it must not implement topology validation, signal arbitration, cooperation algorithms, or emergency pre-emption.
-- `routes/experiments.py` remains HTTP translation for both single-junction and network experiment services.
-- `services/signal_rules.py` remains the sole owner of ranked scenario arbitration and protected phase/timing behavior.
-
-V027 synthetic transfer and neighbour-informed coordination are explicit simulator evidence. They do not make live topology links measured flow and do not activate live multi-camera cooperation.
+Other established ownership remains unchanged: `signal_rules.py` owns protected simulated timing; experiment services own isolated benchmarks; `intersection_network.py` owns topology; decision context/evidence services are non-controlling projections.
 
 ## Frontend
 
 ```text
-apps/pc-studio/frontend/src/
-  App.tsx                 page switching/top-level coordination
-  api.ts                  typed domain API functions
-  layout/                 shell/navigation
-  pages/                  page behavior
-  components/             reusable presentation
-  constants/              navigation/release metadata
-  lib/
-    apiClient.ts           shared API envelope/error handling
-    useSerialPolling.ts    non-overlapping periodic async scheduler
-  styles/                 design-system tokens/layers
-  types.ts / types/       shared domain types
+src/App.tsx
+src/pages/
+src/components/
+src/api.ts
+src/lib/apiClient.ts
+src/lib/remoteCameraApi.ts
+src/lib/useSerialPolling.ts
+src/types.ts / types/
+src/constants/
+src/styles/
 ```
 
-### Polling rule
+Camera Sources page owns camera-source UI state. `remoteCameraApi.ts` owns V032 remote-camera API calls/types. Async polling uses the serial scheduler.
 
-Do not use `setInterval` for async work when a new tick can start before the previous request settles. Use `useSerialPolling` or an equivalent self-scheduling `setTimeout` loop so there is at most one in-flight poll per loop and cleanup cancels future schedules. Live inference already uses a self-serial detection loop; V024 migrates App-level camera and live-context polling.
+## Data / safety rules
 
-## CV / analytics invariants
+Runtime data is not patch content. Canonical image/zone coordinates remain unchanged. Remote ESP frames enter the same CameraFrameService path as other real device frames.
 
-Canonical boxes use original-image coordinates; zones use the validated reference coordinates; display scaling is presentation-only. Occupancy remains per-frame. Unique passage comes only from stable track identity plus counting-line events.
-
-Live network links are configuration metadata, not observed flow. V027 network experiments use explicit synthetic departure/arrival/predicted-arrival/coordination events over a selected link; configured travel time remains a simulation input rather than measured throughput or learned travel time.
-
-Observation provenance must not overclaim perception: simulated/manual events stay labeled as such; AI-derived labels are only what the active detector actually returns.
-
-## Refactor heuristic
-
-Extract shared mechanics when a fact/algorithm is duplicated across multiple modules, when side effects are inconsistently implemented, or when a second caller/test clearly benefits. Do not refactor merely because a file is long.
+Remote camera integration is an input adapter, not a public-road controller and not a second signal-policy architecture.

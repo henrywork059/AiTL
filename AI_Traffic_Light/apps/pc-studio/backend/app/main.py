@@ -27,6 +27,7 @@ from app.routes.template import router as template_router
 from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
+from app.services.remote_camera import remote_camera_service
 from app.services.traffic_recorder import traffic_recorder_service
 
 logger = get_logger(__name__)
@@ -39,15 +40,12 @@ async def app_lifespan(_: FastAPI):
     try:
         yield
     finally:
+        remote_camera_service.stop()
         traffic_recorder_service.stop()
 
 
 def create_app() -> FastAPI:
-    """Create and configure the PC Studio backend app.
-
-    Keep this function focused on app-level wiring only. Put business logic in
-    services and HTTP handlers in route modules.
-    """
+    """Create and configure the PC Studio backend app."""
     configure_logging()
 
     app = FastAPI(title="AI Traffic Light PC Studio Backend", version=PROJECT_VERSION, lifespan=app_lifespan)

@@ -1,166 +1,76 @@
-# V031 Acceptance Checklist
+# V032 Acceptance Checklist
 
-V031 / `0_3_1` is the current unaccepted candidate. V030 / `0_3_0` is the previous candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline. Automated checks do not promote V031.
+V032 / `0_3_2` is the current unaccepted candidate. V031 / `0_3_1` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
 ## Release / packaging
 
-1. `VERSION` reports `0_3_1`, previous `0_3_0`, passed baseline `0_2_4`, and candidate status.
-2. `docs/PATCH_0_3_1.md` and a V031 changelog section exist.
-3. Changed-files ZIP contains only `AI_Traffic_Light/` paths and excludes runtime/generated data.
-4. Python compile, structure checks, relevant regressions, frontend typecheck/build, live smoke, `git diff --check`, and ZIP validation pass locally.
+1. `VERSION` reports `0_3_2`, previous `0_3_1`, passed baseline `0_2_4`, and candidate status.
+2. `docs/PATCH_0_3_2.md`, `CHANGELOG.md`, `START_HERE.md`, camera/API docs and version surfaces agree.
+3. Changed-files ZIP contains only `AI_Traffic_Light/` paths and no runtime/generated content.
+4. ZIP integrity/path validation and manifest/hash checks pass.
 
-## Three-mode network experiment
+## Focused remote-camera behavior
 
-5. `POST /api/traffic/network-experiments` accepts Fixed/Adaptive/Cooperative comparison parameters through one request.
-6. Same seed/config produces the same exogenous arrival-plan fingerprint across repeated runs.
-7. Fixed, Independent Adaptive and Cooperative Adaptive each have separate A/B experiment runtime state.
-8. Synthetic transfer timing remains explicit and deterministic over the selected configured link.
-9. Fixed and Adaptive report cooperation inactive; Cooperative reports cooperation active.
-10. Existing backward-compatible `comparison` still represents Adaptive vs Fixed.
-11. `comparisons` additionally contains Adaptive vs Fixed, Cooperative vs Fixed, and Cooperative vs Adaptive.
+5. `scripts/test_remote_camera_pull.py` passes.
+6. RFC1918 literal IPv4 addresses are accepted.
+7. Public IPs, hostnames, loopback/link-local/non-IPv4 targets are rejected.
+8. Connect probes stock CameraWebServer `/capture` before starting the worker.
+9. A valid JPEG enters the existing CameraFrameService with the requested source ID.
+10. Remote status exposes host/source/capture/stream URLs, worker state, counters and last error/status.
+11. Background pulls do not overlap through multiple worker instances after reconnect/disconnect.
+12. Disconnect stops the worker and does not delete the last camera frame.
+13. FastAPI shutdown stops the worker.
 
-## Cooperation behavior
+## Simulation coexistence
 
-12. Cooperative mode derives predicted incoming demand only from synthetic transfers already in the configured-link pipeline.
-13. Lookahead, max-extension and minimum-incoming settings are snapshotted in the result.
-14. Downstream vehicle green may be extended only within saved phase maximum and maximum-cycle caps.
-15. Cooperation never reorders or skips the protected phase sequence.
-16. Earlier vehicle preparation may reduce only the current protected phase toward its configured minimum.
-17. Active pedestrian demand blocks cooperation-driven shortening of pedestrian WALK/CLEAR.
-18. Coordination events record deterministic coordination ID, link/source/destination identity, provenance, time, pre-advisory destination phase, incoming count, earliest ETA, action, reason, applied flag and timing delta.
-19. Coordination telemetry records evaluations, triggers, applied advisories, green extensions, progression requests, pedestrian protections, and timing seconds added/reduced.
-20. Cooperation provenance is explicitly synthetic predicted-arrival evidence.
-21. No test requires Cooperative to outperform Independent Adaptive universally.
+14. Starting Camera Sources simulation pauses remote ingestion.
+15. Remote configuration remains present during simulation.
+16. Stopping simulation resumes ESP ingestion without reconnecting.
+17. Existing Light/Normal/Busy and pause/resume simulation controls still work.
 
-## Persistence / API / CSV
+## Backward compatibility / shared pipeline
 
-22. `netexp_*` list/get/delete remains functional.
-23. JSON responses preserve standard envelopes/request IDs.
-24. CSV export preserves `X-Request-ID`.
-25. CSV includes aligned Fixed, Adaptive and Cooperative source/destination/network fields plus cooperative coordination columns.
-26. Deleting a network run does not remove single-junction runs or other runtime/user data.
+18. Legacy raw `POST /api/camera/frame` still accepts valid JPEG/PNG.
+19. `GET /api/camera/frame` still returns the common latest frame with request/source/frame headers.
+20. Live AI can use the remote ESP frame through the existing inference source path.
+21. Dataset Capture can persist a remote ESP frame.
+22. Zone Editor/current-frame overlays remain aligned with physical-camera frames.
+23. Occupancy/tracking/flow continue to consume inference outputs with unchanged semantics.
 
-## Validation / negative paths
+## Frontend
 
-27. Invalid/missing selected link is rejected with the existing network validation error path.
-28. Cooperation lookahead outside 1-60 seconds is rejected.
-29. Cooperation max extension outside 0-20 seconds is rejected.
-30. Cooperation minimum incoming count outside 1-20 is rejected.
+24. Camera Sources provides ESP address and source ID fields.
+25. Connect/Reconnect/Disconnect mutation failures are visible to the user.
+26. Connected state shows remote health/counters.
+27. Direct `:81/stream` preview is used when available.
+28. If direct MJPEG cannot render, the page falls back to the backend latest-frame image.
+29. Remote status polling is serial/non-overlapping.
 
-## Inherited signal/network invariants
+## Physical ESP32-CAM
 
-31. V026 independent network transfer semantics remain available inside Fixed/Adaptive results.
-32. V025 ranked scenario one-winner arbitration remains intact.
-33. Protected phase minimum/maximum/cycle constraints remain controller-owned.
-34. Single-junction Simulation Lab remains unchanged and isolated from live runtime.
-35. Live configured network links remain topology metadata rather than observed cross-camera flow.
-36. Existing occupancy, flow/tracking, dataset/training/inference/model/settings/logging features show no regression.
+30. Stock Arduino CameraWebServer uploads/runs on the OV2640 ESP32-CAM.
+31. `/capture` returns a real photograph.
+32. `:81/stream` displays live MJPEG.
+33. Entering that ESP IP in PC Studio connects successfully.
+34. Remote fetch counters continue increasing.
+35. Live AI shows the physical camera image.
+36. Dataset Capture saves a physical-camera image.
+37. Simulation takeover/resume works on the real device connection.
+
+## Inherited validation
+
+38. Python compile passes on the complete checkout.
+39. All non-live regression scripts pass.
+40. `scripts/check_structure.py` passes.
+41. Frontend `npm ci`, `npm run typecheck`, and `npm run build` pass.
+42. Live `test_backend_smoke.py` passes and reports `0_3_2`.
+43. `git diff --check` passes.
+44. Existing V027–V031 network/cooperation/pedestrian/class/emergency/evidence behavior shows no regression.
 
 ## Claims / safety
 
-37. V027 is described as isolated synthetic two-intersection cooperation, not general live N-intersection cooperation.
-38. Configured travel time is described as a simulation input, not a measured/learned road estimate.
-39. In the retained V027 Fixed/Adaptive/Cooperative modes, emergency priority remains inactive.
-40. No unsupported emergency/wheelchair/fall perception claim is introduced.
-41. Nothing controls or connects to physical/public-road traffic-signal infrastructure.
-42. Owner explicitly confirms V027 passed before `passed_baseline` changes.
-
-
-## V028 pedestrian-aware cooperative acceptance
-
-43. `VERSION` reports `0_2_8`, previous `0_2_7`, passed baseline `0_2_4`.
-44. Focused V028 pedestrian-aware network regression passes.
-45. Fixed / Adaptive / Cooperative / Pedestrian-aware Cooperative share one seeded exogenous demand fingerprint.
-46. V027 cooperation still produces bounded predicted-arrival coordination evidence.
-47. Oldest pedestrian wait and request lifecycle/service-session metrics are present.
-48. A request at/above `pedestrian_max_wait_seconds` can trigger bounded protected progression toward pedestrian service without violating phase minimums.
-49. Served synthetic pedestrians produce crossing occupancy for the configured clearance interval.
-50. Active crossing occupancy can reserve bounded WALK/CLEAR time within phase/cycle maxima.
-51. Neighbour coordination does not shorten pedestrian WALK/CLEAR while waiting or crossing demand is active.
-52. Pedestrian-aware vs Cooperative comparison includes pedestrian wait/queue/max-wait metrics.
-53. Four-mode CSV contains pedestrian-awareness evidence columns.
-54. In the retained V028 pre-emergency modes, emergency priority remains inactive and no public-road control claim is introduced.
-55. Full inherited regression, structure check, frontend typecheck/build and live smoke pass locally before owner acceptance.
-
-## V029 simulated emergency-priority acceptance
-
-56. `VERSION` reports `0_2_9`, previous `0_2_8`, passed baseline `0_2_4`, candidate status.
-57. `docs/PATCH_0_2_9.md` and a V029 changelog section exist.
-58. Retained V027 cooperation, retained V028 pedestrian-aware, and focused V029 emergency regressions pass.
-59. Current network `scenario.comparison` retains the V029 emergency baseline/priority pair; later candidates may add modes before that pair.
-60. `emergency_baseline_cooperative` and `emergency_priority_cooperative` receive identical configured emergency event objects and the same seeded base arrival plan.
-61. Emergency event contains ID/type/vehicle/source/destination/link/activation fields with `simulated_configured_emergency_event` provenance, null confidence, and `detector_claimed: false`.
-62. Baseline emergency mode carries the event but reports emergency timing priority inactive/zero.
-63. Priority mode can record source priority, downstream preparation, and destination priority roles without creating a second phase state machine.
-64. Emergency priority may extend current vehicle green only within phase maximum, maximum-cycle cap, and emergency extension cap.
-65. Emergency protected progression reduces only the current phase toward its configured minimum and never skips protected phase order.
-66. Active simulated pedestrian crossing occupancy yields an explicit emergency priority denial until clearance.
-67. Emergency lifecycle evidence records activation, source departure, downstream arrival, and—when completed during the run—clear plus recovery.
-68. Emergency metrics expose event status, source/destination wait, total travel, priority evaluations/grants/denials/applications, downstream preparations, and timing seconds added/reduced.
-69. `comparisons.emergency_priority_vs_emergency_baseline` exists; emergency delay/travel deltas are available only when the event completes in both matched modes.
-70. Six-mode CSV includes emergency status/role/decision/action/ETA/applied columns and preserves `X-Request-ID`.
-71. Invalid event time/type/lookahead/extension inputs are rejected by request/service validation.
-72. V029 is described only as simulated/configured emergency priority; no live detector, hardware/public-road pre-emption, safety-interlock bypass, or safety-certification claim is introduced.
-73. Full inherited backend/frontend/structure/live-smoke/`git diff --check` validation passes locally before owner acceptance.
-74. Owner explicitly confirms V029 passed before `passed_baseline` changes.
-
-## V030 vehicle-class-aware acceptance
-
-76. `VERSION` reports `0_3_0`, previous `0_2_9`, passed baseline `0_2_4`, candidate status.
-77. `docs/PATCH_0_3_0.md` and a V030 changelog section exist.
-78. Retained V027 cooperation, V028 pedestrian-aware, V029 emergency-priority, and V030 vehicle-class-aware focused regressions pass.
-79. `scenario.comparison` contains seven documented modes including `class_aware_cooperative`.
-80. `scenario.vehicle_classes.regular_taxonomy` is `car`, `bus`, `truck`, `motorcycle`, `bicycle`, `other`; special `emergency` remains separate and unknown regular labels fall back to `other`.
-81. `legacy`, `mixed_urban`, and `freight_heavy` profiles are accepted; invalid profile is rejected through the existing traffic-rule validation path.
-82. One run gives all modes the same deterministic class-rich base arrival fingerprint and class-count snapshot.
-83. Per-intersection and network class metrics contain arrivals, transfer arrivals, served, wait distribution, and queue evidence.
-84. Class-aware mode records selected class, weight, minimum waiting count, maximum extension, active flag, events, metrics, and `synthetic_vehicle_class_demand` provenance.
-85. Direct class-method test shows vehicle-green extension remains inside phase/cycle/class cap.
-86. Direct class-method test shows protected progression never shortens below the configured current-phase minimum.
-87. Active pedestrian WALK/CLEAR demand blocks class-priority shortening.
-88. Class weight `1.0` produces no class timing change.
-89. Disabling class priority produces no class-priority events and class-aware network metrics match Pedestrian-aware Cooperative for the same run.
-90. `comparisons.class_aware_cooperative_vs_pedestrian_aware_cooperative.selected_class` reports served/wait/queue deltas for the selected class.
-91. Seven-mode CSV includes class-priority source/destination action/class/waiting/weighted-waiting/applied columns and preserves existing export conventions.
-92. V029 emergency baseline/priority lifecycle and matched-event semantics remain unchanged.
-93. V030 is described only as synthetic class-aware evidence; no live detector-accuracy, real transit/freight priority, hardware/public-road control, or safety claim is introduced.
-94. Full inherited regression, structure check, backend live smoke, frontend typecheck/build, and repository `git diff --check` pass on the complete checkout.
-95. Owner explicitly confirms V030 passed before `passed_baseline` changes.
-
-## V031 persistent decision-evidence acceptance
-
-96. `VERSION` reports `0_3_1`, previous `0_3_0`, passed baseline `0_2_4`, candidate status.
-97. `docs/PATCH_0_3_1.md` and a V031 changelog section exist.
-98. Retained V027 cooperation, V028 pedestrian-aware, V029 emergency-priority, V030 class-aware, and V031 decision-evidence focused regressions pass.
-99. New network runs contain `decision_evidence.schema_version == 1`.
-100. `record_count` equals the number of normalized records and `applied_count` is internally consistent.
-101. Evidence IDs are unique/deterministic and individual records do not embed volatile random run IDs.
-102. Trigger categories include applicable `scenario`, `cooperation`, `pedestrian`, `vehicle_class`, `emergency_priority`, and `emergency_lifecycle` records.
-103. V031+ scenario evidence retains local observations when an active ranked scenario is exposed by the controller.
-104. Each normalized record includes action/decision/applied, timing, grouped context, provenance, reason, explanation and `source_ref`.
-105. `GET /api/traffic/network-experiments/{run_id}/evidence` returns the standard envelope and request ID.
-106. `GET /api/traffic/network-experiments/{run_id}/evidence.csv` returns CSV with `X-Request-ID`.
-107. Detailed mode-specific histories remain present; V031 does not replace/delete them.
-108. An older stored V030 result without a V031 block can be projected through the evidence service without rewriting the historical JSON.
-109. Same-seed/config repeated network runs preserve V030 repeatability semantics except normal top-level run metadata.
-110. The V031 evidence service itself performs no signal arbitration, changes no phase order/timing, mutates no live camera/controller state, and introduces no physical/public-road signal authority.
-111. A pedestrian at/above `pedestrian_max_wait_seconds` causes ordinary cooperation/class timing to defer with `defer_for_pedestrian_max_wait` until pedestrian WALK/CLEAR begins.
-112. The starvation-prevention lock does not bypass or replace emergency crossing protection; emergency priority remains separately bounded.
-113. New repaired-V031 cooperation/pedestrian/class/emergency-priority detailed events preserve previous/effective duration when returned by the controller, and normalized evidence projects them.
-114. `pedestrian_service_pending` / `pedestrian_request_queued` normalize to `defer`, not `observe`.
-115. Full inherited backend regression, live API smoke, frontend typecheck/build, structure check, and full-repository `git diff --check` pass on the owner checkout.
-116. Owner explicitly confirms V031 passed before `passed_baseline` changes.
-## V031 conflict/arbitration repair acceptance
-
-117. `scripts/test_network_policy_arbiter.py` passes and proves the documented overlay priority order.
-118. `scripts/test_network_service_request_lifecycle.py` passes in the complete repository.
-119. Repaired benchmark controllers evaluate ranked scenarios once per simulation tick; post-advisory snapshots do not reapply ranked-scenario timing.
-120. When class priority and cooperation trigger together, class priority owns the destination overlay and cooperation records a defer rather than mutating timing first.
-121. Pedestrian max-wait owns ordinary class/cooperation conflicts; an in-lookahead simulated emergency owns max-wait conflicts unless an active pedestrian crossing owns clearance protection.
-122. `service_request` metadata is causal/lifecycle state in the network benchmark and clears when requested protected service begins; stale `pending_request` is not left after satisfaction.
-123. `policy_arbitration_events` are transition-oriented and `network_metrics.policy_arbitration` exposes evaluation/conflict/owner counts.
-124. New normalized cooperation/pedestrian/class/emergency evidence includes `context.arbitration` when source events contain it.
-125. The seven modes are treated as comparison/ablation modes; no acceptance claim says class-aware and emergency-priority overlays execute together in one integrated mode.
-126. Candidate upload is atomic where practical (single commit/PR); if web upload is used, all manifest members are verified on GitHub before local pull.
-127. After explicit V031 acceptance, `passed_baseline` is updated before V032 and an immutable accepted tag is recommended for rollback.
-128. `scripts/test_decision_context_request_semantics.py` passes; legacy `pending_request` without active lifecycle metadata does not appear as causal `decision_context.requested_service`.
+45. V032 is described as physical camera **input**, not public-road traffic control.
+46. No ESP-side detector accuracy is claimed; inference remains PC-side.
+47. No physical traffic-light LED/signal command path is introduced.
+48. Multi-camera independent live frame storage is not claimed.
+49. Owner explicitly confirms V032 passed before `passed_baseline` changes.

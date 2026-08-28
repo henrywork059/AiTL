@@ -1,168 +1,95 @@
 # Project Scope and Capability Status
 
-This document records what AiTL is intended to demonstrate and how capability claims should be worded. It is a scope/evidence guide, not a release-state source; read root `VERSION` for the active candidate.
+This document records what AiTL is intended to demonstrate and how capability claims should be worded. Root `VERSION` owns release state.
 
-## 1. Scope vocabulary
+## Scope vocabulary
 
-Use these labels consistently:
-
-- **Implemented** — an active code path exists and is testable.
-- **Foundation** — supporting identity/schema/service/context exists, but the target behavior is not active.
+- **Implemented** — active, testable code path.
+- **Foundation** — supporting schema/service/context exists but target behavior is inactive.
 - **Simulation-only** — implemented only in local synthetic/test behavior.
-- **Planned** — intended invention capability, not yet implemented sufficiently to claim operation.
-- **Out of scope** — deliberately excluded from this project.
+- **Planned** — intended but not sufficiently implemented.
+- **Out of scope** — deliberately excluded.
 
-Do not upgrade a label because a UI field, config schema, or placeholder exists.
+## Implemented prototype families
 
-## 2. Current implemented capability families
-
-AiTL currently includes local prototype capability in these families:
-
-- camera-frame receiver and signal-aware synthetic scene;
+- physical ESP32-CAM image input over a private LAN using stock Arduino CameraWebServer `/capture` plus Camera Sources preview;
+- legacy raw device-frame receiver and signal-aware synthetic camera;
 - local trained-model inference;
-- camera-aligned polygon zones and counting lines;
-- sampled occupancy and lightweight track-derived flow analytics;
-- dataset capture/review/manual labeling and managed YOLO training workflow;
-- configurable protected simulated signal timing;
-- ranked adaptive signal scenarios with deterministic one-winner arbitration;
-- isolated seeded Fixed-vs-Adaptive Simulation Lab telemetry;
-- persistent experiment/config/history tooling;
-- generic intersection/topology foundation and source-to-intersection identity;
-- deterministic two-intersection network simulation with synthetic configured-link vehicle transfer and bounded cooperation;
-- simulation-only pedestrian request/clearance protection;
-- simulation-only matched emergency-event baseline and bounded emergency priority with downstream preparation/recovery evidence;
-- simulation-only explicit regular vehicle-class taxonomy, class-rich demand, per-class telemetry, and bounded configured class-aware cooperative timing;
-- persistent schema-v1 normalized network decision evidence with JSON/CSV projection and source references;
-- structured live decision/explanation **foundation**.
+- dataset capture/review/manual labeling/managed YOLO training;
+- camera-aligned zones/counting lines;
+- sampled occupancy and lightweight track-derived flow;
+- configurable protected simulated signal timing and ranked scenarios;
+- isolated Fixed-vs-Adaptive single-junction experiments;
+- generic intersection/topology/source identity;
+- isolated deterministic two-intersection synthetic transfer/cooperation experiments;
+- simulation-only pedestrian-aware, class-aware and emergency-priority network modes;
+- normalized persistent network-experiment decision evidence;
+- structured live decision/explanation foundation.
 
-Exact candidate details belong in `START_HERE.md` and the current patch document.
+## Physical ESP status
 
-## 3. Planned invention capability: multi-intersection cooperation
+**Status: physical camera input implemented; physical signal output planned/outside the current candidate.**
 
-**Status: bounded two-intersection cooperation implemented in isolated simulation; broader/live cooperation remains planned.**
+V032 establishes a real camera transport boundary:
 
-V027 now satisfies the minimum evidence for a simulation-only cooperation claim:
+```text
+ESP32-CAM / OV2640
+→ stock Arduino CameraWebServer
+→ PC pulls JPEG snapshots
+→ existing CameraFrameService
+→ PC-side inference / capture / zones / analytics
+```
 
-- two intersections are modeled simultaneously;
-- each has separate controller/runtime state;
-- explicit synthetic A→B transfers create predicted downstream arrival context;
-- Cooperative Adaptive timing can change because of neighbour arrival context;
-- timing changes remain bounded by protected phase minimum/maximum/cycle rules;
-- active pedestrian service is protected from cooperation-driven shortening;
-- coordination events record incoming count, ETA, action, reason and timing delta;
-- the same seeded demand is compared across Fixed, Independent Adaptive and Cooperative Adaptive modes.
+This supports a controlled model-junction demonstration using real camera images. It does **not** mean:
+- ESP-side AI inference;
+- independent simultaneous multi-camera frame retention;
+- physical signal LED/controller output;
+- public-road traffic authority.
 
-The claim must remain qualified as **isolated synthetic two-intersection cooperation**. It does not establish live multi-camera cooperation, measured road travel-time prediction, general N-intersection coordination, public-road performance, or safety.
+## Multi-intersection cooperation
 
-Future strengthening includes multiple simultaneous links/intersections, richer arrival prediction, uncertainty handling, network objectives, and a compact PC Studio network experiment surface.
+**Status: bounded two-intersection cooperation implemented in isolated simulation; broader/live cooperation planned.**
 
-## 4. Planned invention capability: emergency priority
+Separate intersection controllers, synthetic configured-link transfer, predicted arrivals and bounded downstream timing changes are implemented for the isolated benchmark. Live camera links remain source/topology input, not proof of observed cross-camera transfer or live cooperation.
 
-**Status: implemented in matched synthetic network experiment / planned live-evidence enhancement.**
+## Emergency priority
 
-V029 implements the initial evidence-gated form that this scope required: an explicit simulated/configured emergency vehicle event, not inferred perception. Two matched emergency modes receive the same event so priority behavior can be compared against a no-priority baseline.
+**Status: simulation-only configured emergency priority implemented; compatible live-perception evidence planned.**
 
-Current V029 event/evidence includes:
+Emergency lifecycle/priority is an explicit simulator event with no detector-confidence claim. Physical camera input added by V032 does not automatically make emergency recognition live.
 
-- deterministic emergency event and vehicle IDs;
-- ambulance / fire-engine / police configured type;
-- source/destination intersection and approach plus selected link;
-- activation time and explicit simulation provenance;
-- `confidence: null` and `detector_claimed: false`;
-- activation, source-departure, downstream-arrival, clear and recovery lifecycle events;
-- protected grant/deny/defer decisions and reasons;
-- downstream preparation while the emergency vehicle is in the synthetic transfer pipeline;
-- emergency source/destination wait and end-to-end travel evidence.
+## Pedestrian-aware control
 
-Priority may extend vehicle green or request earlier protected progression only inside existing phase minimum/maximum/cycle bounds. Active simulated pedestrian crossings block emergency timing changes until clearance.
+**Status: simulation-only request/starvation/clearance behavior implemented; stronger live evidence planned.**
 
-The claim must remain **simulation-only emergency priority**. V029 does not establish emergency recognition from a camera/model, live cross-camera emergency identity, hardware pre-emption, general emergency route orchestration, public-road performance, or safety. A detector class name or manual flag alone remains insufficient to claim live emergency priority.
+Per-frame person detections/occupancy must not be described as unique pedestrian throughput or reliable individual wait time unless tracking evidence supports it.
 
-Future strengthening should focus on compatible perception provenance, confidence/uncertainty when an actual detector exists, multi-link route context, and compact evidence presentation—not on relabeling the current configured event as AI recognition.
+## Different vehicle classes
 
-## 5. Planned invention capability: pedestrian-aware control
+**Status: simulation-only class-rich demand and bounded class-aware control implemented; live class evidence strengthening planned.**
 
-**Status: implemented in synthetic network experiment / planned live-evidence enhancement.**
+Synthetic profiles and weights are not detector-accuracy evidence. Real V032 camera frames can be classified only by the loaded PC model and must retain detector provenance.
 
-Existing foundations include pedestrian waiting/crossing zones, counts, dwell/wait-related metrics, pedestrian-priority scenarios/profiles, protected WALK/CLEAR phases, and pedestrian simulation telemetry.
+## Explainable decisions
 
-V028 adds synthetic network evidence for oldest-wait tracking, request start/fulfillment lifecycle, service sessions, maximum-wait starvation prevention, simulated crossing occupancy, and bounded crossing-clearance reserve. These are simulation inputs/evidence; they are not live unique-pedestrian measurements.
+**Status: persistent normalized network-experiment evidence implemented; universal live audit strengthening planned.**
 
-Future strengthening should focus on live-evidence quality rather than re-implementing the V028 simulator layer:
+V031 decision evidence remains non-controlling. V032 changes camera input transport only.
 
-- longest individual live waiting time only where tracking quality supports it;
-- robust live service-request reconstruction across camera/source changes;
-- calibrated crossing-clearance evidence rather than a fixed synthetic duration;
-- interaction with the V029 simulated emergency-priority lifecycle and any later live-evidence source;
-- compact frontend presentation of pedestrian-specific evidence.
+## Evidence hierarchy
 
-Per-frame person counts must not be described as unique pedestrian throughput.
+Prefer:
+1. deterministic unit/service regression;
+2. API integration;
+3. seeded simulator comparison;
+4. owner PC Studio acceptance;
+5. controlled physical model demonstration.
 
-## 6. Planned invention capability: different vehicle classes
-
-**Status: implemented in synthetic network experiment / planned live-evidence enhancement.**
-
-V030 adds the first explicit class-aware evidence layer required by this capability. Regular simulator taxonomy is `car`, `bus`, `truck`, `motorcycle`, `bicycle`, `other`; V029 `emergency` remains a separate special simulator class. Unknown/unmapped regular labels fall back to `other`.
-
-Current V030 evidence includes:
-
-- deterministic `legacy`, `mixed_urban`, and `freight_heavy` synthetic class profiles;
-- identical seeded class-rich exogenous demand for every comparison mode in a run;
-- per-intersection and network class arrivals, transfers, served counts, wait distributions, and sampled queue metrics;
-- one optional Class-aware Cooperative policy layer with configured class, weight, minimum waiting count, and extension cap;
-- neutral weight `1.0` produces no class timing action;
-- configured weight above `1.0` may reserve bounded vehicle service without changing phase order;
-- active pedestrian WALK/CLEAR demand prevents class-priority shortening;
-- structured class-priority events and `synthetic_vehicle_class_demand` provenance;
-- matched `class_aware_cooperative` vs `pedestrian_aware_cooperative` comparison, including selected-class served/wait/queue evidence.
-
-The claim must remain **simulation-only class-aware control/evidence**. V030 does not establish camera class accuracy, unique vehicle identity across cameras, public-transit signal priority, freight schedule integration, lane-level authority, or public-road benefit. A detector class label alone is not permission to invoke the synthetic priority policy.
-
-Future strengthening should focus on compatible live class provenance/confidence, calibrated class-specific service objectives, multiple links/intersections, and evidence that any class weighting is justified rather than arbitrary.
-
-## 7. Planned invention capability: explainable decisions
-
-**Status: persistent network-experiment implementation / live-generalized strengthening planned.**
-
-V031 implements the first stable persistent explainability/evidence layer for the isolated network benchmark. New runs persist `decision_evidence.schema_version: 1`, while older stored runs can project the same schema on demand from the raw evidence they already contain.
-
-Current V031 normalized records support:
-
-- deterministic evidence ID and simulation time;
-- mode and intersection/link identity;
-- trigger categories for ranked scenario, cooperation, pedestrian, regular vehicle class, emergency priority and emergency lifecycle;
-- relevant local observations for V031+ scenario snapshots;
-- neighbour predicted-arrival context;
-- pedestrian wait/crossing context;
-- configured vehicle-class demand/weight context;
-- configured simulated emergency context;
-- resulting action plus grant/deny/defer/observe decision and applied flag;
-- available timing before/after and timing delta;
-- explicit reason, concise explanation and provenance;
-- `source_ref` back to the preserved detailed mode-specific event history;
-- normalized JSON and CSV export.
-
-The claim must remain **persistent explainability/evidence for the isolated synthetic network experiment**. V031 does not yet provide a universal live-runtime audit log, does not reconstruct observations that older stored runs never captured, and does not turn explanations into physical/public-road control authority. `decision_evidence.py` is a projection/export service only and must never own signal arbitration.
-
-Future strengthening should generalize this evidence schema across N-intersection runs and any later compatible live sources while preserving provenance/confidence boundaries.
-
-## 8. Evidence hierarchy
-
-Prefer evidence in this order:
-
-1. deterministic service/unit regression;
-2. API integration test;
-3. seeded simulator comparison with explicit configuration snapshot;
-4. owner manual acceptance in PC Studio;
-5. controlled model-junction demonstration.
-
-Synthetic simulation results are evidence for the selected simulated conditions only. They are not calibrated public-road performance or safety evidence.
-
-## 9. Explicitly out of scope
+## Out of scope
 
 - direct public-road signal control;
-- production traffic-cabinet integration;
-- bypassing hardware safety systems;
-- autonomous authority over public-road movements;
-- safety certification claims;
-- claiming unsupported perception such as emergency vehicle, wheelchair, mobility-aid, or fall recognition without an actual compatible perception source.
+- traffic-cabinet/pre-emption integration;
+- bypassing safety systems;
+- autonomous public-road authority;
+- safety certification;
+- claiming unsupported perception capability.

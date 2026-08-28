@@ -1,92 +1,76 @@
-# Start Here — Current V031 candidate
+# Start Here — Current V032 candidate
 
-Root `VERSION` is authoritative. V031 / `0_3_1` is the current unaccepted candidate; V024 / `0_2_4` remains the owner-confirmed passed baseline. V030 is the previous candidate because the owner explicitly requested V031 before separately accepting V030.
+Root `VERSION` is authoritative. V032 / `0_3_2` is the current unaccepted candidate. V031 / `0_3_1` is the previous candidate because the owner explicitly requested V032 before separately accepting V031. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
-The current same-candidate repair adds explicit network-overlay arbitration, non-reapplying post-advisory snapshots, and protected-service request lifecycle metadata. The seven experiment modes remain ablation/comparison modes; no integrated class+emergency mode is claimed.
+## What V032 changes
 
-## What V031 changes
+V032 connects the physical ESP32-CAM to the existing PC-side camera pipeline without requiring the ESP firmware to know the PC address.
 
-V031 keeps the seven V030 network modes and their protected timing behavior unchanged. It adds **persistent normalized explainability/evidence** so users and future agents do not need separate parsers for every scenario/cooperation/pedestrian/class/emergency history shape.
-
-One `POST /api/traffic/network-experiments` run still contains:
-
-1. Fixed;
-2. Independent Adaptive;
-3. Cooperative Adaptive;
-4. Pedestrian-aware Cooperative;
-5. Class-aware Cooperative;
-6. Emergency Baseline Cooperative;
-7. Emergency-priority Cooperative.
-
-V031 adds `decision_evidence` to new stored runs. The schema-v1 ledger normalizes:
-
-- ranked scenario evidence;
-- neighbour cooperation;
-- pedestrian service/clearance guards;
-- vehicle-class priority;
-- emergency priority;
-- emergency lifecycle.
-
-Each compact record includes deterministic identity, mode/time/intersection/link context, decision/action/applied fields, timing, reason, explanation, relevant context, provenance and a `source_ref` to the preserved detailed event history.
-
-## Evidence API
-
-New read surfaces:
+The tested Arduino baseline is the stock ESP32 `CameraWebServer` example. PC Studio now accepts the ESP private-LAN IPv4 address and uses:
 
 ```text
-GET /api/traffic/network-experiments/{run_id}/evidence
-GET /api/traffic/network-experiments/{run_id}/evidence.csv
+GET http://<ESP-IP>/capture
+GET http://<ESP-IP>:81/stream
 ```
 
-Older stored network runs without a persisted V031 block are projected on demand from the detailed evidence they already contain. They are not silently rewritten. Pre-V031 scenario observations cannot be reconstructed if they were never stored.
+The backend continuously pulls JPEG snapshots from `/capture` and stores them through the existing `CameraFrameService`. This means the same latest-frame path remains available to Live AI, Dataset Capture, Zone Editor, inference, tracking and traffic analytics.
 
-## Scenario snapshots
+## Camera architecture
 
-For V031+ network runs, the isolated simulator records a scenario snapshot when the active ranked scenario changes for a protected phase. It includes winner/action/reason, local observations, phase and available base/effective timing. This is evidence capture only; arbitration remains owned by `signal_rules.py`.
+```text
+OV2640
+  ↓
+ESP32-CAM + stock Arduino CameraWebServer
+  ├── /capture
+  └── :81/stream
+          ↓
+AiTL PC Studio remote-camera service
+          ↓
+CameraFrameService
+          ↓
+inference / capture / zones / analytics / traffic-state prototype pipeline
+```
 
-## Retained V030 behavior
+The ESP does not need a configured PC IP.
 
-V031 retains:
+## Safety / network guard
 
-- V030 regular class taxonomy/profiles/per-class metrics and Class-aware Cooperative mode;
-- V029 matched configured emergency baseline/priority lifecycle and downstream preparation;
-- V028 pedestrian request-age/starvation/clearance evidence;
-- V027 bounded neighbour-informed cooperation;
-- V026 deterministic A→B transfer and separate per-intersection controllers;
-- V025 ranked scenarios and single-junction Simulation Lab;
-- existing camera/dataset/training/model/zone/analytics workflows.
+The backend accepts only literal RFC1918 private IPv4 addresses:
 
-## Current limitations
+- `10.0.0.0/8`
+- `172.16.0.0/12`
+- `192.168.0.0/16`
 
-- The normalized ledger is currently a network-experiment evidence surface, not a universal live-runtime audit database.
-- Historical runs can only project fields that were actually persisted at the time.
-- The benchmark still selects one directed two-intersection pair.
-- PC Studio has no dedicated network/evidence dashboard yet; V031 remains backend/API/test-first.
-- All class, cooperation, pedestrian and emergency network evidence remains synthetic simulation evidence.
-- No physical/public-road signal controller, cabinet, pre-emption interface, safety-interlock bypass, or safety-certification claim exists.
+This keeps the remote fetch feature scoped to a local prototype LAN and avoids making the backend a general URL fetcher.
+
+## Simulation coexistence
+
+If the built-in Camera Sources simulation is started while an ESP camera is configured, remote ingestion pauses. The ESP connection remains configured and ingestion resumes after simulation stops.
+
+## Backward compatibility
+
+The existing device push route remains:
+
+```text
+POST /api/camera/frame?source_id=<camera_id>
+```
+
+V032 does not remove the old ESP/Raspberry-Pi upload path.
+
+## Limitations
+
+- Remote camera configuration is process-memory only in this patch; reconnect after backend restart.
+- The live backend still retains one latest non-simulation frame, not independent simultaneous per-camera buffers.
+- Stock CameraWebServer direct MJPEG is used for Camera Sources preview; the backend uses repeated `/capture` snapshots for the shared processing pipeline.
+- V032 does not add signal-output hardware control.
+- Physical/public-road traffic-light authority remains outside scope.
 
 ## Validation starting point
 
 Read:
 
-1. `docs/PATCH_0_3_1.md`;
-2. `docs/LOCAL_TESTING.md`;
-3. `docs/TEST_READY_CHECKLIST.md`;
-4. `docs/PROJECT_SCOPE.md`;
-5. `docs/API_CONTRACTS.md`.
+1. `docs/PATCH_0_3_2.md`
+2. `docs/ESP32_CAMERA_STREAMING.md`
+3. `scripts/test_remote_camera_pull.py`
 
-Focused regressions:
-
-```powershell
-python .\scripts\test_network_simulation_experiments.py
-python .\scripts\test_pedestrian_aware_network_simulation.py
-python .\scripts\test_emergency_priority_network_simulation.py
-python .\scripts\test_vehicle_class_aware_network_simulation.py
-python .\scripts\test_decision_evidence_network_simulation.py
-```
-
-Owner acceptance is still required before `passed_baseline` changes.
-
-## Next invention direction
-
-After V031 acceptance, the next dependency is generalizing the evidence-backed network simulation beyond one selected two-intersection link, followed by a compact network/evidence UI.
+Then run the complete repository test workflow on the owner Windows checkout before acceptance.

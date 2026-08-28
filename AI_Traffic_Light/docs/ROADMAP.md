@@ -2,59 +2,71 @@
 
 Root `VERSION` defines the active candidate. This roadmap records dependency order, not acceptance state.
 
-## 0_3_1 — persistent normalized decision evidence candidate
+## Current V032 milestone — physical camera input
 
-V031 consolidates existing V030 evidence without adding another signal-control mode:
+V032 closes the first hardware-input gap by letting PC Studio connect to the already-working stock Arduino ESP32 CameraWebServer using the ESP private-LAN IP.
 
-- schema-versioned normalized decision/event ledger;
-- scenario, cooperation, pedestrian, regular vehicle-class, emergency-priority and emergency-lifecycle trigger categories;
-- deterministic evidence IDs and stable source references;
-- local/neighbour/pedestrian/class/emergency context where available;
-- action, grant/deny/defer/observe decision, timing before/after, reason and concise explanation;
-- explicit provenance;
-- JSON/CSV evidence surfaces;
-- on-demand projection for older stored network runs without rewriting them;
-- detailed legacy histories retained for drill-down/backward compatibility.
+Implemented milestone:
 
-## V031 acceptance/stability gate
+```text
+physical OV2640 image
+→ ESP32-CAM Wi-Fi server
+→ PC-side camera transport
+→ common frame pipeline
+→ inference / capture / zones / analytics
+```
 
-Before N-intersection generalization, keep the repaired V031 decision model stable:
+This is camera input only.
 
-- one explicit higher-level overlay owner per intersection/tick;
-- ranked scenario evaluation once per tick with non-reapplying post-advisory snapshots;
-- meaningful protected-service request lifecycle rather than stale status-only requests;
-- transition-oriented arbitration evidence and normalized arbitration context;
-- retained seven-mode ablation semantics (class-aware and emergency-priority are not yet one integrated mode);
-- complete-repository regressions and owner acceptance before `passed_baseline` changes.
+## Priority 1 — accept and harden V032
 
-## Priority 1 — generalize network orchestration
+- complete full backend/frontend regression;
+- physical ESP reconnect/simulation/capture acceptance;
+- confirm frame rate/resolution is practical for the model junction;
+- retain clean errors for unreachable/restarted ESP devices.
 
-After the selected two-intersection evidence is stable:
+## Priority 2 — independent multi-camera live sources
 
-- support multiple simultaneous directed links/intersections;
-- generic N-intersection run selection and topology validation;
-- richer arrival prediction and travel-time uncertainty;
-- network/corridor objectives alongside local objectives;
-- multi-link emergency route context;
-- multi-link class-aware objectives only where explicitly configured;
-- keep V031 evidence schema generic enough that records do not depend on A/B-only assumptions.
+Before claiming a physical multi-intersection system:
 
-## Priority 2 — compact PC Studio network experiment UI
+- retain latest frame independently per source/intersection;
+- explicit source selection/routing for inference, capture and zone pipelines;
+- camera health per node;
+- avoid cross-source tracker identity contamination;
+- preserve provenance and stale-source fallback.
 
-Expose the backend experiment/evidence work without turning the frontend into an unbounded telemetry dump:
+## Priority 3 — model-junction signal output abstraction
 
-- network run setup and topology/link selection;
-- per-mode/per-intersection summary tabs;
-- pairwise comparison panels;
-- normalized evidence filters by mode/category/intersection/decision/provenance;
-- drill-down from V031 normalized records to detailed raw histories;
-- CSV export access;
-- strong synthetic/prototype-only labeling.
+For classroom/model hardware only, add an isolated device-output interface so simulated/controller state can drive model LEDs without coupling signal logic to ESP-specific code.
 
-## Priority 3 — live-evidence strengthening
+This must remain separate from public-road traffic infrastructure and preserve controller safety semantics.
 
-Only after compatible perception sources exist should the project explore live emergency recognition, reliable live class/pedestrian identity, or live multi-source retention/tracking. Any such source must expose explicit provenance/confidence and be evaluated separately from deterministic simulation evidence.
+## Priority 4 — network orchestration generalization
 
-## Explicitly outside scope
+- multiple simultaneous directed links/intersections;
+- generic N-intersection run selection;
+- richer arrival prediction/uncertainty;
+- network/corridor objectives;
+- multi-link emergency/class context;
+- keep normalized evidence generic.
 
-Physical/public-road signal control, traffic-cabinet/pre-emption integration, bypassing safety systems, production autonomous authority, and safety certification remain outside this project.
+## Priority 5 — compact network/evidence UI
+
+- topology/run setup;
+- per-mode/per-intersection summaries;
+- pairwise comparisons;
+- normalized evidence filters and drill-down;
+- clear synthetic vs physical-input provenance.
+
+## Priority 6 — live-evidence strengthening
+
+Only when compatible trained perception exists:
+
+- evaluate class/pedestrian detection on real camera data;
+- reliable live wait/flow reconstruction;
+- emergency recognition only with an actual validated source;
+- confidence/uncertainty and failure-state evidence.
+
+## Outside scope
+
+Physical/public-road cabinet control, bypassing road safety systems, production autonomous authority and safety certification remain excluded.
