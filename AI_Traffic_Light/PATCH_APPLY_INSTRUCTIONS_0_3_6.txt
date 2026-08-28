@@ -1,26 +1,15 @@
-AiTL V036 full reviewed patch
-==============================
+AiTL V036 full reviewed multi-ESP patch (R3)
 
-This is a changed-files-only overlay for the current V036 candidate.
-It includes the complete low-latency TCP transport + multi-ESP camera extension.
+1. Extract this ZIP at the repository root so AI_Traffic_Light/ overlays the existing project.
+2. Do not delete datasets, outputs, models, config runtime JSON, .venv, node_modules, or other local runtime/user data.
+3. From AI_Traffic_Light run:
 
-Important: CHANGELOG.md is intentionally not shipped as a replacement file because
-it contains repository history. The included metadata finalizer updates the existing
-CHANGELOG.md in place without deleting older sections.
+   .\scripts\update_test_run.ps1 -SkipUpdate
 
-Apply locally from the AI_Traffic_Light project folder after extracting the ZIP over
-your repository:
+The V036 runner now automatically invokes scripts/apply_v036_full_patch.ps1 before project-structure validation. That finalizer safely adds/repairs the 0_3_6 CHANGELOG section on the existing full historical CHANGELOG.md and synchronizes the frontend project-version source.
 
-  .\scripts\apply_v036_full_patch.ps1
-  .\scripts\update_test_run.ps1 -SkipUpdate
+You may also run the finalizer manually first; it is idempotent:
 
-Then test Camera Sources with two ESP32-CAM boards:
-- add/save unique source IDs and private-LAN IPs;
-- Connect + Start each at VGA / JPEG 14 / 15 FPS first;
-- switch between running streams;
-- confirm only the selected source reaches Live AI / Dataset Capture;
-- stop one camera and confirm the other remains running;
-- restart PC Studio and confirm saved IP/settings/last selection restore, but sockets
-  correctly start disconnected.
+   .\scripts\apply_v036_full_patch.ps1
 
-V036 remains an unaccepted candidate. passed_baseline remains 0_2_4.
+Candidate remains 0_3_6. passed_baseline remains 0_2_4 until explicit owner acceptance.

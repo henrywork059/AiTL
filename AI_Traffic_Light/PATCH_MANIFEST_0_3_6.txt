@@ -1,45 +1,39 @@
-AiTL V036 full reviewed patch manifest
-=======================================
+AiTL V036 full reviewed patch R3 manifest
 
-Candidate: 0_3_6
-Passed baseline: 0_2_4
-Patch type: changed-files-only full V036 overlay (review revision 2)
-Runtime config/remote_cameras.json is intentionally excluded.
-CHANGELOG.md is intentionally not replaced; scripts/apply_v036_full_patch.ps1 updates the existing full changelog in place.
-Camera Sources displays resolution as numeric pixel dimensions; internal frame-size protocol enums are unchanged.
-
-SHA-256  PATH
-fd3c8bf4364e11b946e89936038b905b6c0aa441934417638c8cecada1e0d262  PATCH_APPLY_INSTRUCTIONS_0_3_6.txt
-5622961789512cc50d24880a740ca87e86a6309c61a491abc84d5dc3f7d48e63  README.md
-81013bbfc7b78f154920a18a3a716acdc4394beeb941d7019ef3fff2b807a01d  VERSION
-5a2e81d91cf42dd7d595fe6c51941a0b00e16f3cd0f70d28088299869fc41179  apps/device-camera/esp32-cam/README.md
-c9c48df453882c57b636a02dac254bf490c610295da75135fb9617777b746831  apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino
-678e6db0eaa2880eb17572b4e482fe111ae2bb65863b0313b77fed9f3c0e6c8a  apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/secrets.example.h
-b652342af54dffc919c7fb6a101da7c264623888081964f879095f7790eac65e  apps/device-camera/esp32-cam/include/aitl_config.h
-95f8b72df13181c72bb6d7ccd65392ebe8965f1e2bab3025207ded7415c1ca9a  apps/device-camera/esp32-cam/include/secrets.example.h
-9316296f7d60424f9c0cbf22a991d801aff5eda79b03bc732da71e64fdeb8767  apps/device-camera/esp32-cam/platformio.ini
-23b1a17c19091381267e20f8b2614a7063733450fa30ce64d07483d1ddb73331  apps/device-camera/esp32-cam/src/main.cpp
-95514ef59028abf3a1d602518b9fc8940bed456d198e3eaf9a2fd1f2e28f5c71  apps/pc-studio/backend/README.md
-196f94c96a371268ebe9e2f2cad46c0149bd77441fd3cc17f84c25f3a995b0b9  apps/pc-studio/backend/app/main.py
-ebb3197f0bd71ae3e9a364abf746ccc2dd95cc2f677459812bf0663f32c17187  apps/pc-studio/backend/app/routes/camera.py
-486fae88c19d4f239d57e3e83a26232e35f8d32bd23254decf11a2c3784b2ca1  apps/pc-studio/backend/app/services/remote_camera.py
-3afd502fc422b34ab93bd283684a96a7dc0efc85418ed973ef1f62ea96519357  apps/pc-studio/backend/app/services/remote_camera_manager.py
-35a0a8ab487c09a88a5c42e63704be54a1497bb3239cbbfb2ad8b05a6c1da190  apps/pc-studio/frontend/README.md
-e66c155fe3ac51ad29c5ef22b55f48cfa4a9f75a4144466060e373429d73aee2  apps/pc-studio/frontend/src/constants/projectVersion.ts
-c96b931de0c1f9085ce427f6d9ce2f18961219237309fdcadb583dd87041fb47  apps/pc-studio/frontend/src/lib/remoteCameraApi.ts
-9123fb53916ba81d0e6b4d347517317adf1d9837b357894c442ff2aa2a28a2af  apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx
-63c60bf9a8ab39339d59d24478b3bf8495c0b0d7f58cda9f1045147a61a32bc2  config/.gitignore
-0be4182c0a7530668bd8191c17d82274d58568e765b1696cdfd76e36436f6c8f  docs/API_CONTRACTS.md
-1c1701b2da1a1d47977361e0f9376ab881e94203ca880bee94d33ba40d60e491  docs/ARCHITECTURE.md
-cba4211ac39240adf2c92763ee3d33cccea51ce900f09fd6fead6e01b9f45f40  docs/CODE_STRUCTURE.md
-1efbb449547336981d98e60a709efbfe5bebb545b45f7a4a3306ac0a0bdcd953  docs/ESP32_CAMERA_STREAMING.md
-cccf58dd63b251f925995d8e53cb22821f930e94f9f686e82f2ca400276f439c  docs/LOCAL_TESTING.md
-20ed9a586f5e1e3e343e285c2906071219e2bf16c4f888e0e2e9fa137339002b  docs/PATCH_0_3_6.md
-2f29ceb6c4e0b420072747fe5eb534971d089f90967a685befbc744e0ce35402  docs/PC_STUDIO_FUNCTION_LIST.md
-9ddeaeb86b65ab3b2874091f6fe912e2d864e4dac29c35921565026243d96b52  docs/PROJECT_SCOPE.md
-08b600eef72b57e607ef40de587c0168fc67db143da8583f80b189e63da9717c  docs/START_HERE.md
-c5d8689e1c99407689372adf1d0c31b22c57d7e6a2d6dc65083de1e0d209130d  docs/TEST_READY_CHECKLIST.md
-120a0a5feb9dd6d46855ceb4e10d7e74256e3f6444afb75e9cad79eec4896486  scripts/apply_v036_full_patch.ps1
-69e4465d34f75e02876d25a91da542da973f2ba882ba6781c6931f25f5904154  scripts/test_remote_camera_multi.py
-21e06f2cf753e3a4d1ccedbe3fd9bdb7ef8e31369e9c709038f0c6ff2a035be3  scripts/test_remote_camera_pull.py
-8a2f8bc44e8c0109df8d555c0eaa3c00618c0dec2e0f8fcfbc52da5824925508  scripts/test_remote_camera_session.py
+PATCH_APPLY_INSTRUCTIONS_0_3_6.txt
+PATCH_MANIFEST_0_3_6.txt
+README.md
+VERSION
+apps/device-camera/esp32-cam/README.md
+apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino
+apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/secrets.example.h
+apps/device-camera/esp32-cam/include/aitl_config.h
+apps/device-camera/esp32-cam/include/secrets.example.h
+apps/device-camera/esp32-cam/platformio.ini
+apps/device-camera/esp32-cam/src/main.cpp
+apps/pc-studio/backend/README.md
+apps/pc-studio/backend/app/main.py
+apps/pc-studio/backend/app/routes/camera.py
+apps/pc-studio/backend/app/services/remote_camera.py
+apps/pc-studio/backend/app/services/remote_camera_manager.py
+apps/pc-studio/frontend/README.md
+apps/pc-studio/frontend/src/constants/projectVersion.ts
+apps/pc-studio/frontend/src/lib/remoteCameraApi.ts
+apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx
+config/.gitignore
+docs/API_CONTRACTS.md
+docs/ARCHITECTURE.md
+docs/CODE_STRUCTURE.md
+docs/ESP32_CAMERA_STREAMING.md
+docs/LOCAL_TESTING.md
+docs/PATCH_0_3_6.md
+docs/PC_STUDIO_FUNCTION_LIST.md
+docs/PROJECT_SCOPE.md
+docs/START_HERE.md
+docs/TEST_READY_CHECKLIST.md
+scripts/apply_v036_full_patch.ps1
+scripts/test_remote_camera_multi.py
+scripts/test_remote_camera_pull.py
+scripts/test_remote_camera_session.py
+scripts/test_v036_metadata_runner.py
+scripts/update_test_run.ps1

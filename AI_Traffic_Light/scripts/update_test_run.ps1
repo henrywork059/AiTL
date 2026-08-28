@@ -85,6 +85,32 @@ function Wait-HttpReady {
     throw "Timed out waiting for $Url"
 }
 
+function Get-ProjectVersion {
+    if (-not (Test-Path $versionFile)) {
+        return $null
+    }
+    $versionLine = Get-Content $versionFile | Where-Object { $_ -match '^\s*version\s*:' } | Select-Object -First 1
+    if (-not $versionLine) {
+        return $null
+    }
+    return (($versionLine -split ':', 2)[1]).Trim()
+}
+
+function Invoke-CandidateMetadataFinalizer {
+    $currentVersion = Get-ProjectVersion
+    if ($currentVersion -ne "0_3_6") {
+        return
+    }
+
+    $finalizer = Join-Path $projectRoot "scripts\apply_v036_full_patch.ps1"
+    if (-not (Test-Path $finalizer)) {
+        return
+    }
+
+    Write-Host "`n=== V036 metadata finalization ===" -ForegroundColor Cyan
+    & $finalizer
+}
+
 Write-Host "AiTL update / test / run" -ForegroundColor Green
 Write-Host "Repository: $repoRoot"
 Write-Host "Project:    $projectRoot"
@@ -121,6 +147,11 @@ if (Test-Path $versionFile) {
     Write-Host "`n=== Current project version ===" -ForegroundColor Cyan
     Get-Content $versionFile
 }
+
+# V036's full patch intentionally preserves the owner's existing historical
+# CHANGELOG.md instead of replacing it with a partial copy. Finalize the
+# candidate metadata automatically before structure/version validation.
+Invoke-CandidateMetadataFinalizer
 
 if (-not $SkipTests) {
     Push-Location $projectRoot
