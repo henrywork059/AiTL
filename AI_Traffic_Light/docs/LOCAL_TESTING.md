@@ -37,3 +37,28 @@ Focused regressions must verify:
 8. After Wi-Fi returns, confirm `session_recoveries` increments and video resumes without manually pressing Start.
 9. Test 20 FPS and retain it only if reconnect count/failure streak remain near zero.
 10. Test simulation pause/resume, Live AI and Dataset Capture.
+
+
+## V035 stream-repair diagnostic
+
+After flashing the repaired V035 `.ino`, first use:
+
+```text
+Resolution: VGA
+JPEG quality: 14
+Target FPS: 10
+```
+
+Expected Serial Monitor while active:
+
+- no recurring `cam_hal: FB-OVF`;
+- `stream_client=connected`;
+- `stream` counter increases continuously;
+- `last_frame_bytes` is non-zero;
+- `actual_fps` is materially above the previous ~0.3 FPS.
+
+Then increase to 15 FPS, followed by 20 FPS only if stable.
+
+If `FB-OVF` still appears at VGA/quality 14 after this repair, record `/status`
+including `psram`, `last_frame_bytes`, `last_frame_ms`, `last_send_ms`, and
+`actual_fps`, because that would indicate a different camera/PSRAM or power issue.

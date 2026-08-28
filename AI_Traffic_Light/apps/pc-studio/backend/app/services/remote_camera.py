@@ -31,7 +31,7 @@ DEFAULT_TARGET_FPS = 15
 
 CONTROL_TIMEOUT_SECONDS = 2.5
 STREAM_CONNECT_TIMEOUT_SECONDS = 2.5
-STREAM_READ_TIMEOUT_SECONDS = 2.5
+STREAM_READ_TIMEOUT_SECONDS = 6.0
 STATUS_REFRESH_SECONDS = 2.0
 
 RECONNECT_BACKOFF_INITIAL_SECONDS = 0.15
@@ -218,7 +218,12 @@ def normalize_private_lan_ipv4(value: str) -> str:
 
 
 class RemoteCameraService:
-    """Own one on-demand ESP session and one resilient persistent MJPEG transport."""
+    """Own one on-demand ESP session and one resilient persistent MJPEG transport.
+
+    V035 repair note: stream reads allow a 6 s camera stall before declaring the
+    socket dead. This prevents slow/overflowing camera frames from causing a
+    reconnect loop while still detecting a genuinely stalled stream quickly.
+    """
 
     def __init__(self) -> None:
         self._lock = RLock()

@@ -42,3 +42,15 @@ The firmware retains:
 - PC-selected 1–30 FPS cap.
 
 Recommended starting point remains VGA, JPEG quality 12–16, 15 FPS. Test 20 FPS only if measured FPS is stable and reconnects stay at zero.
+
+
+## V035 framebuffer repair
+
+The ESP camera is now initialized the same way as Espressif's current CameraWebServer
+allocation strategy: when PSRAM exists, initialize JPEG mode at UXGA with two PSRAM
+buffers and `CAMERA_GRAB_LATEST`, then apply the lower PC-selected runtime resolution.
+
+This matters because runtime `sensor->set_framesize()` changes the sensor output but
+does not retroactively make a too-small initialization allocation a safe choice for
+larger JPEG frames. Repeated `cam_hal: FB-OVF` is therefore treated as a camera-buffer
+problem before tuning network FPS.

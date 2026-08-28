@@ -85,3 +85,36 @@ Remote status adds:
 - `last_recovery_at_ms`.
 
 No public-road signal authority is added.
+
+
+## Same-candidate physical-stream repair
+
+Physical testing showed:
+
+```text
+cam_hal: FB-OVF
+stream_client=connected
+stream_frame_count=0
+measured_fps≈0.3
+frame_age≈2 s
+```
+
+The root cause is in the camera-buffer allocation profile, not the V035 PC session workflow.
+
+The first V035 ESP file initialized `esp_camera` at VGA and later allowed PC Studio to
+raise the sensor frame size at runtime. Espressif's CameraWebServer instead initializes
+JPEG mode at UXGA before dropping the sensor to a lower operating resolution so PSRAM
+frame buffers are preallocated for the maximum supported image size.
+
+This same-candidate repair therefore:
+
+- initializes the PSRAM JPEG camera profile at UXGA / quality 10 / two frame buffers /
+  `CAMERA_GRAB_LATEST`, then applies the PC-selected runtime resolution;
+- retains VGA as the default runtime setting;
+- keeps two PSRAM buffers and newest-frame capture;
+- raises the ESP stream send/receive wait timeout from 2 s to 5 s;
+- raises the PC stream read timeout from 2.5 s to 6 s so a temporary camera stall does
+  not immediately trigger a reconnect loop;
+- adds ESP frame-byte/frame-time/send-time/actual-FPS telemetry.
+
+No V036 version bump is made. This is a repair of the still-unaccepted V035 candidate.
