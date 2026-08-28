@@ -10,9 +10,14 @@ BACKEND = ROOT / "apps" / "pc-studio" / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.core.exceptions import AppError
 from app.services.camera_frames import camera_frame_service
-from app.services.remote_camera import RemoteCameraService, _MjpegParser, normalize_private_lan_ipv4
+from app.services.remote_camera import (
+    CAMERA_PROTOCOL,
+    FRAME_PROTOCOL,
+    RemoteCameraService,
+    _encode_frame_packet,
+    _read_frame_packet,
+)
 
 JPEG_1X1 = (
     b"\xff\xd8"
@@ -27,7 +32,7 @@ JPEG_1X1 = (
 
 SETTINGS = {
     "frame_size": "VGA",
-    "jpeg_quality": 12,
+    "jpeg_quality": 14,
     "brightness": 0,
     "contrast": 0,
     "saturation": 0,
@@ -53,84 +58,78 @@ SETTINGS = {
 }
 
 
-def mjpeg_part(frame: bytes = JPEG_1X1) -> bytes:
-    return (
-        b"\r\n--frame\r\n"
-        b"Content-Type: image/jpeg\r\n"
-        b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
-        b"X-AiTL-Sequence: 1\r\n\r\n"
-        + frame
-        + b"\r\n"
-    )
+def device_status(*, session_active: bool) -> dict:
+    return {
+        "protocol": CAMERA_PROTOCOL,
+        "stream_protocol": FRAME_PROTOCOL,
+        "camera_ready": True,
+        "session_active": session_active,
+        "stream_client_active": False,
+        "settings": SETTINGS,
+    }
 
 
-class RepeatingMjpegStream:
-    boundary = b"frame"
-
-    def __init__(self, *, end_after_frames: int | None = None) -> None:
+class ChunkedFrameStream:
+    def __init__(self, packets: bytes, *, chunk_size: int = 3) -> None:
+        self.buffer = bytearray(packets)
+        self.chunk_size = chunk_size
         self.closed = False
-        self.frames = 0
-        self.end_after_frames = end_after_frames
 
-    def read(self, _size: int) -> bytes:
-        if self.closed:
+    def read(self, size: int) -> bytes:
+        if self.closed or not self.buffer:
             return b""
-        if self.end_after_frames is not None and self.frames >= self.end_after_frames:
-            return b""
-        self.frames += 1
-        time.sleep(0.01)
-        return mjpeg_part()
+        count = min(size, self.chunk_size, len(self.buffer))
+        result = bytes(self.buffer[:count])
+        del self.buffer[:count]
+        return result
 
     def close(self) -> None:
         self.closed = True
 
 
-def expect_app_error(fn, code: str) -> None:
-    try:
-        fn()
-    except AppError as exc:
-        assert exc.code.value == code, (exc.code.value, code)
-    else:
-        raise AssertionError(f"Expected AppError {code}")
+class RepeatingTcpStream:
+    def __init__(self, *, end_after_frames: int | None = None) -> None:
+        self.closed = False
+        self.frames = 0
+        self.end_after_frames = end_after_frames
+        self.pending = bytearray()
+
+    def read(self, size: int) -> bytes:
+        if self.closed:
+            return b""
+        if not self.pending:
+            if self.end_after_frames is not None and self.frames >= self.end_after_frames:
+                return b""
+            self.frames += 1
+            time.sleep(0.01)
+            self.pending.extend(
+                _encode_frame_packet(
+                    JPEG_1X1,
+                    sequence=self.frames,
+                    source_uptime_ms=self.frames * 10,
+                )
+            )
+        count = min(size, len(self.pending))
+        result = bytes(self.pending[:count])
+        del self.pending[:count]
+        return result
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def main() -> int:
-    # Multipart parser must tolerate arbitrary TCP chunk boundaries.
-    parser = _MjpegParser(boundary=b"frame")
-    payload = mjpeg_part() + mjpeg_part()
-    cut_points = [3, 17, 41, 79, len(payload)]
-    cursor = 0
-    parsed: list[bytes] = []
-    for cut in cut_points:
-        parsed.extend(parser.feed(payload[cursor:cut]))
-        cursor = cut
-    assert parsed == [JPEG_1X1, JPEG_1X1]
-    print("[PASS] Content-Length MJPEG parser handles split headers/bodies and exact frame boundaries")
-
-    # If two frames arrive together, service keeps newest only.
-    class BurstStream:
-        boundary = b"frame"
-        def __init__(self) -> None:
-            self.sent = False
-        def read(self, _size: int) -> bytes:
-            if self.sent:
-                return b""
-            self.sent = True
-            return mjpeg_part() + mjpeg_part()
-        def close(self) -> None:
-            pass
-
-    parser_service = RemoteCameraService()
-    outcome = parser_service._consume_mjpeg_stream(
-        stream=BurstStream(),
-        source_id="esp32_cam_burst",
-        stop_event=threading.Event(),
+    # Fixed binary framing must survive arbitrary TCP fragmentation.
+    stream = ChunkedFrameStream(
+        _encode_frame_packet(JPEG_1X1, sequence=7, source_uptime_ms=1234),
+        chunk_size=2,
     )
-    parser_status = parser_service.status()
-    assert outcome == "stream_ended"
-    assert parser_status["successful_fetches"] == 1
-    assert parser_status["dropped_stale_frames"] == 1
-    print("[PASS] newest-frame policy drops complete backlog frames instead of replaying latency")
+    packet = _read_frame_packet(stream)
+    assert packet is not None
+    assert packet.content == JPEG_1X1
+    assert packet.sequence == 7
+    assert packet.source_uptime_ms == 1234
+    print("[PASS] V036 length-prefixed JPEG framing handles arbitrary TCP segmentation")
 
     calls: list[tuple[str, str, dict[str, str] | None]] = []
     status_calls = 0
@@ -142,31 +141,24 @@ def main() -> int:
         calls.append((method, path, query))
         if path == "/status":
             status_calls += 1
-            # Connect and the first recovery probe both see an idle session.
-            return {
-                "protocol": "aitl-camera-v035",
-                "camera_ready": True,
-                "session_active": False,
-                "stream_client_active": False,
-                "settings": SETTINGS,
-            }
+            # Initial Connect and first recovery probe both see idle.
+            return device_status(session_active=False)
         if path == "/config":
             assert query is not None
             assert query["stream_fps"] == "15"
-            return {"ok": True, "session_active": False, "settings": SETTINGS}
+            return device_status(session_active=False)
         if path == "/start":
-            return {"camera_ready": True, "session_active": True, "settings": SETTINGS}
+            return device_status(session_active=True)
         if path == "/stop":
-            return {"camera_ready": True, "session_active": False, "settings": SETTINGS}
+            return device_status(session_active=False)
         raise AssertionError(path)
 
     def open_stream(host: str):
         nonlocal opened_streams
         opened_streams += 1
         if opened_streams == 1:
-            # Simulate a connection that produces a frame then drops.
-            return RepeatingMjpegStream(end_after_frames=1)
-        return RepeatingMjpegStream()
+            return RepeatingTcpStream(end_after_frames=1)
+        return RepeatingTcpStream()
 
     service._json_requester = request_json
     service._stream_opener = open_stream
@@ -179,8 +171,8 @@ def main() -> int:
     print("[PASS] Connect remains control-only with zero image transfer")
 
     started = service.start_stream(settings=SETTINGS, target_fps=15)
+    assert started["transport"] == "tcp_jpeg"
     assert started["streaming"] is True
-    assert started["stream_connected"] is False or started["worker_running"] is True
     assert [item[:2] for item in calls[1:4]] == [
         ("POST", "/stop"),
         ("POST", "/config"),
@@ -189,15 +181,15 @@ def main() -> int:
 
     first = service.wait_for_new_frame(-1, timeout_seconds=0.5)
     assert first is not None and first.source_id == "esp32_cam_test"
-    print("[PASS] browser relay can block on an event and wake immediately for a new physical frame")
+    print("[PASS] browser relay still wakes immediately from the shared PC frame slot")
 
-    # First fake stream drops. V035 should probe status, see lost session,
-    # reapply config/start, then reopen the MJPEG stream automatically.
+    # First fake stream ends. V036 probes status, sees lost session, re-arms it,
+    # and reconnects the raw TCP frame socket automatically.
     deadline = time.time() + 1.5
     recovered = None
     while time.time() < deadline:
         recovered = service.status()
-        if recovered["session_recoveries"] >= 1 and recovered["stream_connected"]:
+        if recovered["session_recoveries"] >= 1 and recovered["stream_connected"] and opened_streams >= 2:
             break
         time.sleep(0.03)
 
@@ -206,7 +198,7 @@ def main() -> int:
     assert recovered["stream_reconnects"] >= 1
     assert opened_streams >= 2
     assert status_calls >= 2
-    print("[PASS] dropped/rebooted ESP session is automatically re-armed and MJPEG reconnects")
+    print("[PASS] dropped/rebooted V036 ESP session is automatically re-armed and reconnected")
 
     camera_frame_service.set_simulation(True)
     before = service.status()["successful_fetches"]
@@ -222,7 +214,7 @@ def main() -> int:
         time.sleep(0.03)
         after = service.status()
     assert after["successful_fetches"] > during["successful_fetches"]
-    print("[PASS] simulation suspends physical transport and it resumes afterward")
+    print("[PASS] simulation suspends physical transport and resumes afterward")
 
     stopped = service.stop_stream()
     count_at_stop = stopped["successful_fetches"]
@@ -230,11 +222,11 @@ def main() -> int:
     assert service.status()["successful_fetches"] == count_at_stop
     assert stopped["worker_running"] is False
     assert stopped["stream_connected"] is False
-    print("[PASS] Stop Stream closes the active reader with bounded shutdown")
+    print("[PASS] Stop Stream closes the active TCP reader with bounded shutdown")
 
     service.disconnect()
     assert service.status()["configured"] is False
-    print("[PASS] Disconnect clears V035 remote state safely")
+    print("[PASS] Disconnect clears V036 remote state safely")
     return 0
 
 

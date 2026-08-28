@@ -33,7 +33,7 @@ export type RemoteCameraSettings = {
 
 export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
   frame_size: "VGA",
-  jpeg_quality: 12,
+  jpeg_quality: 14,
   brightness: 0,
   contrast: 0,
   saturation: 0,
@@ -65,7 +65,8 @@ export type RemoteCameraStatus = {
   streaming: boolean;
   stream_connected: boolean;
   paused_for_simulation: boolean;
-  transport: "idle" | "mjpeg";
+  transport: "idle" | "tcp_jpeg";
+  stream_protocol: "aitl-tcp-jpeg-v1" | null;
   host: string | null;
   source_id: string | null;
   status_url: string | null;
@@ -81,6 +82,9 @@ export type RemoteCameraStatus = {
   reconnect_backoff_ms: number;
   stream_bytes_received: number;
   dropped_stale_frames: number;
+  source_sequence_gaps: number;
+  last_remote_sequence: number | null;
+  last_source_uptime_ms: number | null;
   connected_at_ms: number | null;
   stream_started_at_ms: number | null;
   last_stream_connected_at_ms: number | null;

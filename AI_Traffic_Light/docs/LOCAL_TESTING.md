@@ -1,64 +1,53 @@
-# Local Testing — V035
+# Local Testing — V036
 
-Expected:
+Expected release state:
 
 ```text
-version: 0_3_5
-previous_version: 0_3_4
+version: 0_3_6
+previous_version: 0_3_5
 passed_baseline: 0_2_4
 ```
 
-Run:
+Run the normal repository test workflow:
 
 ```powershell
 .\scripts\update_test_run.ps1
 ```
 
 Focused regressions must verify:
-- private-LAN validation;
-- old interval→FPS compatibility;
-- Content-Length parsing across split TCP chunks;
-- newest-frame backlog dropping;
+
+- literal private-LAN ESP IPv4 validation;
+- V035/mismatched firmware rejected during Connect;
+- fixed 16-byte frame header survives arbitrary TCP segmentation;
+- invalid magic/length/incomplete JPEG is rejected;
+- old interval→FPS API compatibility;
 - Connect transfers zero images;
-- event-driven frame wait/wakeup;
+- Start order remains `/stop → /config → /start → TCP`;
+- event-driven browser frame wakeup;
 - automatic lost-session recovery;
 - simulation pause/resume;
 - bounded Stop/Disconnect.
 
-## Physical stability test
+## Physical speed/latency test
 
-1. Flash only the updated V035 `.ino`; keep the existing `secrets.h`.
-2. Connect: confirm ESP `session_active=false` and `stream_client_active=false`.
-3. Start VGA / JPEG 12–16 / 15 FPS.
-4. Confirm PC reports `stream_connected=true`.
-5. Confirm measured FPS is stable and `stream_reconnects=0`.
-6. Move an object quickly and compare visible delay with V034.
-7. Temporarily power-cycle/reset the ESP while PC Studio still wants the stream.
-8. After Wi-Fi returns, confirm `session_recoveries` increments and video resumes without manually pressing Start.
-9. Test 20 FPS and retain it only if reconnect count/failure streak remain near zero.
-10. Test simulation pause/resume, Live AI and Dataset Capture.
+1. Flash the matching V036 firmware.
+2. On Serial Monitor, record the ESP IP.
+3. In PC Studio enter that ESP IP and Connect.
+4. Confirm `/status` reports `protocol=aitl-camera-v036`, `stream_protocol=aitl-tcp-jpeg-v1`, `session_active=false` and no stream client.
+5. Start at VGA / JPEG 14 / 15 FPS.
+6. Confirm PC reports `transport=tcp_jpeg` and `stream_connected=true`.
+7. Confirm ESP `last_frame_bytes > 0`, `stream_frame_count` rises, `actual_fps` is stable, and recurring `cam_hal: FB-OVF` is absent.
+8. Move a high-contrast object rapidly across the frame. Compare visible delay and motion smoothness with V035 if available.
+9. Run at least two minutes. Prefer `stream_reconnects=0` under normal Wi-Fi; occasional reconnects under forced congestion are acceptable if video resumes fresh rather than replaying old frames.
+10. Reset/power-cycle the ESP while PC Studio still wants the stream. Confirm `session_recoveries` increments and video returns without pressing Start again.
+11. Test 20 FPS. Retain it only if actual FPS approaches target without rising send failures/reconnects.
+12. Test simulation pause/resume, Live AI and Dataset Capture.
 
+## Diagnose speed limits
 
-## V035 stream-repair diagnostic
+If measured FPS is low, compare ESP telemetry:
 
-After flashing the repaired V035 `.ino`, first use:
-
-```text
-Resolution: VGA
-JPEG quality: 14
-Target FPS: 10
-```
-
-Expected Serial Monitor while active:
-
-- no recurring `cam_hal: FB-OVF`;
-- `stream_client=connected`;
-- `stream` counter increases continuously;
-- `last_frame_bytes` is non-zero;
-- `actual_fps` is materially above the previous ~0.3 FPS.
-
-Then increase to 15 FPS, followed by 20 FPS only if stable.
-
-If `FB-OVF` still appears at VGA/quality 14 after this repair, record `/status`
-including `psram`, `last_frame_bytes`, `last_frame_ms`, `last_send_ms`, and
-`actual_fps`, because that would indicate a different camera/PSRAM or power issue.
+- high `last_capture_ms`: camera/resolution/quality is the bottleneck;
+- high `last_send_ms` or `stream_deadline_drops`: Wi-Fi/network is the bottleneck;
+- rising `source_sequence_gaps`: frames were lost across a transport/reconnect interval;
+- recurring `FB-OVF`: investigate camera/PSRAM/power before increasing FPS.

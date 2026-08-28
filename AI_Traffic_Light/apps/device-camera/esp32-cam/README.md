@@ -1,161 +1,85 @@
-# AiTL ESP32-CAM live frame sender
+# AiTL ESP32-CAM camera node
 
-This folder contains the first working ESP32-CAM sender for AiTL.
+This folder contains the AI Thinker ESP32-CAM firmware used by PC Studio.
 
-The firmware is intentionally a lightweight camera node:
+The current architecture is PC-initiated:
 
 ```text
-AI Thinker ESP32-CAM
-→ Wi-Fi
-→ capture JPEG
-→ POST raw JPEG to PC Studio
-→ /api/camera/frame?source_id=<device_id>
+ESP boot → Wi-Fi → idle
+PC Studio Connect → ESP /status only
+PC Studio Start → /config → /start → persistent TCP JPEG stream
+PC Studio Stop → close stream → /stop
 ```
 
-The PC remains responsible for inference, dataset capture, training, analytics, and all traffic-light simulation/recommendation logic.
+The ESP does **not** need the PC's IP address. It only needs its own Wi-Fi credentials. In PC Studio, enter the ESP's private-LAN IPv4 address.
 
-## Supported target
+## Transport
 
-The checked-in PlatformIO environment uses:
+- HTTP port 80: `/status`, `/config`, `/start`, `/stop`, optional idle `/capture`.
+- TCP port 81: one low-latency binary JPEG stream.
+- Frame format: 16-byte `ATL1` header (`length`, `sequence`, `uptime_ms`) followed by the JPEG.
+- Browser preview is produced by PC Studio; browsers never connect directly to port 81.
+
+## PlatformIO
+
+The checked-in target is:
 
 ```ini
 board = esp32cam
 framework = arduino
 ```
 
-`src/main.cpp` therefore uses the standard **AI Thinker ESP32-CAM** camera pin map. If your camera board is an ESP32-S3 camera or another pin layout, do not flash this pin map unchanged.
-
-## 1. Create the local secrets file
-
-From:
-
-```text
-AI_Traffic_Light/apps/device-camera/esp32-cam/
-```
-
-copy:
-
-```text
-include/secrets.example.h
-```
-
-to:
-
-```text
-include/secrets.h
-```
-
-`include/secrets.h` is ignored by Git.
-
-Edit at least:
-
-```cpp
-#define AITL_WIFI_SSID "YOUR_WIFI_NAME"
-#define AITL_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-#define AITL_SERVER_HOST "192.168.1.100"
-#define AITL_SOURCE_ID "esp32_cam_01"
-```
-
-Use the PC's **LAN IPv4 address** for `AITL_SERVER_HOST`. On Windows, run:
-
-```powershell
-ipconfig
-```
-
-Use the IPv4 address for the Wi-Fi/Ethernet adapter that is on the same LAN as the ESP. Do not enter `127.0.0.1` and do not include `http://`.
-
-The normal AiTL backend port is `8000`.
-
-## 2. Start PC Studio backend
-
-The repository's Windows backend launcher already binds to `0.0.0.0:8000`, which allows another device on the LAN to reach it.
-
-Start the backend using the normal AiTL workflow. If Windows Firewall asks, allow Python/Uvicorn on the **Private** network used by the prototype.
-
-Before flashing the ESP, test from another device on the same LAN if possible:
-
-```text
-http://<PC-LAN-IP>:8000/api/camera/status
-```
-
-A JSON response confirms that the PC is reachable.
-
-## 3. Build and upload with PlatformIO
-
-Open this folder in VS Code with the PlatformIO extension, or run:
+Create the local secret file:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\apps\device-camera\esp32-cam"
+Copy-Item .\include\secrets.example.h .\include\secrets.h
+```
+
+Edit only the Wi-Fi values in `include/secrets.h`.
+
+Build/upload:
+
+```powershell
 pio run
 pio run -t upload
 pio device monitor -b 115200
 ```
 
-If `pio` is not available in a normal PowerShell terminal, use the PlatformIO VS Code toolbar commands **Build**, **Upload**, and **Serial Monitor**.
+## Arduino IDE
 
-### Bare AI Thinker ESP32-CAM + USB-to-TTL
-
-Typical programming wiring:
+A standalone sketch is provided at:
 
 ```text
-USB-TTL 5V  -> ESP32-CAM 5V
-USB-TTL GND -> ESP32-CAM GND
-USB-TTL TX  -> ESP32-CAM U0R / GPIO3
-USB-TTL RX  -> ESP32-CAM U0T / GPIO1
-ESP32-CAM GPIO0 -> GND only while entering flash mode
+arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino
 ```
 
-Use a USB-to-TTL adapter with **3.3 V serial logic**. Power the ESP32-CAM through its 5 V input with a supply/adapter that can provide stable current. After upload, disconnect GPIO0 from GND and reset/power-cycle the board to boot normally.
+Copy `secrets.example.h` to `secrets.h` inside that sketch folder, enter Wi-Fi credentials, then upload as an **AI Thinker ESP32-CAM** target using the installed ESP32 Arduino core.
 
-An ESP32-CAM-MB programmer board normally handles the serial wiring for you.
+## First physical test
 
-## 4. Expected serial output
-
-A working boot should show messages similar to:
+Use:
 
 ```text
-AiTL ESP32-CAM live frame sender
-Camera ready ...
-Wi-Fi connected. ESP IP: 192.168.x.x
-Receiver: http://192.168.x.x:8000/api/camera/frame?source_id=esp32_cam_01
-Frame upload OK ...
+VGA
+JPEG quality 14
+15 FPS
 ```
 
-The ESP also exposes a local diagnostic endpoint:
+Expected Serial output includes the ESP IP, stream client state, actual FPS, frame bytes, capture time and send time. Test 20 FPS only after 15 FPS is stable.
 
-```text
-http://<ESP-IP>/status
-```
+## Low-latency behavior
 
-It reports camera/Wi-Fi state, upload counters, last HTTP result, RSSI, heap, and uptime. It does not expose the Wi-Fi password.
+When PSRAM exists the camera initializes JPEG at UXGA with two PSRAM framebuffers and `CAMERA_GRAB_LATEST`, then applies the PC-selected runtime resolution. Wi-Fi sleep is disabled. The stream uses `TCP_NODELAY`, keepalive and a short send deadline.
 
-## 5. PC Studio acceptance check
+If a frame cannot be delivered promptly, the ESP closes the stream socket rather than allowing old frames to build up. PC Studio reconnects and resumes from current imagery.
 
-With simulation mode stopped:
+## Compatibility
 
-1. Open **Camera Sources** in PC Studio.
-2. Power the ESP32-CAM.
-3. Confirm the camera status changes to the configured `source_id`.
-4. Confirm frame number continues increasing.
-5. Confirm the preview shows the real ESP image.
-6. Leave it running for at least 2 minutes and confirm uploads continue after normal Wi-Fi jitter.
-7. Temporarily stop the backend, wait for upload failures on Serial Monitor, restart the backend, and confirm uploads recover without rebooting the ESP.
+PC Studio's current binary stream requires matching firmware. A V035 HTTP/MJPEG firmware will be rejected during Connect instead of being interpreted as the V036 frame protocol.
 
-## Default streaming settings
-
-```text
-Resolution: VGA / 640x480 when PSRAM is available
-JPEG quality: 12
-Upload interval: 250 ms (up to about 4 frames/s)
-HTTP timeout: 3.5 s
-```
-
-If the link is unstable, first increase `AITL_FRAME_INTERVAL_MS` to `500UL`. If necessary, reduce `AITL_FRAME_SIZE` to `FRAMESIZE_QVGA`.
-
-## Current limitation
-
-PC Studio's current receiver retains one latest uploaded device frame. `source_id` identifies the sender, but two ESP cameras uploading at the same time will currently replace each other's latest frame. Multi-camera retention/routing needs a later PC-side change.
+Legacy `POST /api/camera/frame` remains available in PC Studio for other device senders, but this ESP firmware no longer uses per-frame HTTP uploads.
 
 ## Prototype boundary
 
-This firmware only sends camera images to the local AiTL PC prototype. It does not run heavy AI and does not control public-road traffic infrastructure.
+This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.

@@ -1,56 +1,57 @@
-# ESP32-CAM V035 streaming
+# ESP32-CAM low-latency streaming
 
-Use the updated standalone `AiTL_ESP32CAM_V035.ino`. `secrets.h` is unchanged.
+## Current architecture
 
-## Workflow
-
-The ESP boots idle. Connect sends no images.
-
-Start Stream:
+The camera node is intentionally simple: capture JPEGs and deliver them to PC Studio. AI, dataset handling, training, analytics and signal simulation remain on the PC.
 
 ```text
-/config + stream_fps
-/start
-persistent :81/stream
+Port 80: HTTP /status /config /start /stop /capture
+Port 81: one persistent AiTL TCP JPEG stream
 ```
 
-Stop Stream closes the PC stream and calls `/stop`.
+Connect is control-only. The ESP does not send image bytes until PC Studio applies settings, calls `/start`, and opens port 81.
 
-## V035 stability changes
+## Image framing
 
-The stream HTTP server enables:
-- TCP keepalive;
-- TCP_NODELAY;
-- 2 s send/receive wait timeout;
-- LRU socket purge.
+The port-81 stream uses a fixed 16-byte network-endian header followed immediately by JPEG bytes:
 
-The firmware keeps Wi-Fi sleep disabled and uses `WiFi.reconnect()` before a full `WiFi.begin()` fallback.
+`ATL1 + length + sequence + uptime_ms + JPEG`
 
-`/status` now reports `stream_client_active` so transport state can be diagnosed separately from `session_active`.
+The fixed header avoids multipart boundary scanning and per-frame HTTP headers between ESP and PC.
 
-## V035 speed changes
+## Camera configuration
 
-Each MJPEG frame uses two HTTPD writes:
-1. multipart boundary + headers;
-2. JPEG bytes.
+When PSRAM exists, initialize JPEG capture at UXGA, quality 10, two PSRAM framebuffers and `CAMERA_GRAB_LATEST`, then apply the lower runtime resolution/quality selected in PC Studio. This preserves sufficient framebuffer allocation for later resolution changes.
 
-V034 used three writes.
+Recommended first physical settings:
 
-The firmware retains:
-- `CAMERA_GRAB_LATEST`;
-- two PSRAM framebuffers;
-- PC-selected 1–30 FPS cap.
+```text
+Resolution: VGA
+JPEG quality: 14
+Target FPS: 15
+```
 
-Recommended starting point remains VGA, JPEG quality 12–16, 15 FPS. Test 20 FPS only if measured FPS is stable and reconnects stay at zero.
+Test 20 FPS after 15 FPS is stable. Use QVGA or a larger JPEG-quality number if bandwidth/capture time is limiting.
 
+## Latency controls
 
-## V035 framebuffer repair
+- Wi-Fi sleep disabled.
+- `TCP_NODELAY` enabled.
+- TCP keepalive enabled.
+- no application image queue on the ESP.
+- frame schedule is based on target deadlines rather than `delay()` after a send.
+- blocked frame sends have a short socket timeout and 250 ms total send deadline.
+- missed deadline closes the client; PC Studio reconnects to fresh imagery.
+- PC receiver declares a 2 s source stall instead of waiting 6 s.
 
-The ESP camera is now initialized the same way as Espressif's current CameraWebServer
-allocation strategy: when PSRAM exists, initialize JPEG mode at UXGA with two PSRAM
-buffers and `CAMERA_GRAB_LATEST`, then apply the lower PC-selected runtime resolution.
+## Firmware choices
 
-This matters because runtime `sensor->set_framesize()` changes the sensor output but
-does not retroactively make a too-small initialization allocation a safe choice for
-larger JPEG frames. Repeated `cam_hal: FB-OVF` is therefore treated as a camera-buffer
-problem before tuning network FPS.
+PlatformIO source:
+
+`apps/device-camera/esp32-cam/src/main.cpp`
+
+Standalone Arduino IDE sketch:
+
+`apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino`
+
+For either workflow, configure only the ESP Wi-Fi credentials. Do not configure a PC IP on the ESP. PC Studio asks for the ESP's private-LAN IPv4 address.

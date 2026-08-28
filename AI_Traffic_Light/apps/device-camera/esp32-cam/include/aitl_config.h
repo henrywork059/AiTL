@@ -6,7 +6,6 @@
 #include "secrets.h"
 #endif
 
-// Safe build defaults. Copy secrets.example.h to secrets.h and replace these.
 #ifndef AITL_WIFI_SSID
 #define AITL_WIFI_SSID "CHANGE_ME"
 #endif
@@ -15,39 +14,42 @@
 #define AITL_WIFI_PASSWORD "CHANGE_ME"
 #endif
 
-#ifndef AITL_SERVER_HOST
-#define AITL_SERVER_HOST "CHANGE_ME"
-#endif
-
-#ifndef AITL_SERVER_PORT
-#define AITL_SERVER_PORT 8000
-#endif
-
-#ifndef AITL_SOURCE_ID
-#define AITL_SOURCE_ID "esp32_cam_01"
-#endif
-
 #ifndef AITL_DEVICE_HOSTNAME
 #define AITL_DEVICE_HOSTNAME "aitl-cam-01"
 #endif
 
-// 250 ms = up to 4 frame uploads/second. Increase this if Wi-Fi or the PC is overloaded.
-#ifndef AITL_FRAME_INTERVAL_MS
-#define AITL_FRAME_INTERVAL_MS 250UL
+#ifndef AITL_DEFAULT_SOURCE_ID
+#define AITL_DEFAULT_SOURCE_ID "esp32_cam_01"
 #endif
 
-// VGA is a practical first setting for an ESP32-CAM traffic-model prototype.
-#ifndef AITL_FRAME_SIZE
-#define AITL_FRAME_SIZE FRAMESIZE_VGA
+#ifndef AITL_DEFAULT_FRAME_SIZE
+#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_VGA
 #endif
 
-// ESP32 camera JPEG quality uses a lower number for higher quality.
-#ifndef AITL_JPEG_QUALITY
-#define AITL_JPEG_QUALITY 12
+// ESP camera JPEG quality: lower number = higher image quality/larger frame.
+#ifndef AITL_DEFAULT_JPEG_QUALITY
+#define AITL_DEFAULT_JPEG_QUALITY 14
 #endif
 
-#ifndef AITL_HTTP_TIMEOUT_MS
-#define AITL_HTTP_TIMEOUT_MS 3500U
+#ifndef AITL_DEFAULT_STREAM_FPS
+#define AITL_DEFAULT_STREAM_FPS 15U
+#endif
+
+#ifndef AITL_CONTROL_PORT
+#define AITL_CONTROL_PORT 80U
+#endif
+
+#ifndef AITL_STREAM_PORT
+#define AITL_STREAM_PORT 81U
+#endif
+
+// Freshness-first transport: a blocked frame is abandoned instead of queued.
+#ifndef AITL_STREAM_SEND_TIMEOUT_MS
+#define AITL_STREAM_SEND_TIMEOUT_MS 120U
+#endif
+
+#ifndef AITL_FRAME_SEND_DEADLINE_MS
+#define AITL_FRAME_SEND_DEADLINE_MS 250U
 #endif
 
 #ifndef AITL_WIFI_CONNECT_TIMEOUT_MS
@@ -55,13 +57,9 @@
 #endif
 
 #ifndef AITL_WIFI_RETRY_MS
-#define AITL_WIFI_RETRY_MS 5000UL
-#endif
-
-#ifndef AITL_CAMERA_RETRY_MS
-#define AITL_CAMERA_RETRY_MS 5000UL
+#define AITL_WIFI_RETRY_MS 3000UL
 #endif
 
 #ifndef AITL_SERIAL_STATUS_INTERVAL_MS
-#define AITL_SERIAL_STATUS_INTERVAL_MS 10000UL
+#define AITL_SERIAL_STATUS_INTERVAL_MS 5000UL
 #endif

@@ -26,7 +26,7 @@ class RemoteCameraConnectRequest(BaseModel):
 
 class RemoteCameraSettingsRequest(BaseModel):
     frame_size: Literal["QQVGA", "HQVGA", "QVGA", "CIF", "VGA", "SVGA", "XGA", "SXGA", "UXGA"] = "VGA"
-    jpeg_quality: int = Field(default=12, ge=4, le=63)
+    jpeg_quality: int = Field(default=14, ge=4, le=63)
     brightness: int = Field(default=0, ge=-2, le=2)
     contrast: int = Field(default=0, ge=-2, le=2)
     saturation: int = Field(default=0, ge=-2, le=2)
@@ -53,30 +53,27 @@ class RemoteCameraSettingsRequest(BaseModel):
 
 class RemoteCameraStartRequest(BaseModel):
     target_fps: int = Field(default=15, ge=1, le=30)
-    # Retained so older V033/V034 callers remain accepted; V035 UI sends target_fps.
+    # Retained so V033-V035 callers remain accepted; V036 UI sends target_fps.
     fetch_interval_ms: int | None = Field(default=None, ge=34, le=5000)
     settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
 
 
 def _live_mjpeg() -> Iterator[bytes]:
-    """Relay newest PC-side frames; physical ESP frames wake this generator immediately."""
+    """Browser relay remains MJPEG; ESP-to-PC transport is the V036 TCP JPEG stream."""
     last_frame_number = -1
 
     while True:
         if camera_frame_service.simulation_enabled:
-            # The simulator is generated on demand; 20 ms avoids a CPU-heavy busy loop.
             frame = camera_frame_service.latest_frame()
             if frame is None or frame.frame_number == last_frame_number:
                 time.sleep(0.02)
                 continue
         elif remote_camera_service.streaming_requested:
-            # Physical frames notify a Condition from the ingestion thread, removing
-            # V034's 10 ms browser-preview polling delay and unnecessary lock traffic.
             frame = remote_camera_service.wait_for_new_frame(last_frame_number, timeout_seconds=1.0)
             if frame is None:
                 continue
         else:
-            # Legacy raw uploads have no persistent transport notifier.
+            # Legacy raw uploads remain compatible with the shared frame service.
             frame = camera_frame_service.latest_frame()
             if frame is None or frame.frame_number == last_frame_number:
                 time.sleep(0.02)
@@ -97,7 +94,7 @@ def _live_mjpeg() -> Iterator[bytes]:
 def list_camera_sources(request: Request) -> dict:
     data = {
         "sources": [
-            {"id": "remote_esp32", "label": "ESP32-CAM by IP", "type": "mjpeg_pull", "status": "ready"},
+            {"id": "remote_esp32", "label": "ESP32-CAM by IP", "type": "tcp_jpeg_pull", "status": "ready"},
             {"id": "frame_receiver", "label": "Device frame receiver", "type": "http_upload", "status": "ready"},
             {"id": "simulation_camera", "label": "PC simulation camera", "type": "simulation", "status": "ready"},
             {"id": "webcam_0", "label": "Local webcam", "type": "webcam", "status": "placeholder"},
@@ -114,7 +111,7 @@ def camera_status(request: Request) -> dict:
 
 @router.get("/live.mjpeg")
 def live_camera_mjpeg(request: Request) -> StreamingResponse:
-    """Low-latency browser preview from the same PC-side frame pipeline used by inference/capture."""
+    """Low-latency browser preview from the same PC frame pipeline used by inference/capture."""
     return StreamingResponse(
         _live_mjpeg(),
         media_type="multipart/x-mixed-replace; boundary=frame",
@@ -150,7 +147,7 @@ def start_remote_camera(payload: RemoteCameraStartRequest, request: Request) -> 
         fetch_interval_ms=payload.fetch_interval_ms,
     )
     logger.info(
-        "Remote ESP low-latency MJPEG stream started",
+        "Remote ESP low-latency TCP JPEG stream started",
         extra={
             "request_id": request.state.request_id,
             "camera_host": data["host"],

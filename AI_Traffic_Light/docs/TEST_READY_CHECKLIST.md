@@ -1,19 +1,25 @@
-# V035 Acceptance Checklist
+# V036 Acceptance Checklist
 
-1. VERSION is `0_3_5`; previous `0_3_4`; baseline remains `0_2_4`.
-2. Connect requests `/status` only and sends zero images.
-3. Start applies full settings and target FPS before image transport.
-4. PC uses one persistent MJPEG stream with TCP keepalive.
-5. Multipart parser uses exact Content-Length and handles split network chunks.
-6. Backlogged complete frames are discarded in favor of newest.
-7. Physical browser preview wakes on frame notification rather than 10 ms polling.
-8. Transport reports connected/reconnecting state separately.
-9. ESP reboot/lost session automatically triggers status probe + config/start recovery.
-10. Reconnect uses bounded exponential backoff rather than fixed rapid retry.
-11. Stop closes the active socket promptly before ESP `/stop`.
-12. Simulation suspends and later resumes physical transport.
-13. ESP HTTPD TCP_NODELAY/keepalive/timeouts compile under the installed Arduino ESP32 core.
-14. Full inherited backend regressions pass.
-15. Frontend typecheck/build and live smoke pass.
-16. Real ESP test shows equal-or-better latency and materially stronger recovery than V034.
-17. Owner explicitly accepts V035 before `passed_baseline` changes.
+1. `VERSION` is `0_3_6`; previous candidate `0_3_5`; passed baseline remains `0_2_4`.
+2. Matching V036 PlatformIO firmware and standalone Arduino IDE sketch compile for AI Thinker ESP32-CAM.
+3. ESP requires Wi-Fi credentials only; no PC/server IP is required in firmware.
+4. Connect requests `/status` only and transfers zero image bytes.
+5. V035/mismatched firmware produces a clear compatibility error during Connect.
+6. Start applies full OV2640 settings and target FPS before opening image transport.
+7. ESP→PC image transport is one persistent length-prefixed TCP JPEG connection on port 81.
+8. Fixed header is `ATL1 + length + sequence + source uptime`; split TCP segments are handled correctly.
+9. PC validates payload length and JPEG boundaries.
+10. ESP uses JPEG, two PSRAM framebuffers and `CAMERA_GRAB_LATEST` when PSRAM exists.
+11. ESP allocation starts at UXGA before applying the selected runtime frame size.
+12. ESP/PC stream sockets use `TCP_NODELAY`; keepalive remains enabled.
+13. Frame cadence does not add a post-send delay on top of the target period.
+14. A congested ESP send is abandoned by deadline rather than queued for seconds.
+15. PC stream stall timeout/reconnect is bounded and automatic session restoration still works.
+16. Browser preview remains event-driven and uses the shared PC frame service.
+17. Simulation suspends and later resumes the physical stream.
+18. Live AI and Dataset Capture still consume physical frames correctly.
+19. Focused backend tests, full inherited backend regressions, structure checks and smoke pass on the complete repository.
+20. Frontend typecheck/build passes.
+21. Physical VGA/JPEG14/15 FPS test shows stable streaming with no recurring framebuffer overflow.
+22. Physical latency is equal to or lower than V035 and severe Wi-Fi congestion recovers to a fresh frame rather than visibly replaying backlog.
+23. Owner explicitly accepts V036 before `passed_baseline` changes.

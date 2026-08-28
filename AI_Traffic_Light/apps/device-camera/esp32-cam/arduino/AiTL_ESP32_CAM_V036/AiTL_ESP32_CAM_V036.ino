@@ -1,3 +1,6 @@
+// AiTL V036 standalone Arduino IDE sketch.
+// Keep this behavior aligned with ../../src/main.cpp.
+
 #include <Arduino.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -6,7 +9,30 @@
 #include <lwip/sockets.h>
 #include <lwip/tcp.h>
 
-#include "aitl_config.h"
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+
+#ifndef AITL_WIFI_SSID
+#define AITL_WIFI_SSID "CHANGE_ME"
+#endif
+#ifndef AITL_WIFI_PASSWORD
+#define AITL_WIFI_PASSWORD "CHANGE_ME"
+#endif
+#ifndef AITL_DEVICE_HOSTNAME
+#define AITL_DEVICE_HOSTNAME "aitl-cam-01"
+#endif
+#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_VGA
+#define AITL_DEFAULT_JPEG_QUALITY 14
+#define AITL_DEFAULT_STREAM_FPS 15U
+#define AITL_CONTROL_PORT 80U
+#define AITL_STREAM_PORT 81U
+#define AITL_STREAM_SEND_TIMEOUT_MS 120U
+#define AITL_FRAME_SEND_DEADLINE_MS 250U
+#define AITL_WIFI_CONNECT_TIMEOUT_MS 20000UL
+#define AITL_WIFI_RETRY_MS 3000UL
+#define AITL_SERIAL_STATUS_INTERVAL_MS 5000UL
+
 
 namespace {
 

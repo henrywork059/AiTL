@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import http.client
 import ipaddress
 import json
 import socket
+import struct
 from threading import Condition, Event, RLock, Thread, current_thread
 import time
 from typing import BinaryIO, Callable
@@ -30,16 +30,19 @@ MAX_TARGET_FPS = 30
 DEFAULT_TARGET_FPS = 15
 
 CONTROL_TIMEOUT_SECONDS = 2.5
-STREAM_CONNECT_TIMEOUT_SECONDS = 2.5
-STREAM_READ_TIMEOUT_SECONDS = 6.0
+STREAM_CONNECT_TIMEOUT_SECONDS = 2.0
+STREAM_READ_TIMEOUT_SECONDS = 2.0
 STATUS_REFRESH_SECONDS = 2.0
 
-RECONNECT_BACKOFF_INITIAL_SECONDS = 0.15
-RECONNECT_BACKOFF_MAX_SECONDS = 2.0
+RECONNECT_BACKOFF_INITIAL_SECONDS = 0.10
+RECONNECT_BACKOFF_MAX_SECONDS = 1.5
 
 MAX_JSON_RESPONSE_BYTES = 32 * 1024
-STREAM_READ_BYTES = 64 * 1024
-MAX_MJPEG_HEADER_BYTES = 2048
+TCP_STREAM_PORT = 81
+FRAME_MAGIC = b"ATL1"
+FRAME_HEADER = struct.Struct("!4sIII")
+FRAME_PROTOCOL = "aitl-tcp-jpeg-v1"
+CAMERA_PROTOCOL = "aitl-camera-v036"
 
 CAMERA_SETTING_KEYS = (
     "frame_size",
@@ -78,121 +81,116 @@ class _NoRedirectHandler(HTTPRedirectHandler):
 
 @dataclass(frozen=True)
 class RemoteCapture:
-    """Compatibility value retained for earlier patch tooling/tests."""
+    """Compatibility value retained for earlier focused tests/tools."""
 
     content: bytes
     content_type: str
     http_status: int
 
 
-class _HttpStreamHandle:
-    """Own both HTTPConnection and HTTPResponse for deterministic socket cleanup."""
+@dataclass(frozen=True)
+class _FramePacket:
+    """One V036 source frame after the fixed binary header is decoded."""
 
-    def __init__(
-        self,
-        connection: http.client.HTTPConnection,
-        response: http.client.HTTPResponse,
-        *,
-        boundary: bytes,
-    ) -> None:
-        self._connection = connection
-        self._response = response
-        self.boundary = boundary
+    sequence: int
+    source_uptime_ms: int
+    content: bytes
+
+
+class _TcpFrameStream:
+    """Small socket wrapper with exact-length reads and deterministic shutdown."""
+
+    def __init__(self, sock: socket.socket) -> None:
+        self._socket = sock
         self.closed = False
 
-    def read1(self, size: int) -> bytes:
-        return self._response.read1(size)
+    def read_exact(self, size: int) -> bytes:
+        if size <= 0:
+            return b""
 
-    def read(self, size: int) -> bytes:
-        return self._response.read(size)
+        buffer = bytearray(size)
+        view = memoryview(buffer)
+        offset = 0
+        while offset < size:
+            received = self._socket.recv_into(view[offset:])
+            if received == 0:
+                if offset == 0:
+                    return b""
+                raise EOFError("TCP JPEG frame ended before the declared length was received.")
+            offset += received
+        return bytes(buffer)
 
     def close(self) -> None:
         if self.closed:
             return
         self.closed = True
         try:
-            self._response.close()
-        finally:
-            self._connection.close()
-
-
-class _MjpegParser:
-    """Incrementally parse multipart JPEG parts by Content-Length."""
-
-    def __init__(self, boundary: bytes = b"frame") -> None:
-        normalized = boundary.strip().strip(b'"')
-        if normalized.startswith(b"--"):
-            normalized = normalized[2:]
-        if not normalized:
-            normalized = b"frame"
-        self._marker = b"--" + normalized
-        self._buffer = bytearray()
-
-    @staticmethod
-    def _content_length(header_block: bytes) -> int:
-        for line in header_block.split(b"\r\n"):
-            name, separator, value = line.partition(b":")
-            if separator and name.strip().lower() == b"content-length":
-                try:
-                    length = int(value.strip())
-                except ValueError as exc:
-                    raise ValueError("MJPEG Content-Length is not an integer.") from exc
-                if length <= 0 or length > MAX_FRAME_BYTES:
-                    raise ValueError("MJPEG Content-Length is outside the accepted frame size.")
-                return length
-        raise ValueError("MJPEG part is missing Content-Length.")
-
-    def feed(self, chunk: bytes) -> list[bytes]:
-        if not chunk:
-            return []
-
-        self._buffer.extend(chunk)
-        frames: list[bytes] = []
-
-        while True:
-            marker_index = self._buffer.find(self._marker)
-            if marker_index < 0:
-                # Keep only enough tail bytes for a split boundary marker.
-                keep = min(len(self._buffer), len(self._marker) + 4)
-                if keep:
-                    del self._buffer[:-keep]
-                return frames
-
-            if marker_index > 0:
-                del self._buffer[:marker_index]
-
-            boundary_line_end = self._buffer.find(b"\r\n", len(self._marker))
-            if boundary_line_end < 0:
-                return frames
-
-            header_start = boundary_line_end + 2
-            header_end = self._buffer.find(b"\r\n\r\n", header_start)
-            if header_end < 0:
-                if len(self._buffer) - header_start > MAX_MJPEG_HEADER_BYTES:
-                    raise ValueError("MJPEG part header exceeded the size limit.")
-                return frames
-
-            header_block = bytes(self._buffer[header_start:header_end])
-            content_length = self._content_length(header_block)
-            body_start = header_end + 4
-            body_end = body_start + content_length
-
-            if len(self._buffer) < body_end:
-                if len(self._buffer) > body_start + MAX_FRAME_BYTES:
-                    raise ValueError("MJPEG frame exceeded the accepted size limit.")
-                return frames
-
-            jpeg = bytes(self._buffer[body_start:body_end])
-            del self._buffer[:body_end]
-
-            if not jpeg.startswith(b"\xff\xd8") or not jpeg.endswith(b"\xff\xd9"):
-                raise ValueError("MJPEG part did not contain a complete JPEG frame.")
-
-            frames.append(jpeg)
+            self._socket.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self._socket.close()
 
 
 JsonRequester = Callable[[str, str, str, dict[str, str] | None], dict]
 StreamOpener = Callable[[str], BinaryIO]
+
+
+def _read_exact(stream: BinaryIO, size: int) -> bytes:
+    """Read exactly size bytes from real or test stream objects."""
+    exact_reader = getattr(stream, "read_exact", None)
+    if callable(exact_reader):
+        return exact_reader(size)
+
+    chunks = bytearray()
+    while len(chunks) < size:
+        chunk = stream.read(size - len(chunks))
+        if not chunk:
+            if not chunks:
+                return b""
+            raise EOFError("TCP JPEG frame ended before the declared length was received.")
+        chunks.extend(chunk)
+    return bytes(chunks)
+
+
+def _encode_frame_packet(
+    content: bytes,
+    *,
+    sequence: int = 1,
+    source_uptime_ms: int = 0,
+) -> bytes:
+    """Test/helper encoder for the V036 fixed-header JPEG stream."""
+    return FRAME_HEADER.pack(
+        FRAME_MAGIC,
+        len(content),
+        sequence & 0xFFFFFFFF,
+        source_uptime_ms & 0xFFFFFFFF,
+    ) + content
+
+
+def _read_frame_packet(stream: BinaryIO) -> _FramePacket | None:
+    header = _read_exact(stream, FRAME_HEADER.size)
+    if not header:
+        return None
+    if len(header) != FRAME_HEADER.size:
+        raise EOFError("TCP JPEG frame header was incomplete.")
+
+    magic, payload_length, sequence, source_uptime_ms = FRAME_HEADER.unpack(header)
+    if magic != FRAME_MAGIC:
+        raise ValueError("ESP stream protocol magic did not match AiTL TCP JPEG v1.")
+    if payload_length <= 0 or payload_length > MAX_FRAME_BYTES:
+        raise ValueError("ESP TCP JPEG payload length is outside the accepted frame size.")
+
+    content = _read_exact(stream, payload_length)
+    if len(content) != payload_length:
+        raise EOFError("ESP TCP JPEG payload ended before the declared length was received.")
+    if not content.startswith(b"\xff\xd8") or not content.endswith(b"\xff\xd9"):
+        raise ValueError("ESP TCP frame did not contain a complete JPEG image.")
+
+    return _FramePacket(
+        sequence=sequence,
+        source_uptime_ms=source_uptime_ms,
+        content=content,
+    )
 
 
 def normalize_private_lan_ipv4(value: str) -> str:
@@ -218,11 +216,12 @@ def normalize_private_lan_ipv4(value: str) -> str:
 
 
 class RemoteCameraService:
-    """Own one on-demand ESP session and one resilient persistent MJPEG transport.
+    """Own one PC-controlled ESP session and one freshness-first TCP JPEG stream.
 
-    V035 repair note: stream reads allow a 6 s camera stall before declaring the
-    socket dead. This prevents slow/overflowing camera frames from causing a
-    reconnect loop while still detecting a genuinely stalled stream quickly.
+    V036 intentionally keeps HTTP only for low-rate control/status. Image transport
+    uses a fixed 16-byte binary header followed by the JPEG bytes on one persistent
+    TCP socket. This removes HTTP multipart parsing/copying from the hot path and lets
+    the ESP abandon a congested client instead of accumulating old frames.
     """
 
     def __init__(self) -> None:
@@ -259,13 +258,16 @@ class RemoteCameraService:
         self._current_backoff_ms = 0
         self._stream_bytes_received = 0
         self._dropped_stale_frames = 0
+        self._source_sequence_gaps = 0
+        self._last_remote_sequence: int | None = None
+        self._last_source_uptime_ms: int | None = None
         self._last_frame_interval_ms: float | None = None
         self._measured_fps = 0.0
         self._last_recovery_at_ms: int | None = None
         self._last_error: str | None = None
 
         self._json_requester: JsonRequester = self._request_json
-        self._stream_opener: StreamOpener = self._open_mjpeg_stream
+        self._stream_opener: StreamOpener = self._open_tcp_stream
 
     def _status_url(self, host: str) -> str:
         return f"http://{host}/status"
@@ -274,7 +276,7 @@ class RemoteCameraService:
         return f"http://{host}/capture"
 
     def _stream_url(self, host: str) -> str:
-        return f"http://{host}:81/stream"
+        return f"tcp://{host}:{TCP_STREAM_PORT}"
 
     def _request_json(
         self,
@@ -292,7 +294,7 @@ class RemoteCameraService:
             data=b"" if method != "GET" else None,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "AiTL-PC-Studio/0.3.5",
+                "User-Agent": "AiTL-PC-Studio/0.3.6",
                 "Connection": "close",
             },
             method=method,
@@ -357,93 +359,40 @@ class RemoteCameraService:
         return parsed
 
     @staticmethod
-    def _parse_boundary(content_type: str | None) -> bytes:
-        if content_type:
-            for item in content_type.split(";")[1:]:
-                name, separator, value = item.partition("=")
-                if separator and name.strip().lower() == "boundary":
-                    boundary = value.strip().strip('"').encode("ascii", errors="ignore")
-                    if boundary:
-                        return boundary
-        return b"frame"
-
-    @staticmethod
     def _configure_pc_stream_socket(sock: socket.socket) -> None:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
-        keepalive_options = (
+        for option_name, option_value in (
             ("TCP_KEEPIDLE", 3),
             ("TCP_KEEPINTVL", 1),
             ("TCP_KEEPCNT", 3),
-        )
-        for option_name, option_value in keepalive_options:
+        ):
             option = getattr(socket, option_name, None)
             if option is None:
                 continue
             try:
                 sock.setsockopt(socket.IPPROTO_TCP, option, option_value)
             except OSError:
-                # Platform support varies; basic SO_KEEPALIVE remains enabled.
                 pass
 
         sock.settimeout(STREAM_READ_TIMEOUT_SECONDS)
 
-    def _open_mjpeg_stream(self, host: str) -> BinaryIO:
-        connection = http.client.HTTPConnection(host, 81, timeout=STREAM_CONNECT_TIMEOUT_SECONDS)
+    def _open_tcp_stream(self, host: str) -> BinaryIO:
         try:
-            connection.connect()
-            if connection.sock is None:
-                raise OSError("MJPEG TCP socket was not created.")
-            self._configure_pc_stream_socket(connection.sock)
-
-            connection.request(
-                "GET",
-                "/stream",
-                headers={
-                    "Accept": "multipart/x-mixed-replace,image/jpeg",
-                    "User-Agent": "AiTL-PC-Studio/0.3.5",
-                    "Cache-Control": "no-cache",
-                    "Connection": "close",
-                },
+            sock = socket.create_connection(
+                (host, TCP_STREAM_PORT),
+                timeout=STREAM_CONNECT_TIMEOUT_SECONDS,
             )
-            response = connection.getresponse()
-        except (OSError, TimeoutError, http.client.HTTPException) as exc:
-            connection.close()
+            self._configure_pc_stream_socket(sock)
+            return _TcpFrameStream(sock)
+        except (OSError, TimeoutError) as exc:
             raise AppError(
                 ErrorCode.CAMERA_NOT_CONNECTED,
-                "PC Studio could not open the ESP32-CAM MJPEG stream.",
+                "PC Studio could not open the ESP32-CAM low-latency TCP JPEG stream.",
                 status_code=502,
-                details={"host": host, "reason": str(exc)},
+                details={"host": host, "port": TCP_STREAM_PORT, "reason": str(exc)},
             ) from exc
-
-        if response.status < 200 or response.status >= 300:
-            status = int(response.status)
-            response.close()
-            connection.close()
-            raise AppError(
-                ErrorCode.CAMERA_NOT_CONNECTED,
-                f"ESP camera returned HTTP {status} for the MJPEG stream.",
-                status_code=502,
-                details={"host": host, "http_status": status},
-            )
-
-        content_type = response.headers.get("Content-Type")
-        if content_type and "multipart/x-mixed-replace" not in content_type.lower():
-            response.close()
-            connection.close()
-            raise AppError(
-                ErrorCode.CAMERA_FRAME_TYPE_UNSUPPORTED,
-                "ESP stream did not return multipart MJPEG content.",
-                status_code=502,
-                details={"host": host, "content_type": content_type},
-            )
-
-        return _HttpStreamHandle(
-            connection,
-            response,
-            boundary=self._parse_boundary(content_type),
-        )
 
     def _settings_query(self, settings: dict, target_fps: int) -> dict[str, str]:
         query: dict[str, str] = {}
@@ -475,7 +424,7 @@ class RemoteCameraService:
                 pass
 
         if thread is not None and thread.is_alive() and thread is not current_thread():
-            thread.join(timeout=3.0)
+            thread.join(timeout=2.5)
 
         with self._lock:
             if self._thread is thread:
@@ -485,15 +434,26 @@ class RemoteCameraService:
             self._stream_connected = False
             self._frame_condition.notify_all()
 
-    def _record_frame(self, content: bytes, frame_number: int) -> None:
+    @staticmethod
+    def _sequence_gap(previous: int | None, current: int) -> int:
+        if previous is None:
+            return 0
+        delta = (current - previous) & 0xFFFFFFFF
+        if delta <= 1 or delta >= 0x80000000:
+            return 0
+        return delta - 1
+
+    def _record_frame(self, packet: _FramePacket, frame_number: int) -> None:
         now_ms = int(time.time() * 1000)
         with self._frame_condition:
             previous_success = self._last_success_at_ms
+            self._source_sequence_gaps += self._sequence_gap(self._last_remote_sequence, packet.sequence)
+            self._last_remote_sequence = packet.sequence
+            self._last_source_uptime_ms = packet.source_uptime_ms
             self._last_attempt_at_ms = now_ms
             self._last_success_at_ms = now_ms
-            self._last_http_status = 200
             self._last_frame_number = frame_number
-            self._last_frame_bytes = len(content)
+            self._last_frame_bytes = len(packet.content)
             self._successful_fetches += 1
             self._device_reachable = True
             self._stream_connected = True
@@ -522,61 +482,48 @@ class RemoteCameraService:
             self._stream_connected = False
             self._last_error = message
 
-    def _store_jpeg(self, *, source_id: str, content: bytes) -> None:
-        if len(content) > MAX_FRAME_BYTES:
+    def _store_packet(self, *, source_id: str, packet: _FramePacket) -> None:
+        if len(packet.content) > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
-                "ESP MJPEG frame exceeded the backend 8 MiB frame limit.",
+                "ESP TCP JPEG frame exceeded the backend 8 MiB frame limit.",
                 status_code=413,
-                details={"size_bytes": len(content), "max_size_bytes": MAX_FRAME_BYTES},
+                details={"size_bytes": len(packet.content), "max_size_bytes": MAX_FRAME_BYTES},
             )
 
         frame = camera_frame_service.store_upload(
             source_id=source_id,
             content_type="image/jpeg",
-            content=content,
+            content=packet.content,
         )
-        self._record_frame(content, frame.frame_number)
+        self._record_frame(packet, frame.frame_number)
 
-    def _consume_mjpeg_stream(
+    def _consume_tcp_stream(
         self,
         *,
         stream: BinaryIO,
         source_id: str,
         stop_event: Event,
     ) -> str:
-        boundary = getattr(stream, "boundary", b"frame")
-        parser = _MjpegParser(boundary=boundary)
-
         while not stop_event.is_set():
             if camera_frame_service.simulation_enabled:
                 return "paused_for_simulation"
 
-            read1 = getattr(stream, "read1", None)
-            chunk = read1(STREAM_READ_BYTES) if callable(read1) else stream.read(STREAM_READ_BYTES)
-            if not chunk:
+            packet = _read_frame_packet(stream)
+            if packet is None:
                 if stop_event.is_set():
                     return "stopped"
                 return "stream_ended"
 
             with self._lock:
-                self._stream_bytes_received += len(chunk)
+                self._stream_bytes_received += FRAME_HEADER.size + len(packet.content)
 
-            frames = parser.feed(chunk)
-            if not frames:
-                continue
-
-            if len(frames) > 1:
-                with self._lock:
-                    self._dropped_stale_frames += len(frames) - 1
-
-            # Latency is more important than preserving every intermediate frame.
-            self._store_jpeg(source_id=source_id, content=frames[-1])
+            self._store_packet(source_id=source_id, packet=packet)
 
         return "stopped"
 
     def wait_for_new_frame(self, after_frame_number: int, timeout_seconds: float = 1.0) -> CameraFrame | None:
-        """Wake the browser relay when the physical stream publishes a new frame."""
+        """Wake the browser MJPEG relay immediately when the physical source publishes."""
         deadline = time.monotonic() + max(0.0, timeout_seconds)
         with self._frame_condition:
             while self._streaming_requested:
@@ -598,6 +545,23 @@ class RemoteCameraService:
         with self._lock:
             return self._streaming_requested
 
+    def _assert_matching_firmware(self, device: dict, host: str) -> None:
+        camera_protocol = str(device.get("protocol") or "")
+        stream_protocol = str(device.get("stream_protocol") or "")
+        if camera_protocol != CAMERA_PROTOCOL or stream_protocol != FRAME_PROTOCOL:
+            raise AppError(
+                ErrorCode.CAMERA_NOT_CONNECTED,
+                "ESP32-CAM firmware does not match the V036 low-latency TCP stream protocol. Flash the matching V036 firmware first.",
+                status_code=409,
+                details={
+                    "host": host,
+                    "expected_protocol": CAMERA_PROTOCOL,
+                    "actual_protocol": camera_protocol or None,
+                    "expected_stream_protocol": FRAME_PROTOCOL,
+                    "actual_stream_protocol": stream_protocol or None,
+                },
+            )
+
     def connect(self, *, host: str, source_id: str) -> dict:
         """Connect to status/control only; zero image transfer is preserved."""
         normalized_host = normalize_private_lan_ipv4(host)
@@ -609,6 +573,7 @@ class RemoteCameraService:
                 status_code=502,
                 details={"host": normalized_host},
             )
+        self._assert_matching_firmware(device, normalized_host)
 
         self.disconnect()
         now_ms = int(time.time() * 1000)
@@ -628,13 +593,14 @@ class RemoteCameraService:
 
         logger.info(
             "Remote ESP camera control connection established",
-            extra={"host": normalized_host, "source_id": source_id},
+            extra={"host": normalized_host, "source_id": source_id, "stream_protocol": FRAME_PROTOCOL},
         )
         return self.status()
 
     def _arm_esp_session(self, host: str, settings: dict, fps: int) -> dict:
         applied = self._json_requester(host, "/config", "POST", self._settings_query(settings, fps))
         started = self._json_requester(host, "/start", "POST", None)
+        self._assert_matching_firmware(started, host)
         if started.get("session_active") is not True:
             raise AppError(
                 ErrorCode.CAMERA_STREAM_NOT_STARTED,
@@ -659,6 +625,7 @@ class RemoteCameraService:
             return False
 
         device = self._json_requester(host, "/status", "GET", None)
+        self._assert_matching_firmware(device, host)
         now_ms = int(time.time() * 1000)
         with self._lock:
             self._device_status = device
@@ -695,7 +662,7 @@ class RemoteCameraService:
         target_fps: int = DEFAULT_TARGET_FPS,
         fetch_interval_ms: int | None = None,
     ) -> dict:
-        """Apply settings, activate ESP session, then open one resilient MJPEG transport."""
+        """Apply settings, activate ESP session, then open one TCP JPEG transport."""
         if fetch_interval_ms is not None and target_fps == DEFAULT_TARGET_FPS:
             interval = max(1, int(fetch_interval_ms))
             target_fps = max(MIN_TARGET_FPS, min(MAX_TARGET_FPS, round(1000 / interval)))
@@ -724,7 +691,6 @@ class RemoteCameraService:
         except AppError:
             pass
 
-        # Arm synchronously so no image transport starts before configuration succeeds.
         with self._lock:
             self._target_fps = fps
             self._settings = dict(settings)
@@ -743,6 +709,9 @@ class RemoteCameraService:
             self._current_backoff_ms = 0
             self._stream_bytes_received = 0
             self._dropped_stale_frames = 0
+            self._source_sequence_gaps = 0
+            self._last_remote_sequence = None
+            self._last_source_uptime_ms = None
             self._last_http_status = None
             self._last_frame_number = None
             self._last_frame_bytes = 0
@@ -757,14 +726,14 @@ class RemoteCameraService:
             thread = Thread(
                 target=self._run,
                 args=(stop_event,),
-                name="aitl-remote-mjpeg",
+                name="aitl-remote-tcp-jpeg",
                 daemon=True,
             )
             self._thread = thread
             thread.start()
 
         logger.info(
-            "Remote ESP resilient MJPEG stream requested",
+            "Remote ESP low-latency TCP JPEG stream requested",
             extra={"host": host, "source_id": self._source_id, "target_fps": fps},
         )
         return self.status()
@@ -834,7 +803,7 @@ class RemoteCameraService:
                 return
 
             if camera_frame_service.simulation_enabled:
-                stop_event.wait(0.05)
+                stop_event.wait(0.04)
                 continue
 
             stream: BinaryIO | None = None
@@ -845,11 +814,10 @@ class RemoteCameraService:
                     self._active_stream = stream
                     self._stream_connected = True
                     self._device_reachable = True
-                    self._last_http_status = 200
                     self._last_stream_connected_at_ms = int(time.time() * 1000)
                     self._last_error = None
 
-                outcome = self._consume_mjpeg_stream(
+                outcome = self._consume_tcp_stream(
                     stream=stream,
                     source_id=source_id,
                     stop_event=stop_event,
@@ -859,17 +827,17 @@ class RemoteCameraService:
                     continue
 
                 failed = True
-                self._record_stream_failure("ESP MJPEG stream ended unexpectedly.")
+                self._record_stream_failure("ESP TCP JPEG stream ended unexpectedly.")
             except AppError as exc:
                 failed = True
                 self._record_stream_failure(
                     exc.message,
                     exc.details.get("http_status") if exc.details else None,
                 )
-            except (OSError, TimeoutError, ValueError, http.client.HTTPException) as exc:
+            except (OSError, TimeoutError, EOFError, ValueError) as exc:
                 if not stop_event.is_set():
                     failed = True
-                    self._record_stream_failure(f"ESP MJPEG transport error: {exc}")
+                    self._record_stream_failure(f"ESP TCP JPEG transport error: {exc}")
             finally:
                 if stream is not None:
                     try:
@@ -888,8 +856,6 @@ class RemoteCameraService:
                 with self._lock:
                     self._stream_reconnects += 1
 
-                # If the ESP rebooted or lost its session, restore settings/session
-                # before reopening the persistent stream.
                 try:
                     self._recover_esp_session_if_needed(host)
                 except AppError as exc:
@@ -911,6 +877,7 @@ class RemoteCameraService:
 
         try:
             device = self._json_requester(host, "/status", "GET", None)
+            self._assert_matching_firmware(device, host)
             now_ms = int(time.time() * 1000)
             with self._lock:
                 self._device_status = device
@@ -949,7 +916,8 @@ class RemoteCameraService:
                 "paused_for_simulation": bool(
                     requested and worker_running and camera_frame_service.simulation_enabled
                 ),
-                "transport": "mjpeg" if requested else "idle",
+                "transport": "tcp_jpeg" if requested else "idle",
+                "stream_protocol": FRAME_PROTOCOL if requested else None,
                 "host": host,
                 "source_id": self._source_id if host else None,
                 "status_url": self._status_url(host) if host else None,
@@ -969,6 +937,9 @@ class RemoteCameraService:
                 "reconnect_backoff_ms": self._current_backoff_ms,
                 "stream_bytes_received": self._stream_bytes_received,
                 "dropped_stale_frames": self._dropped_stale_frames,
+                "source_sequence_gaps": self._source_sequence_gaps,
+                "last_remote_sequence": self._last_remote_sequence,
+                "last_source_uptime_ms": self._last_source_uptime_ms,
                 "connected_at_ms": self._connected_at_ms,
                 "stream_started_at_ms": self._stream_started_at_ms,
                 "last_stream_connected_at_ms": self._last_stream_connected_at_ms,
@@ -988,7 +959,7 @@ class RemoteCameraService:
                     "connect",
                     "config",
                     "start",
-                    "persistent_mjpeg",
+                    "persistent_tcp_jpeg",
                     "auto_recover_if_needed",
                     "stop",
                 ],

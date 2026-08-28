@@ -127,7 +127,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
       setRemote(next);
       if (next.settings) setSettings(next.settings);
       onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage("Settings applied. Low-latency persistent MJPEG streaming started.");
+      setRemoteMessage("Settings applied. Low-latency TCP JPEG streaming started.");
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM stream could not start.");
     } finally {
@@ -175,7 +175,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div>
               <h2>Camera input</h2>
               <p className="placeholder-copy">
-                The ESP waits idle after connection. PC Studio applies all camera settings and starts image requests only when you press Start Stream.
+                The ESP waits idle after connection. PC Studio applies all camera settings and opens the image socket only when you press Start Stream.
               </p>
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : status?.frame_available ? "status-implemented" : ""}`}>
@@ -301,19 +301,12 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
 
               <div className="checklist">
                 {([
-                  ["awb", "Auto white balance"],
-                  ["awb_gain", "Auto white-balance gain"],
-                  ["aec", "Auto exposure"],
-                  ["aec2", "AEC2 DSP"],
-                  ["agc", "Auto gain"],
-                  ["bpc", "Black-pixel correction"],
-                  ["wpc", "White-pixel correction"],
-                  ["raw_gma", "Raw gamma"],
-                  ["lenc", "Lens correction"],
-                  ["hmirror", "Horizontal mirror"],
-                  ["vflip", "Vertical flip"],
-                  ["dcw", "Downsize/crop"],
-                  ["colorbar", "Color test bar"],
+                  ["awb", "Auto white balance"], ["awb_gain", "Auto white-balance gain"],
+                  ["aec", "Auto exposure"], ["aec2", "AEC2 DSP"], ["agc", "Auto gain"],
+                  ["bpc", "Black-pixel correction"], ["wpc", "White-pixel correction"],
+                  ["raw_gma", "Raw gamma"], ["lenc", "Lens correction"],
+                  ["hmirror", "Horizontal mirror"], ["vflip", "Vertical flip"],
+                  ["dcw", "Downsize/crop"], ["colorbar", "Color test bar"],
                 ] as const).map(([key, label]) => (
                   <label key={key}>
                     <input
@@ -348,14 +341,14 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>ESP address</span><strong>{remote?.host ?? "none"}</strong></div>
               <div><span>Device</span><strong>{remote?.device_reachable ? "reachable" : remote?.configured ? "unreachable" : "not connected"}</strong></div>
               <div><span>ESP session</span><strong>{remote?.streaming ? "active" : "idle"}</strong></div>
-              <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "MJPEG paused" : remote?.stream_connected ? "MJPEG connected" : remote?.streaming ? "reconnecting" : "idle"}</strong></div>
+              <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "TCP JPEG paused" : remote?.stream_connected ? "TCP JPEG connected" : remote?.streaming ? "reconnecting" : "idle"}</strong></div>
               <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
               <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
               <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
               <div><span>Reconnect backoff</span><strong>{remote?.reconnect_backoff_ms ? `${remote.reconnect_backoff_ms} ms` : "—"}</strong></div>
-              <div><span>Stale frames dropped</span><strong>{remote?.dropped_stale_frames ?? 0}</strong></div>
+              <div><span>Source sequence gaps</span><strong>{remote?.source_sequence_gaps ?? 0}</strong></div>
               <div><span>Source</span><strong>{status?.active_source_id ?? "none"}</strong></div>
               <div><span>Resolution</span><strong>{status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : settings.frame_size}</strong></div>
               <div><span>Frame age</span><strong>{formatAge(status?.age_ms ?? null)}</strong></div>
@@ -366,7 +359,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              V035 keeps one persistent MJPEG path, adds TCP keepalive, automatic ESP session recovery, exponential reconnect backoff, and event-driven preview delivery.
+              V036 uses HTTP only for ESP control/status and one persistent length-prefixed TCP JPEG stream for ESP-to-PC images. The browser preview remains the existing PC-side MJPEG relay.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/frame?source_id=esp_cam_01</code>
           </section>
