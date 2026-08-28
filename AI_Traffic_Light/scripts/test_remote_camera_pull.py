@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 import sys
 import threading
@@ -15,13 +14,15 @@ from app.core.exceptions import AppError
 from app.services.camera_frames import camera_frame_service
 from app.services.remote_camera import RemoteCameraService, normalize_private_lan_ipv4
 
-JPEG_1X1 = base64.b64decode(
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////"
-    "2wBDAf//////////////////////////////////////////////////////////////////////////////////////"
-    "wgARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA"
-    "/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAA"
-    "AP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/a"
-    "AAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k="
+JPEG_1X1 = (
+    b"\xff\xd8"  # SOI
+    b"\xff\xc0\x00\x0b"  # SOF0, segment length 11
+    b"\x08"  # precision
+    b"\x00\x01"  # height = 1
+    b"\x00\x01"  # width = 1
+    b"\x01"  # one component
+    b"\x01\x11\x00"
+    b"\xff\xd9"  # EOI
 )
 
 SETTINGS = {
