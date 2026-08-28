@@ -43,13 +43,21 @@
 #define AITL_STREAM_PORT 81U
 #endif
 
-// Freshness-first transport: a blocked frame is abandoned instead of queued.
-#ifndef AITL_STREAM_SEND_TIMEOUT_MS
-#define AITL_STREAM_SEND_TIMEOUT_MS 120U
+// Freshness-first transport: reset the stall timer on write progress; abandon only no-progress/hard-cap frames.
+#ifndef AITL_STREAM_SELECT_SLICE_MS
+#define AITL_STREAM_SELECT_SLICE_MS 20U
 #endif
 
-#ifndef AITL_FRAME_SEND_DEADLINE_MS
-#define AITL_FRAME_SEND_DEADLINE_MS 120U
+#ifndef AITL_FRAME_STALL_TIMEOUT_MS
+#define AITL_FRAME_STALL_TIMEOUT_MS 250U
+#endif
+
+#ifndef AITL_FRAME_TOTAL_SEND_LIMIT_MS
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 500U
+#endif
+
+#ifndef AITL_STREAM_SEND_CHUNK_BYTES
+#define AITL_STREAM_SEND_CHUNK_BYTES 1360U
 #endif
 
 #ifndef AITL_WIFI_CONNECT_TIMEOUT_MS

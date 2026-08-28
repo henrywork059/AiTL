@@ -108,4 +108,12 @@ At the owner's request, V036 now supports multiple ESP32-CAM devices without pro
 
 ## Same-candidate ESP send-stall repair
 
-Hardware logs showed 1–4 KiB JPEG frames sometimes spending 300–1100 ms inside the ESP TCP send path, causing repeated reconnects, stale frames, and temporary `/status` failures even with acceptable Wi-Fi RSSI. V036 now waits for socket writability with `select()` and sends with `MSG_DONTWAIT`, retrying partial/EAGAIN writes only until the absolute per-frame deadline. The freshness deadline is 120 ms. A partial/stalled frame still closes the TCP session so the PC never consumes a truncated JPEG as a complete frame. The wire protocol remains `aitl-tcp-jpeg-v1`; PC API compatibility is unchanged, but ESP firmware must be reflashed for this repair.
+Hardware logs first showed 1–4 KiB JPEG frames spending 300–1100 ms in the ESP TCP send path. R4 removed the long blocking call but its 120 ms whole-frame cutoff was too aggressive: real 6–8 KiB JPEGs can exceed the default lwIP TCP sender buffer (roughly four MSS windows), so a healthy frame may need ACK progress before the full payload can be queued. R5 sends in 1360-byte non-blocking chunks, uses a 250 ms no-progress timeout that resets after successful partial writes, and retains a 500 ms hard whole-frame cap. A genuinely stalled frame still closes the TCP session so the PC never consumes a truncated JPEG as a complete frame. The wire protocol remains `aitl-tcp-jpeg-v1`; PC API compatibility is unchanged, but ESP firmware must be reflashed for this repair.
+
+## Same-candidate R5 transport repair
+
+- Replaced R4's 120 ms whole-frame cutoff with progress-bounded non-blocking TCP writes.
+- JPEG payloads are sent in 1360-byte chunks; successful partial writes reset a 250 ms no-progress timer.
+- A separate 500 ms whole-frame ceiling prevents indefinite stalls without aborting healthy frames merely because they exceed one lwIP send-buffer window.
+- This addresses physical ESP logs where 6-8 KiB JPEGs exceeded the approximately 5760-byte default TCP sender buffer and R4 closed the socket after sending only part of the declared payload.
+- The `aitl-tcp-jpeg-v1` wire format is unchanged. Reflash the ESP firmware; the PC protocol does not change.

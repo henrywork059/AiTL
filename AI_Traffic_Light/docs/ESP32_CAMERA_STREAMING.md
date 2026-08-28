@@ -40,7 +40,7 @@ Test 20 FPS after 15 FPS is stable. Use QVGA or a larger JPEG-quality number if 
 - TCP keepalive enabled.
 - no application image queue on the ESP.
 - frame schedule is based on target deadlines rather than `delay()` after a send.
-- blocked frame sends have a short socket timeout and 250 ms total send deadline.
+- blocked frame sends use a 250 ms no-progress timeout plus a 500 ms hard whole-frame cap.
 - missed deadline closes the client; PC Studio reconnects to fresh imagery.
 - PC receiver declares a 2 s source stall instead of waiting 6 s.
 
@@ -67,4 +67,4 @@ Simulation still pauses all physical ESP image transports and they resume automa
 
 ## V036 send-path behavior
 
-The ESP stream socket uses TCP_NODELAY/keepalive plus a freshness-first non-blocking send loop. Before each write the firmware waits for socket writability with `select()`, then uses `send(..., MSG_DONTWAIT)`. Partial writes are completed only while the absolute frame deadline remains. If the frame cannot be completed within 120 ms, the socket is closed and the PC reconnects to a fresh frame rather than preserving a stale/partial image.
+The ESP stream socket uses TCP_NODELAY/keepalive plus a progress-bounded non-blocking send loop. JPEG data is offered in 1360-byte chunks with `send(..., MSG_DONTWAIT)`. Temporary `EAGAIN` backpressure is handled with short `select()` waits; every successful partial write resets a 250 ms no-progress timer. A separate 500 ms whole-frame ceiling prevents indefinite stalls. If progress stops or the hard cap is reached, the socket is closed and the PC reconnects to a fresh frame rather than preserving a stale/partial image.

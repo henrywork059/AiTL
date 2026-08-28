@@ -85,4 +85,4 @@ Legacy `POST /api/camera/frame` remains available in PC Studio for other device 
 This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.
 
 ### V036 same-candidate send repair
-The TCP JPEG sender now uses `select()` + `MSG_DONTWAIT` with a 120 ms absolute frame deadline. This prevents one blocked socket write from freezing HTTP control/status handling. Reflash the ESP after applying this repair; the wire protocol and PC IP workflow are unchanged.
+The TCP JPEG sender uses `MSG_DONTWAIT` and 1360-byte chunks. When lwIP reports temporary backpressure, the firmware waits in short `select()` slices. Successful writes reset a 250 ms no-progress timer; a separate 500 ms hard frame cap prevents indefinite stalls. This allows JPEGs larger than one default lwIP send-buffer window to complete after ACK progress without allowing stale backlog to grow. Reflash the ESP after applying this repair; the wire protocol and PC IP workflow are unchanged.

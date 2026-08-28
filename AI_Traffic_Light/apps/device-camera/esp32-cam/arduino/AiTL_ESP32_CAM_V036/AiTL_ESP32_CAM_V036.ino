@@ -1,4 +1,4 @@
-// AiTL V036 standalone Arduino IDE sketch (same-candidate non-blocking TCP send repair).
+// AiTL V036 standalone Arduino IDE sketch (same-candidate progress-bounded TCP send repair).
 // Keep this behavior aligned with ../../src/main.cpp.
 
 #include <Arduino.h>
@@ -28,8 +28,10 @@
 #define AITL_DEFAULT_STREAM_FPS 15U
 #define AITL_CONTROL_PORT 80U
 #define AITL_STREAM_PORT 81U
-#define AITL_STREAM_SEND_TIMEOUT_MS 120U
-#define AITL_FRAME_SEND_DEADLINE_MS 120U
+#define AITL_STREAM_SELECT_SLICE_MS 20U
+#define AITL_FRAME_STALL_TIMEOUT_MS 250U
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 500U
+#define AITL_STREAM_SEND_CHUNK_BYTES 1360U
 #define AITL_WIFI_CONNECT_TIMEOUT_MS 20000UL
 #define AITL_WIFI_RETRY_MS 3000UL
 #define AITL_SERIAL_STATUS_INTERVAL_MS 5000UL
@@ -39,6 +41,7 @@ namespace {
 
 constexpr char kCameraProtocol[] = "aitl-camera-v036";
 constexpr char kStreamProtocol[] = "aitl-tcp-jpeg-v1";
+constexpr char kFirmwareRevision[] = "r5-progress-bounded-send";
 constexpr uint8_t kFrameMagic[4] = {'A', 'T', 'L', '1'};
 constexpr size_t kFrameHeaderBytes = 16;
 
@@ -157,45 +160,62 @@ void putU32be(uint8_t* out, uint32_t value) {
   out[3] = static_cast<uint8_t>(value & 0xFF);
 }
 
-bool waitSocketWritableUntil(int fd, uint32_t deadlineMs) {
+bool waitSocketWritableForProgress(int fd, uint32_t totalStartedMs, uint32_t lastProgressMs) {
   while (true) {
-    const int32_t remainingMs = static_cast<int32_t>(deadlineMs - millis());
-    if (remainingMs <= 0) return false;
+    const uint32_t now = millis();
+    if (now - totalStartedMs >= AITL_FRAME_TOTAL_SEND_LIMIT_MS) return false;
+    if (now - lastProgressMs >= AITL_FRAME_STALL_TIMEOUT_MS) return false;
+
+    const uint32_t totalRemaining = AITL_FRAME_TOTAL_SEND_LIMIT_MS - (now - totalStartedMs);
+    const uint32_t stallRemaining = AITL_FRAME_STALL_TIMEOUT_MS - (now - lastProgressMs);
+    uint32_t waitMs = AITL_STREAM_SELECT_SLICE_MS;
+    if (totalRemaining < waitMs) waitMs = totalRemaining;
+    if (stallRemaining < waitMs) waitMs = stallRemaining;
+    if (waitMs == 0) return false;
 
     fd_set writeSet;
     FD_ZERO(&writeSet);
     FD_SET(fd, &writeSet);
-
     timeval timeout{};
-    const uint32_t remaining = static_cast<uint32_t>(remainingMs);
-    const uint32_t boundedMs = remaining < AITL_STREAM_SEND_TIMEOUT_MS ? remaining : AITL_STREAM_SEND_TIMEOUT_MS;
-    timeout.tv_sec = boundedMs / 1000U;
-    timeout.tv_usec = (boundedMs % 1000U) * 1000U;
+    timeout.tv_sec = waitMs / 1000U;
+    timeout.tv_usec = (waitMs % 1000U) * 1000U;
 
     const int ready = select(fd + 1, nullptr, &writeSet, nullptr, &timeout);
     if (ready > 0) return FD_ISSET(fd, &writeSet);
-    if (ready == 0) continue;
+    if (ready == 0) {
+      yield();
+      continue;
+    }
     if (errno == EINTR) continue;
     return false;
   }
 }
 
-bool sendAllWithDeadline(int fd, const uint8_t* data, size_t length, uint32_t deadlineMs) {
+bool sendAllProgressBounded(int fd, const uint8_t* data, size_t length, uint32_t totalStartedMs) {
   size_t sent = 0;
-  while (sent < length) {
-    if (!waitSocketWritableUntil(fd, deadlineMs)) return false;
+  uint32_t lastProgressMs = millis();
 
-    // Match Espressif's current NetworkClient strategy: after select() reports
-    // writability, use MSG_DONTWAIT so a single send() cannot block the camera
-    // loop past our freshness deadline. Partial writes are expected and retried.
-    const int result = ::send(fd, data + sent, length - sent, MSG_DONTWAIT);
+  while (sent < length) {
+    const uint32_t now = millis();
+    if (now - totalStartedMs >= AITL_FRAME_TOTAL_SEND_LIMIT_MS) return false;
+    if (now - lastProgressMs >= AITL_FRAME_STALL_TIMEOUT_MS) return false;
+
+    size_t chunk = length - sent;
+    if (chunk > AITL_STREAM_SEND_CHUNK_BYTES) chunk = AITL_STREAM_SEND_CHUNK_BYTES;
+
+    // Try the non-blocking write first. A 6-8 KiB JPEG can exceed the default
+    // lwIP TCP send buffer, so EAGAIN simply means we must wait for ACK progress.
+    const int result = ::send(fd, data + sent, chunk, MSG_DONTWAIT);
     if (result > 0) {
       sent += static_cast<size_t>(result);
+      lastProgressMs = millis();
+      yield();
       continue;
     }
     if (result == 0) return false;
-    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-      yield();
+    if (errno == EINTR) continue;
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      if (!waitSocketWritableForProgress(fd, totalStartedMs, lastProgressMs)) return false;
       continue;
     }
     return false;
@@ -226,8 +246,8 @@ void configureStreamSocket(WiFiClient& client) {
 #endif
 
   timeval sendTimeout{};
-  sendTimeout.tv_sec = AITL_STREAM_SEND_TIMEOUT_MS / 1000U;
-  sendTimeout.tv_usec = (AITL_STREAM_SEND_TIMEOUT_MS % 1000U) * 1000U;
+  sendTimeout.tv_sec = AITL_FRAME_STALL_TIMEOUT_MS / 1000U;
+  sendTimeout.tv_usec = (AITL_FRAME_STALL_TIMEOUT_MS % 1000U) * 1000U;
   setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout));
 }
 
@@ -265,6 +285,7 @@ String statusJson() {
   String json = "{";
   json += "\"protocol\":\"" + String(kCameraProtocol) + "\"";
   json += ",\"stream_protocol\":\"" + String(kStreamProtocol) + "\"";
+  json += ",\"firmware_revision\":\"" + String(kFirmwareRevision) + "\"";
   json += ",\"camera_ready\":" + String(cameraReady ? "true" : "false");
   json += ",\"session_active\":" + String(sessionActive ? "true" : "false");
   json += ",\"stream_client_active\":" + String((streamClient && streamClient.connected()) ? "true" : "false");
@@ -273,6 +294,9 @@ String statusJson() {
   json += ",\"stream_frame_count\":" + String(streamFrameCount);
   json += ",\"stream_send_failures\":" + String(streamSendFailures);
   json += ",\"stream_deadline_drops\":" + String(streamDeadlineDrops);
+  json += ",\"send_stall_timeout_ms\":" + String(AITL_FRAME_STALL_TIMEOUT_MS);
+  json += ",\"frame_send_limit_ms\":" + String(AITL_FRAME_TOTAL_SEND_LIMIT_MS);
+  json += ",\"send_chunk_bytes\":" + String(AITL_STREAM_SEND_CHUNK_BYTES);
   json += ",\"last_frame_bytes\":" + String(lastFrameBytes);
   json += ",\"last_capture_ms\":" + String(lastCaptureMs);
   json += ",\"last_send_ms\":" + String(lastSendMs);
@@ -561,9 +585,8 @@ void sendNextFrameIfDue() {
 
   const int fd = streamClient.fd();
   const uint32_t sendStarted = millis();
-  const uint32_t deadline = sendStarted + AITL_FRAME_SEND_DEADLINE_MS;
-  const bool headerOk = fd >= 0 && sendAllWithDeadline(fd, header, sizeof(header), deadline);
-  const bool payloadOk = headerOk && sendAllWithDeadline(fd, fb->buf, fb->len, deadline);
+  const bool headerOk = fd >= 0 && sendAllProgressBounded(fd, header, sizeof(header), sendStarted);
+  const bool payloadOk = headerOk && sendAllProgressBounded(fd, fb->buf, fb->len, sendStarted);
   lastSendMs = millis() - sendStarted;
   lastFrameBytes = static_cast<uint32_t>(fb->len);
   esp_camera_fb_return(fb);
@@ -605,7 +628,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL V036 low-latency ESP32-CAM node");
+  Serial.println("AiTL V036 R5 progress-bounded ESP32-CAM node");
 
   cameraReady = initCamera();
   connectWifi();
