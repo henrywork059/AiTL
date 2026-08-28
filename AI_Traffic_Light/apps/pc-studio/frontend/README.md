@@ -1,12 +1,11 @@
 # PC Studio Frontend
 
-V034 Camera Sources adds low-latency physical-camera presentation:
+V035 Camera Sources keeps the V034 workflow and adds clearer transport diagnostics:
+- MJPEG connected vs reconnecting;
+- target/measured FPS;
+- reconnect count;
+- automatic session-recovery count;
+- current failure streak/backoff;
+- stale-frame drops.
 
-- Connect remains status/control only;
-- Start Stream sends all camera settings plus target FPS;
-- transport state shows persistent MJPEG;
-- measured FPS and reconnect count are visible;
-- preview uses backend `/api/camera/live.mjpeg` rather than status-poll-driven still images;
-- simulation can temporarily pause the physical stream.
-
-The frontend does not connect directly to the ESP MJPEG endpoint; the backend owns the single physical stream.
+The preview remains the backend MJPEG relay; the browser does not open a second ESP connection.

@@ -1,19 +1,20 @@
 # Roadmap
 
-## V034 milestone
+## V035 milestone
 
-Validate persistent MJPEG performance on the physical ESP32-CAM:
-- practical VGA/QVGA FPS;
-- latency under motion;
-- reconnect stability;
-- bandwidth versus JPEG quality;
-- simulation pause/resume.
+Validate resilient physical-camera transport:
+- sustained VGA/QVGA measured FPS;
+- visible end-to-end latency;
+- ESP reset/reconnect recovery;
+- weak-Wi-Fi reconnect behavior;
+- simulation pause/resume;
+- CPU load of backend relay/parser.
 
 ## Next
 
-1. independent multi-camera frame buffers/routing;
-2. per-intersection source assignment and tracker isolation;
-3. model-junction signal-output abstraction;
+1. independent per-source multi-camera buffers and routing;
+2. intersection-to-camera assignment and tracker isolation;
+3. model-junction physical signal-output abstraction;
 4. broader multi-intersection orchestration/evidence UI.
 
-Public-road control remains outside scope.
+Public-road signal control remains outside scope.

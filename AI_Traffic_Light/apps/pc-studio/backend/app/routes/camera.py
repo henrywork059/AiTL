@@ -53,31 +53,44 @@ class RemoteCameraSettingsRequest(BaseModel):
 
 class RemoteCameraStartRequest(BaseModel):
     target_fps: int = Field(default=15, ge=1, le=30)
-    # Retained so old V033 callers remain accepted; V034 UI sends target_fps.
+    # Retained so older V033/V034 callers remain accepted; V035 UI sends target_fps.
     fetch_interval_ms: int | None = Field(default=None, ge=34, le=5000)
     settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
 
 
 def _live_mjpeg() -> Iterator[bytes]:
-    """Stream only new CameraFrameService frames to the browser with minimal UI delay."""
+    """Relay newest PC-side frames; physical ESP frames wake this generator immediately."""
     last_frame_number = -1
 
     while True:
-        frame = camera_frame_service.latest_frame()
-        if frame is not None and frame.frame_number != last_frame_number:
-            last_frame_number = frame.frame_number
-            header = (
-                MJPEG_BOUNDARY
-                + f"Content-Type: {frame.content_type}\r\n".encode()
-                + f"Content-Length: {len(frame.content)}\r\n".encode()
-                + f"X-Camera-Source: {frame.source_id}\r\n".encode()
-                + f"X-Frame-Number: {frame.frame_number}\r\n\r\n".encode()
-            )
-            yield header + frame.content + b"\r\n"
-            # Avoid a tight loop when simulation can synthesize a new frame on demand.
-            time.sleep(0.01)
+        if camera_frame_service.simulation_enabled:
+            # The simulator is generated on demand; 20 ms avoids a CPU-heavy busy loop.
+            frame = camera_frame_service.latest_frame()
+            if frame is None or frame.frame_number == last_frame_number:
+                time.sleep(0.02)
+                continue
+        elif remote_camera_service.streaming_requested:
+            # Physical frames notify a Condition from the ingestion thread, removing
+            # V034's 10 ms browser-preview polling delay and unnecessary lock traffic.
+            frame = remote_camera_service.wait_for_new_frame(last_frame_number, timeout_seconds=1.0)
+            if frame is None:
+                continue
         else:
-            time.sleep(0.01)
+            # Legacy raw uploads have no persistent transport notifier.
+            frame = camera_frame_service.latest_frame()
+            if frame is None or frame.frame_number == last_frame_number:
+                time.sleep(0.02)
+                continue
+
+        last_frame_number = frame.frame_number
+        header = (
+            MJPEG_BOUNDARY
+            + f"Content-Type: {frame.content_type}\r\n".encode()
+            + f"Content-Length: {len(frame.content)}\r\n".encode()
+            + f"X-Camera-Source: {frame.source_id}\r\n".encode()
+            + f"X-Frame-Number: {frame.frame_number}\r\n\r\n".encode()
+        )
+        yield header + frame.content + b"\r\n"
 
 
 @router.get("/sources")
@@ -106,8 +119,9 @@ def live_camera_mjpeg(request: Request) -> StreamingResponse:
         _live_mjpeg(),
         media_type="multipart/x-mixed-replace; boundary=frame",
         headers={
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, no-transform",
             "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
             "X-Request-ID": request.state.request_id,
         },
     )

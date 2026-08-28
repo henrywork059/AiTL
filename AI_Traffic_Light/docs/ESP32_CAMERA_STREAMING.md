@@ -1,35 +1,44 @@
-# ESP32-CAM V034 streaming
+# ESP32-CAM V035 streaming
 
-Use the matching `AiTL_ESP32CAM_V034_ArduinoIDE.zip`.
+Use the updated standalone `AiTL_ESP32CAM_V035.ino`. `secrets.h` is unchanged.
 
-## Transport
+## Workflow
 
-The ESP remains idle after boot and Connect. Start Stream sends camera settings plus `stream_fps`, calls `/start`, then PC Studio opens one persistent:
+The ESP boots idle. Connect sends no images.
 
-```text
-http://<ESP-IP>:81/stream
-```
-
-No continuous image traffic exists while idle.
-
-## Performance settings
-
-Recommended baseline:
+Start Stream:
 
 ```text
-VGA
-JPEG quality 12–16
-15 FPS
+/config + stream_fps
+/start
+persistent :81/stream
 ```
 
-For lower latency/bandwidth:
-- use QVGA/VGA rather than UXGA;
-- use a higher JPEG quality number (for example 14–18) to reduce byte size;
-- use 10–15 FPS on weaker Wi-Fi;
-- try 20 FPS only when RSSI/stability are good.
+Stop Stream closes the PC stream and calls `/stop`.
 
-The firmware keeps Wi-Fi sleep disabled and uses `CAMERA_GRAB_LATEST` so stale queued frames are not preferred.
+## V035 stability changes
 
-## Simulation
+The stream HTTP server enables:
+- TCP keepalive;
+- TCP_NODELAY;
+- 2 s send/receive wait timeout;
+- LRU socket purge.
 
-When PC Studio simulation starts, the backend closes/pauses its ESP stream request. The ESP session remains configured but sends no image bytes because no stream client is requesting them. PC Studio reopens the MJPEG stream after simulation stops.
+The firmware keeps Wi-Fi sleep disabled and uses `WiFi.reconnect()` before a full `WiFi.begin()` fallback.
+
+`/status` now reports `stream_client_active` so transport state can be diagnosed separately from `session_active`.
+
+## V035 speed changes
+
+Each MJPEG frame uses two HTTPD writes:
+1. multipart boundary + headers;
+2. JPEG bytes.
+
+V034 used three writes.
+
+The firmware retains:
+- `CAMERA_GRAB_LATEST`;
+- two PSRAM framebuffers;
+- PC-selected 1–30 FPS cap.
+
+Recommended starting point remains VGA, JPEG quality 12–16, 15 FPS. Test 20 FPS only if measured FPS is stable and reconnects stay at zero.

@@ -1,28 +1,32 @@
-# Architecture — V034 camera path
+# Architecture — V035 camera path
 
 ```text
-ESP32-CAM OV2640
-  Wi-Fi sleep off
+ESP32-CAM / OV2640
   CAMERA_GRAB_LATEST
-  2 PSRAM FBs
+  2 PSRAM framebuffers
+  Wi-Fi sleep disabled
+  HTTPD keepalive + TCP_NODELAY
        │
-       │ persistent :81/stream
+       │ one persistent MJPEG connection
        ▼
 RemoteCameraService
-  incremental JPEG extraction
-  reconnect + FPS telemetry
+  direct HTTPConnection
+  TCP keepalive
+  Content-Length multipart parser
+  newest-frame policy
+  reconnect + session recovery
        │
        ▼
 CameraFrameService
-       ├── /api/camera/live.mjpeg → Camera Sources
+       ├── Condition wakeup → /api/camera/live.mjpeg
        ├── Live AI
-       ├── Dataset Capture
+       ├── Dataset
        ├── Zones
-       └── Analytics / traffic-state inputs
+       └── analytics
 ```
 
-V034 avoids a second browser→ESP stream: the PC backend owns the single physical MJPEG transport and relays its latest frames to the UI.
+There is still one physical ESP→backend image stream. The browser does not open a second ESP stream.
 
-Signal policy, inference, training and analytics ownership are unchanged.
+If the ESP reboots, the backend can restore the retained session configuration automatically rather than requiring a manual Stop/Start cycle.
 
-When simulation is active, the backend does not keep consuming the physical ESP stream. This prevents unnecessary image transfer and stale buffering.
+Simulation suspends the physical image stream while retaining the configured remote camera state.

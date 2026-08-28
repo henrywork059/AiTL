@@ -1,64 +1,52 @@
-# API Contracts — V034 camera transport
+# API Contracts — V035 camera transport highlights
 
-Existing non-camera contracts are unchanged.
+Existing non-camera contracts remain unchanged.
 
-## Session control
+## Connect
 
 `POST /api/camera/remote/connect`
 
-```json
-{"host":"192.168.68.57","source_id":"esp32_cam_01"}
-```
+Connect probes ESP `/status` only and transfers zero image bytes.
 
-Connect performs ESP `/status` only. Zero image bytes are requested.
+## Start
 
 `POST /api/camera/remote/start`
 
-```json
-{
-  "target_fps": 15,
-  "settings": {
-    "frame_size": "VGA",
-    "jpeg_quality": 12
-  }
-}
-```
+Body continues to contain:
+- `target_fps` 1–30;
+- the complete V033/V034 OV2640 settings object;
+- legacy `fetch_interval_ms` remains accepted as a compatibility alias.
 
-The complete existing V033 OV2640 settings object is still required. V034 adds `target_fps` 1–30. The backend sends it to ESP `/config` as `stream_fps`.
-
-For compatibility, `fetch_interval_ms` is still accepted; when supplied by an older V033 client it is converted to an equivalent bounded target FPS.
-
-Start ordering:
+Ordering remains:
 
 ```text
 /stop best effort
-/config?<complete settings + stream_fps>
+/config?<settings + stream_fps>
 /start
-open http://<ESP-IP>:81/stream
+persistent :81/stream
 ```
 
-`POST /api/camera/remote/stop` closes the persistent stream before calling ESP `/stop`.
+## Persistent transport
 
-## Low-latency preview
+The backend now parses the ESP multipart response by boundary + `Content-Length`, not JPEG marker scanning. It keeps the newest complete frame when more than one is already buffered.
+
+On transport failure, V035 probes `/status`. If `session_active=false`, it automatically reapplies the retained configuration and calls `/start` before reconnecting.
+
+## Preview
 
 `GET /api/camera/live.mjpeg`
 
-Returns `multipart/x-mixed-replace; boundary=frame` from the current CameraFrameService frame sequence. This is a PC-side relay, not a second ESP connection.
+For physical ESP frames, the relay is event-driven: the ingestion thread notifies the relay when a new frame is stored. Simulation and legacy upload retain bounded polling fallback behavior.
+
+Response disables caching/transformation/buffering where supported.
 
 ## Status additions
 
-Remote status includes:
+- `stream_connected`
+- `session_recoveries`
+- `consecutive_failures`
+- `reconnect_backoff_ms`
+- `last_stream_connected_at_ms`
+- `last_recovery_at_ms`
 
-- `transport`: `idle` or `mjpeg`
-- `target_fps`
-- `measured_fps`
-- `last_frame_interval_ms`
-- `stream_reconnects`
-- `stream_bytes_received`
-- `stream_url`
-
-Existing V033 status/session/settings fields remain.
-
-## Safety
-
-Remote targets remain literal RFC1918 IPv4 only and redirects remain disabled. No physical/public-road signal-control API is added.
+Private RFC1918 IPv4 restriction remains. No redirects or public-road signal-control API are introduced.

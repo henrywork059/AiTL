@@ -63,6 +63,7 @@ export type RemoteCameraStatus = {
   device_reachable: boolean;
   worker_running: boolean;
   streaming: boolean;
+  stream_connected: boolean;
   paused_for_simulation: boolean;
   transport: "idle" | "mjpeg";
   host: string | null;
@@ -75,10 +76,15 @@ export type RemoteCameraStatus = {
   measured_fps: number;
   last_frame_interval_ms: number | null;
   stream_reconnects: number;
+  session_recoveries: number;
+  consecutive_failures: number;
+  reconnect_backoff_ms: number;
   stream_bytes_received: number;
   dropped_stale_frames: number;
   connected_at_ms: number | null;
   stream_started_at_ms: number | null;
+  last_stream_connected_at_ms: number | null;
+  last_recovery_at_ms: number | null;
   last_probe_at_ms: number | null;
   last_attempt_at_ms: number | null;
   last_success_at_ms: number | null;

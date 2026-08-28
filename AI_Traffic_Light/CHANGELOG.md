@@ -1,5 +1,19 @@
 # Changelog
 
+## 0_3_5 — Resilient low-latency ESP streaming
+
+- Created V035 / `0_3_5` at the owner's explicit request after V034 to further improve physical-camera speed, connection stability and the streaming workflow; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Kept the V033/V034 safety/traffic contract: Connect remains status/control only with zero image transfer; Start applies complete PC-owned settings before `/start`; Stop closes image transport before `/stop`.
+- Replaced the V034 `urllib` stream opener with a direct `http.client.HTTPConnection` transport so the PC can enable TCP keepalive/TCP_NODELAY and use a dedicated stream read timeout.
+- Replaced JPEG SOI/EOI scanning with a multipart `Content-Length` parser that handles arbitrary TCP chunk boundaries and extracts exact JPEG parts.
+- Increased stream read size from 4 KiB to 64 KiB to reduce Python/network-read overhead while still retaining newest-frame backlog dropping.
+- Added event-driven physical-frame wakeups for `/api/camera/live.mjpeg`, removing V034's 10 ms browser-preview polling loop for ESP frames.
+- Added automatic ESP session recovery: after a dropped connection or ESP reboot, the backend probes `/status`, reapplies the retained settings and target FPS if the session was lost, calls `/start`, then reopens MJPEG.
+- Added bounded exponential reconnect backoff plus `stream_connected`, session-recovery, failure-streak and backoff telemetry.
+- Matching ESP firmware adds TCP_NODELAY, HTTPD TCP keepalive, shorter send/receive timeouts, two writes per MJPEG frame instead of three, stream-client status, and less disruptive Wi-Fi reconnect handling.
+- Simulation still suspends physical image transfer and automatically resumes it afterward.
+- No ESP-side inference, public-road control, or independent simultaneous multi-camera frame store is introduced.
+
 ## 0_3_4 — Low-latency persistent ESP MJPEG transport
 
 - Created V034 / `0_3_4` at the owner's explicit request after V033 to improve physical-camera streaming speed and reduce latency; V024 / `0_2_4` remains the owner-confirmed passed baseline.

@@ -81,7 +81,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     : status.simulation_enabled
       ? status.simulation_paused ? "simulation paused" : "simulation running"
       : remote?.streaming
-        ? remote.paused_for_simulation ? "ESP paused for simulation" : "ESP streaming"
+        ? remote.paused_for_simulation
+          ? "ESP paused for simulation"
+          : remote.stream_connected
+            ? "ESP streaming"
+            : "ESP reconnecting"
         : remote?.configured
           ? remote.device_reachable ? "ESP ready" : "ESP unreachable"
           : status.frame_available
@@ -344,10 +348,13 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>ESP address</span><strong>{remote?.host ?? "none"}</strong></div>
               <div><span>Device</span><strong>{remote?.device_reachable ? "reachable" : remote?.configured ? "unreachable" : "not connected"}</strong></div>
               <div><span>ESP session</span><strong>{remote?.streaming ? "active" : "idle"}</strong></div>
-              <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "MJPEG paused" : remote?.streaming ? "persistent MJPEG" : "idle"}</strong></div>
+              <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "MJPEG paused" : remote?.stream_connected ? "MJPEG connected" : remote?.streaming ? "reconnecting" : "idle"}</strong></div>
               <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
               <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
+              <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
+              <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
+              <div><span>Reconnect backoff</span><strong>{remote?.reconnect_backoff_ms ? `${remote.reconnect_backoff_ms} ms` : "—"}</strong></div>
               <div><span>Stale frames dropped</span><strong>{remote?.dropped_stale_frames ?? 0}</strong></div>
               <div><span>Source</span><strong>{status?.active_source_id ?? "none"}</strong></div>
               <div><span>Resolution</span><strong>{status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : settings.frame_size}</strong></div>
@@ -359,7 +366,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              V034 keeps PC-owned Start/Stop control but uses one persistent ESP MJPEG connection instead of repeated /capture HTTP requests.
+              V035 keeps one persistent MJPEG path, adds TCP keepalive, automatic ESP session recovery, exponential reconnect backoff, and event-driven preview delivery.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/frame?source_id=esp_cam_01</code>
           </section>

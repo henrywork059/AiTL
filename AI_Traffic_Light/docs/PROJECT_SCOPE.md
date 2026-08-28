@@ -2,20 +2,17 @@
 
 ## Physical camera input
 
-V034 implements a PC-controlled, on-demand physical ESP32-CAM path with persistent MJPEG transport for lower latency. The ESP still sends no images before the PC starts a session.
+V035 implements a local PC-controlled ESP32-CAM input path with:
+- idle Connect;
+- PC-owned runtime sensor configuration;
+- persistent low-latency MJPEG;
+- transport recovery after temporary network/session loss;
+- common downstream use by preview, inference, dataset capture, zones and analytics.
 
-Implemented candidate evidence:
-- private-LAN camera control;
-- PC-owned sensor settings and target FPS;
-- persistent newest-frame MJPEG ingestion;
-- PC-side preview/inference/dataset/analytics reuse.
-
-Not implied:
-- validated detector accuracy;
+This does not imply:
 - ESP-side inference;
+- validated production detector accuracy;
 - simultaneous independent multi-camera buffers;
-- physical/public-road signal authority.
+- physical/public-road traffic-signal authority.
 
-Existing cooperation, pedestrian, class, emergency and decision-evidence features retain their documented simulation/prototype provenance.
-
-Public-road traffic control remains out of scope.
+Existing cooperation, pedestrian, class, emergency and explainability/evidence features retain their documented prototype/simulation provenance.

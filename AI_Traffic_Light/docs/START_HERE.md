@@ -1,28 +1,29 @@
-# Start Here — V034
+# Start Here — V035
 
-V034 / `0_3_4` is the current unaccepted candidate. V033 is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V035 / `0_3_5` is the current candidate.
 
-## Why V034
-
-V033 used a new HTTP `/capture` request for every frame. That is simple but adds connection/request overhead and limits practical frame rate.
-
-V034 uses one persistent ESP MJPEG connection after Start Stream:
+The V034 persistent-MJPEG direction is retained. V035 improves the weak points around it:
 
 ```text
-Connect: GET /status only
-Start:
-  POST /config + target_fps
-  POST /start
-  GET :81/stream   ← stays open
-Stop:
-  close stream
-  POST /stop
+Connect → status only
+Start → config → start → persistent MJPEG
+                 ↓
+          exact multipart parser
+                 ↓
+          newest PC frame
+                 ↓
+       event-driven browser relay
 ```
 
-The backend extracts JPEGs continuously and stores each newest frame in the existing CameraFrameService.
+If the ESP stream drops:
 
-Camera Sources displays `/api/camera/live.mjpeg`, so preview refresh is no longer coupled to the frontend status-poll interval.
+```text
+status probe
+  ↓
+session still active? → reconnect stream
+session lost/rebooted? → reapply config → start → reconnect
+```
 
-Use the matching V034 Arduino firmware. Start with VGA / JPEG quality 12–16 / 15 FPS.
+Retries use bounded exponential backoff.
 
-V034 also drops older complete JPEGs if more than one frame arrives in the same network read, preferring the newest frame to avoid backlog latency.
+For the ESP, replace only the `.ino` with the V035 file. Existing `secrets.h` does not change.

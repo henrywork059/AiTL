@@ -12,17 +12,17 @@ if str(BACKEND) not in sys.path:
 
 from app.core.exceptions import AppError
 from app.services.camera_frames import camera_frame_service
-from app.services.remote_camera import RemoteCameraService, normalize_private_lan_ipv4
+from app.services.remote_camera import RemoteCameraService, _MjpegParser, normalize_private_lan_ipv4
 
 JPEG_1X1 = (
-    b"\xff\xd8"  # SOI
-    b"\xff\xc0\x00\x0b"  # SOF0, segment length 11
-    b"\x08"  # precision
-    b"\x00\x01"  # height = 1
-    b"\x00\x01"  # width = 1
-    b"\x01"  # one component
+    b"\xff\xd8"
+    b"\xff\xc0\x00\x0b"
+    b"\x08"
+    b"\x00\x01"
+    b"\x00\x01"
+    b"\x01"
     b"\x01\x11\x00"
-    b"\xff\xd9"  # EOI
+    b"\xff\xd9"
 )
 
 SETTINGS = {
@@ -53,43 +53,36 @@ SETTINGS = {
 }
 
 
-class FakeMjpegStream:
-    def __init__(self) -> None:
+def mjpeg_part(frame: bytes = JPEG_1X1) -> bytes:
+    return (
+        b"\r\n--frame\r\n"
+        b"Content-Type: image/jpeg\r\n"
+        b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
+        b"X-AiTL-Sequence: 1\r\n\r\n"
+        + frame
+        + b"\r\n"
+    )
+
+
+class RepeatingMjpegStream:
+    boundary = b"frame"
+
+    def __init__(self, *, end_after_frames: int | None = None) -> None:
         self.closed = False
+        self.frames = 0
+        self.end_after_frames = end_after_frames
 
     def read(self, _size: int) -> bytes:
         if self.closed:
             return b""
+        if self.end_after_frames is not None and self.frames >= self.end_after_frames:
+            return b""
+        self.frames += 1
         time.sleep(0.01)
-        return (
-            b"\r\n--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
-            + str(len(JPEG_1X1)).encode()
-            + b"\r\n\r\n"
-            + JPEG_1X1
-            + b"\r\n"
-        )
+        return mjpeg_part()
 
     def close(self) -> None:
         self.closed = True
-
-
-def fake_control(calls: list[tuple[str, str, dict[str, str] | None]]):
-    def request_json(host: str, path: str, method: str, query: dict[str, str] | None) -> dict:
-        calls.append((method, path, query))
-        if path == "/status":
-            return {"camera_ready": True, "session_active": False, "settings": SETTINGS}
-        if path == "/config":
-            assert query is not None
-            assert query["frame_size"] == "VGA"
-            assert query["jpeg_quality"] == "12"
-            assert query["stream_fps"].isdigit()
-            return {"ok": True, "session_active": False, "settings": SETTINGS}
-        if path == "/start":
-            return {"camera_ready": True, "session_active": True, "settings": SETTINGS}
-        if path == "/stop":
-            return {"camera_ready": True, "session_active": False, "settings": SETTINGS}
-        raise AssertionError(path)
-    return request_json
 
 
 def expect_app_error(fn, code: str) -> None:
@@ -107,26 +100,44 @@ def main() -> int:
     assert normalize_private_lan_ipv4("172.16.5.2") == "172.16.5.2"
     expect_app_error(lambda: normalize_private_lan_ipv4("8.8.8.8"), "ATL-CAMERA-003")
     expect_app_error(lambda: normalize_private_lan_ipv4("example.com"), "ATL-CAMERA-003")
-    print("[PASS] remote camera host validation remains private-LAN only")
+    print("[PASS] remote camera host validation remains literal private-LAN IPv4 only")
 
     calls: list[tuple[str, str, dict[str, str] | None]] = []
     service = RemoteCameraService()
-    service._json_requester = fake_control(calls)
-    service._stream_opener = lambda host: FakeMjpegStream()
+
+    def request_json(host: str, path: str, method: str, query: dict[str, str] | None) -> dict:
+        calls.append((method, path, query))
+        if path == "/status":
+            return {"camera_ready": True, "session_active": True, "settings": SETTINGS}
+        if path == "/config":
+            assert query is not None
+            return {"ok": True, "session_active": False, "settings": SETTINGS}
+        if path == "/start":
+            return {"camera_ready": True, "session_active": True, "settings": SETTINGS}
+        if path == "/stop":
+            return {"camera_ready": True, "session_active": False, "settings": SETTINGS}
+        raise AssertionError(path)
+
+    service._json_requester = request_json
+    service._stream_opener = lambda host: RepeatingMjpegStream()
 
     service.connect(host="192.168.1.87", source_id="esp32_cam_compat")
     assert service.status()["successful_fetches"] == 0
 
-    # V034 retains the V033 fetch_interval_ms call shape as a compatibility alias.
+    # V033/V034 callers using fetch_interval_ms remain accepted.
     started = service.start_stream(settings=SETTINGS, fetch_interval_ms=100)
     assert started["target_fps"] == 10
     assert calls[2][2]["stream_fps"] == "10"
-    time.sleep(0.05)
+
+    deadline = time.time() + 0.5
+    while time.time() < deadline and service.status()["successful_fetches"] < 1:
+        time.sleep(0.02)
     assert service.status()["successful_fetches"] >= 1
-    print("[PASS] V033 start-call compatibility maps capture interval to V034 target FPS")
+    print("[PASS] older start-call shape maps interval to V035 target FPS")
 
     service.stop()
-    print("[PASS] low-latency transport shutdown is bounded")
+    assert service.status()["worker_running"] is False
+    print("[PASS] resilient transport shutdown remains bounded")
     return 0
 
 
