@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_3_3 — PC-controlled on-demand ESP camera session
+
+- Created V033 / `0_3_3` at the owner's explicit request after V032; V032 remains the previous candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Changed the remote ESP workflow so **Connect** probes only the ESP `/status` control surface and does not request or transfer an image.
+- Added explicit **Start Stream** / **Stop Stream** lifecycle. Start sends the complete validated OV2640 runtime settings to the ESP `/config`, activates `/start`, and only then starts bounded PC-side `/capture` polling. Stop ends PC polling and calls ESP `/stop`, returning the camera session to idle while keeping the device connected.
+- Added PC-controlled resolution, JPEG quality, brightness, contrast, saturation, effect, white-balance, exposure, gain, correction, mirror/flip/downsize and color-bar settings plus PC capture interval.
+- Added `POST /api/camera/remote/start` and `POST /api/camera/remote/stop`; V032 connect/disconnect/status and legacy raw frame upload remain compatible.
+- Added matching Arduino IDE V033 firmware whose `/capture` and `:81/stream` endpoints refuse image transfer unless a PC-started session is active.
+- Built-in simulation pauses PC frame requests without discarding the configured ESP session, and frame requests resume afterward.
+- No physical/public-road signal command path is introduced.
+
 ## 0_3_2 — PC-pull ESP32-CAM integration
 
 - Created V032 / `0_3_2` at the owner's explicit request while V031 remained unaccepted; V024 / `0_2_4` remains the owner-confirmed passed baseline.

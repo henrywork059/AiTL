@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
@@ -17,12 +19,42 @@ logger = get_logger(__name__)
 class RemoteCameraConnectRequest(BaseModel):
     host: str = Field(min_length=7, max_length=64)
     source_id: str = Field(default="esp32_cam_01", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
-    fetch_interval_ms: int = Field(default=500, ge=100, le=5000)
+
+
+class RemoteCameraSettingsRequest(BaseModel):
+    frame_size: Literal["QQVGA", "HQVGA", "QVGA", "CIF", "VGA", "SVGA", "XGA", "SXGA", "UXGA"] = "VGA"
+    jpeg_quality: int = Field(default=12, ge=4, le=63)
+    brightness: int = Field(default=0, ge=-2, le=2)
+    contrast: int = Field(default=0, ge=-2, le=2)
+    saturation: int = Field(default=0, ge=-2, le=2)
+    special_effect: int = Field(default=0, ge=0, le=6)
+    awb: bool = True
+    awb_gain: bool = True
+    wb_mode: int = Field(default=0, ge=0, le=4)
+    aec: bool = True
+    aec2: bool = False
+    ae_level: int = Field(default=0, ge=-2, le=2)
+    aec_value: int = Field(default=300, ge=0, le=1200)
+    agc: bool = True
+    agc_gain: int = Field(default=0, ge=0, le=30)
+    gainceiling: int = Field(default=0, ge=0, le=6)
+    bpc: bool = False
+    wpc: bool = True
+    raw_gma: bool = True
+    lenc: bool = True
+    hmirror: bool = False
+    vflip: bool = False
+    dcw: bool = True
+    colorbar: bool = False
+
+
+class RemoteCameraStartRequest(BaseModel):
+    fetch_interval_ms: int = Field(default=250, ge=100, le=5000)
+    settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
 
 
 @router.get("/sources")
 def list_camera_sources(request: Request) -> dict:
-    """Return the working receiver, remote pull, and simulation source slots."""
     data = {
         "sources": [
             {"id": "remote_esp32", "label": "ESP32-CAM by IP", "type": "http_pull", "status": "ready"},
@@ -38,40 +70,43 @@ def list_camera_sources(request: Request) -> dict:
 
 @router.get("/status")
 def camera_status(request: Request) -> dict:
-    """Return receiver/simulation status and latest-frame metadata."""
     data = camera_frame_service.status()
-    logger.debug(
-        "Camera status returned",
-        extra={
-            "request_id": request.state.request_id,
-            "camera_mode": data["mode"],
-            "frame_number": data["frame_number"],
-        },
-    )
     return ok(data, request_id=request.state.request_id)
 
 
 @router.get("/remote/status")
 def remote_camera_status(request: Request) -> dict:
-    data = remote_camera_service.status()
+    data = remote_camera_service.status(refresh_device=True)
     return ok(data, request_id=request.state.request_id)
 
 
 @router.post("/remote/connect")
 def connect_remote_camera(payload: RemoteCameraConnectRequest, request: Request) -> dict:
-    data = remote_camera_service.connect(
-        host=payload.host,
-        source_id=payload.source_id,
+    data = remote_camera_service.connect(host=payload.host, source_id=payload.source_id)
+    logger.info(
+        "Remote ESP camera connected for control",
+        extra={"request_id": request.state.request_id, "camera_host": data["host"], "source_id": data["source_id"]},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.post("/remote/start")
+def start_remote_camera(payload: RemoteCameraStartRequest, request: Request) -> dict:
+    data = remote_camera_service.start_stream(
+        settings=payload.settings.model_dump(),
         fetch_interval_ms=payload.fetch_interval_ms,
     )
     logger.info(
-        "Remote ESP camera connection configured",
-        extra={
-            "request_id": request.state.request_id,
-            "camera_host": data["host"],
-            "source_id": data["source_id"],
-        },
+        "Remote ESP camera stream started",
+        extra={"request_id": request.state.request_id, "camera_host": data["host"], "source_id": data["source_id"]},
     )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.post("/remote/stop")
+def stop_remote_camera(request: Request) -> dict:
+    data = remote_camera_service.stop_stream()
+    logger.info("Remote ESP camera stream stopped", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)
 
 
@@ -87,44 +122,25 @@ async def upload_camera_frame(
     request: Request,
     source_id: str = Query(default="device_camera", min_length=1, max_length=64),
 ) -> dict:
-    """Accept one raw JPEG/PNG body from an ESP32 or Raspberry Pi camera node."""
     content = await request.body()
     frame = camera_frame_service.store_upload(
         source_id=source_id,
         content_type=request.headers.get("content-type", ""),
         content=content,
     )
-    logger.info(
-        "Camera frame received",
-        extra={
-            "request_id": request.state.request_id,
-            "source_id": frame.source_id,
-            "frame_number": frame.frame_number,
-            "size_bytes": len(frame.content),
-        },
-    )
     return ok(frame.metadata(), request_id=request.state.request_id)
 
 
 @router.get("/frame")
 def latest_camera_frame(request: Request) -> Response:
-    """Return the latest device, remote, or simulation frame as image bytes."""
     frame = camera_frame_service.latest_frame()
     if frame is None:
         raise AppError(
             ErrorCode.CAMERA_NOT_CONNECTED,
-            "No camera frame has arrived yet. Connect an ESP camera, upload an image, or start simulation mode.",
+            "No camera frame has arrived yet. Start an ESP stream, upload an image, or start simulation mode.",
             status_code=404,
         )
 
-    logger.debug(
-        "Latest camera frame returned",
-        extra={
-            "request_id": request.state.request_id,
-            "source_id": frame.source_id,
-            "frame_number": frame.frame_number,
-        },
-    )
     return Response(
         content=frame.content,
         media_type=frame.content_type,
@@ -139,17 +155,13 @@ def latest_camera_frame(request: Request) -> Response:
 
 @router.post("/simulation/start")
 def start_camera_simulation(request: Request) -> dict:
-    """Enable the synthetic camera. Remote pull remains configured but pauses ingestion."""
     data = camera_frame_service.set_simulation(True)
-    logger.info("Camera simulation started", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)
 
 
 @router.post("/simulation/stop")
 def stop_camera_simulation(request: Request) -> dict:
-    """Return to device/remote receiver mode without discarding the last device frame."""
     data = camera_frame_service.set_simulation(False)
-    logger.info("Camera simulation stopped", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)
 
 
@@ -158,17 +170,5 @@ def update_camera_simulation_settings(
     payload: CameraSimulationSettingsRequest,
     request: Request,
 ) -> dict:
-    """Adjust synthetic-scene density or pause/resume the active simulation."""
-    data = camera_frame_service.configure_simulation(
-        density=payload.density,
-        paused=payload.paused,
-    )
-    logger.info(
-        "Camera simulation settings updated",
-        extra={
-            "request_id": request.state.request_id,
-            "simulation_density": data["simulation_density"],
-            "simulation_paused": data["simulation_paused"],
-        },
-    )
+    data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused)
     return ok(data, request_id=request.state.request_id)

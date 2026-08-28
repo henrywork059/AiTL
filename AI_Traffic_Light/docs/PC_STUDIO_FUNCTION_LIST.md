@@ -1,65 +1,29 @@
-# PC Studio Function List
+# PC Studio Function List — current highlights
 
-This is a current capability catalog. Read root `VERSION` for candidate state and `PROJECT_SCOPE.md` for scope boundaries.
+## Camera
 
-## Camera / live simulation
+- physical ESP32-CAM control connection by private-LAN IP;
+- V033 explicit idle / Start Stream / Stop Stream lifecycle;
+- complete PC-owned runtime OV2640 settings sent before each stream start;
+- bounded repeated `/capture` polling only after ESP session activation;
+- simulation pause/resume of physical frame requests;
+- legacy raw JPEG/PNG upload compatibility;
+- common frame pipeline for Live AI, Dataset Capture, zones and analytics.
 
-- receive raw JPEG/PNG device uploads;
-- V032 connect to a stock Arduino ESP32-CAM CameraWebServer by private-LAN IPv4;
-- probe/pull `/capture` JPEG snapshots into the common PC frame pipeline;
-- direct `:81/stream` Camera Sources preview with backend-frame fallback;
-- remote connection/fetch telemetry and reconnect/disconnect;
-- pause remote ingestion while built-in simulation is active and resume afterward;
-- signal-aware synthetic single-junction scene with density and pause/resume controls.
+## Existing PC Studio capabilities
 
-## Inference / dataset / training
+- local trained-model inference;
+- dataset capture/review/manual labeling/managed YOLO training;
+- model registry;
+- camera-aligned zones/counting lines;
+- occupancy/tracking/flow analytics;
+- configurable protected simulated signal timing and ranked scenarios;
+- deterministic single-junction simulation lab;
+- isolated two-intersection cooperation/pedestrian/class/emergency experiment modes;
+- persistent normalized decision evidence.
 
-- local trained-model inference on the common current camera frame;
-- capture/delete/review/manual-label frames;
-- managed YOLO train/validation dataset;
-- local Ultralytics training with convergence/early stopping;
-- model registry/load/default/delete.
+## Limitation
 
-## Zones / analytics
+Live non-simulation camera storage is still one latest-frame slot, not independent simultaneous buffers for multiple ESP cameras.
 
-- camera-aligned waiting/crossing/queue/counting/ignore regions and counting lines;
-- sampled occupancy history;
-- lightweight tracking;
-- directional line passages and region entry/exit/dwell;
-- separate occupancy and flow analytics with CSV export.
-
-## Traffic logic
-
-- protected phase base/min/max timing;
-- Fixed/Adaptive/Test modes;
-- ranked ALL/ANY scenarios using metrics or zone/class counts;
-- bounded extend/reduce/hold/request-next/incident actions;
-- one highest-ranked eligible winner;
-- persistence/cooldown/stale fallback;
-- decision history/explanations.
-
-## Simulation Lab / network evidence
-
-- isolated Fixed-vs-Adaptive single-junction experiments;
-- isolated two-intersection seeded network experiments;
-- Fixed, Independent Adaptive, Cooperative, Pedestrian-aware, Class-aware, Emergency Baseline and Emergency-priority comparison modes;
-- synthetic transfer/predicted-arrival/cooperation evidence;
-- pedestrian request/clearance evidence;
-- synthetic class profiles/per-class metrics;
-- configured simulated emergency lifecycle/priority evidence;
-- normalized persistent decision evidence JSON/CSV.
-
-## Network / explanation foundation
-
-- generic intersection/source identity;
-- directed neighbour links;
-- live neighbour/decision context;
-- explicit provenance and inactive live-cooperation/public-road-control boundaries.
-
-## V032 limitation
-
-The backend still keeps one latest non-simulation frame rather than simultaneous independent frame buffers for many ESP cameras. V032 establishes the physical camera input path; multi-camera live routing is a later extension.
-
-## Safety
-
-Physical ESP camera input is implemented. Physical/public-road signal control is not.
+Physical/public-road signal control remains outside scope.

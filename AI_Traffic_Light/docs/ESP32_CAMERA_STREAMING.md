@@ -1,78 +1,60 @@
-# ESP32-CAM integration
+# ESP32-CAM V033 integration
 
-## Recommended V032 path
+## Required matching firmware
 
-Use the stock Arduino ESP32 CameraWebServer example as the first hardware baseline.
+Use `AiTL_ESP32CAM_V033_ArduinoIDE.zip`.
 
-The ESP32-CAM needs only its Wi-Fi credentials. It does **not** need the PC IP.
+The ESP stores only:
 
-After reset, Serial Monitor at 115200 should print:
+- Wi-Fi SSID/password;
+- device ID;
+- hostname.
 
-```text
-Camera Ready! Use 'http://192.168.x.x' to connect
-```
+Camera quality/resolution/exposure/gain/image settings are not configured in `secrets.h`. PC Studio sends them each time Start Stream is pressed.
 
-Use that ESP IP in PC Studio → Camera Sources.
+## Idle behavior
 
-## Endpoints used by AiTL
-
-For an ESP at `192.168.1.87`:
+After boot:
 
 ```text
-Still JPEG:
-http://192.168.1.87/capture
-
-MJPEG:
-http://192.168.1.87:81/stream
+Wi-Fi connected
+control server ready
+session=idle
 ```
 
-V032 uses repeated `/capture` requests for the backend processing pipeline and may use `:81/stream` for direct Camera Sources preview.
+`GET /status` works, but `/capture` and `:81/stream` do not return images until `POST /start`.
 
-## PC Studio workflow
+## Start sequence
 
-1. Start AiTL PC Studio.
-2. Open Camera Sources.
-3. Enter the ESP IP only, for example `192.168.1.87`.
-4. Keep source ID as `esp32_cam_01` unless you need a different identity.
-5. Press Connect.
-6. Confirm status is connected and frames increase.
-7. Open Live AI / Dataset Capture / Zone Editor as required.
-
-## Network requirements
-
-The PC and ESP must be on the same reachable private LAN.
-
-Accepted camera ranges:
+PC Studio performs:
 
 ```text
-10.0.0.0/8
-172.16.0.0/12
-192.168.0.0/16
+POST /config?<complete camera settings>
+POST /start
+GET /capture
+GET /capture
+GET /capture
+...
 ```
 
-Hostnames and public IP addresses are intentionally not accepted by the V032 remote camera puller.
+Stop Stream performs `POST /stop`.
 
-## Simulation
+This means image transfer is demand-driven from the PC.
 
-Simulation remains available. Starting simulation pauses ESP snapshot ingestion without deleting the configured ESP address. Stopping simulation resumes ESP ingestion.
+## Browser diagnostic
 
-## Legacy push compatibility
+Before PC Start Stream, `/status` should show:
 
-The older device-camera transport remains supported:
-
-```http
-POST /api/camera/frame?source_id=<camera_id>
-Content-Type: image/jpeg
-
-<raw JPEG bytes>
+```json
+"session_active": false
 ```
 
-That mode requires the camera node to know the PC address. V032's preferred first-test path is PC → ESP pull because it matches the already-working Arduino CameraWebServer example.
+After PC Start Stream it becomes `true`, and capture counters should rise as PC Studio requests images.
 
-## Multi-camera limitation
+## Network
 
-The current backend keeps one latest non-simulation camera frame. V032 adds source identity and connection structure but does not yet provide simultaneous independent frame buffers for several live ESP cameras.
+PC and ESP must be mutually reachable on the same private LAN. V033 PC Studio accepts literal RFC1918 IPv4 targets only.
 
-## Safety boundary
+## Limitation
 
-This camera path is for a local/student prototype and model-junction demonstration. It does not connect AiTL to public-road traffic-signal infrastructure.
+One backend latest-frame slot remains shared for the live non-simulation camera path. Independent simultaneous multi-camera retention is a later patch.
