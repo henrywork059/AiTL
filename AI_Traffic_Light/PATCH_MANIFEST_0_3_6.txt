@@ -1,4 +1,4 @@
-AiTL V036 full reviewed patch R5 manifest
+AiTL V036 full reviewed patch R6 manifest
 
 PATCH_APPLY_INSTRUCTIONS_0_3_6.txt
 PATCH_MANIFEST_0_3_6.txt

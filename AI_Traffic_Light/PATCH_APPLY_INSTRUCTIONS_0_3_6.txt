@@ -1,4 +1,4 @@
-AiTL V036 full reviewed multi-ESP patch (R5 - progress-bounded ESP TCP send repair)
+AiTL V036 full reviewed multi-ESP patch (R6 - warmup-vectored ESP TCP send repair)
 
 1. Extract this ZIP at the repository root so AI_Traffic_Light/ overlays the existing project.
 2. Do not delete datasets, outputs, models, config runtime JSON, .venv, node_modules, or other local runtime/user data.
@@ -10,10 +10,10 @@ The V036 runner automatically invokes scripts/apply_v036_full_patch.ps1 before p
 
 Candidate remains 0_3_6. passed_baseline remains 0_2_4 until explicit owner acceptance.
 
-IMPORTANT HARDWARE STEP FOR R5:
+IMPORTANT HARDWARE STEP FOR R6:
 - Reflash each ESP32-CAM with the included V036 Arduino/PlatformIO firmware.
-- R5 replaces R4's 120 ms whole-frame cutoff with 1360-byte MSG_DONTWAIT writes, a 250 ms no-progress timeout, and a 500 ms hard frame cap.
+- R6 replaces R5's repeated 250 ms abort/reconnect loop with vectored MSG_DONTWAIT writes and a bounded per-connection warm-up before tighter steady-state limits.
 - The wire protocol remains aitl-tcp-jpeg-v1; no PC protocol migration is required.
 - Start at 240 x 176 or 320 x 240, JPEG quality 14, 15 FPS.
-- Serial boot should identify: AiTL V036 R5 progress-bounded ESP32-CAM node.
+- Serial boot should identify: AiTL V036 R6 warmup-vectored ESP32-CAM node.
 - Healthy operation should keep client=on, failures stable, frame counts increasing, and frame age low.

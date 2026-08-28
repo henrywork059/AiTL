@@ -1,8 +1,9 @@
-// AiTL V036 standalone Arduino IDE sketch (same-candidate progress-bounded TCP send repair).
+// AiTL V036 standalone Arduino IDE sketch (same-candidate connection-warmup vectored TCP send repair).
 // Keep this behavior aligned with ../../src/main.cpp.
 
 #include <Arduino.h>
 #include <errno.h>
+#include <sys/uio.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <esp_camera.h>
@@ -29,9 +30,11 @@
 #define AITL_CONTROL_PORT 80U
 #define AITL_STREAM_PORT 81U
 #define AITL_STREAM_SELECT_SLICE_MS 20U
-#define AITL_FRAME_STALL_TIMEOUT_MS 250U
-#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 500U
-#define AITL_STREAM_SEND_CHUNK_BYTES 1360U
+#define AITL_WARMUP_SUCCESS_FRAMES 3U
+#define AITL_WARMUP_STALL_TIMEOUT_MS 1000U
+#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 1500U
+#define AITL_FRAME_STALL_TIMEOUT_MS 500U
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 900U
 #define AITL_WIFI_CONNECT_TIMEOUT_MS 20000UL
 #define AITL_WIFI_RETRY_MS 3000UL
 #define AITL_SERIAL_STATUS_INTERVAL_MS 5000UL
@@ -41,7 +44,7 @@ namespace {
 
 constexpr char kCameraProtocol[] = "aitl-camera-v036";
 constexpr char kStreamProtocol[] = "aitl-tcp-jpeg-v1";
-constexpr char kFirmwareRevision[] = "r5-progress-bounded-send";
+constexpr char kFirmwareRevision[] = "r6-warmup-vectored-send";
 constexpr uint8_t kFrameMagic[4] = {'A', 'T', 'L', '1'};
 constexpr size_t kFrameHeaderBytes = 16;
 
@@ -112,6 +115,10 @@ uint32_t lastStatusAtMs = 0;
 uint32_t fpsWindowStartedAtMs = 0;
 uint32_t fpsWindowFrames = 0;
 float actualFps = 0.0f;
+uint32_t streamClientSuccessfulFrames = 0;
+uint32_t lastSendAcceptedBytes = 0;
+int lastSendErrno = 0;
+bool lastSendWarmup = false;
 
 const char* frameSizeName(framesize_t value) {
   switch (value) {
@@ -160,14 +167,19 @@ void putU32be(uint8_t* out, uint32_t value) {
   out[3] = static_cast<uint8_t>(value & 0xFF);
 }
 
-bool waitSocketWritableForProgress(int fd, uint32_t totalStartedMs, uint32_t lastProgressMs) {
+bool waitSocketWritableForProgress(
+    int fd,
+    uint32_t totalStartedMs,
+    uint32_t lastProgressMs,
+    uint32_t stallTimeoutMs,
+    uint32_t totalLimitMs) {
   while (true) {
     const uint32_t now = millis();
-    if (now - totalStartedMs >= AITL_FRAME_TOTAL_SEND_LIMIT_MS) return false;
-    if (now - lastProgressMs >= AITL_FRAME_STALL_TIMEOUT_MS) return false;
+    if (now - totalStartedMs >= totalLimitMs) return false;
+    if (now - lastProgressMs >= stallTimeoutMs) return false;
 
-    const uint32_t totalRemaining = AITL_FRAME_TOTAL_SEND_LIMIT_MS - (now - totalStartedMs);
-    const uint32_t stallRemaining = AITL_FRAME_STALL_TIMEOUT_MS - (now - lastProgressMs);
+    const uint32_t totalRemaining = totalLimitMs - (now - totalStartedMs);
+    const uint32_t stallRemaining = stallTimeoutMs - (now - lastProgressMs);
     uint32_t waitMs = AITL_STREAM_SELECT_SLICE_MS;
     if (totalRemaining < waitMs) waitMs = totalRemaining;
     if (stallRemaining < waitMs) waitMs = stallRemaining;
@@ -183,7 +195,7 @@ bool waitSocketWritableForProgress(int fd, uint32_t totalStartedMs, uint32_t las
     const int ready = select(fd + 1, nullptr, &writeSet, nullptr, &timeout);
     if (ready > 0) return FD_ISSET(fd, &writeSet);
     if (ready == 0) {
-      yield();
+      delay(1);
       continue;
     }
     if (errno == EINTR) continue;
@@ -191,33 +203,79 @@ bool waitSocketWritableForProgress(int fd, uint32_t totalStartedMs, uint32_t las
   }
 }
 
-bool sendAllProgressBounded(int fd, const uint8_t* data, size_t length, uint32_t totalStartedMs) {
+bool sendFrameVectoredProgressBounded(
+    int fd,
+    const uint8_t* header,
+    size_t headerLength,
+    const uint8_t* payload,
+    size_t payloadLength,
+    uint32_t totalStartedMs,
+    uint32_t stallTimeoutMs,
+    uint32_t totalLimitMs,
+    size_t& acceptedBytes,
+    int& terminalErrno) {
+  const size_t totalLength = headerLength + payloadLength;
   size_t sent = 0;
   uint32_t lastProgressMs = millis();
+  acceptedBytes = 0;
+  terminalErrno = 0;
 
-  while (sent < length) {
+  while (sent < totalLength) {
     const uint32_t now = millis();
-    if (now - totalStartedMs >= AITL_FRAME_TOTAL_SEND_LIMIT_MS) return false;
-    if (now - lastProgressMs >= AITL_FRAME_STALL_TIMEOUT_MS) return false;
+    if (now - totalStartedMs >= totalLimitMs || now - lastProgressMs >= stallTimeoutMs) {
+      terminalErrno = ETIMEDOUT;
+      acceptedBytes = sent;
+      return false;
+    }
 
-    size_t chunk = length - sent;
-    if (chunk > AITL_STREAM_SEND_CHUNK_BYTES) chunk = AITL_STREAM_SEND_CHUNK_BYTES;
+    iovec vectors[2]{};
+    int vectorCount = 0;
+    if (sent < headerLength) {
+      vectors[vectorCount].iov_base = const_cast<uint8_t*>(header + sent);
+      vectors[vectorCount].iov_len = headerLength - sent;
+      ++vectorCount;
+      if (payloadLength > 0) {
+        vectors[vectorCount].iov_base = const_cast<uint8_t*>(payload);
+        vectors[vectorCount].iov_len = payloadLength;
+        ++vectorCount;
+      }
+    } else {
+      const size_t payloadOffset = sent - headerLength;
+      vectors[0].iov_base = const_cast<uint8_t*>(payload + payloadOffset);
+      vectors[0].iov_len = payloadLength - payloadOffset;
+      vectorCount = 1;
+    }
 
-    // Try the non-blocking write first. A 6-8 KiB JPEG can exceed the default
-    // lwIP TCP send buffer, so EAGAIN simply means we must wait for ACK progress.
-    const int result = ::send(fd, data + sent, chunk, MSG_DONTWAIT);
+    msghdr message{};
+    message.msg_iov = vectors;
+    message.msg_iovlen = vectorCount;
+
+    // Present header + JPEG as one logical write so lwIP can fill MSS-sized
+    // segments efficiently instead of emitting a standalone 16-byte packet.
+    const int result = ::sendmsg(fd, &message, MSG_DONTWAIT);
     if (result > 0) {
       sent += static_cast<size_t>(result);
+      acceptedBytes = sent;
       lastProgressMs = millis();
-      yield();
+      delay(1);
       continue;
     }
-    if (result == 0) return false;
+    if (result == 0) {
+      terminalErrno = ECONNRESET;
+      acceptedBytes = sent;
+      return false;
+    }
     if (errno == EINTR) continue;
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      if (!waitSocketWritableForProgress(fd, totalStartedMs, lastProgressMs)) return false;
+      if (!waitSocketWritableForProgress(fd, totalStartedMs, lastProgressMs, stallTimeoutMs, totalLimitMs)) {
+        terminalErrno = ETIMEDOUT;
+        acceptedBytes = sent;
+        return false;
+      }
       continue;
     }
+    terminalErrno = errno;
+    acceptedBytes = sent;
     return false;
   }
   return true;
@@ -244,11 +302,6 @@ void configureStreamSocket(WiFiClient& client) {
   int keepCount = 3;
   setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));
 #endif
-
-  timeval sendTimeout{};
-  sendTimeout.tv_sec = AITL_FRAME_STALL_TIMEOUT_MS / 1000U;
-  sendTimeout.tv_usec = (AITL_FRAME_STALL_TIMEOUT_MS % 1000U) * 1000U;
-  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout));
 }
 
 String settingsJson() {
@@ -296,7 +349,12 @@ String statusJson() {
   json += ",\"stream_deadline_drops\":" + String(streamDeadlineDrops);
   json += ",\"send_stall_timeout_ms\":" + String(AITL_FRAME_STALL_TIMEOUT_MS);
   json += ",\"frame_send_limit_ms\":" + String(AITL_FRAME_TOTAL_SEND_LIMIT_MS);
-  json += ",\"send_chunk_bytes\":" + String(AITL_STREAM_SEND_CHUNK_BYTES);
+  json += ",\"warmup_stall_timeout_ms\":" + String(AITL_WARMUP_STALL_TIMEOUT_MS);
+  json += ",\"warmup_send_limit_ms\":" + String(AITL_WARMUP_TOTAL_SEND_LIMIT_MS);
+  json += ",\"stream_client_successful_frames\":" + String(streamClientSuccessfulFrames);
+  json += ",\"last_send_accepted_bytes\":" + String(lastSendAcceptedBytes);
+  json += ",\"last_send_errno\":" + String(lastSendErrno);
+  json += ",\"last_send_warmup\":" + String(lastSendWarmup ? "true" : "false");
   json += ",\"last_frame_bytes\":" + String(lastFrameBytes);
   json += ",\"last_capture_ms\":" + String(lastCaptureMs);
   json += ",\"last_send_ms\":" + String(lastSendMs);
@@ -535,10 +593,11 @@ void acceptStreamClient() {
   if (streamClient && streamClient.connected()) return;
 
   closeStreamClient();
-  WiFiClient candidate = streamServer.available();
+  WiFiClient candidate = streamServer.accept();
   if (!candidate) return;
   configureStreamSocket(candidate);
   streamClient = candidate;
+  streamClientSuccessfulFrames = 0;
   nextFrameDueUs = micros();
   Serial.printf("TCP stream client connected from %s\n", streamClient.remoteIP().toString().c_str());
 }
@@ -584,22 +643,40 @@ void sendNextFrameIfDue() {
   putU32be(header + 12, millis());
 
   const int fd = streamClient.fd();
+  const bool warmup = streamClientSuccessfulFrames < AITL_WARMUP_SUCCESS_FRAMES;
+  const uint32_t stallTimeoutMs = warmup ? AITL_WARMUP_STALL_TIMEOUT_MS : AITL_FRAME_STALL_TIMEOUT_MS;
+  const uint32_t totalLimitMs = warmup ? AITL_WARMUP_TOTAL_SEND_LIMIT_MS : AITL_FRAME_TOTAL_SEND_LIMIT_MS;
   const uint32_t sendStarted = millis();
-  const bool headerOk = fd >= 0 && sendAllProgressBounded(fd, header, sizeof(header), sendStarted);
-  const bool payloadOk = headerOk && sendAllProgressBounded(fd, fb->buf, fb->len, sendStarted);
+  size_t acceptedBytes = 0;
+  int terminalErrno = 0;
+  const bool payloadOk = fd >= 0 && sendFrameVectoredProgressBounded(
+      fd,
+      header,
+      sizeof(header),
+      fb->buf,
+      fb->len,
+      sendStarted,
+      stallTimeoutMs,
+      totalLimitMs,
+      acceptedBytes,
+      terminalErrno);
   lastSendMs = millis() - sendStarted;
   lastFrameBytes = static_cast<uint32_t>(fb->len);
+  lastSendAcceptedBytes = static_cast<uint32_t>(acceptedBytes);
+  lastSendErrno = terminalErrno;
+  lastSendWarmup = warmup;
   esp_camera_fb_return(fb);
 
   if (!payloadOk) {
     ++streamSendFailures;
-    ++streamDeadlineDrops;
-    // A partial/blocked frame must never remain queued as visual history. Closing the
-    // socket makes the PC discard the partial packet and reconnect to a fresh frame.
+    if (terminalErrno == ETIMEDOUT) ++streamDeadlineDrops;
+    // Once any part of a length-prefixed frame is sent, a failure requires closing
+    // the connection so the receiver can discard the partial frame deterministically.
     closeStreamClient();
     return;
   }
 
+  ++streamClientSuccessfulFrames;
   ++streamFrameCount;
   lastFrameAtMs = millis();
   updateFpsWindow();
@@ -609,7 +686,7 @@ void printPeriodicStatus() {
   if (millis() - lastStatusAtMs < AITL_SERIAL_STATUS_INTERVAL_MS) return;
   lastStatusAtMs = millis();
   Serial.printf(
-      "ip=%s session=%s client=%s fps=%.1f target=%u frame=%luB capture=%lums send=%lums failures=%lu rssi=%d\n",
+      "ip=%s session=%s client=%s fps=%.1f target=%u frame=%luB capture=%lums send=%lums accepted=%lu errno=%d warmup=%s failures=%lu rssi=%d\n",
       WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "offline",
       sessionActive ? "on" : "off",
       (streamClient && streamClient.connected()) ? "on" : "off",
@@ -618,6 +695,9 @@ void printPeriodicStatus() {
       static_cast<unsigned long>(lastFrameBytes),
       static_cast<unsigned long>(lastCaptureMs),
       static_cast<unsigned long>(lastSendMs),
+      static_cast<unsigned long>(lastSendAcceptedBytes),
+      lastSendErrno,
+      lastSendWarmup ? "yes" : "no",
       static_cast<unsigned long>(streamSendFailures),
       WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127);
 }
@@ -628,7 +708,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL V036 R5 progress-bounded ESP32-CAM node");
+  Serial.println("AiTL V036 R6 warmup-vectored ESP32-CAM node");
 
   cameraReady = initCamera();
   connectWifi();
@@ -641,6 +721,7 @@ void setup() {
   controlServer.onNotFound([]() { sendJson(404, "{\"error\":\"not_found\"}"); });
   controlServer.begin();
 
+  streamServer.setNoDelay(true);
   streamServer.begin();
   streamServer.setNoDelay(true);
   fpsWindowStartedAtMs = millis();

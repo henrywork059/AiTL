@@ -43,21 +43,29 @@
 #define AITL_STREAM_PORT 81U
 #endif
 
-// Freshness-first transport: reset the stall timer on write progress; abandon only no-progress/hard-cap frames.
+// Freshness-first transport with a longer bounded warm-up for each new TCP connection.
 #ifndef AITL_STREAM_SELECT_SLICE_MS
 #define AITL_STREAM_SELECT_SLICE_MS 20U
 #endif
 
+#ifndef AITL_WARMUP_SUCCESS_FRAMES
+#define AITL_WARMUP_SUCCESS_FRAMES 3U
+#endif
+
+#ifndef AITL_WARMUP_STALL_TIMEOUT_MS
+#define AITL_WARMUP_STALL_TIMEOUT_MS 1000U
+#endif
+
+#ifndef AITL_WARMUP_TOTAL_SEND_LIMIT_MS
+#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 1500U
+#endif
+
 #ifndef AITL_FRAME_STALL_TIMEOUT_MS
-#define AITL_FRAME_STALL_TIMEOUT_MS 250U
+#define AITL_FRAME_STALL_TIMEOUT_MS 500U
 #endif
 
 #ifndef AITL_FRAME_TOTAL_SEND_LIMIT_MS
-#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 500U
-#endif
-
-#ifndef AITL_STREAM_SEND_CHUNK_BYTES
-#define AITL_STREAM_SEND_CHUNK_BYTES 1360U
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 900U
 #endif
 
 #ifndef AITL_WIFI_CONNECT_TIMEOUT_MS

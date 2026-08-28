@@ -117,3 +117,17 @@ Hardware logs first showed 1–4 KiB JPEG frames spending 300–1100 ms in the E
 - A separate 500 ms whole-frame ceiling prevents indefinite stalls without aborting healthy frames merely because they exceed one lwIP send-buffer window.
 - This addresses physical ESP logs where 6-8 KiB JPEGs exceeded the approximately 5760-byte default TCP sender buffer and R4 closed the socket after sending only part of the declared payload.
 - The `aitl-tcp-jpeg-v1` wire format is unchanged. Reflash the ESP firmware; the PC protocol does not change.
+
+## Same-candidate R6 connection-warmup transport repair
+
+Physical R5 testing showed failures clustering at `send=251–253 ms`, proving the R5 250 ms no-progress limit itself was terminating the connection. Reconnecting on every such event repeatedly restarts TCP and can prevent the stream from ever reaching steady state. R6 therefore keeps the wire protocol unchanged but changes packetization and timeout policy.
+
+- Header and JPEG are now presented to lwIP as one scatter/gather `sendmsg(..., MSG_DONTWAIT)` logical write, avoiding a standalone 16-byte TCP write before the JPEG.
+- Artificial 1360-byte application chunking is removed so lwIP can segment the logical frame according to its own TCP/MSS/send-buffer state.
+- Each newly accepted TCP connection gets three warm-up successes with a 1000 ms no-progress limit and 1500 ms total send limit.
+- After warm-up, freshness limits tighten to 500 ms no-progress and 900 ms total. These remain below the PC's 2 s frame-read timeout.
+- A partial frame still forces socket closure because the receiver has already consumed the declared frame length header; incomplete payloads are never treated as valid JPEGs.
+- Added `last_send_accepted_bytes`, `last_send_errno`, `last_send_warmup`, and per-connection successful-frame telemetry so the next hardware log shows whether failure occurred before or after lwIP accepted frame bytes.
+- The firmware now uses the current `NetworkServer.accept()` API and applies no-delay policy at the server and accepted-client socket.
+
+The `aitl-tcp-jpeg-v1` frame format and all PC APIs remain unchanged. Reflash the ESP firmware for R6.
