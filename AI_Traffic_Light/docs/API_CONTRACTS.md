@@ -73,3 +73,18 @@ Existing fields remain, with these V036 semantics/additions:
 - existing connection/recovery/FPS/byte fields remain.
 
 Private RFC1918 IPv4 restriction remains. No redirects or public-road signal-control API are introduced.
+
+
+## Saved multi-camera registry
+
+V036 same-candidate multi-camera extension adds:
+
+- `POST /api/camera/remote/cameras` — save/update one ESP profile (`host`, `source_id`, `target_fps`, complete settings) and select it;
+- `POST /api/camera/remote/select` — select an existing saved ESP without stopping other ESP streams;
+- `DELETE /api/camera/remote/cameras/{source_id}` — stop/disconnect that ESP if needed and remove its saved profile.
+
+`GET /api/camera/remote/status` remains backward compatible for the selected camera and additionally returns `active_source_id`, `camera_count`, `cameras`, `multi_camera`, and `max_saved_cameras`. Each `cameras[]` item reports its saved IP/settings plus connected/streaming/reachability state.
+
+Profiles are stored locally in `config/remote_cameras.json` using the existing atomic JSON-store helper. Socket state is never persisted: after PC Studio restarts, the list/settings are restored but devices must be connected again.
+
+Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; therefore Live AI, Dataset Capture, zones and analytics continue to consume one unambiguous active source. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.

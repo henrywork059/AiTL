@@ -23,3 +23,13 @@
 21. Physical VGA/JPEG14/15 FPS test shows stable streaming with no recurring framebuffer overflow.
 22. Physical latency is equal to or lower than V035 and severe Wi-Fi congestion recovers to a fresh frame rather than visibly replaying backlog.
 23. Owner explicitly accepts V036 before `passed_baseline` changes.
+24. Camera Sources can save multiple ESP profiles with unique source IDs/private IPv4 addresses and per-camera FPS/OV2640 settings.
+25. Saved camera profiles and last-selected source survive PC Studio restart without falsely persisting live socket state.
+26. At least two ESP TCP streams can run simultaneously and maintain independent telemetry/caches.
+27. Only the selected ESP publishes into `CameraFrameService`; non-selected frames do not contaminate Live AI/capture/zone/analytics input.
+28. Selecting another already-running ESP uses a cached frame only when it is recent; a stale target cache clears the former physical source until a fresh target frame arrives, and the former stream is not stopped.
+29. Stop/Disconnect/Remove affects only the selected/target ESP; other active ESP streams continue.
+30. Changing a saved IP invalidates cached bytes from the former device.
+31. Backend shutdown disconnects every active ESP session.
+32. `config/remote_cameras.json` remains ignored runtime/user data and is never included in a patch ZIP.
+

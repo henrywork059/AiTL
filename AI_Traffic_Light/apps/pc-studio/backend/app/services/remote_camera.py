@@ -133,6 +133,7 @@ class _TcpFrameStream:
 
 JsonRequester = Callable[[str, str, str, dict[str, str] | None], dict]
 StreamOpener = Callable[[str], BinaryIO]
+FrameSink = Callable[[str, _FramePacket], int]
 
 
 def _read_exact(stream: BinaryIO, size: int) -> bytes:
@@ -224,7 +225,7 @@ class RemoteCameraService:
     the ESP abandon a congested client instead of accumulating old frames.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, frame_sink: FrameSink | None = None) -> None:
         self._lock = RLock()
         self._frame_condition = Condition(self._lock)
         self._stop_event = Event()
@@ -268,6 +269,7 @@ class RemoteCameraService:
 
         self._json_requester: JsonRequester = self._request_json
         self._stream_opener: StreamOpener = self._open_tcp_stream
+        self._frame_sink = frame_sink
 
     def _status_url(self, host: str) -> str:
         return f"http://{host}/status"
@@ -491,12 +493,16 @@ class RemoteCameraService:
                 details={"size_bytes": len(packet.content), "max_size_bytes": MAX_FRAME_BYTES},
             )
 
-        frame = camera_frame_service.store_upload(
-            source_id=source_id,
-            content_type="image/jpeg",
-            content=packet.content,
-        )
-        self._record_frame(packet, frame.frame_number)
+        if self._frame_sink is not None:
+            frame_number = int(self._frame_sink(source_id, packet))
+        else:
+            frame = camera_frame_service.store_upload(
+                source_id=source_id,
+                content_type="image/jpeg",
+                content=packet.content,
+            )
+            frame_number = frame.frame_number
+        self._record_frame(packet, frame_number)
 
     def _consume_tcp_stream(
         self,
@@ -726,7 +732,7 @@ class RemoteCameraService:
             thread = Thread(
                 target=self._run,
                 args=(stop_event,),
-                name="aitl-remote-tcp-jpeg",
+                name=f"aitl-remote-tcp-jpeg-{self._source_id}",
                 daemon=True,
             )
             self._thread = thread

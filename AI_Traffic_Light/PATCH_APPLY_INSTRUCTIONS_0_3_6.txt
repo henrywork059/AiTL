@@ -1,0 +1,26 @@
+AiTL V036 full reviewed patch
+==============================
+
+This is a changed-files-only overlay for the current V036 candidate.
+It includes the complete low-latency TCP transport + multi-ESP camera extension.
+
+Important: CHANGELOG.md is intentionally not shipped as a replacement file because
+it contains repository history. The included metadata finalizer updates the existing
+CHANGELOG.md in place without deleting older sections.
+
+Apply locally from the AI_Traffic_Light project folder after extracting the ZIP over
+your repository:
+
+  .\scripts\apply_v036_full_patch.ps1
+  .\scripts\update_test_run.ps1 -SkipUpdate
+
+Then test Camera Sources with two ESP32-CAM boards:
+- add/save unique source IDs and private-LAN IPs;
+- Connect + Start each at VGA / JPEG 14 / 15 FPS first;
+- switch between running streams;
+- confirm only the selected source reaches Live AI / Dataset Capture;
+- stop one camera and confirm the other remains running;
+- restart PC Studio and confirm saved IP/settings/last selection restore, but sockets
+  correctly start disconnected.
+
+V036 remains an unaccepted candidate. passed_baseline remains 0_2_4.

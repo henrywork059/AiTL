@@ -11,7 +11,7 @@ from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.models import CameraSimulationSettingsRequest
 from app.services.camera_frames import camera_frame_service
-from app.services.remote_camera import remote_camera_service
+from app.services.remote_camera_manager import remote_camera_manager as remote_camera_service
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -50,6 +50,18 @@ class RemoteCameraSettingsRequest(BaseModel):
     dcw: bool = True
     colorbar: bool = False
 
+
+
+
+class RemoteCameraProfileRequest(BaseModel):
+    host: str = Field(min_length=7, max_length=64)
+    source_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    target_fps: int = Field(default=15, ge=1, le=30)
+    settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
+
+
+class RemoteCameraSelectRequest(BaseModel):
+    source_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
 
 class RemoteCameraStartRequest(BaseModel):
     target_fps: int = Field(default=15, ge=1, le=30)
@@ -127,6 +139,42 @@ def live_camera_mjpeg(request: Request) -> StreamingResponse:
 @router.get("/remote/status")
 def remote_camera_status(request: Request) -> dict:
     return ok(remote_camera_service.status(refresh_device=True), request_id=request.state.request_id)
+
+
+@router.post("/remote/cameras")
+def save_remote_camera_profile(payload: RemoteCameraProfileRequest, request: Request) -> dict:
+    data = remote_camera_service.save_profile(
+        host=payload.host,
+        source_id=payload.source_id,
+        target_fps=payload.target_fps,
+        settings=payload.settings.model_dump(),
+        select=True,
+    )
+    logger.info(
+        "Remote ESP camera profile saved",
+        extra={"request_id": request.state.request_id, "camera_host": payload.host, "source_id": payload.source_id},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.post("/remote/select")
+def select_remote_camera(payload: RemoteCameraSelectRequest, request: Request) -> dict:
+    data = remote_camera_service.select(payload.source_id)
+    logger.info(
+        "Remote ESP camera selected",
+        extra={"request_id": request.state.request_id, "source_id": payload.source_id},
+    )
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.delete("/remote/cameras/{source_id}")
+def delete_remote_camera_profile(source_id: str, request: Request) -> dict:
+    data = remote_camera_service.delete_profile(source_id)
+    logger.info(
+        "Remote ESP camera profile deleted",
+        extra={"request_id": request.state.request_id, "source_id": source_id},
+    )
+    return ok(data, request_id=request.state.request_id)
 
 
 @router.post("/remote/connect")
@@ -209,12 +257,18 @@ def latest_camera_frame(request: Request) -> Response:
 
 @router.post("/simulation/start")
 def start_camera_simulation(request: Request) -> dict:
-    return ok(camera_frame_service.set_simulation(True), request_id=request.state.request_id)
+    camera_frame_service.set_simulation(True)
+    remote_camera_service.sync_after_simulation_change()
+    return ok(camera_frame_service.status(), request_id=request.state.request_id)
 
 
 @router.post("/simulation/stop")
 def stop_camera_simulation(request: Request) -> dict:
-    return ok(camera_frame_service.set_simulation(False), request_id=request.state.request_id)
+    camera_frame_service.set_simulation(False)
+    remote_camera_service.sync_after_simulation_change()
+    # Return status after the manager has restored/cleared the selected physical
+    # source, so the response cannot describe the pre-switch shared frame state.
+    return ok(camera_frame_service.status(), request_id=request.state.request_id)
 
 
 @router.post("/simulation/settings")

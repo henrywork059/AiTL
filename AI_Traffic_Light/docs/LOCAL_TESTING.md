@@ -8,10 +8,11 @@ previous_version: 0_3_5
 passed_baseline: 0_2_4
 ```
 
-Run the normal repository test workflow:
+After extracting the full V036 overlay, finalize the preserved changelog/version metadata once, then run the normal repository test workflow:
 
 ```powershell
-.\scripts\update_test_run.ps1
+.\scripts\apply_v036_full_patch.ps1
+.\scripts\update_test_run.ps1 -SkipUpdate
 ```
 
 Focused regressions must verify:
@@ -26,7 +27,14 @@ Focused regressions must verify:
 - event-driven browser frame wakeup;
 - automatic lost-session recovery;
 - simulation pause/resume;
-- bounded Stop/Disconnect.
+- bounded Stop/Disconnect;
+- persisted multi-camera IP/FPS/settings registry;
+- two independent ESP streams active at once;
+- non-selected streams cannot overwrite the selected `CameraFrameService` source;
+- switching to another running ESP uses only a recent cached/latest frame and clears the former source when the target cache is stale;
+- changing a selected profile IP invalidates cached bytes from the former device;
+- stopping/disconnecting one ESP does not stop the others;
+- backend shutdown disconnects every ESP session.
 
 ## Physical speed/latency test
 
@@ -51,3 +59,13 @@ If measured FPS is low, compare ESP telemetry:
 - high `last_send_ms` or `stream_deadline_drops`: Wi-Fi/network is the bottleneck;
 - rising `source_sequence_gaps`: frames were lost across a transport/reconnect interval;
 - recurring `FB-OVF`: investigate camera/PSRAM/power before increasing FPS.
+
+
+## Multi-camera physical test
+
+1. Flash the same V036 firmware to two or more ESP32-CAM boards.
+2. In Camera Sources choose **New camera**, enter the first private IPv4/source ID, set VGA / JPEG 14 / 15 FPS, then Save, Connect and Start Stream.
+3. Add the second ESP with a different source ID/IP and Start Stream. Confirm the first ESP remains listed as streaming in the background.
+4. Switch the Saved ESP camera selector between them. The preview, `active_source_id`, Live AI and Dataset Capture source must follow the selected ESP only.
+5. Stop or disconnect one camera and confirm the other keeps streaming.
+6. Restart PC Studio. Confirm both IPs and each camera's FPS/OV2640 settings are restored, while connection state correctly returns to disconnected until Connect is pressed.

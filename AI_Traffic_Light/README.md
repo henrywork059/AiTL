@@ -6,9 +6,9 @@ V036 / `0_3_6` is the current unaccepted candidate. V035 / `0_3_5` is the previo
 
 ## V036 physical camera
 
-V036 keeps HTTP only for ESP status/config/start/stop control and moves the hot ESP→PC image path to one PC-initiated persistent TCP connection on port 81.
+V036 keeps HTTP only for ESP status/config/start/stop control and moves each ESP→PC image path to its own PC-initiated persistent TCP connection on port 81.
 
-Each frame is JPEG with a fixed 16-byte `ATL1` header carrying payload length, sequence and ESP uptime. The PC reads exact frame lengths, keeps the newest camera frame in the existing `CameraFrameService`, and continues to expose browser-compatible MJPEG from the backend.
+Each frame is JPEG with a fixed 16-byte `ATL1` header carrying payload length, sequence and ESP uptime. PC Studio can save up to 12 ESP profiles, retain IP/FPS/OV2640 settings per camera, keep several ESP streams running independently, cache the newest frame from each, and select one active ESP to feed the existing `CameraFrameService`. Browser-compatible MJPEG still comes from the backend.
 
 Low-latency protections include:
 - `CAMERA_GRAB_LATEST` with two PSRAM framebuffers;
@@ -19,6 +19,6 @@ Low-latency protections include:
 - automatic session restoration after ESP reboot/loss;
 - bounded exponential reconnect backoff.
 
-Connect still transfers zero image bytes. Camera settings remain PC-owned and are applied before Start Stream.
+Connect still transfers zero image bytes. Camera settings remain PC-owned and are applied before Start Stream. Switching the selected ESP changes the source used by Live AI, Dataset Capture, zones and analytics without forcing other ESP streams to stop. The previous physical frame is cleared during a source change, and only a recent target cache may be promoted.
 
 Physical/public-road traffic-signal control remains outside scope.

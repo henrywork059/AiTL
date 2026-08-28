@@ -58,7 +58,31 @@ export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
   colorbar: false,
 };
 
+
+export type RemoteCameraProfile = {
+  source_id: string;
+  host: string;
+  target_fps: number;
+  settings: RemoteCameraSettings;
+  last_used_ms: number;
+  selected: boolean;
+  connected: boolean;
+  device_reachable: boolean;
+  streaming: boolean;
+  stream_connected: boolean;
+  paused_for_simulation: boolean;
+  measured_fps: number;
+  last_success_at_ms: number | null;
+  last_error: string | null;
+};
+
 export type RemoteCameraStatus = {
+  active_source_id: string | null;
+  camera_count: number;
+  cameras: RemoteCameraProfile[];
+  registry_warning: string | null;
+  multi_camera: boolean;
+  max_saved_cameras: number;
   configured: boolean;
   device_reachable: boolean;
   worker_running: boolean;
@@ -110,6 +134,33 @@ export function liveCameraMjpegUrl(): string {
 
 export async function fetchRemoteCameraStatus(): Promise<RemoteCameraStatus> {
   return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/status`);
+}
+
+export async function saveRemoteCamera(input: {
+  host: string;
+  source_id: string;
+  target_fps: number;
+  settings: RemoteCameraSettings;
+}): Promise<RemoteCameraStatus> {
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/cameras`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function selectRemoteCamera(source_id: string): Promise<RemoteCameraStatus> {
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_id }),
+  });
+}
+
+export async function deleteRemoteCamera(source_id: string): Promise<RemoteCameraStatus> {
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/cameras/${encodeURIComponent(source_id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function connectRemoteCamera(input: {

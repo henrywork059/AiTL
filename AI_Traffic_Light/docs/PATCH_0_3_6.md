@@ -1,4 +1,4 @@
-# Patch 0_3_6 — Low-latency binary TCP ESP streaming
+# Patch 0_3_6 — Low-latency binary TCP and multi-ESP streaming
 
 ## Release state
 
@@ -82,9 +82,26 @@ Only Wi-Fi credentials are required on the ESP. PC Studio owns the ESP IP entry.
 - PC→browser preview remains MJPEG.
 - AI/inference remains on the PC.
 - simulation, capture, training, zones and analytics continue to use `CameraFrameService`.
-- no independent simultaneous multi-camera frame store is added.
+- the shared downstream AI/capture frame store remains single-active-source, but V036 now adds independent per-ESP transport workers and newest-frame caches so multiple physical streams can stay active and be switched by the user.
 - no public-road traffic controller authority is added.
 
 ## Expected performance effect
 
 The patch removes hot-path HTTP/multipart parsing and prevents multi-second blocked sends from becoming stale-frame latency. Actual FPS is still bounded by OV2640 JPEG capture time, selected resolution/quality, ESP32 CPU/PSRAM behavior and 2.4 GHz Wi-Fi conditions. It is therefore expected to improve transport overhead and worst-case latency, not to guarantee a fixed FPS increase on every network.
+
+
+## Same-candidate multi-camera extension
+
+At the owner's request, V036 now supports multiple ESP32-CAM devices without promoting the version to V037.
+
+- Added a persistent camera registry at runtime `config/remote_cameras.json` using the existing atomic JSON-store helper.
+- Up to 12 profiles retain private IPv4 address, source ID, target FPS and full OV2640 settings, plus the last-selected camera.
+- Added one independent `RemoteCameraService` / TCP worker per connected ESP and a newest-frame cache per source. Multiple ESP streams can remain active simultaneously.
+- Added an explicit active-source selector. Only the selected ESP publishes into the existing `CameraFrameService`, preserving one unambiguous source for Live AI, Dataset Capture, zones and analytics.
+- Switching to another running ESP promotes its cached newest frame only when that cache is recent, then follows live frames without stopping the previous ESP stream. A stale target cache leaves the shared physical frame empty until a fresh target frame arrives.
+- Re-addressing a saved source retires the old session generation before the new IP becomes active; late frames from the retired worker are rejected even if they arrive after the profile/cache reset.
+- Stop/Disconnect operations affect only the selected ESP. Removing a saved camera stops/disconnects that target only. Backend shutdown disconnects all camera sessions.
+- Added save/select/delete camera-profile APIs and Camera Sources UI for New camera, saved-camera selection, Save, Connect, Start/Stop, Disconnect and Remove saved.
+- Connection/socket state is deliberately not persisted across PC Studio restart; only addresses/settings/selection are restored.
+
+- Same-candidate UI repair: Camera Sources now displays OV2640 resolution choices and fallback status as numeric pixel dimensions (for example `640 × 480`) instead of format aliases such as `VGA`; the internal firmware/API frame-size enum is unchanged.

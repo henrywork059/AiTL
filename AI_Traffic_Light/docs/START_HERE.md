@@ -8,13 +8,17 @@ V036 / `0_3_6` is the current unaccepted candidate. V024 / `0_2_4` remains the o
 ESP boot → idle
 PC Connect → GET /status only → zero image bytes
 
-PC Start Stream
+PC selects one saved ESP profile
+  → restores that ESP IP + FPS + OV2640 settings
+
+PC Start Stream for selected ESP
   → POST /stop
   → POST /config (full OV2640 settings + target FPS)
   → POST /start
   → TCP connect to ESP :81
   → [ATL1 | JPEG length | sequence | ESP uptime] + JPEG
-  → CameraFrameService
+  → per-ESP newest-frame cache
+  → selected ESP only → CameraFrameService
       ├─ PC browser MJPEG relay
       ├─ Live AI
       ├─ Dataset Capture
@@ -27,3 +31,5 @@ HTTP is deliberately retained for low-rate control/status. The high-rate ESP→P
 If the image socket fails, PC Studio probes `/status`. A still-active ESP session is reconnected directly; a lost/rebooted session receives `/config` + `/start` before reconnection.
 
 Flash the matching V036 firmware before testing. V036 PC Studio rejects V035 firmware because port 81 carries a different wire protocol.
+
+Several ESPs may run this sequence independently at the same time. Camera Sources selects which running ESP feeds the shared PC Studio pipeline; switching selection does not stop the others. Saved profiles live in runtime `config/remote_cameras.json`.
