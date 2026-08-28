@@ -24,41 +24,24 @@ Keep the ESP camera idle until PC Studio explicitly starts a session, and make P
    - ESP returns to idle.
 5. **Disconnect** — stop best-effort then clear the PC device connection.
 
-## New PC API
+## Same-candidate regression repair
 
-- `POST /api/camera/remote/start`
-- `POST /api/camera/remote/stop`
+The first V033 candidate retained the V032 `scripts/test_remote_camera_pull.py`. That old regression expected `connect(..., fetch_interval_ms=100)` to start the image worker immediately. V033 intentionally removed both behaviors.
 
-`POST /api/camera/remote/connect` now establishes status/control only and deliberately does not fetch an image.
+The repaired regression now verifies the V033 contract:
+
+- Connect performs `/status` only and requests zero images.
+- Start Stream performs `/stop` → `/config` → `/start` before image polling.
+- Active sessions feed the existing `CameraFrameService`.
+- Simulation pauses/resumes PC image requests.
+- Stop Stream stops the worker while keeping the ESP connection.
+- Disconnect/shutdown remains safe.
+
+This is a **same-candidate V033 test repair**, not V034. Runtime implementation, API, firmware, `VERSION`, and `passed_baseline` are unchanged.
 
 ## PC-controlled settings
 
-- frame size: QQVGA / HQVGA / QVGA / CIF / VGA / SVGA / XGA / SXGA / UXGA;
-- JPEG quality 4–63;
-- brightness / contrast / saturation;
-- special effect;
-- auto white balance / AWB gain / WB mode;
-- auto exposure / AEC2 / AE level / AEC value;
-- auto gain / AGC gain / gain ceiling;
-- black/white pixel correction;
-- raw gamma / lens correction;
-- horizontal mirror / vertical flip;
-- downsize/crop;
-- color bar;
-- PC capture interval 100–5000 ms.
-
-## Matching firmware
-
-V033 Arduino firmware adds:
-
-- `GET /status`
-- `POST /config?...`
-- `POST /start`
-- `POST /stop`
-- gated `GET /capture`
-- gated `GET :81/stream`
-
-Image endpoints return a conflict while the session is idle.
+V033 retains PC-owned resolution, JPEG quality, image adjustment, white-balance, exposure, gain, correction, mirror/flip/downsize/color-bar settings and PC capture interval.
 
 ## Deliberate non-changes
 
