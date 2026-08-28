@@ -1,8 +1,9 @@
-from typing import Literal
+import time
+from typing import Iterator, Literal
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from app.core.api_response import ok
 from app.core.error_codes import ErrorCode
@@ -14,6 +15,8 @@ from app.services.remote_camera import remote_camera_service
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+MJPEG_BOUNDARY = b"--frame\r\n"
 
 
 class RemoteCameraConnectRequest(BaseModel):
@@ -49,35 +52,70 @@ class RemoteCameraSettingsRequest(BaseModel):
 
 
 class RemoteCameraStartRequest(BaseModel):
-    fetch_interval_ms: int = Field(default=250, ge=100, le=5000)
+    target_fps: int = Field(default=15, ge=1, le=30)
+    # Retained so old V033 callers remain accepted; V034 UI sends target_fps.
+    fetch_interval_ms: int | None = Field(default=None, ge=34, le=5000)
     settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
+
+
+def _live_mjpeg() -> Iterator[bytes]:
+    """Stream only new CameraFrameService frames to the browser with minimal UI delay."""
+    last_frame_number = -1
+
+    while True:
+        frame = camera_frame_service.latest_frame()
+        if frame is not None and frame.frame_number != last_frame_number:
+            last_frame_number = frame.frame_number
+            header = (
+                MJPEG_BOUNDARY
+                + f"Content-Type: {frame.content_type}\r\n".encode()
+                + f"Content-Length: {len(frame.content)}\r\n".encode()
+                + f"X-Camera-Source: {frame.source_id}\r\n".encode()
+                + f"X-Frame-Number: {frame.frame_number}\r\n\r\n".encode()
+            )
+            yield header + frame.content + b"\r\n"
+            # Avoid a tight loop when simulation can synthesize a new frame on demand.
+            time.sleep(0.01)
+        else:
+            time.sleep(0.01)
 
 
 @router.get("/sources")
 def list_camera_sources(request: Request) -> dict:
     data = {
         "sources": [
-            {"id": "remote_esp32", "label": "ESP32-CAM by IP", "type": "http_pull", "status": "ready"},
+            {"id": "remote_esp32", "label": "ESP32-CAM by IP", "type": "mjpeg_pull", "status": "ready"},
             {"id": "frame_receiver", "label": "Device frame receiver", "type": "http_upload", "status": "ready"},
             {"id": "simulation_camera", "label": "PC simulation camera", "type": "simulation", "status": "ready"},
             {"id": "webcam_0", "label": "Local webcam", "type": "webcam", "status": "placeholder"},
             {"id": "video_file", "label": "Traffic video file", "type": "file", "status": "placeholder"},
         ]
     }
-    logger.info("Camera source template returned", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)
 
 
 @router.get("/status")
 def camera_status(request: Request) -> dict:
-    data = camera_frame_service.status()
-    return ok(data, request_id=request.state.request_id)
+    return ok(camera_frame_service.status(), request_id=request.state.request_id)
+
+
+@router.get("/live.mjpeg")
+def live_camera_mjpeg(request: Request) -> StreamingResponse:
+    """Low-latency browser preview from the same PC-side frame pipeline used by inference/capture."""
+    return StreamingResponse(
+        _live_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Request-ID": request.state.request_id,
+        },
+    )
 
 
 @router.get("/remote/status")
 def remote_camera_status(request: Request) -> dict:
-    data = remote_camera_service.status(refresh_device=True)
-    return ok(data, request_id=request.state.request_id)
+    return ok(remote_camera_service.status(refresh_device=True), request_id=request.state.request_id)
 
 
 @router.post("/remote/connect")
@@ -94,11 +132,17 @@ def connect_remote_camera(payload: RemoteCameraConnectRequest, request: Request)
 def start_remote_camera(payload: RemoteCameraStartRequest, request: Request) -> dict:
     data = remote_camera_service.start_stream(
         settings=payload.settings.model_dump(),
+        target_fps=payload.target_fps,
         fetch_interval_ms=payload.fetch_interval_ms,
     )
     logger.info(
-        "Remote ESP camera stream started",
-        extra={"request_id": request.state.request_id, "camera_host": data["host"], "source_id": data["source_id"]},
+        "Remote ESP low-latency MJPEG stream started",
+        extra={
+            "request_id": request.state.request_id,
+            "camera_host": data["host"],
+            "source_id": data["source_id"],
+            "target_fps": data["target_fps"],
+        },
     )
     return ok(data, request_id=request.state.request_id)
 
@@ -140,7 +184,6 @@ def latest_camera_frame(request: Request) -> Response:
             "No camera frame has arrived yet. Start an ESP stream, upload an image, or start simulation mode.",
             status_code=404,
         )
-
     return Response(
         content=frame.content,
         media_type=frame.content_type,
@@ -155,14 +198,12 @@ def latest_camera_frame(request: Request) -> Response:
 
 @router.post("/simulation/start")
 def start_camera_simulation(request: Request) -> dict:
-    data = camera_frame_service.set_simulation(True)
-    return ok(data, request_id=request.state.request_id)
+    return ok(camera_frame_service.set_simulation(True), request_id=request.state.request_id)
 
 
 @router.post("/simulation/stop")
 def stop_camera_simulation(request: Request) -> dict:
-    data = camera_frame_service.set_simulation(False)
-    return ok(data, request_id=request.state.request_id)
+    return ok(camera_frame_service.set_simulation(False), request_id=request.state.request_id)
 
 
 @router.post("/simulation/settings")

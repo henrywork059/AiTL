@@ -1,60 +1,35 @@
-# ESP32-CAM V033 integration
+# ESP32-CAM V034 streaming
 
-## Required matching firmware
+Use the matching `AiTL_ESP32CAM_V034_ArduinoIDE.zip`.
 
-Use `AiTL_ESP32CAM_V033_ArduinoIDE.zip`.
+## Transport
 
-The ESP stores only:
-
-- Wi-Fi SSID/password;
-- device ID;
-- hostname.
-
-Camera quality/resolution/exposure/gain/image settings are not configured in `secrets.h`. PC Studio sends them each time Start Stream is pressed.
-
-## Idle behavior
-
-After boot:
+The ESP remains idle after boot and Connect. Start Stream sends camera settings plus `stream_fps`, calls `/start`, then PC Studio opens one persistent:
 
 ```text
-Wi-Fi connected
-control server ready
-session=idle
+http://<ESP-IP>:81/stream
 ```
 
-`GET /status` works, but `/capture` and `:81/stream` do not return images until `POST /start`.
+No continuous image traffic exists while idle.
 
-## Start sequence
+## Performance settings
 
-PC Studio performs:
+Recommended baseline:
 
 ```text
-POST /config?<complete camera settings>
-POST /start
-GET /capture
-GET /capture
-GET /capture
-...
+VGA
+JPEG quality 12–16
+15 FPS
 ```
 
-Stop Stream performs `POST /stop`.
+For lower latency/bandwidth:
+- use QVGA/VGA rather than UXGA;
+- use a higher JPEG quality number (for example 14–18) to reduce byte size;
+- use 10–15 FPS on weaker Wi-Fi;
+- try 20 FPS only when RSSI/stability are good.
 
-This means image transfer is demand-driven from the PC.
+The firmware keeps Wi-Fi sleep disabled and uses `CAMERA_GRAB_LATEST` so stale queued frames are not preferred.
 
-## Browser diagnostic
+## Simulation
 
-Before PC Start Stream, `/status` should show:
-
-```json
-"session_active": false
-```
-
-After PC Start Stream it becomes `true`, and capture counters should rise as PC Studio requests images.
-
-## Network
-
-PC and ESP must be mutually reachable on the same private LAN. V033 PC Studio accepts literal RFC1918 IPv4 targets only.
-
-## Limitation
-
-One backend latest-frame slot remains shared for the live non-simulation camera path. Independent simultaneous multi-camera retention is a later patch.
+When PC Studio simulation starts, the backend closes/pauses its ESP stream request. The ESP session remains configured but sends no image bytes because no stream client is requesting them. PC Studio reopens the MJPEG stream after simulation stops.

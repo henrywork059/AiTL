@@ -1,45 +1,30 @@
-# Local Testing Notes — V033
+# Local Testing — V034
 
-## Version
-
-Expected:
+Expected version:
 
 ```text
-version: 0_3_3
-previous_version: 0_3_2
+version: 0_3_4
+previous_version: 0_3_3
 passed_baseline: 0_2_4
 ```
 
-## Software checks
-
-From `AI_Traffic_Light`:
+Run the normal update/test workflow:
 
 ```powershell
-$py = ".\apps\pc-studio\backend\.venv\Scripts\python.exe"
-& $py -m compileall ".\apps\pc-studio\backend\app" ".\scripts"
-& $py ".\scripts\test_remote_camera_session.py"
-& $py ".\scripts\check_structure.py"
+.\scripts\update_test_run.ps1
 ```
 
-Then run all inherited non-live regression scripts, frontend `npm ci`, `npm run typecheck`, `npm run build`, live backend smoke, and `git diff --check`.
+Focused checks must include `test_remote_camera_pull.py` and `test_remote_camera_session.py`.
 
-## Physical acceptance
+## Physical performance acceptance
 
-1. Flash V033 Arduino firmware.
-2. Confirm Serial Monitor shows `session=idle`.
-3. In a browser open `http://<ESP-IP>/status`.
-4. Confirm `/capture` returns conflict while idle.
-5. In PC Studio enter the ESP IP and click **Connect**.
-6. Confirm PC reports **ESP ready** but ESP `capture_count` remains unchanged.
-7. Choose resolution/quality/settings.
-8. Click **Start Stream**.
-9. Confirm settings appear in ESP `/status`.
-10. Confirm `session_active=true`.
-11. Confirm PC frame counter and ESP capture counter increase.
-12. Click **Stop Stream**.
-13. Confirm ESP returns to `session_active=false` and capture counter stops increasing.
-14. Start/stop simulation while ESP stream is active; PC requests must pause/resume without reconnecting.
-15. Confirm Dataset Capture and Live AI consume the physical frame.
-16. Confirm legacy raw frame upload still works.
-
-Only explicit owner acceptance may change `passed_baseline`.
+1. Flash V034 ESP firmware.
+2. Connect in PC Studio; confirm zero image transfer before Start Stream.
+3. Start with VGA / JPEG quality 12–16 / 15 FPS.
+4. Confirm remote status shows `transport=mjpeg`.
+5. Confirm `measured_fps` approaches the selected target without a rising reconnect count.
+6. Move an object quickly in front of the camera and verify Camera Sources motion is substantially smoother than V033.
+7. Try 20 FPS. Keep it only if measured FPS and latency remain stable.
+8. Start simulation and confirm ESP stream traffic pauses; stop simulation and confirm it resumes.
+9. Test Live AI and Dataset Capture on physical frames.
+10. Run full inherited backend/frontend/smoke/git checks before owner acceptance.

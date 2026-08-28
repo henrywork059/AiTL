@@ -7,6 +7,7 @@ import {
   DEFAULT_REMOTE_CAMERA_SETTINGS,
   disconnectRemoteCamera,
   fetchRemoteCameraStatus,
+  liveCameraMjpegUrl,
   refreshCameraAfterRemoteChange,
   startRemoteCamera,
   stopRemoteCamera,
@@ -40,7 +41,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
   const [remote, setRemote] = useState<RemoteCameraStatus | null>(null);
   const [host, setHost] = useState("");
   const [sourceId, setSourceId] = useState("esp32_cam_01");
-  const [fetchIntervalMs, setFetchIntervalMs] = useState(250);
+  const [targetFps, setTargetFps] = useState(15);
   const [settings, setSettings] = useState<RemoteCameraSettings>({ ...DEFAULT_REMOTE_CAMERA_SETTINGS });
   const [busy, setBusy] = useState(false);
   const [remoteMessage, setRemoteMessage] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
         if (next.host) setHost(next.host);
         if (next.source_id) setSourceId(next.source_id);
         if (next.settings) setSettings(next.settings);
-        setFetchIntervalMs(next.fetch_interval_ms);
+        setTargetFps(next.target_fps);
       })
       .catch(() => undefined);
   }, []);
@@ -68,9 +69,12 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     { onError: () => undefined },
   );
 
-  const imageUrl = status?.frame_available
-    ? `${API_BASE}/api/camera/frame?v=${status.frame_number}`
-    : null;
+  const useLivePreview = Boolean(remote?.streaming || status?.simulation_enabled);
+  const imageUrl = useLivePreview
+    ? liveCameraMjpegUrl()
+    : status?.frame_available
+      ? `${API_BASE}/api/camera/frame?v=${status.frame_number}`
+      : null;
 
   const statusLabel = !status
     ? "checking"
@@ -113,13 +117,13 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     setRemoteMessage(null);
     try {
       const next = await startRemoteCamera({
-        fetch_interval_ms: fetchIntervalMs,
+        target_fps: targetFps,
         settings,
       });
       setRemote(next);
       if (next.settings) setSettings(next.settings);
       onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage("Settings applied to the ESP32-CAM. PC-controlled frame streaming started.");
+      setRemoteMessage("Settings applied. Low-latency persistent MJPEG streaming started.");
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM stream could not start.");
     } finally {
@@ -263,8 +267,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
                 <input type="number" min={4} max={63} value={settings.jpeg_quality} onChange={(event) => setSetting("jpeg_quality", numberValue(event.target.value))} disabled={busy || remote?.streaming} />
               </label>
               <label>
-                PC capture interval (ms)
-                <input type="number" min={100} max={5000} step={50} value={fetchIntervalMs} onChange={(event) => setFetchIntervalMs(numberValue(event.target.value))} disabled={busy || remote?.streaming} />
+                Target stream FPS
+                <input type="number" min={1} max={30} step={1} value={targetFps} onChange={(event) => setTargetFps(numberValue(event.target.value))} disabled={busy || remote?.streaming} />
               </label>
               <label>
                 Brightness (-2 to 2)
@@ -340,7 +344,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>ESP address</span><strong>{remote?.host ?? "none"}</strong></div>
               <div><span>Device</span><strong>{remote?.device_reachable ? "reachable" : remote?.configured ? "unreachable" : "not connected"}</strong></div>
               <div><span>ESP session</span><strong>{remote?.streaming ? "active" : "idle"}</strong></div>
-              <div><span>PC pull</span><strong>{remote?.paused_for_simulation ? "paused for simulation" : remote?.worker_running ? "running" : "stopped"}</strong></div>
+              <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "MJPEG paused" : remote?.streaming ? "persistent MJPEG" : "idle"}</strong></div>
+              <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
+              <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
+              <div><span>Stale frames dropped</span><strong>{remote?.dropped_stale_frames ?? 0}</strong></div>
               <div><span>Source</span><strong>{status?.active_source_id ?? "none"}</strong></div>
               <div><span>Resolution</span><strong>{status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : settings.frame_size}</strong></div>
               <div><span>Frame age</span><strong>{formatAge(status?.age_ms ?? null)}</strong></div>
@@ -351,7 +359,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              V033 adds PC-owned camera configuration and explicit Start/Stop Stream. Legacy raw JPEG/PNG device upload remains available.
+              V034 keeps PC-owned Start/Stop control but uses one persistent ESP MJPEG connection instead of repeated /capture HTTP requests.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/frame?source_id=esp_cam_01</code>
           </section>

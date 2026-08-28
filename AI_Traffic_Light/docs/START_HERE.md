@@ -1,36 +1,28 @@
-# Start Here — Current V033 candidate
+# Start Here — V034
 
-V033 / `0_3_3` is the current unaccepted candidate. V032 is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V034 / `0_3_4` is the current unaccepted candidate. V033 is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
-## Main change
+## Why V034
 
-The ESP no longer starts transferring images simply because PC Studio connects.
+V033 used a new HTTP `/capture` request for every frame. That is simple but adds connection/request overhead and limits practical frame rate.
 
-V033 separates **connection** from **streaming**:
+V034 uses one persistent ESP MJPEG connection after Start Stream:
 
 ```text
-Connect
-  → status/control only
-  → ESP stays idle
-
-Start Stream
-  → PC sends complete camera settings
-  → ESP applies settings
-  → ESP session starts
-  → PC starts /capture requests
-
-Stop Stream
-  → PC stops requests
-  → ESP session stops
-  → device remains connected/idle
+Connect: GET /status only
+Start:
+  POST /config + target_fps
+  POST /start
+  GET :81/stream   ← stays open
+Stop:
+  close stream
+  POST /stop
 ```
 
-The ESP sends JPEG bytes only in response to image requests while the PC-started session is active.
+The backend extracts JPEGs continuously and stores each newest frame in the existing CameraFrameService.
 
-## Settings owned by PC Studio
+Camera Sources displays `/api/camera/live.mjpeg`, so preview refresh is no longer coupled to the frontend status-poll interval.
 
-Resolution, JPEG quality, brightness, contrast, saturation, effects, white balance, exposure, gain, sensor corrections, mirror, flip, downsize/crop and color bar are supplied at Start Stream. The capture interval is a PC-side polling setting.
+Use the matching V034 Arduino firmware. Start with VGA / JPEG quality 12–16 / 15 FPS.
 
-Use the matching `AiTL_ESP32CAM_V033_ArduinoIDE.zip` firmware.
-
-Owner acceptance is still required before `passed_baseline` changes.
+V034 also drops older complete JPEGs if more than one frame arrives in the same network read, preferring the newest frame to avoid backlog latency.

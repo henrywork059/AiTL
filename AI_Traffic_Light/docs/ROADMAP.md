@@ -1,20 +1,19 @@
 # Roadmap
 
-## Current V033 milestone
+## V034 milestone
 
-Validate on-demand physical camera sessions:
+Validate persistent MJPEG performance on the physical ESP32-CAM:
+- practical VGA/QVGA FPS;
+- latency under motion;
+- reconnect stability;
+- bandwidth versus JPEG quality;
+- simulation pause/resume.
 
-- connect without frame transfer;
-- apply PC-owned sensor settings;
-- start/stop image transfer;
-- stable reconnect/session restart;
-- practical resolution/quality/frame interval.
+## Next
 
-## Next hardware milestones
+1. independent multi-camera frame buffers/routing;
+2. per-intersection source assignment and tracker isolation;
+3. model-junction signal-output abstraction;
+4. broader multi-intersection orchestration/evidence UI.
 
-1. independent per-source multi-camera frame storage/routing;
-2. source-to-intersection live assignment and tracker isolation;
-3. classroom/model-junction signal-output abstraction;
-4. broader multi-intersection experiment orchestration and compact network/evidence UI.
-
-Public-road traffic control remains outside scope.
+Public-road control remains outside scope.

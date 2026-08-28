@@ -1,5 +1,18 @@
 # Changelog
 
+## 0_3_4 — Low-latency persistent ESP MJPEG transport
+
+- Created V034 / `0_3_4` at the owner's explicit request after V033 to improve physical-camera streaming speed and reduce latency; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Preserved V033's idle/connect/config/start/stop contract: Connect still performs status/control only and transfers zero image bytes.
+- Replaced repeated one-request-per-frame `/capture` polling with one persistent ESP `:81/stream` MJPEG connection after Start Stream.
+- Added PC-selected `target_fps` (1–30), sent to the ESP with the complete OV2640 configuration as `stream_fps`; V033 `fetch_interval_ms` callers remain accepted as a compatibility alias.
+- Added incremental JPEG SOI/EOI extraction from the persistent MJPEG byte stream, immediate newest-frame ingestion into the existing `CameraFrameService`, stream reconnect handling, transport byte/reconnect counters, measured FPS and frame-interval telemetry.
+- Added `GET /api/camera/live.mjpeg` so Camera Sources receives a backend MJPEG preview from the same current-frame pipeline instead of waiting for React camera-status polling to refresh still-image URLs.
+- Updated matching ESP firmware to retain `CAMERA_GRAB_LATEST`, two PSRAM framebuffers, Wi-Fi sleep disabled, and a PC-controlled target-FPS cap to prevent stale-frame buffering.
+- Starting Camera Sources simulation pauses/closes the active ESP image stream; stopping simulation reopens it without reconfiguring the session.
+- Updated inherited V033 remote-camera regressions to validate persistent MJPEG transport and compatibility behavior.
+- No ESP-side inference, multi-camera independent buffer store, physical signal output, or public-road control path is introduced.
+
 ## 0_3_3 — PC-controlled on-demand ESP camera session
 
 - Created V033 / `0_3_3` at the owner's explicit request after V032; V032 remains the previous candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline.

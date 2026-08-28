@@ -1,100 +1,64 @@
-# API Contracts — V033 camera highlights
+# API Contracts — V034 camera transport
 
-All JSON PC Studio API responses retain the standard envelope and `meta.request_id`. Existing non-camera APIs remain unchanged.
+Existing non-camera contracts are unchanged.
 
-## Remote ESP status/control
+## Session control
 
-### `POST /api/camera/remote/connect`
-
-Body:
+`POST /api/camera/remote/connect`
 
 ```json
 {"host":"192.168.68.57","source_id":"esp32_cam_01"}
 ```
 
-Validates an RFC1918 literal IPv4 address and probes only ESP `GET /status`. It does **not** request `/capture` and does not start image transfer.
+Connect performs ESP `/status` only. Zero image bytes are requested.
 
-### `GET /api/camera/remote/status`
-
-Returns configured/reachable/worker/streaming/simulation-pause state, ESP identity/status snapshot, current applied settings, fetch counters and last error.
-
-### `POST /api/camera/remote/start`
-
-Body:
+`POST /api/camera/remote/start`
 
 ```json
 {
-  "fetch_interval_ms": 250,
+  "target_fps": 15,
   "settings": {
     "frame_size": "VGA",
-    "jpeg_quality": 12,
-    "brightness": 0,
-    "contrast": 0,
-    "saturation": 0,
-    "special_effect": 0,
-    "awb": true,
-    "awb_gain": true,
-    "wb_mode": 0,
-    "aec": true,
-    "aec2": false,
-    "ae_level": 0,
-    "aec_value": 300,
-    "agc": true,
-    "agc_gain": 0,
-    "gainceiling": 0,
-    "bpc": false,
-    "wpc": true,
-    "raw_gma": true,
-    "lenc": true,
-    "hmirror": false,
-    "vflip": false,
-    "dcw": true,
-    "colorbar": false
+    "jpeg_quality": 12
   }
 }
 ```
 
-Ordering is deliberate:
+The complete existing V033 OV2640 settings object is still required. V034 adds `target_fps` 1–30. The backend sends it to ESP `/config` as `stream_fps`.
+
+For compatibility, `fetch_interval_ms` is still accepted; when supplied by an older V033 client it is converted to an equivalent bounded target FPS.
+
+Start ordering:
 
 ```text
-ESP /stop (best-effort prior session)
-→ ESP /config?<all settings>
-→ ESP /start
-→ PC /capture polling worker
+/stop best effort
+/config?<complete settings + stream_fps>
+/start
+open http://<ESP-IP>:81/stream
 ```
 
-No image is fetched before `/start` succeeds.
+`POST /api/camera/remote/stop` closes the persistent stream before calling ESP `/stop`.
 
-### `POST /api/camera/remote/stop`
+## Low-latency preview
 
-Stops the PC pull worker first, then calls ESP `/stop`. Device connection remains configured.
+`GET /api/camera/live.mjpeg`
 
-### `POST /api/camera/remote/disconnect`
+Returns `multipart/x-mixed-replace; boundary=frame` from the current CameraFrameService frame sequence. This is a PC-side relay, not a second ESP connection.
 
-Stops the stream best-effort and clears the configured ESP connection.
+## Status additions
 
-## ESP V033 contract
+Remote status includes:
 
-ESP port 80:
+- `transport`: `idle` or `mjpeg`
+- `target_fps`
+- `measured_fps`
+- `last_frame_interval_ms`
+- `stream_reconnects`
+- `stream_bytes_received`
+- `stream_url`
 
-- `GET /`
-- `GET /status`
-- `POST /config?<settings>`
-- `POST /start`
-- `POST /stop`
-- `GET /capture`
+Existing V033 status/session/settings fields remain.
 
-ESP port 81:
+## Safety
 
-- `GET /stream`
-
-`/capture` and `/stream` reject requests while `session_active=false`.
-
-## Existing compatibility
-
-- `POST /api/camera/frame?source_id=<id>` remains supported.
-- `GET /api/camera/frame` remains the common PC-side latest-frame surface.
-- Camera simulation remains unchanged.
-- Dataset/inference/zones/analytics consume the same CameraFrameService path.
-
-No public-road signal-control API is introduced.
+Remote targets remain literal RFC1918 IPv4 only and redirects remain disabled. No physical/public-road signal-control API is added.

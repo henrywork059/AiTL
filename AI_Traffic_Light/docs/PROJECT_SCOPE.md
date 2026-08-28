@@ -2,18 +2,20 @@
 
 ## Physical camera input
 
-**Implemented candidate capability:** V033 provides PC-controlled, on-demand physical ESP32-CAM input. The ESP remains idle until the PC applies runtime settings and explicitly starts a session.
+V034 implements a PC-controlled, on-demand physical ESP32-CAM path with persistent MJPEG transport for lower latency. The ESP still sends no images before the PC starts a session.
 
-Physical camera input does not imply:
-- ESP-side inference;
+Implemented candidate evidence:
+- private-LAN camera control;
+- PC-owned sensor settings and target FPS;
+- persistent newest-frame MJPEG ingestion;
+- PC-side preview/inference/dataset/analytics reuse.
+
+Not implied:
 - validated detector accuracy;
-- simultaneous multi-camera live routing;
+- ESP-side inference;
+- simultaneous independent multi-camera buffers;
 - physical/public-road signal authority.
 
-## Existing simulation/evidence capabilities
+Existing cooperation, pedestrian, class, emergency and decision-evidence features retain their documented simulation/prototype provenance.
 
-AiTL retains local inference, datasets/training, zones, tracking/analytics, ranked simulated signal policy, isolated network cooperation, pedestrian-aware, class-aware, emergency-priority and normalized evidence functions according to their existing simulation/prototype provenance.
-
-## Out of scope
-
-Direct public-road traffic-signal/cabinet control, safety-interlock bypass, production autonomous authority and safety certification remain excluded.
+Public-road traffic control remains out of scope.

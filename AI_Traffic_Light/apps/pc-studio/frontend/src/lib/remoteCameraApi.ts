@@ -64,11 +64,19 @@ export type RemoteCameraStatus = {
   worker_running: boolean;
   streaming: boolean;
   paused_for_simulation: boolean;
+  transport: "idle" | "mjpeg";
   host: string | null;
   source_id: string | null;
   status_url: string | null;
   capture_url: string | null;
+  stream_url: string | null;
+  target_fps: number;
   fetch_interval_ms: number;
+  measured_fps: number;
+  last_frame_interval_ms: number | null;
+  stream_reconnects: number;
+  stream_bytes_received: number;
+  dropped_stale_frames: number;
   connected_at_ms: number | null;
   stream_started_at_ms: number | null;
   last_probe_at_ms: number | null;
@@ -86,6 +94,10 @@ export type RemoteCameraStatus = {
   prototype_only: boolean;
 };
 
+export function liveCameraMjpegUrl(): string {
+  return `${API_BASE}/api/camera/live.mjpeg`;
+}
+
 export async function fetchRemoteCameraStatus(): Promise<RemoteCameraStatus> {
   return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/status`);
 }
@@ -102,7 +114,7 @@ export async function connectRemoteCamera(input: {
 }
 
 export async function startRemoteCamera(input: {
-  fetch_interval_ms: number;
+  target_fps: number;
   settings: RemoteCameraSettings;
 }): Promise<RemoteCameraStatus> {
   return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/start`, {
@@ -113,15 +125,11 @@ export async function startRemoteCamera(input: {
 }
 
 export async function stopRemoteCamera(): Promise<RemoteCameraStatus> {
-  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/stop`, {
-    method: "POST",
-  });
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/stop`, { method: "POST" });
 }
 
 export async function disconnectRemoteCamera(): Promise<RemoteCameraStatus> {
-  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/disconnect`, {
-    method: "POST",
-  });
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/disconnect`, { method: "POST" });
 }
 
 export async function refreshCameraAfterRemoteChange(): Promise<CameraStatus> {
