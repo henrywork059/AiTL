@@ -1,57 +1,44 @@
-# Patch 0_3_7 — Adaptive single-window low-latency ESP streaming
+# Patch 0_3_7 — Quality-preserving low-latency ESP streaming
 
-V037 / `0_3_7` is a new candidate explicitly requested by the owner after V036. `passed_baseline` remains `0_2_4`.
+V037 / `0_3_7` remains an unaccepted candidate. `passed_baseline` remains `0_2_4` until explicit owner acceptance.
 
-## Why V037 exists
+## R6 diagnosis
 
-Physical V036 R6 testing proved the persistent TCP path could stay connected and complete frames, but typical JPEGs around 11–22 KB still produced 100–500+ ms sends and occasional timeout/reconnects. The physical logs repeatedly showed partial writes near the classic ESP32 lwIP TCP send-buffer boundary.
+R2/R4 assumed that a complete JPEG should fit roughly one classic ESP32 lwIP send-buffer window. Physical isolation testing disproved that assumption.
 
-## V037 R2 changes
+- Wi-Fi-only testing could remain stable for minutes with no disconnects.
+- Camera isolation with `fb_count=1`, `CAMERA_GRAB_WHEN_EMPTY` and 20 MHz XCLK remained stable during 299 QVGA JPEG captures with zero capture failures and zero Wi-Fi disconnects.
+- A separate TCP-only sender, with no camera initialized, successfully sent 8 KiB, 16 KiB and 32 KiB ATL1-framed payloads. Across the connected phases it completed 1040 sends with zero send failures, zero Wi-Fi disconnects and one persistent client connection.
+- 16 KiB and 32 KiB payloads took longer to send, proving a throughput limit rather than a frame-size validity limit.
+- The same SSID was observed on different BSSIDs with very different RSSI, so weak mesh/AP association can still create transient transport pressure.
 
-- Keep the V036 `aitl-tcp-jpeg-v1` frame format, PC-initiated session model and multi-ESP architecture.
-- Firmware identity is `aitl-camera-v037`; PC Studio accepts V037 and V036 binary-TCP nodes during migration.
-- New camera defaults remain QVGA / JPEG 24 / 15 FPS. Existing saved profiles are not rewritten.
-- Adaptive JPEG compression now targets a ~5000-byte payload, intentionally below the common ~5744-byte classic ESP32 lwIP default send buffer.
-- Oversized captured JPEGs are **not** sent as partial ATL1 frames while compression can still be increased. They are dropped locally, compression is tightened aggressively, and a fresh replacement frame is captured a few milliseconds later. This avoids a reconnect just to learn that an oversized frame cannot queue promptly.
-- If a real partial TCP send still occurs, V037 learns a more conservative payload target from the number of bytes accepted before the stall.
-- Compression steps scale with how far the JPEG exceeds the current payload target instead of always increasing by a fixed small amount.
-- Maximum adaptive JPEG quality number is 50; the user's configured value remains the best-quality recovery floor.
-- Quality recovery is deliberately slower and requires substantial payload headroom.
-- PC Studio increases the TCP receive buffer request to 256 KiB.
-- ESP telemetry adds `adaptive_payload_target_bytes`, `adaptive_local_frame_drops` and `adaptive_window_learns` alongside configured/effective JPEG quality and send EWMA.
-- Camera Sources displays these transport diagnostics.
+The earlier R4 failure chain was therefore self-amplifying: a transient slow/failed send could be interpreted as a JPEG-size problem, drive `effective_jpeg_quality` to 50, lower effective resolution repeatedly, and permanently damage image quality even though larger JPEGs are valid over TCP.
 
+## R6 changes
 
-## V037 R3 updater/worktree repair
-
-- Removed the automatic V036 metadata-finalizer call from `scripts/update_test_run.ps1`. Candidate metadata must already be committed on GitHub/main (or deliberately overlaid locally); the test runner no longer edits tracked release files.
-- Kept the strict pre-pull dirty-tree safety check for genuine tracked edits. Runtime/untracked files remain allowed and are never cleaned destructively.
-- Added a second tracked-cleanliness assertion after the non-live validation suite so a future test/helper that modifies tracked source fails immediately in that same run rather than breaking the next update.
-- Extended `test_update_test_run_script.py` to reject reintroduction of the historical finalizer or tracked-file write operations.
-- This is a same-candidate V037 repair. Camera transport, adaptive JPEG behavior, APIs and firmware are unchanged from R2.
-
-## V037 R4 adaptive-resolution repair
-
-Physical R2 logs exposed a logic bug: once `effective_jpeg_quality` reached the configured adaptive ceiling, the local oversize guard stopped dropping frames and sent them even when `frame_bytes > adaptive_payload_target_bytes`. This produced the observed `q=50` / `targetB=3800` / `frame=8–22 KB` combination and reintroduced 200–1400 ms TCP sends.
-
-R4 changes the pressure ladder to:
-
-1. increase JPEG compression while headroom remains;
-2. if the JPEG is still oversized at maximum compression, drop that capture locally and lower only the **effective runtime resolution** one step;
-3. retry with a fresh frame;
-4. restore effective resolution slowly after sustained send-time/payload headroom;
-5. only then recover JPEG quality toward the saved setting.
-
-The user's saved `frame_size` is never rewritten. Runtime adaptation is bounded to the existing supported OV2640 frame-size ladder and remains visible through configured/effective frame-size plus downshift/recovery telemetry. A hard oversize guard prevents a very large frame from leaking onto TCP even at the smallest resolution.
+- Keep camera protocol `aitl-camera-v037` and wire protocol `aitl-tcp-jpeg-v1`; the fixed `ATL1 | length | sequence | uptime | JPEG` record is unchanged.
+- Keep 20 MHz camera XCLK.
+- Change the PSRAM camera pipeline to one framebuffer with `CAMERA_GRAB_WHEN_EMPTY`; remove the R4 two-buffer `CAMERA_GRAB_LATEST` configuration that kept the capture/DMA path continuously active.
+- Allocate the single PSRAM framebuffer at UXGA capability so saved profiles can still select any supported runtime resolution.
+- When a new TCP client connects, discard the frame that may have been waiting while idle so the first transmitted frame is fresh.
+- Remove the 5000-byte target, 3800-byte learned minimum, partial-send window learning, local oversize rejection, automatic q=50 pressure escalation, and automatic effective-resolution downshift/recovery.
+- Preserve the configured JPEG quality and frame size across network failures. A failed partial length-prefixed frame closes that client socket and waits for PC reconnect instead of degrading future images.
+- Retain the proven non-blocking vectored `sendmsg(..., MSG_DONTWAIT)` path with `select()` progress waits, `TCP_NODELAY`, keepalive, and per-connection warmup.
+- Relax normal send guardrails to 700 ms no-progress / 1500 ms total and warmup guardrails to 1200 ms / 2000 ms. These are failure guardrails, not image-quality adaptation triggers.
+- Keep freshness-first scheduling: when transmission takes longer than the requested frame interval, the ESP schedules from the current time instead of queuing catch-up frames. Achieved FPS therefore falls naturally to sustainable throughput.
+- Add RSSI, BSSID, channel, Wi-Fi disconnect count, reconnect count and last disconnect reason to `/status` and serial diagnostics.
+- Keep legacy adaptive telemetry keys at zero for UI/API compatibility during the same V037 candidate.
+- PC Studio's existing automatic persistent-TCP reconnect/session-recovery worker remains unchanged; manual **Disconnect** still intentionally stops reconnection and clears the selected live connection.
 
 ## Deliberate non-changes
 
-- No UDP transport in V037 R2. This revision first attacks the specific TCP send-window behavior demonstrated by the V036 physical logs.
+- No UDP transport.
+- No protocol/version promotion.
+- No rewrite of saved `config/remote_cameras.json` profiles.
 - No ESP-side AI/inference.
 - No public-road or physical signal authority.
-- No rewrite of `config/remote_cameras.json`.
-- The 16-byte `ATL1` header and JPEG payload format are unchanged.
+- V036 binary-TCP camera nodes remain accepted by PC Studio during migration.
 
 ## Acceptance target
 
-At 320 × 240 / saved JPEG 24 / 15 FPS, the ESP should converge quickly toward JPEG payloads near or below the adaptive target. After convergence, successful send times should fall substantially and reconnect/failure counters should stop climbing continuously. Image quality must remain adequate for the project's local detector. Physical results decide acceptance.
+Test R6 first at QVGA / JPEG quality 20–24 / 5–15 FPS. Image quality must stay at the saved setting; `effective_jpeg_quality` must equal `configured_jpeg_quality`, effective frame size must equal the saved frame size, and old adaptive counters/targets must remain zero. Under a healthy BSSID/RSSI the stream should remain connected. Under a transient weak link the current socket may reconnect, but the firmware must not lower JPEG quality or resolution as a side effect.

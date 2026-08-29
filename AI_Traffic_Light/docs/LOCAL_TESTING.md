@@ -24,49 +24,26 @@ V037 R3 makes the runner read-only for tracked project/release files. A normal s
 
 If upgrading a PC that was previously dirtied by the historical V036 finalizer, restore only those already-generated metadata edits once before pulling R3. After R3 is installed, this cleanup should not recur.
 
-## Focused V037 checks
+## Focused V037 R6 checks
 
-- V037 firmware keeps `sendmsg(..., MSG_DONTWAIT)` and the V036 `ATL1` frame format.
-- V037 status reports configured/effective JPEG quality, adjustment count and send EWMA.
-- failed/slow/large sends can only increase the effective JPEG quality number up to 50;
-- sustained fast/small delivery can only recover toward, never below, the saved configured quality;
-- `/config` resets adaptive quality to the newly saved configured value;
-- PC accepts `aitl-camera-v037` and migration-compatible `aitl-camera-v036`, but rejects V035 HTTP/MJPEG firmware;
-- new profiles default to QVGA / JPEG 24 / 15 FPS without rewriting existing saved profiles;
-- multi-ESP switching, simulation pause/resume, Live AI and Dataset Capture remain intact.
+- Firmware keeps `sendmsg(..., MSG_DONTWAIT)`, TCP_NODELAY/keepalive and the V036-compatible `ATL1` frame format.
+- PSRAM camera configuration uses exactly one framebuffer with `CAMERA_GRAB_WHEN_EMPTY`; XCLK remains 20 MHz.
+- R2/R4 payload-target, partial-window learning, q=50 escalation and effective-resolution downshift code is absent.
+- `/config` applies the saved JPEG quality and frame size directly; effective quality/size mirror the saved settings.
+- A failed partial frame closes the client socket but does not modify JPEG quality or resolution.
+- Status exposes `quality_preserving_transport`, send EWMA/slow-frame count, RSSI, BSSID, channel and ESP Wi-Fi disconnect/reconnect counts.
+- PC accepts `aitl-camera-v037` and migration-compatible `aitl-camera-v036`; the wire format remains `aitl-tcp-jpeg-v1`.
+- Multi-ESP switching, simulation pause/resume, Live AI and Dataset Capture remain intact.
 
-## Physical test
+## Physical R6 check
 
-1. Flash `AiTL_ESP32_CAM_V037.ino` and confirm `AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node`.
-2. Use 320 × 240 / JPEG 24 / 15 FPS.
-3. Run at least two minutes while moving objects through the frame.
-4. Watch serial values: `fps`, `frame`, `send`, `q`, `ewma`, `adj`, `failures`, `rssi`.
-5. A pressured link should raise `q` above the saved value, shrink JPEGs, then stabilize rather than continuously reconnect.
-6. When the link remains fast, `q` should slowly return toward the saved configured value.
-7. On PC Studio confirm frame age remains current, failure streak settles, reconnects do not climb continuously, and measured FPS improves over the V036 test under equivalent conditions.
+1. Flash `AiTL_ESP32_CAM_V037.ino` and confirm `AiTL V037 R6 quality-preserving TCP ESP32-CAM node`.
+2. Start with 320 × 240 / JPEG quality 24 / 5–15 FPS.
+3. Confirm Serial Monitor reports `fixed=yes`, `q=<saved>/<saved>`, RSSI, BSSID and channel.
+4. Confirm image quality does not automatically collapse after a slow send: there must be no q=50 escalation and no runtime resolution downshift.
+5. Under healthy Wi-Fi, `client=on` should remain stable and `failures`/`deadlines` should not climb continuously.
+6. If the network slows, achieved FPS may fall below target. That is expected; freshness is preferred over queueing old frames.
+7. If a send actually fails, the ESP closes that partial-frame socket and PC Studio should enter reconnecting then return to TCP JPEG connected without changing the saved image settings.
+8. Compare the displayed BSSID/RSSI with the earlier strong and weak mesh/AP associations when diagnosing a recurrence.
 
-Do not claim a speed improvement until this physical comparison is completed.
-
-## V037 R2 single-window transport check
-
-After Start Stream, the first few captured frames may be skipped locally while the ESP raises compression. This is expected and should not increment PC reconnects.
-
-Healthy convergence should show:
-
-```text
-targetB=5000 (or a learned lower value)
-localdrop=<small count that stops growing rapidly>
-learn=0 or a small stable count
-frame≈targetB or lower
-accepted≈frame+16
-errno=0
-send normally well below the previous 100–500 ms range
-failures stable
-```
-
-If `q` reaches 50 and frames remain much larger than `targetB`, reduce resolution rather than continuing to increase timeouts.
-
-
-## V037 R4 physical check
-
-After flashing R4, Serial Monitor must identify `AiTL V037 R4 adaptive-resolution ESP32-CAM node`. Start with 320 × 240 / JPEG 24 / 15 FPS. When a frame remains above `targetB` at maximum compression, verify `resdown` increments and `res=<actual>/<effective enum>` steps downward instead of sending the oversized frame. `localdrop` may rise during convergence. Once stable headroom persists, `resup` may increment slowly toward the saved resolution. The saved Camera Sources resolution must not be rewritten by runtime adaptation.
+The R6 acceptance criterion is stability **without image-quality self-degradation**, not forcing every requested FPS regardless of available Wi-Fi throughput.

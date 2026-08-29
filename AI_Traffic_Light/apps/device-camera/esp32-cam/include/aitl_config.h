@@ -45,81 +45,22 @@
 #define AITL_WARMUP_SUCCESS_FRAMES 3U
 #endif
 #ifndef AITL_WARMUP_STALL_TIMEOUT_MS
-#define AITL_WARMUP_STALL_TIMEOUT_MS 1000U
+#define AITL_WARMUP_STALL_TIMEOUT_MS 1200U
 #endif
 #ifndef AITL_WARMUP_TOTAL_SEND_LIMIT_MS
-#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 1500U
+#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 2000U
 #endif
 #ifndef AITL_FRAME_STALL_TIMEOUT_MS
-#define AITL_FRAME_STALL_TIMEOUT_MS 500U
+#define AITL_FRAME_STALL_TIMEOUT_MS 700U
 #endif
 #ifndef AITL_FRAME_TOTAL_SEND_LIMIT_MS
-#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 900U
-#endif
-
-// Adaptive JPEG pressure controller. OV2640 quality uses an inverse scale:
-// higher number = stronger compression = smaller JPEG. The user's configured
-// quality is the best-quality floor; V037 may temporarily raise the number
-// under network pressure and slowly return toward the configured value.
-#ifndef AITL_ADAPTIVE_MAX_JPEG_QUALITY
-#define AITL_ADAPTIVE_MAX_JPEG_QUALITY 50
-#endif
-#ifndef AITL_ADAPTIVE_PRESSURE_STEP
-#define AITL_ADAPTIVE_PRESSURE_STEP 2
-#endif
-#ifndef AITL_ADAPTIVE_FAILURE_STEP
-#define AITL_ADAPTIVE_FAILURE_STEP 6
-#endif
-#ifndef AITL_ADAPTIVE_HIGH_SEND_PERCENT
-#define AITL_ADAPTIVE_HIGH_SEND_PERCENT 85U
-#endif
-#ifndef AITL_ADAPTIVE_LOW_SEND_PERCENT
-#define AITL_ADAPTIVE_LOW_SEND_PERCENT 35U
-#endif
-#ifndef AITL_ADAPTIVE_MIN_HIGH_SEND_MS
-#define AITL_ADAPTIVE_MIN_HIGH_SEND_MS 20U
-#endif
-#ifndef AITL_ADAPTIVE_MIN_LOW_SEND_MS
-#define AITL_ADAPTIVE_MIN_LOW_SEND_MS 8U
-#endif
-#ifndef AITL_ADAPTIVE_LARGE_FRAME_BYTES
-#define AITL_ADAPTIVE_LARGE_FRAME_BYTES 6500U
-#endif
-#ifndef AITL_ADAPTIVE_RECOVERY_FRAME_BYTES
-#define AITL_ADAPTIVE_RECOVERY_FRAME_BYTES 3600U
-#endif
-#ifndef AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES
-#define AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES 30U
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 1500U
 #endif
 
 
-// R4 single-window + adaptive-resolution controller: the classic ESP32 Arduino/lwIP default TCP
-// send buffer is about 5744 bytes. Keeping a JPEG below this target lets the
-// whole ATL1+JPEG record be queued without waiting for a second ACK window.
-#ifndef AITL_ADAPTIVE_TARGET_FRAME_BYTES
-#define AITL_ADAPTIVE_TARGET_FRAME_BYTES 5000U
-#endif
-#ifndef AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES
-#define AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES 3800U
-#endif
-#ifndef AITL_ADAPTIVE_WINDOW_MARGIN_BYTES
-#define AITL_ADAPTIVE_WINDOW_MARGIN_BYTES 512U
-#endif
-#ifndef AITL_ADAPTIVE_OVERSIZE_STEP_MAX
-#define AITL_ADAPTIVE_OVERSIZE_STEP_MAX 10
-#endif
-#ifndef AITL_ADAPTIVE_LOCAL_RETRY_MS
-#define AITL_ADAPTIVE_LOCAL_RETRY_MS 5U
-#endif
-#ifndef AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT
-#define AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT 72U
-#endif
-#ifndef AITL_ADAPTIVE_HARD_FRAME_BYTES
-#define AITL_ADAPTIVE_HARD_FRAME_BYTES 6500U
-#endif
-#ifndef AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES
-#define AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES 60U
-#endif
+// R6 intentionally has no automatic JPEG-size target, quality escalation, or
+// effective-resolution downshift. TCP segmentation is allowed to carry JPEGs
+// larger than one lwIP send buffer; configured image quality is preserved.
 
 #ifndef AITL_WIFI_CONNECT_TIMEOUT_MS
 #define AITL_WIFI_CONNECT_TIMEOUT_MS 20000UL

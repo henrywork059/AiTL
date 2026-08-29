@@ -122,14 +122,15 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
   const deviceEffectiveQuality = typeof remote?.device?.effective_jpeg_quality === "number" ? remote.device.effective_jpeg_quality : null;
   const deviceConfiguredQuality = typeof remote?.device?.configured_jpeg_quality === "number" ? remote.device.configured_jpeg_quality : null;
   const deviceSendEwma = typeof remote?.device?.send_ewma_ms === "number" ? remote.device.send_ewma_ms : null;
-  const deviceQualityAdjustments = typeof remote?.device?.adaptive_quality_adjustments === "number" ? remote.device.adaptive_quality_adjustments : null;
-  const devicePayloadTarget = typeof remote?.device?.adaptive_payload_target_bytes === "number" ? remote.device.adaptive_payload_target_bytes : null;
-  const deviceLocalDrops = typeof remote?.device?.adaptive_local_frame_drops === "number" ? remote.device.adaptive_local_frame_drops : null;
-  const deviceWindowLearns = typeof remote?.device?.adaptive_window_learns === "number" ? remote.device.adaptive_window_learns : null;
+  const deviceQualityPreserving = remote?.device?.quality_preserving_transport === true;
   const deviceEffectiveFrameSize = typeof remote?.device?.effective_frame_size === "string" ? remote.device.effective_frame_size : null;
   const deviceConfiguredFrameSize = typeof remote?.device?.configured_frame_size === "string" ? remote.device.configured_frame_size : null;
-  const deviceResolutionDownshifts = typeof remote?.device?.adaptive_resolution_downshifts === "number" ? remote.device.adaptive_resolution_downshifts : null;
-  const deviceResolutionRecoveries = typeof remote?.device?.adaptive_resolution_recoveries === "number" ? remote.device.adaptive_resolution_recoveries : null;
+  const deviceWifiRssi = typeof remote?.device?.rssi === "number" ? remote.device.rssi : null;
+  const deviceWifiBssid = typeof remote?.device?.wifi_bssid === "string" ? remote.device.wifi_bssid : null;
+  const deviceWifiChannel = typeof remote?.device?.wifi_channel === "number" ? remote.device.wifi_channel : null;
+  const deviceWifiDisconnects = typeof remote?.device?.wifi_disconnects === "number" ? remote.device.wifi_disconnects : null;
+  const deviceWifiReconnects = typeof remote?.device?.wifi_reconnects === "number" ? remote.device.wifi_reconnects : null;
+  const deviceTransportSlowFrames = typeof remote?.device?.transport_slow_frames === "number" ? remote.device.transport_slow_frames : null;
   const selectedFrameAvailable = Boolean(
     status?.frame_available
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
@@ -508,13 +509,14 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
               <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
               <div><span>JPEG quality</span><strong>{deviceEffectiveQuality !== null ? `${deviceEffectiveQuality} effective / ${deviceConfiguredQuality ?? settings.jpeg_quality} saved` : settings.jpeg_quality}</strong></div>
-              <div><span>ESP send EWMA</span><strong>{deviceSendEwma !== null ? `${deviceSendEwma.toFixed(0)} ms` : "—"}</strong></div>
-              <div><span>Quality adjustments</span><strong>{deviceQualityAdjustments ?? 0}</strong></div>
-              <div><span>ESP payload target</span><strong>{devicePayloadTarget !== null ? `${devicePayloadTarget} B` : "—"}</strong></div>
-              <div><span>Oversize frames skipped</span><strong>{deviceLocalDrops ?? 0}</strong></div>
-              <div><span>TCP window learns</span><strong>{deviceWindowLearns ?? 0}</strong></div>
+              <div><span>Image policy</span><strong>{deviceQualityPreserving ? "fixed saved quality / resolution" : "legacy adaptive firmware"}</strong></div>
               <div><span>ESP effective size</span><strong>{deviceEffectiveFrameSize ? `${deviceEffectiveFrameSize} effective / ${deviceConfiguredFrameSize ?? settings.frame_size} saved` : FRAME_SIZE_DIMENSIONS[settings.frame_size]}</strong></div>
-              <div><span>Resolution adaptations</span><strong>{`${deviceResolutionDownshifts ?? 0} down / ${deviceResolutionRecoveries ?? 0} up`}</strong></div>
+              <div><span>ESP send EWMA</span><strong>{deviceSendEwma !== null ? `${deviceSendEwma.toFixed(0)} ms` : "—"}</strong></div>
+              <div><span>Slow-send frames</span><strong>{deviceTransportSlowFrames ?? 0}</strong></div>
+              <div><span>Wi-Fi RSSI</span><strong>{deviceWifiRssi !== null ? `${deviceWifiRssi} dBm` : "—"}</strong></div>
+              <div><span>Wi-Fi BSSID</span><strong>{deviceWifiBssid ?? "—"}</strong></div>
+              <div><span>Wi-Fi channel</span><strong>{deviceWifiChannel ?? "—"}</strong></div>
+              <div><span>ESP Wi-Fi recovery</span><strong>{`${deviceWifiDisconnects ?? 0} lost / ${deviceWifiReconnects ?? 0} reconnected`}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
               <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
@@ -530,7 +532,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              V037 R2 uses the same length-prefixed TCP JPEG wire format as V036, while targeting JPEG payloads that fit one ESP lwIP send window when practical. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
+              V037 R6 keeps the V036-compatible length-prefixed TCP JPEG wire format but no longer forces JPEGs into one lwIP send window. Saved JPEG quality and resolution stay fixed across transport pressure; the ESP exposes RSSI/BSSID/channel diagnostics and lets achieved FPS fall to sustainable throughput. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/remote/select</code>
           </section>

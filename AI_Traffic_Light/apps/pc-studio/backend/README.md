@@ -16,4 +16,4 @@
 
 `CameraFrameService` remains the common downstream latest-frame surface used by preview, inference, dataset capture, zones and analytics. `GET /api/camera/live.mjpeg` remains browser-facing MJPEG; the ESP→PC image hop is not MJPEG in V037.
 
-V037 R2 keeps V036 binary-TCP compatibility and adds single-window ESP-side adaptive JPEG pressure control. New profile defaults are QVGA / JPEG 24 / 15 FPS; existing persisted profiles are not rewritten.
+V037 R6 keeps V036 binary-TCP compatibility and the existing PC reconnect/session-recovery worker. The ESP now preserves saved image quality/resolution under transport pressure instead of using the former single-window adaptive controller. New profile defaults remain QVGA / JPEG 24 / 15 FPS; existing persisted profiles are not rewritten.

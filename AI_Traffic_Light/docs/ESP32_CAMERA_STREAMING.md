@@ -21,7 +21,7 @@ The fixed header avoids multipart boundary scanning and per-frame HTTP headers b
 
 ## Camera configuration
 
-When PSRAM exists, initialize JPEG capture at UXGA, quality 10, two PSRAM framebuffers and `CAMERA_GRAB_LATEST`, then apply the lower runtime resolution/quality selected in PC Studio. This preserves sufficient framebuffer allocation for later resolution changes.
+When PSRAM exists, R6 initializes JPEG capture at UXGA capability with one PSRAM framebuffer and `CAMERA_GRAB_WHEN_EMPTY`, then applies the runtime resolution/quality selected in PC Studio. Allocating the single buffer at UXGA preserves later resolution changes without keeping a two-buffer latest-frame pipeline continuously active.
 
 Recommended first physical settings:
 
@@ -65,10 +65,14 @@ Each connected/started ESP has its own independent port-81 TCP worker and newest
 
 Simulation still pauses all physical ESP image transports and they resume automatically afterward.
 
-## V037 send-path behavior
+## V037 R6 send-path behavior
 
-The ESP stream socket uses TCP_NODELAY/keepalive plus a progress-bounded non-blocking send loop. The 16-byte `ATL1` header and JPEG payload are exposed to lwIP as one scatter/gather `sendmsg(..., MSG_DONTWAIT)` logical write so lwIP controls MSS segmentation and the tiny header is not forced into a separate application write. Temporary `EAGAIN` backpressure is handled with short `select()` waits. Each new TCP connection receives three bounded warm-up successes (1000 ms no-progress / 1500 ms total); steady-state limits then tighten to 500 ms no-progress / 900 ms total. If progress stops or the hard cap is reached, the socket is closed and the PC discards the partial frame before reconnecting.
+The ESP stream socket uses TCP_NODELAY/keepalive plus a progress-bounded non-blocking send loop. The 16-byte `ATL1` header and JPEG payload are exposed to lwIP as one scatter/gather `sendmsg(..., MSG_DONTWAIT)` logical write, so TCP is free to segment JPEGs larger than one send buffer. Temporary `EAGAIN` backpressure is handled with short `select()` waits.
 
+Each new TCP connection receives three bounded warm-up successes (1200 ms no-progress / 2000 ms total); steady-state limits are 700 ms no-progress / 1500 ms total. A partial-frame failure closes that socket so the PC can discard the incomplete ATL1 record and reconnect deterministically.
 
-### Adaptive JPEG pressure
-V037 R2 retains ATL1/TCP but targets a ~5 KB JPEG payload so a complete frame normally fits one classic ESP32 lwIP send window. Oversized captures are dropped locally while compression is increased, avoiding intentional partial-frame reconnects. Partial-send evidence can lower the target further. Serial telemetry reports `q=<effective>/<configured>`, `ewma`, `targetB`, `localdrop`, `learn`, and `adj`.
+The camera uses one PSRAM framebuffer with `CAMERA_GRAB_WHEN_EMPTY` and a 20 MHz XCLK. A pending idle frame is discarded when a new TCP client connects. Scheduling is freshness-first: if a send takes longer than the requested frame interval, the next deadline starts from current time instead of catching up old work.
+
+### Quality-preserving policy
+
+R6 removes the R2/R4 ~5 KB payload target, partial-send window learning, q=50 compression escalation and runtime resolution downshift. Network pressure may reduce achieved FPS or force a socket reconnect, but it does not rewrite the configured JPEG quality or frame size. Serial and `/status` telemetry expose `q=<effective>/<configured>` (normally equal), send EWMA, slow-send count, RSSI, BSSID, channel, and ESP Wi-Fi disconnect/reconnect counters.

@@ -1,5 +1,5 @@
 # Changelog
-## 0_3_7 — Adaptive single-window ESP streaming
+## 0_3_7 — Quality-preserving ESP streaming
 
 - Created V037 / `0_3_7` at the owner's explicit request after V036; V024 / `0_2_4` remains the owner-confirmed passed baseline.
 - Preserved the V036 multi-ESP architecture, PC-controlled session lifecycle, 16-byte `ATL1` framing and `aitl-tcp-jpeg-v1` wire format.
@@ -13,6 +13,11 @@
 - R3 permanently removes the historical V036 metadata-finalizer hook from the normal update/test/run helper, so validation no longer rewrites tracked `CHANGELOG.md` or frontend version metadata and the next normal Git pull is not blocked by runner-created edits. A post-test cleanliness guard now catches any future helper that dirties tracked source.
 - R4 fixes an R2 physical-test bug where frames larger than the adaptive payload target were sent anyway after JPEG compression reached its ceiling. V037 now drops that capture and temporarily steps only the effective sensor resolution down until the frame fits; sustained low-send-time headroom restores resolution one step at a time before JPEG quality is recovered. Saved resolution remains unchanged.
 - R4 adds configured/effective frame-size, resolution downshift/recovery, and actual frame-dimension telemetry so physical adaptation is visible in Serial Monitor and Camera Sources.
+- R6 follows controlled camera-only and TCP-only isolation tests. One-buffer `CAMERA_GRAB_WHEN_EMPTY` camera capture at 20 MHz was stable, and synthetic 8/16/32 KiB ATL1 records completed 1040 TCP sends with zero send failures on the healthy BSSID, disproving the R2/R4 assumption that a JPEG must fit a ~5.7 KiB lwIP send buffer.
+- R6 removes the 3.8–5 KB payload target, partial-send target learning, local oversize rejection, automatic q=50 compression escalation and effective-resolution downshift. Configured JPEG quality/resolution now remain fixed across transport pressure.
+- R6 uses one UXGA-capable PSRAM framebuffer with `CAMERA_GRAB_WHEN_EMPTY`, keeps 20 MHz XCLK, flushes the pending idle frame at new TCP-client connection, and retains freshness-first scheduling with no catch-up backlog.
+- R6 relaxes steady-state send guardrails to 700 ms no-progress / 1500 ms total (1200 / 2000 ms during connection warmup), while retaining non-blocking vectored `sendmsg`, `TCP_NODELAY`, keepalive, deterministic partial-frame socket close, and the existing PC reconnect/session-recovery worker.
+- R6 adds RSSI/BSSID/channel and ESP Wi-Fi disconnect/reconnect telemetry. Legacy R2/R4 adaptive keys remain zero-valued for same-candidate API compatibility, and Camera Sources now presents the quality-preserving policy plus Wi-Fi diagnostics instead of the obsolete payload-target controls.
 - No ESP-side inference, UDP transport, physical/public-road signal authority or rewrite of runtime camera-profile data is introduced.
 ## 0_3_6 — Low-latency binary TCP multi-ESP camera input
 

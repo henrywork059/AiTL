@@ -1,0 +1,60 @@
+AiTL V037 R6 — quality-preserving TCP camera repair
+==================================================
+
+Version remains: 0_3_7
+Previous version: 0_3_6
+Passed baseline remains: 0_2_4
+
+Runtime changes
+---------------
+- Preserve configured JPEG quality and resolution across TCP pressure/failures.
+- Remove the R2/R4 3.8–5 KB payload target, partial-send target learning,
+  automatic q=50 compression escalation, local oversize rejection and runtime
+  resolution downshift/recovery.
+- Use one PSRAM framebuffer with CAMERA_GRAB_WHEN_EMPTY; keep 20 MHz XCLK.
+- Keep persistent ATL1 / aitl-tcp-jpeg-v1 transport and non-blocking vectored
+  sendmsg path.
+- Relax send guardrails to 700 ms no-progress / 1500 ms total, with
+  1200 / 2000 ms connection warmup.
+- Flush the pending one-buffer frame when a new TCP client connects.
+- Keep freshness-first scheduling; achieved FPS may fall rather than queue old work.
+- Add RSSI, BSSID, channel, slow-send and ESP Wi-Fi recovery telemetry.
+- Existing PC reconnect/session-recovery implementation is retained.
+
+Changed files
+-------------
+AI_Traffic_Light/CHANGELOG.md
+AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_7.txt
+AI_Traffic_Light/PATCH_MANIFEST_0_3_7_R6.txt
+AI_Traffic_Light/README.md
+AI_Traffic_Light/VERSION
+AI_Traffic_Light/apps/device-camera/esp32-cam/README.md
+AI_Traffic_Light/apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino
+AI_Traffic_Light/apps/device-camera/esp32-cam/include/aitl_config.h
+AI_Traffic_Light/apps/device-camera/esp32-cam/src/main.cpp
+AI_Traffic_Light/apps/pc-studio/backend/README.md
+AI_Traffic_Light/apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx
+AI_Traffic_Light/docs/API_CONTRACTS.md
+AI_Traffic_Light/docs/ESP32_CAMERA_STREAMING.md
+AI_Traffic_Light/docs/LOCAL_TESTING.md
+AI_Traffic_Light/docs/PATCH_0_3_7.md
+AI_Traffic_Light/docs/START_HERE.md
+AI_Traffic_Light/docs/TEST_READY_CHECKLIST.md
+AI_Traffic_Light/scripts/test_v036_firmware_send_structure.py
+AI_Traffic_Light/scripts/test_v037_adaptive_camera_transport.py
+
+Validation performed before handoff
+-----------------------------------
+- Current GitHub main core files were matched by Git blob SHA before editing.
+- Focused V037 R6 transport regression: PASS.
+- Inherited V036 vectored-send structure regression: PASS.
+- Permanent updater regression: PASS.
+- Historical metadata-runner regression: PASS after restoring its archived helper
+  into the isolated validation snapshot.
+- git diff --check equivalent on the reconstructed current snapshot: PASS.
+- PlatformIO/Arduino firmware bodies are byte-identical after their respective
+  configuration preambles.
+- Firmware string/bracket structural checks: PASS.
+- Full Arduino board compile and full PC Studio npm/backend suite are not run in
+  this isolated artifact environment; run the normal project updater after the
+  files are committed to GitHub main.

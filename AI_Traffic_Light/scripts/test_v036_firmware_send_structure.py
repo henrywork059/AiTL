@@ -7,7 +7,7 @@ V037_STANDALONE = PROJECT_ROOT / "apps/device-camera/esp32-cam/arduino/AiTL_ESP3
 CONFIG = PROJECT_ROOT / "apps/device-camera/esp32-cam/include/aitl_config.h"
 
 
-def assert_r6_transport_foundation(path: Path, text: str) -> None:
+def assert_vectored_transport(path: Path, text: str) -> None:
     assert "sendFrameVectoredProgressBounded" in text, f"missing vectored progress send helper: {path}"
     assert "sendmsg(fd, &message, MSG_DONTWAIT)" in text, f"missing scatter/gather non-blocking send: {path}"
     assert "waitSocketWritableForProgress" in text, f"missing progress-bounded socket wait: {path}"
@@ -18,9 +18,8 @@ def assert_r6_transport_foundation(path: Path, text: str) -> None:
     assert "streamServer.accept()" in text, f"firmware should use current accept() API: {path}"
     assert "streamServer.setNoDelay(true)" in text, f"server no-delay policy missing: {path}"
     assert "lastSendAcceptedBytes" in text and "lastSendErrno" in text, f"send diagnostics missing: {path}"
-    assert "sendAllProgressBounded" not in text, f"R5 chunked helper still present: {path}"
-    assert "AITL_STREAM_SEND_CHUNK_BYTES" not in text, f"R5 artificial chunking still present: {path}"
-    assert "AITL_FRAME_SEND_DEADLINE_MS" not in text, f"R4 whole-frame cutoff still present: {path}"
+    assert "sendAllProgressBounded" not in text, f"old chunked helper still present: {path}"
+    assert "AITL_STREAM_SEND_CHUNK_BYTES" not in text, f"artificial chunking reintroduced: {path}"
     assert "::send(fd, data + sent, length - sent, 0)" not in text, f"blocking raw send reintroduced: {path}"
 
 
@@ -30,32 +29,33 @@ def main() -> int:
     v037 = V037_STANDALONE.read_text(encoding="utf-8")
     config = CONFIG.read_text(encoding="utf-8")
 
-    # V037 intentionally inherits the R6 transport foundation before layering
-    # adaptive JPEG pressure control on top of it.
-    assert_r6_transport_foundation(PLATFORMIO, platformio)
-    assert_r6_transport_foundation(V037_STANDALONE, v037)
+    assert_vectored_transport(PLATFORMIO, platformio)
+    assert_vectored_transport(V037_STANDALONE, v037)
 
     for marker in (
         "#define AITL_STREAM_SELECT_SLICE_MS 20U",
         "#define AITL_WARMUP_SUCCESS_FRAMES 3U",
-        "#define AITL_WARMUP_STALL_TIMEOUT_MS 1000U",
-        "#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 1500U",
-        "#define AITL_FRAME_STALL_TIMEOUT_MS 500U",
-        "#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 900U",
+        "#define AITL_WARMUP_STALL_TIMEOUT_MS 1200U",
+        "#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 2000U",
+        "#define AITL_FRAME_STALL_TIMEOUT_MS 700U",
+        "#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 1500U",
     ):
-        assert marker in config, f"current PlatformIO config missing inherited R6 bound {marker}"
-        assert marker in v037, f"V037 Arduino sketch missing inherited R6 bound {marker}"
+        assert marker in config, f"current PlatformIO config missing R6 bound {marker}"
+        assert marker in v037, f"V037 Arduino sketch missing R6 bound {marker}"
 
-    # Keep the archived V036 sketch identifiable as the previous physical-test build.
+    # Keep archived V036 identifiable as the previous physical-test firmware.
     assert V036_STANDALONE.is_file()
-    assert 'r6-warmup-vectored-send' in v036
-    assert 'aitl-camera-v036' in v036
+    assert "r6-warmup-vectored-send" in v036
+    assert "aitl-camera-v036" in v036
 
-    assert 'aitl-camera-v037' in platformio and 'adaptJpegPressure' in platformio
-    assert 'aitl-camera-v037' in v037 and 'adaptJpegPressure' in v037
+    assert "aitl-camera-v037" in platformio and "quality_preserving_transport" in platformio
+    assert "aitl-camera-v037" in v037 and "quality_preserving_transport" in v037
+    assert "adaptJpegPressure" not in platformio
+    assert "adaptJpegPressure" not in v037
 
-    print("[PASS] V037 inherits the V036 R6 non-blocking vectored TCP send foundation")
-    print("[PASS] archived V036 R6 standalone sketch remains identifiable for comparison")
+    print("[PASS] V037 R6 keeps the proven V036 non-blocking vectored TCP foundation")
+    print("[PASS] V037 R6 extends send guardrails without reintroducing blocking writes")
+    print("[PASS] archived V036 standalone sketch remains identifiable for comparison")
     return 0
 
 

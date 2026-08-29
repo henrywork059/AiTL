@@ -90,21 +90,20 @@ Profiles are stored locally in `config/remote_cameras.json` using the existing a
 Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; therefore Live AI, Dataset Capture, zones and analytics continue to consume one unambiguous active source. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.
 
 
-## V037 adaptive JPEG telemetry
+## V037 R6 quality-preserving transport telemetry
 
-A V037 device `/status` may additionally report:
+A V037 R6 device `/status` additionally reports:
 
-- `adaptive_quality_enabled: true`;
-- `configured_jpeg_quality`: the PC-saved OV2640 quality floor;
-- `effective_jpeg_quality`: the current quality number after adaptive compression;
-- `adaptive_quality_adjustments`: number of runtime quality changes;
+- `quality_preserving_transport: true`;
+- `adaptive_quality_enabled: false`;
+- `configured_jpeg_quality` and `effective_jpeg_quality` (R6 keeps them equal);
+- `configured_frame_size` and `effective_frame_size` (R6 keeps them equal);
 - `send_ewma_ms`: exponentially weighted send time;
-- `adaptive_payload_target_bytes`: current maximum JPEG payload target before local oversize skipping;
-- `adaptive_local_frame_drops`: captured oversized JPEGs skipped locally before any ATL1 bytes were written;
-- `adaptive_window_learns`: number of times a partial TCP send lowered the conservative payload target;
-- `configured_frame_size`: the PC-saved resolution ceiling;
-- `effective_frame_size`: the temporary runtime resolution after V037 R4 pressure adaptation;
-- `adaptive_resolution_downshifts` / `adaptive_resolution_recoveries`: runtime size-adaptation counters;
-- `last_frame_width` / `last_frame_height`: actual dimensions of the most recently captured JPEG.
+- `transport_slow_frames`: frames whose send time exceeded the requested frame-period budget;
+- `wifi_bssid` and `wifi_channel`: current AP identity/channel alongside existing `rssi`;
+- `wifi_disconnects` and `wifi_reconnects`: ESP-side connection transition counters;
+- existing `last_frame_width` / `last_frame_height`, frame byte count and send diagnostics.
+
+For same-candidate compatibility, the previous `adaptive_quality_adjustments`, `adaptive_payload_target_bytes`, `adaptive_local_frame_drops`, `adaptive_window_learns`, `adaptive_resolution_downshifts`, and `adaptive_resolution_recoveries` keys remain present but stay zero in R6. They must not be interpreted as active adaptation.
 
 These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.
