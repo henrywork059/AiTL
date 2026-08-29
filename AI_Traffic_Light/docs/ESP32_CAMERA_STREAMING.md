@@ -26,8 +26,8 @@ When PSRAM exists, initialize JPEG capture at UXGA, quality 10, two PSRAM frameb
 Recommended first physical settings:
 
 ```text
-Resolution: VGA
-JPEG quality: 14
+Resolution: QVGA (320 × 240)
+JPEG quality: 24
 Target FPS: 15
 ```
 
@@ -52,7 +52,7 @@ PlatformIO source:
 
 Standalone Arduino IDE sketch:
 
-`apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino`
+`apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino`
 
 For either workflow, configure only the ESP Wi-Fi credentials. Do not configure a PC IP on the ESP. PC Studio asks for the ESP's private-LAN IPv4 address.
 
@@ -65,6 +65,10 @@ Each connected/started ESP has its own independent port-81 TCP worker and newest
 
 Simulation still pauses all physical ESP image transports and they resume automatically afterward.
 
-## V036 send-path behavior
+## V037 send-path behavior
 
 The ESP stream socket uses TCP_NODELAY/keepalive plus a progress-bounded non-blocking send loop. The 16-byte `ATL1` header and JPEG payload are exposed to lwIP as one scatter/gather `sendmsg(..., MSG_DONTWAIT)` logical write so lwIP controls MSS segmentation and the tiny header is not forced into a separate application write. Temporary `EAGAIN` backpressure is handled with short `select()` waits. Each new TCP connection receives three bounded warm-up successes (1000 ms no-progress / 1500 ms total); steady-state limits then tighten to 500 ms no-progress / 900 ms total. If progress stops or the hard cap is reached, the socket is closed and the PC discards the partial frame before reconnecting.
+
+
+### Adaptive JPEG pressure
+V037 retains the ATL1 TCP frame format but monitors send duration and JPEG payload size. Under pressure it temporarily raises the JPEG quality number to reduce bytes; after sustained fast delivery it slowly returns toward the saved configured value. Serial telemetry reports `q=<effective>/<configured>`, `ewma`, and `adj`.

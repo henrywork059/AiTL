@@ -6,7 +6,7 @@ AiTL implements a local PC-controlled ESP32-CAM input path with:
 
 - idle Connect/status probing with zero image transfer;
 - PC-owned OV2640 runtime configuration;
-- persistent low-latency length-prefixed TCP JPEG image transport;
+- persistent low-latency length-prefixed TCP JPEG image transport with V037 adaptive JPEG pressure control;
 - transport/session recovery after temporary network or ESP restart;
 - a persistent list of saved ESP private-LAN IP addresses and per-camera settings;
 - several independent ESP stream workers/newest-frame caches that may run concurrently;
@@ -23,3 +23,8 @@ This does not imply:
 - physical/public-road traffic-signal authority.
 
 Existing cooperation, pedestrian, class, emergency and explainability/evidence features retain their documented prototype/simulation provenance. Multiple physical camera inputs are a data-source foundation for later multi-intersection work; they do not by themselves activate live cooperative control.
+
+
+### V037 physical-stream adaptation
+
+V037 may temporarily increase OV2640 JPEG compression on a physical camera when actual TCP send pressure cannot sustain the configured image load. This is a transport/freshness mechanism, not an AI image-quality judgement. The user's configured quality remains the recovery floor and the effective compression is bounded.

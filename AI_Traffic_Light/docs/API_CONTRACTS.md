@@ -1,4 +1,4 @@
-# API Contracts — V036 camera transport highlights
+# API Contracts — V037 camera transport highlights
 
 Existing non-camera contracts remain unchanged.
 
@@ -12,13 +12,13 @@ The ESP must report:
 
 ```json
 {
-  "protocol": "aitl-camera-v036",
+  "protocol": "aitl-camera-v037",
   "stream_protocol": "aitl-tcp-jpeg-v1",
   "camera_ready": true
 }
 ```
 
-A mismatched older firmware returns the existing camera-not-connected error envelope with HTTP 409 and compatibility details. No new stable error code is introduced.
+V037 PC Studio also accepts `aitl-camera-v036` because V036 uses the same `aitl-tcp-jpeg-v1` wire format. A mismatched older firmware such as V035 returns the existing camera-not-connected error envelope with HTTP 409 and compatibility details. No new stable error code is introduced.
 
 ## Start
 
@@ -40,7 +40,7 @@ persistent TCP connect to ESP :81
 
 ## Persistent image transport
 
-ESP port 81 is not HTTP in V036. It is one private-LAN TCP stream with repeated frames:
+ESP port 81 is not HTTP in V037/V036. It is one private-LAN TCP stream with repeated frames:
 
 ```text
 ATL1 | uint32 JPEG length | uint32 sequence | uint32 ESP uptime_ms | JPEG bytes
@@ -62,7 +62,7 @@ Response disables caching/transformation/buffering where supported.
 
 `GET /api/camera/remote/status`
 
-Existing fields remain, with these V036 semantics/additions:
+Existing fields remain, with these V037 semantics/additions:
 
 - `transport`: `idle` or `tcp_jpeg`;
 - `stream_protocol`: `null` or `aitl-tcp-jpeg-v1`;
@@ -77,7 +77,7 @@ Private RFC1918 IPv4 restriction remains. No redirects or public-road signal-con
 
 ## Saved multi-camera registry
 
-V036 same-candidate multi-camera extension adds:
+The saved multi-camera registry retained from V036 provides:
 
 - `POST /api/camera/remote/cameras` — save/update one ESP profile (`host`, `source_id`, `target_fps`, complete settings) and select it;
 - `POST /api/camera/remote/select` — select an existing saved ESP without stopping other ESP streams;
@@ -88,3 +88,16 @@ V036 same-candidate multi-camera extension adds:
 Profiles are stored locally in `config/remote_cameras.json` using the existing atomic JSON-store helper. Socket state is never persisted: after PC Studio restarts, the list/settings are restored but devices must be connected again.
 
 Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; therefore Live AI, Dataset Capture, zones and analytics continue to consume one unambiguous active source. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.
+
+
+## V037 adaptive JPEG telemetry
+
+A V037 device `/status` may additionally report:
+
+- `adaptive_quality_enabled: true`;
+- `configured_jpeg_quality`: the PC-saved OV2640 quality floor;
+- `effective_jpeg_quality`: the current quality number after adaptive compression;
+- `adaptive_quality_adjustments`: number of runtime quality changes;
+- `send_ewma_ms`: exponentially weighted send time.
+
+These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.

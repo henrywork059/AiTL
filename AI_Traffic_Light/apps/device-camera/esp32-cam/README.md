@@ -51,18 +51,18 @@ pio device monitor -b 115200
 A standalone sketch is provided at:
 
 ```text
-arduino/AiTL_ESP32_CAM_V036/AiTL_ESP32_CAM_V036.ino
+arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino
 ```
 
 Copy `secrets.example.h` to `secrets.h` inside that sketch folder, enter Wi-Fi credentials, then upload as an **AI Thinker ESP32-CAM** target using the installed ESP32 Arduino core.
 
 ## First physical test
 
-Use:
+Use for a new V037 profile:
 
 ```text
-VGA
-JPEG quality 14
+320 × 240 (QVGA)
+JPEG quality 24
 15 FPS
 ```
 
@@ -76,7 +76,7 @@ If a frame cannot be delivered promptly, the ESP closes the stream socket rather
 
 ## Compatibility
 
-PC Studio's current binary stream requires matching firmware. A V035 HTTP/MJPEG firmware will be rejected during Connect instead of being interpreted as the V036 frame protocol.
+PC Studio's current binary stream requires compatible firmware. V035 HTTP/MJPEG firmware is rejected during Connect; V036 binary TCP remains accepted during migration because it uses the same `aitl-tcp-jpeg-v1` wire format.
 
 Legacy `POST /api/camera/frame` remains available in PC Studio for other device senders, but this ESP firmware no longer uses per-frame HTTP uploads.
 
@@ -84,5 +84,7 @@ Legacy `POST /api/camera/frame` remains available in PC Studio for other device 
 
 This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.
 
-### V036 same-candidate send repair
-The current V036 R6 TCP JPEG sender presents the `ATL1` header and JPEG as one scatter/gather `sendmsg(..., MSG_DONTWAIT)` stream write and lets lwIP perform TCP segmentation. Temporary backpressure waits in short `select()` slices. Each newly accepted connection receives three bounded warm-up frames (1000 ms no-progress / 1500 ms total) before steady-state limits tighten to 500 ms no-progress / 900 ms total. This avoids the R5 250 ms reconnect loop while still bounding stale-frame delay. Reflash the ESP after applying R6; the wire protocol and PC IP workflow are unchanged.
+### V037 adaptive transport
+V037 keeps the V036 `ATL1` TCP wire format and R6 vectored non-blocking sender, then adds adaptive JPEG pressure control. The saved/user-configured JPEG quality remains the quality floor. When send time exceeds the target-frame budget, frames are large, or a send fails, firmware temporarily increases the OV2640 JPEG quality number (stronger compression) up to a bounded ceiling. After a sustained run of small/fast frames, it steps back toward the configured quality. Status/serial telemetry exposes configured/effective quality, adjustment count, and send-time EWMA.
+
+New profiles default to QVGA / JPEG 24 / 15 FPS; existing saved profiles are preserved. V037 PC Studio remains wire-compatible with V036 camera nodes during migration, but V037 adaptive behavior requires flashing the V037 firmware.

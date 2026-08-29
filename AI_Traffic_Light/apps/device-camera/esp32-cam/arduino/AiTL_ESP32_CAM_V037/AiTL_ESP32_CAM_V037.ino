@@ -1,4 +1,6 @@
-// AiTL V037 PlatformIO firmware (adaptive JPEG pressure control over persistent TCP).
+// AiTL V037 standalone Arduino IDE sketch (adaptive JPEG pressure control over persistent TCP).
+// Keep this behavior aligned with ../../src/main.cpp.
+
 #include <Arduino.h>
 #include <errno.h>
 #include <sys/uio.h>
@@ -9,7 +11,44 @@
 #include <lwip/sockets.h>
 #include <lwip/tcp.h>
 
-#include "aitl_config.h"
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
+
+#ifndef AITL_WIFI_SSID
+#define AITL_WIFI_SSID "CHANGE_ME"
+#endif
+#ifndef AITL_WIFI_PASSWORD
+#define AITL_WIFI_PASSWORD "CHANGE_ME"
+#endif
+#ifndef AITL_DEVICE_HOSTNAME
+#define AITL_DEVICE_HOSTNAME "aitl-cam-01"
+#endif
+#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_QVGA
+#define AITL_DEFAULT_JPEG_QUALITY 24
+#define AITL_DEFAULT_STREAM_FPS 15U
+#define AITL_CONTROL_PORT 80U
+#define AITL_STREAM_PORT 81U
+#define AITL_STREAM_SELECT_SLICE_MS 20U
+#define AITL_WARMUP_SUCCESS_FRAMES 3U
+#define AITL_WARMUP_STALL_TIMEOUT_MS 1000U
+#define AITL_WARMUP_TOTAL_SEND_LIMIT_MS 1500U
+#define AITL_FRAME_STALL_TIMEOUT_MS 500U
+#define AITL_FRAME_TOTAL_SEND_LIMIT_MS 900U
+#define AITL_ADAPTIVE_MAX_JPEG_QUALITY 40
+#define AITL_ADAPTIVE_PRESSURE_STEP 2
+#define AITL_ADAPTIVE_FAILURE_STEP 4
+#define AITL_ADAPTIVE_HIGH_SEND_PERCENT 85U
+#define AITL_ADAPTIVE_LOW_SEND_PERCENT 35U
+#define AITL_ADAPTIVE_MIN_HIGH_SEND_MS 20U
+#define AITL_ADAPTIVE_MIN_LOW_SEND_MS 8U
+#define AITL_ADAPTIVE_LARGE_FRAME_BYTES 9000U
+#define AITL_ADAPTIVE_RECOVERY_FRAME_BYTES 7000U
+#define AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES 12U
+#define AITL_WIFI_CONNECT_TIMEOUT_MS 20000UL
+#define AITL_WIFI_RETRY_MS 3000UL
+#define AITL_SERIAL_STATUS_INTERVAL_MS 5000UL
+
 
 namespace {
 
@@ -410,31 +449,25 @@ void adaptJpegPressure(bool success, uint32_t frameBytes, uint32_t sendMs) {
         ? static_cast<float>(sendMs)
         : (sendEwmaMs * 0.80f + static_cast<float>(sendMs) * 0.20f);
   }
-
   const uint32_t safeFps = targetFps > 0 ? targetFps : 1U;
   const uint32_t rawFrameBudgetMs = 1000U / safeFps;
   const uint32_t frameBudgetMs = rawFrameBudgetMs > 0 ? rawFrameBudgetMs : 1U;
   const uint32_t highCandidate = (frameBudgetMs * AITL_ADAPTIVE_HIGH_SEND_PERCENT) / 100U;
   const uint32_t lowCandidate = (frameBudgetMs * AITL_ADAPTIVE_LOW_SEND_PERCENT) / 100U;
-  const uint32_t highSendMs = highCandidate > AITL_ADAPTIVE_MIN_HIGH_SEND_MS
-      ? highCandidate : AITL_ADAPTIVE_MIN_HIGH_SEND_MS;
-  const uint32_t lowSendMs = lowCandidate > AITL_ADAPTIVE_MIN_LOW_SEND_MS
-      ? lowCandidate : AITL_ADAPTIVE_MIN_LOW_SEND_MS;
+  const uint32_t highSendMs = highCandidate > AITL_ADAPTIVE_MIN_HIGH_SEND_MS ? highCandidate : AITL_ADAPTIVE_MIN_HIGH_SEND_MS;
+  const uint32_t lowSendMs = lowCandidate > AITL_ADAPTIVE_MIN_LOW_SEND_MS ? lowCandidate : AITL_ADAPTIVE_MIN_LOW_SEND_MS;
 
   if (!success) {
     adaptiveRecoveryFrames = 0;
     setEffectiveJpegQuality(effectiveJpegQuality + AITL_ADAPTIVE_FAILURE_STEP);
     return;
   }
-
   if (sendMs > highSendMs || frameBytes > AITL_ADAPTIVE_LARGE_FRAME_BYTES) {
     adaptiveRecoveryFrames = 0;
     setEffectiveJpegQuality(effectiveJpegQuality + AITL_ADAPTIVE_PRESSURE_STEP);
     return;
   }
-
-  if (sendMs <= lowSendMs && frameBytes <= AITL_ADAPTIVE_RECOVERY_FRAME_BYTES
-      && effectiveJpegQuality > settings.jpegQuality) {
+  if (sendMs <= lowSendMs && frameBytes <= AITL_ADAPTIVE_RECOVERY_FRAME_BYTES && effectiveJpegQuality > settings.jpegQuality) {
     ++adaptiveRecoveryFrames;
     if (adaptiveRecoveryFrames >= AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES) {
       setEffectiveJpegQuality(effectiveJpegQuality - 1);
@@ -442,7 +475,6 @@ void adaptJpegPressure(bool success, uint32_t frameBytes, uint32_t sendMs) {
     }
     return;
   }
-
   adaptiveRecoveryFrames = 0;
 }
 

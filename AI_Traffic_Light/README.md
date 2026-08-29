@@ -2,11 +2,11 @@
 
 Local/student-scale computer-vision and adaptive traffic-light simulation prototype.
 
-V036 / `0_3_6` is the current unaccepted candidate. V035 / `0_3_5` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V037 / `0_3_7` is the current unaccepted candidate. V036 / `0_3_6` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
-## V036 physical camera
+## V037 physical camera
 
-V036 keeps HTTP only for ESP status/config/start/stop control and moves each ESP→PC image path to its own PC-initiated persistent TCP connection on port 81.
+V037 retains V036 HTTP control plus the persistent TCP image path on port 81 and adds adaptive ESP-side JPEG pressure control to shrink payloads when send time cannot sustain the configured load.
 
 Each frame is JPEG with a fixed 16-byte `ATL1` header carrying payload length, sequence and ESP uptime. PC Studio can save up to 12 ESP profiles, retain IP/FPS/OV2640 settings per camera, keep several ESP streams running independently, cache the newest frame from each, and select one active ESP to feed the existing `CameraFrameService`. Browser-compatible MJPEG still comes from the backend.
 
@@ -23,5 +23,5 @@ Connect still transfers zero image bytes. Camera settings remain PC-owned and ar
 
 Physical/public-road traffic-signal control remains outside scope.
 
-### V036 same-candidate hardware repair
-The current V036 patch includes a non-blocking ESP TCP send repair (`select()` + `MSG_DONTWAIT`) after hardware logs showed blocking writes causing reconnect storms. Reflash the included V036 ESP firmware when applying the latest full patch.
+### V037 adaptive transport
+Physical V036 R6 logs showed that TCP could stay connected but 11–22 KB JPEGs still consumed 100–500+ ms to send. V037 keeps the R6 non-blocking vectored sender and dynamically increases JPEG compression when send pressure is high, then slowly returns toward the saved quality when the link is healthy. New profiles default to QVGA / JPEG 24 / 15 FPS. Reflash V037 firmware to use this behavior.

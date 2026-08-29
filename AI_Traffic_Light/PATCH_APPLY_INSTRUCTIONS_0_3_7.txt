@@ -1,0 +1,19 @@
+AiTL V037 / 0_3_7 changed-files overlay
+
+This is a new candidate explicitly requested after V036.
+passed_baseline remains 0_2_4.
+
+Preferred GitHub-first workflow used by this project:
+1. Upload/extract every file in this overlay to the matching AI_Traffic_Light/ path on GitHub main in one atomic commit/PR when possible.
+2. Do not upload only the ZIP itself.
+3. Preserve local runtime/user data: datasets/, outputs/, *.pt, config/remote_cameras.json, config/signal_rules.json, node_modules/, .venv/, dist/, caches.
+4. On the PC, after GitHub main contains the complete patch, run:
+
+   Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
+   .\scripts\update_test_run.ps1
+
+5. Flash apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino to the ESP32-CAM.
+6. First physical test: 320 x 240, JPEG 24, target 15 FPS.
+7. Confirm serial boot text: AiTL V037 adaptive-JPEG ESP32-CAM node
+
+If you manually overlay this ZIP on the local repository instead of uploading it to GitHub first, run update_test_run.ps1 -SkipUpdate for that local test.

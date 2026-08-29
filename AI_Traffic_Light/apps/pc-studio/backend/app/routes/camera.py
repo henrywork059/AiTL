@@ -25,8 +25,8 @@ class RemoteCameraConnectRequest(BaseModel):
 
 
 class RemoteCameraSettingsRequest(BaseModel):
-    frame_size: Literal["QQVGA", "HQVGA", "QVGA", "CIF", "VGA", "SVGA", "XGA", "SXGA", "UXGA"] = "VGA"
-    jpeg_quality: int = Field(default=14, ge=4, le=63)
+    frame_size: Literal["QQVGA", "HQVGA", "QVGA", "CIF", "VGA", "SVGA", "XGA", "SXGA", "UXGA"] = "QVGA"
+    jpeg_quality: int = Field(default=24, ge=4, le=63)
     brightness: int = Field(default=0, ge=-2, le=2)
     contrast: int = Field(default=0, ge=-2, le=2)
     saturation: int = Field(default=0, ge=-2, le=2)

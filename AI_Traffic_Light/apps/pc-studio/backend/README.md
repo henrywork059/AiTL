@@ -14,4 +14,6 @@
 - freshness-guarded source switching so stale caches/old-IP frames cannot masquerade as a new selected frame;
 - backend lifespan shutdown that disconnects every active ESP session.
 
-`CameraFrameService` remains the common downstream latest-frame surface used by preview, inference, dataset capture, zones and analytics. `GET /api/camera/live.mjpeg` remains browser-facing MJPEG; the ESP→PC image hop is not MJPEG in V036.
+`CameraFrameService` remains the common downstream latest-frame surface used by preview, inference, dataset capture, zones and analytics. `GET /api/camera/live.mjpeg` remains browser-facing MJPEG; the ESP→PC image hop is not MJPEG in V037.
+
+V037 keeps V036 binary-TCP compatibility and adds ESP-side adaptive JPEG pressure control. New profile defaults are QVGA / JPEG 24 / 15 FPS; existing persisted profiles are not rewritten.

@@ -32,8 +32,8 @@ export type RemoteCameraSettings = {
 };
 
 export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
-  frame_size: "VGA",
-  jpeg_quality: 14,
+  frame_size: "QVGA",
+  jpeg_quality: 24,
   brightness: 0,
   contrast: 0,
   saturation: 0,

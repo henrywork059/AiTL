@@ -1,5 +1,29 @@
 # Changelog
 
+## 0_3_7 — Adaptive low-latency ESP streaming
+
+- Created V037 / `0_3_7` at the owner's explicit request after V036; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Kept the V036 multi-ESP architecture and `aitl-tcp-jpeg-v1` ATL1 length-prefixed TCP JPEG wire format so PC-side framing, selected-source isolation, simulation coexistence, Live AI, capture, zones and analytics remain compatible.
+- Added V037 ESP adaptive JPEG pressure control: slow/large/failed sends temporarily raise the OV2640 JPEG quality number (stronger compression), while sustained fast/small delivery gradually recovers toward the saved configured quality.
+- Bounded adaptive compression so it never goes below the user's configured compression setting and normally tops out at quality number 40; already-higher configured compression is preserved.
+- Added configured/effective JPEG quality, adaptive adjustment count and send-time EWMA to ESP status/serial diagnostics.
+- Changed only new-camera defaults to QVGA / JPEG 24 / 15 FPS across firmware, backend profile defaults and frontend defaults; existing saved camera profiles remain untouched.
+- PC Studio identifies `aitl-camera-v037` as current and also accepts V036 binary-TCP camera nodes during migration because the image wire format is unchanged. V035 HTTP/MJPEG firmware remains incompatible.
+- Preserved R6 non-blocking vectored `sendmsg`, TCP_NODELAY/keepalive, connection warm-up bounds and freshness-first scheduling. V037 does not switch to UDP in this candidate.
+- No ESP-side inference, physical/public-road signal control, or safety-certification claim is introduced.
+
+## 0_3_6 — Low-latency binary TCP multi-ESP camera input
+
+- Created V036 / `0_3_6` after V035 to improve physical ESP32-CAM streaming speed and reduce end-to-end latency; V024 / `0_2_4` remained the owner-confirmed passed baseline.
+- Replaced the ESP-to-PC HTTP/MJPEG hot path with persistent length-prefixed binary TCP JPEG on port 81 while retaining HTTP port 80 for status/config/start/stop/diagnostics.
+- Added `aitl-tcp-jpeg-v1`: ATL1 magic, JPEG length, source sequence, ESP uptime and JPEG payload.
+- Preserved Connect as zero-image status/control only and Start as `/stop` best effort -> full `/config` -> `/start` -> TCP open.
+- Added freshness-first socket deadlines, TCP_NODELAY/keepalive, PSRAM double buffering, `CAMERA_GRAB_LATEST`, reconnect/recovery behavior and PC exact-length frame validation.
+- Added saved multi-ESP profiles and simultaneous independent stream workers/caches; exactly one selected ESP feeds the shared downstream `CameraFrameService`.
+- Hardened switching against stale caches, in-flight source races and retired-session late frames; added numeric resolution display and retained simulation compatibility.
+- Same-candidate physical repairs progressed through non-blocking send, progress-bounded send and R6 connection-warmup vectored send after hardware logs exposed TCP buffer/backpressure behavior.
+- No ESP-side inference, public-road control, or new stable error code was introduced.
+
 ## 0_3_5 — Resilient low-latency ESP streaming
 
 - Created V035 / `0_3_5` at the owner's explicit request after V034 to further improve physical-camera speed, connection stability and the streaming workflow; V024 / `0_2_4` remains the owner-confirmed passed baseline.

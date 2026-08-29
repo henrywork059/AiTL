@@ -42,7 +42,8 @@ TCP_STREAM_PORT = 81
 FRAME_MAGIC = b"ATL1"
 FRAME_HEADER = struct.Struct("!4sIII")
 FRAME_PROTOCOL = "aitl-tcp-jpeg-v1"
-CAMERA_PROTOCOL = "aitl-camera-v036"
+CAMERA_PROTOCOL = "aitl-camera-v037"
+COMPATIBLE_CAMERA_PROTOCOLS = {CAMERA_PROTOCOL, "aitl-camera-v036"}
 
 CAMERA_SETTING_KEYS = (
     "frame_size",
@@ -90,7 +91,7 @@ class RemoteCapture:
 
 @dataclass(frozen=True)
 class _FramePacket:
-    """One V036 source frame after the fixed binary header is decoded."""
+    """One V037/V036-compatible source frame after the fixed binary header is decoded."""
 
     sequence: int
     source_uptime_ms: int
@@ -159,7 +160,7 @@ def _encode_frame_packet(
     sequence: int = 1,
     source_uptime_ms: int = 0,
 ) -> bytes:
-    """Test/helper encoder for the V036 fixed-header JPEG stream."""
+    """Test/helper encoder for the V037/V036-compatible fixed-header JPEG stream."""
     return FRAME_HEADER.pack(
         FRAME_MAGIC,
         len(content),
@@ -219,7 +220,7 @@ def normalize_private_lan_ipv4(value: str) -> str:
 class RemoteCameraService:
     """Own one PC-controlled ESP session and one freshness-first TCP JPEG stream.
 
-    V036 intentionally keeps HTTP only for low-rate control/status. Image transport
+    V037 keeps HTTP only for low-rate control/status and remains wire-compatible with V036. Image transport
     uses a fixed 16-byte binary header followed by the JPEG bytes on one persistent
     TCP socket. This removes HTTP multipart parsing/copying from the hot path and lets
     the ESP abandon a congested client instead of accumulating old frames.
@@ -296,7 +297,7 @@ class RemoteCameraService:
             data=b"" if method != "GET" else None,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "AiTL-PC-Studio/0.3.6",
+                "User-Agent": "AiTL-PC-Studio/0.3.7",
                 "Connection": "close",
             },
             method=method,
@@ -554,14 +555,15 @@ class RemoteCameraService:
     def _assert_matching_firmware(self, device: dict, host: str) -> None:
         camera_protocol = str(device.get("protocol") or "")
         stream_protocol = str(device.get("stream_protocol") or "")
-        if camera_protocol != CAMERA_PROTOCOL or stream_protocol != FRAME_PROTOCOL:
+        if camera_protocol not in COMPATIBLE_CAMERA_PROTOCOLS or stream_protocol != FRAME_PROTOCOL:
             raise AppError(
                 ErrorCode.CAMERA_NOT_CONNECTED,
-                "ESP32-CAM firmware does not match the V036 low-latency TCP stream protocol. Flash the matching V036 firmware first.",
+                "ESP32-CAM firmware is not compatible with the V037 low-latency TCP stream protocol. Flash V037 firmware; V036 remains wire-compatible during migration.",
                 status_code=409,
                 details={
                     "host": host,
                     "expected_protocol": CAMERA_PROTOCOL,
+                    "compatible_protocols": sorted(COMPATIBLE_CAMERA_PROTOCOLS),
                     "actual_protocol": camera_protocol or None,
                     "expected_stream_protocol": FRAME_PROTOCOL,
                     "actual_stream_protocol": stream_protocol or None,

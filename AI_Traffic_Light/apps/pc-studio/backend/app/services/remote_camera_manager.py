@@ -32,8 +32,8 @@ MAX_SWITCH_CACHE_AGE_MS = 1500
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 DEFAULT_CAMERA_SETTINGS: dict[str, Any] = {
-    "frame_size": "VGA",
-    "jpeg_quality": 14,
+    "frame_size": "QVGA",
+    "jpeg_quality": 24,
     "brightness": 0,
     "contrast": 0,
     "saturation": 0,
@@ -84,7 +84,7 @@ class _CachedPacket:
 
 
 class RemoteCameraManager:
-    """Persist and coordinate several V036 ESP32-CAM sessions.
+    """Persist and coordinate several V037/V036-compatible ESP32-CAM sessions.
 
     Every saved ESP owns an independent RemoteCameraService/socket worker and a
     private cached newest JPEG. Exactly one saved ESP is selected as the active
@@ -139,7 +139,7 @@ class RemoteCameraManager:
         merged = {**DEFAULT_CAMERA_SETTINGS, **(settings or {})}
         normalized: dict[str, Any] = {}
 
-        frame_size = str(merged.get("frame_size", "VGA")).upper()
+        frame_size = str(merged.get("frame_size", "QVGA")).upper()
         if frame_size not in FRAME_SIZES:
             raise AppError(
                 ErrorCode.INVALID_REQUEST,

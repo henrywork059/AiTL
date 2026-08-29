@@ -119,6 +119,10 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     : null;
   const selectedStreaming = Boolean(selectedProfile?.streaming);
   const backgroundStreams = remote?.cameras.filter((camera) => camera.streaming && camera.source_id !== remote.active_source_id).length ?? 0;
+  const deviceEffectiveQuality = typeof remote?.device?.effective_jpeg_quality === "number" ? remote.device.effective_jpeg_quality : null;
+  const deviceConfiguredQuality = typeof remote?.device?.configured_jpeg_quality === "number" ? remote.device.configured_jpeg_quality : null;
+  const deviceSendEwma = typeof remote?.device?.send_ewma_ms === "number" ? remote.device.send_ewma_ms : null;
+  const deviceQualityAdjustments = typeof remote?.device?.adaptive_quality_adjustments === "number" ? remote.device.adaptive_quality_adjustments : null;
   const selectedFrameAvailable = Boolean(
     status?.frame_available
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
@@ -306,7 +310,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div>
               <h2>Camera input</h2>
               <p className="placeholder-copy">
-                V036 can keep several ESP32-CAM sessions available. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline.
+                V037 keeps several ESP32-CAM sessions available and adapts JPEG compression when Wi-Fi/TCP pressure would otherwise create stale frames. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline.
               </p>
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
@@ -404,7 +408,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div className="panel-header">
               <div>
                 <h2>Camera settings</h2>
-                <p className="placeholder-copy">Each saved ESP keeps its own OV2640 settings and target FPS. Start Stream applies the selected camera's saved values.</p>
+                <p className="placeholder-copy">Each saved ESP keeps its own OV2640 settings and target FPS. V037 may temporarily increase JPEG compression above the saved quality value to preserve freshness, then recover quality when the link is fast.</p>
               </div>
               <span className="status-pill muted">{selectedStreaming ? "locked while streaming" : "saved per camera"}</span>
             </div>
@@ -496,6 +500,9 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "TCP JPEG paused" : remote?.stream_connected ? "TCP JPEG connected" : remote?.streaming ? "reconnecting" : "idle"}</strong></div>
               <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
               <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>JPEG quality</span><strong>{deviceEffectiveQuality !== null ? `${deviceEffectiveQuality} effective / ${deviceConfiguredQuality ?? settings.jpeg_quality} saved` : settings.jpeg_quality}</strong></div>
+              <div><span>ESP send EWMA</span><strong>{deviceSendEwma !== null ? `${deviceSendEwma.toFixed(0)} ms` : "—"}</strong></div>
+              <div><span>Quality adjustments</span><strong>{deviceQualityAdjustments ?? 0}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
               <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
@@ -511,7 +518,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              Every ESP uses the same V036 HTTP control + persistent length-prefixed TCP JPEG protocol. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
+              V037 uses the same length-prefixed TCP JPEG wire format as V036, while adding adaptive JPEG pressure control in the new firmware. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/remote/select</code>
           </section>
