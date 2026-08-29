@@ -14,6 +14,7 @@ from uuid import uuid4
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
+from app.services.camera_candidate_analysis import isolate_transport_candidates
 from app.services.camera_diagnostic_analysis import (
     EXPECTED_CONTROL_PROBES,
     analyze_camera_bottlenecks,
@@ -345,6 +346,34 @@ class CameraDiagnosticService:
         phase["stop_error"] = stop_error
         return phase
 
+    def _diagnostic_mode(self, host: str, mode: str, payload_bytes: int = 16384) -> dict[str, Any]:
+        return self._control_action(host, "/diag/mode", query={"mode": mode, "payload_bytes": str(payload_bytes)})
+
+    def _capture_only_probe(self, host: str, attempts: int = 3) -> dict[str, Any]:
+        times: list[float] = []; sizes: list[int] = []; errors: list[str] = []
+        for _ in range(attempts):
+            try:
+                result, elapsed = self._http_json(host, "/diag/capture")
+                times.append(safe_float(result.get("capture_ms"), elapsed)); sizes.append(safe_int(result.get("frame_bytes")))
+            except Exception as exc: errors.append(f"{type(exc).__name__}: {exc}")
+        return {"attempts":attempts,"successes":len(times),"failures":len(errors),"capture_avg_ms":round(statistics.mean(times),1) if times else None,"capture_p95_ms":round(percentile(times,.95) or 0.0,1) if times else None,"frame_avg_bytes":round(statistics.mean(sizes)) if sizes else 0,"errors":errors[:5]}
+
+    def _candidate_mode_phase(self, host: str, settings: dict[str, Any], mode: str, *, payload_bytes: int = 16384, seconds: float = 6.0) -> dict[str, Any]:
+        self._diagnostic_mode(host, mode, payload_bytes)
+        try:
+            phase = self._run_configured_phase(host, settings, 5, seconds, poll_status=False)
+            phase["diagnostic_mode"] = mode
+            return phase
+        finally:
+            try:
+                self._control_action(host, "/stop")
+            except Exception:
+                pass
+            try:
+                self._diagnostic_mode(host, "normal")
+            except Exception:
+                pass
+
     @staticmethod
     def _profile_from_status(manager_status: dict[str, Any]) -> dict[str, Any]:
         source_id = manager_status.get("active_source_id")
@@ -486,9 +515,35 @@ class CameraDiagnosticService:
             boundary_resets = 0
             settings_match = lifecycle_ok = quality_preserved = image_integrity = False
             after_direct = dict(last_device)
+            capture_probe: dict[str, Any] = {"attempts":3,"successes":0,"failures":3}
+            synthetic_phase: dict[str, Any] = {"target_fps":5,"frames":0,"disconnects":0,"bad_frames":0}
+            capture_synthetic_phase: dict[str, Any] = {"target_fps":5,"frames":0,"disconnects":0,"bad_frames":0}
+            staged_phase: dict[str, Any] = {"target_fps":5,"frames":0,"disconnects":0,"bad_frames":0}
+            candidate_isolation: dict[str, Any] = {"supported":False,"primary_candidate":"firmware_diagnostic_support_missing","findings":[],"ruled_out":[],"matrix":{}}
 
             if successes and protocol_ok and camera_ready:
-                # 2) Load ladder using identical saved image settings.
+                # 2) Candidate-isolation matrix. Requires R7 diagnostic firmware but never changes saved image quality/resolution.
+                diagnostic_supported = str(last_device.get("firmware_revision") or "").startswith("v037-r7-diagnostic-isolation")
+                if diagnostic_supported:
+                    capture_probe = self._capture_only_probe(host)
+                    try: synthetic_phase = self._candidate_mode_phase(host, settings, "synthetic_dram")
+                    except Exception as exc: synthetic_phase={"target_fps":5,"frames":0,"disconnects":1,"bad_frames":0,"unexpected_send_failures":0,"deadline_drops":0,"errors":[str(exc)]}
+                    try: capture_synthetic_phase = self._candidate_mode_phase(host, settings, "capture_synthetic")
+                    except Exception as exc: capture_synthetic_phase={"target_fps":5,"frames":0,"disconnects":1,"bad_frames":0,"unexpected_send_failures":0,"deadline_drops":0,"errors":[str(exc)]}
+                    try: staged_phase = self._candidate_mode_phase(host, settings, "camera_staged_dram")
+                    except Exception as exc: staged_phase={"target_fps":5,"frames":0,"disconnects":1,"bad_frames":0,"unexpected_send_failures":0,"deadline_drops":0,"errors":[str(exc)]}
+                    try: self._diagnostic_mode(host, "normal")
+                    except Exception: pass
+                    checks += [
+                        {"id":"capture_only","category":"candidate","label":"Camera capture without TCP payload","status":"pass" if safe_int(capture_probe.get('successes'))==safe_int(capture_probe.get('attempts')) else "warn","detail":f"{safe_int(capture_probe.get('successes'))}/{safe_int(capture_probe.get('attempts'))} captures; p95 {capture_probe.get('capture_p95_ms')} ms","metrics":capture_probe},
+                        {"id":"synthetic_dram","category":"candidate","label":"Camera-independent internal-DRAM TCP","status":"pass" if phase_clean(synthetic_phase) else "fail","detail":f"{safe_float(synthetic_phase.get('measured_fps')):.2f}/5 FPS, {safe_int(synthetic_phase.get('disconnects'))} disconnects","metrics":self._public_phase(synthetic_phase)},
+                        {"id":"capture_synthetic","category":"candidate","label":"Camera load + internal-DRAM TCP","status":"pass" if phase_clean(capture_synthetic_phase) else "fail","detail":f"{safe_float(capture_synthetic_phase.get('measured_fps')):.2f}/5 FPS, {safe_int(capture_synthetic_phase.get('disconnects'))} disconnects","metrics":self._public_phase(capture_synthetic_phase)},
+                        {"id":"staged_dram","category":"candidate","label":"Real JPEG staged through internal RAM","status":"pass" if phase_clean(staged_phase) else "fail","detail":f"{safe_float(staged_phase.get('measured_fps')):.2f}/5 FPS, {safe_int(staged_phase.get('disconnects'))} disconnects","metrics":self._public_phase(staged_phase)},
+                    ]
+                else:
+                    checks.append({"id":"candidate_firmware","category":"candidate","label":"Deep transport-isolation firmware support","status":"fail","detail":"Flash V037 R7 diagnostic-isolation firmware to distinguish LAN/lwIP, camera-load and direct-PSRAM candidates.","metrics":{}})
+
+                # 3) Load ladder using identical saved image settings (normal direct camera path).
                 for target in LOAD_TARGET_FPS:
                     try:
                         phase = self._run_configured_phase(host, settings, target, LOAD_PHASE_SECONDS, poll_status=False)
@@ -549,6 +604,8 @@ class CameraDiagnosticService:
                 managed_phase=self._managed_phase(host=host,source_id=source_id,settings=settings,target_fps=saved_target)
                 managed_good=safe_int(managed_phase.get("frames"))>=3 and safe_int(managed_phase.get("failed_fetches"))==0 and safe_int(managed_phase.get("reconnects"))==0
                 checks.append({"id":"pc_studio_managed","category":"functionality","label":"Normal PC Studio stream worker","status":"pass" if managed_good else "warn" if safe_int(managed_phase.get("frames")) else "fail","detail":f"{safe_int(managed_phase.get('frames'))} frames, {safe_float(managed_phase.get('measured_fps')):.2f} FPS, {safe_int(managed_phase.get('failed_fetches'))} failures, {safe_int(managed_phase.get('reconnects'))} reconnects","metrics":managed_phase})
+                if diagnostic_supported:
+                    candidate_isolation={"supported":True, **isolate_transport_candidates(synthetic=synthetic_phase,capture_synthetic=capture_synthetic_phase,direct=load_phases[0] if load_phases else {},staged=staged_phase,managed=managed_phase,capture_probe=capture_probe,control_successes=successes,control_total=CONTROL_PROBE_ATTEMPTS,rssi_min=rssi_min)}
                 contention_reference=reference
             else:
                 contention_reference=None
@@ -616,7 +673,7 @@ class CameraDiagnosticService:
                 "run_id":run_id,"started_at_ms":started_epoch_ms,"duration_ms":int(round((time.monotonic()-started_mono)*1000)),"source_id":source_id,"host":host,**diagnosis,"checks":checks,"metrics":metrics,
                 "functionality":{"score":function_score,"passed":function_passes,"total":len(function_checks),"config_roundtrip":settings_match,"session_lifecycle":lifecycle_ok},
                 "stability":{"grade":analysis["stability_grade"],"score":analysis["stability_score"],"phase":self._public_phase(stability_phase)},
-                "bottleneck_analysis":analysis,"load_ladder":[self._public_phase(p) for p in load_phases],"contention_phase":self._public_phase(contention_phase),"managed_phase":managed_phase,
+                "bottleneck_analysis":analysis,"candidate_isolation":candidate_isolation,"candidate_phases":{"capture_only":capture_probe,"synthetic_dram":self._public_phase(synthetic_phase),"capture_synthetic":self._public_phase(capture_synthetic_phase),"camera_staged_dram":self._public_phase(staged_phase)},"load_ladder":[self._public_phase(p) for p in load_phases],"contention_phase":self._public_phase(contention_phase),"managed_phase":managed_phase,
                 "device":{"protocol":after_direct.get("protocol") or last_device.get("protocol"),"stream_protocol":after_direct.get("stream_protocol") or last_device.get("stream_protocol"),"firmware_revision":after_direct.get("firmware_revision") or last_device.get("firmware_revision"),"camera_ready":after_direct.get("camera_ready",camera_ready),"rssi":after_direct.get("rssi"),"wifi_bssid":after_direct.get("wifi_bssid"),"wifi_channel":after_direct.get("wifi_channel")},
                 "state_restored":state_restored,"restore_error":restore_error,"diagnostic_target_fps":5,"diagnostic_load_targets":list(LOAD_TARGET_FPS),"prototype_only":True,
             }

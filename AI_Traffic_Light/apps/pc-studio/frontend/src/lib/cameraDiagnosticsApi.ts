@@ -138,6 +138,10 @@ export type CameraDiagnosticMetrics = {
   stability_bad_frames: number;
 };
 
+
+export type CameraCandidateFinding = { code: string; layer: string; confidence: string; evidence: string; action: string };
+export type CameraCandidateIsolation = { supported: boolean; primary_candidate: string; findings: CameraCandidateFinding[]; ruled_out: string[]; matrix: Record<string, boolean> };
+
 export type CameraDiagnosticReport = {
   run_id: string;
   started_at_ms: number;
@@ -166,6 +170,8 @@ export type CameraDiagnosticReport = {
     phase: CameraLoadPhase;
   };
   bottleneck_analysis: CameraBottleneckAnalysis;
+  candidate_isolation: CameraCandidateIsolation;
+  candidate_phases: Record<string, unknown>;
   load_ladder: CameraLoadPhase[];
   contention_phase: CameraLoadPhase;
   managed_phase: CameraManagedPhase;

@@ -7,7 +7,8 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.services.camera_diagnostic_analysis import EXPECTED_CONTROL_PROBES, analyze_camera_bottlenecks
-from app.services.camera_diagnostics import CONTROL_PROBE_ATTEMPTS, classify_camera_diagnostic
+from app.services.camera_candidate_analysis import isolate_transport_candidates
+from app.services.camera_diagnostic_analysis import classify_camera_diagnostic
 
 
 def diagnose(**overrides):
@@ -86,7 +87,6 @@ def analyze(**overrides):
 
 
 def main() -> int:
-    assert CONTROL_PROBE_ATTEMPTS == EXPECTED_CONTROL_PROBES
     print("[PASS] diagnostic regression derives probe count from the production source of truth")
 
     healthy = diagnose(phase_boundary_send_resets=2)
@@ -165,7 +165,18 @@ def main() -> int:
     assert any(item["id"] == "managed_worker_throughput" for item in managed_slow["findings"])
     print("[PASS] direct-vs-managed comparison can expose a PC Studio receive bottleneck")
 
+
+    def cand(synthetic, capture_synthetic, direct, staged, managed=None, **kw):
+        return isolate_transport_candidates(synthetic=synthetic,capture_synthetic=capture_synthetic,direct=direct,staged=staged,managed=managed or {"frames":30,"failed_fetches":0,"reconnects":0},capture_probe={"successes":3},control_successes=EXPECTED_CONTROL_PROBES,control_total=EXPECTED_CONTROL_PROBES,rssi_min=-55,**kw)
+    assert cand(phase(5,0,disconnects=2),phase(5,0),phase(5,0),phase(5,0))["primary_candidate"]=="camera_independent_tcp_path"
+    assert cand(phase(5,4.8),phase(5,0,disconnects=2),phase(5,0),phase(5,0))["primary_candidate"]=="camera_network_coexistence"
+    assert cand(phase(5,4.8),phase(5,4.8),phase(5,0,disconnects=2),phase(5,4.8))["primary_candidate"]=="direct_psram_to_lwip"
+    assert cand(phase(5,4.8),phase(5,4.8),phase(5,0,disconnects=2),phase(5,0,disconnects=2))["primary_candidate"]=="camera_stream_backpressure"
+    assert cand(phase(5,4.8),phase(5,4.8),phase(5,4.8),phase(5,4.8),managed={"frames":1,"failed_fetches":2,"reconnects":1})["primary_candidate"]=="pc_studio_receiver"
+    print("[PASS] R4 candidate matrix distinguishes LAN/lwIP, camera-load coexistence, PSRAM-direct, general camera-stream and PC receiver failures")
+
     service_text = (BACKEND / "app" / "services" / "camera_diagnostics.py").read_text(encoding="utf-8")
+    assert "CONTROL_PROBE_ATTEMPTS = EXPECTED_CONTROL_PROBES" in service_text
     analysis_text = (BACKEND / "app" / "services" / "camera_diagnostic_analysis.py").read_text(encoding="utf-8")
     route_text = (BACKEND / "app" / "routes" / "camera_diagnostics.py").read_text(encoding="utf-8")
     api_text = (ROOT / "apps" / "pc-studio" / "frontend" / "src" / "lib" / "cameraDiagnosticsApi.ts").read_text(encoding="utf-8")
@@ -180,7 +191,12 @@ def main() -> int:
     assert "Deep one-click camera test" in page_text
     assert "FPS / throughput load ladder" in page_text
     assert "Diagnostic boundary resets excluded" in page_text
-    print("[PASS] V038 R3 deep-diagnostic service/API/UI surfaces are wired")
+    firmware = (ROOT / "apps" / "device-camera" / "esp32-cam" / "src" / "main.cpp").read_text(encoding="utf-8")
+    for marker in ("v037-r7-diagnostic-isolation", "/diag/mode", "/diag/capture", "synthetic_dram", "capture_synthetic", "camera_staged_dram", "MALLOC_CAP_INTERNAL"):
+        assert marker in firmware, marker
+    assert "candidate_isolation" in service_text and "isolate_transport_candidates" in service_text
+    assert "Candidate isolation matrix" in page_text
+    print("[PASS] V038 R4 candidate-isolation firmware/backend/UI surfaces are wired")
     return 0
 
 

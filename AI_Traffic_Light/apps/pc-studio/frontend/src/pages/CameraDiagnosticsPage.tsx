@@ -184,6 +184,15 @@ export function CameraDiagnosticsPage() {
               </div>
             </section>
 
+          <section className="panel">
+            <div className="panel-header"><div><h2>Candidate isolation matrix</h2><p className="placeholder-copy">Separates camera-independent TCP, camera/DMA load, direct PSRAM framebuffer sending, internal-RAM staged sending, and the managed PC Studio receiver.</p></div><span className="status-pill muted">{report.candidate_isolation.supported ? report.candidate_isolation.primary_candidate : "firmware support required"}</span></div>
+            {!report.candidate_isolation.supported ? <p className="error-message">Flash the V037 R7 diagnostic-isolation ESP firmware included with this patch, then rerun Diagnose camera.</p> : <>
+              <div className="settings-list">{Object.entries(report.candidate_isolation.matrix).map(([name, passed]) => <div key={name}><span>{name.replace(/_/g," ")}</span><code>{passed ? "PASS" : "FAIL"}</code></div>)}</div>
+              {report.candidate_isolation.findings.map((item) => <div key={item.code} className="small-note"><strong>{item.code}</strong> — {item.evidence}<br />Action: {item.action}</div>)}
+              {report.candidate_isolation.ruled_out.length > 0 && <p className="small-note">Ruled out: {report.candidate_isolation.ruled_out.join("; ")}</p>}
+            </>}
+          </section>
+
             <section className="panel">
               <div className="panel-header">
                 <div>

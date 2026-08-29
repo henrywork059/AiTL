@@ -6,6 +6,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <esp_camera.h>
+#include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <lwip/sockets.h>
 #include <lwip/tcp.h>
@@ -44,7 +45,7 @@ namespace {
 
 constexpr char kCameraProtocol[] = "aitl-camera-v037";
 constexpr char kStreamProtocol[] = "aitl-tcp-jpeg-v1";
-constexpr char kFirmwareRevision[] = "v037-r6-quality-preserving-tcp";
+constexpr char kFirmwareRevision[] = "v037-r7-diagnostic-isolation";
 constexpr uint8_t kFrameMagic[4] = {'A', 'T', 'L', '1'};
 constexpr size_t kFrameHeaderBytes = 16;
 
@@ -136,6 +137,36 @@ uint32_t wifiDisconnects = 0;
 uint32_t wifiReconnects = 0;
 bool wifiEverConnected = false;
 bool wifiPreviouslyConnected = false;
+
+enum class DiagnosticStreamMode : uint8_t { Normal, SyntheticDram, CaptureSynthetic, StagedCamera };
+DiagnosticStreamMode diagnosticStreamMode = DiagnosticStreamMode::Normal;
+size_t diagnosticPayloadBytes = 16384;
+uint8_t* diagnosticDramBuffer = nullptr;
+size_t diagnosticDramCapacity = 0;
+constexpr size_t kDiagnosticMaxPayloadBytes = 16384;
+constexpr size_t kDiagnosticStageBytes = 1460;
+
+const char* diagnosticModeName() {
+  switch (diagnosticStreamMode) {
+    case DiagnosticStreamMode::SyntheticDram: return "synthetic_dram";
+    case DiagnosticStreamMode::CaptureSynthetic: return "capture_synthetic";
+    case DiagnosticStreamMode::StagedCamera: return "camera_staged_dram";
+    default: return "normal";
+  }
+}
+
+bool ensureDiagnosticDramBuffer(size_t bytes) {
+  if (bytes < 128 || bytes > kDiagnosticMaxPayloadBytes) return false;
+  if (diagnosticDramBuffer && diagnosticDramCapacity >= bytes) return true;
+  if (diagnosticDramBuffer) { heap_caps_free(diagnosticDramBuffer); diagnosticDramBuffer = nullptr; diagnosticDramCapacity = 0; }
+  diagnosticDramBuffer = static_cast<uint8_t*>(heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  if (!diagnosticDramBuffer) return false;
+  diagnosticDramCapacity = bytes;
+  memset(diagnosticDramBuffer, 0x5A, bytes);
+  diagnosticDramBuffer[0]=0xFF; diagnosticDramBuffer[1]=0xD8;
+  diagnosticDramBuffer[bytes-2]=0xFF; diagnosticDramBuffer[bytes-1]=0xD9;
+  return true;
+}
 
 const char* frameSizeName(framesize_t value) {
   switch (value) {
@@ -357,6 +388,9 @@ String statusJson() {
   json += "\"protocol\":\"" + String(kCameraProtocol) + "\"";
   json += ",\"stream_protocol\":\"" + String(kStreamProtocol) + "\"";
   json += ",\"firmware_revision\":\"" + String(kFirmwareRevision) + "\"";
+  json += ",\"diagnostic_stream_mode\":\"" + String(diagnosticModeName()) + "\"";
+  json += ",\"diagnostic_payload_bytes\":" + String(diagnosticPayloadBytes);
+  json += ",\"diagnostic_internal_dram_free\":" + String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
   json += ",\"camera_ready\":" + String(cameraReady ? "true" : "false");
   json += ",\"session_active\":" + String(sessionActive ? "true" : "false");
   json += ",\"stream_client_active\":" + String((streamClient && streamClient.connected()) ? "true" : "false");
@@ -560,6 +594,62 @@ void handleStop() {
   sendJson(200, statusJson());
 }
 
+void handleDiagnosticMode() {
+  if (sessionActive || (streamClient && streamClient.connected())) { sendJson(409, "{\"error\":\"stream_active\"}"); return; }
+  if (!controlServer.hasArg("mode")) { sendJson(422, "{\"error\":\"missing_mode\"}"); return; }
+  const String mode = controlServer.arg("mode");
+  size_t bytes = diagnosticPayloadBytes;
+  if (controlServer.hasArg("payload_bytes")) bytes = static_cast<size_t>(controlServer.arg("payload_bytes").toInt());
+  if (mode == "normal") diagnosticStreamMode = DiagnosticStreamMode::Normal;
+  else if (mode == "synthetic_dram") diagnosticStreamMode = DiagnosticStreamMode::SyntheticDram;
+  else if (mode == "capture_synthetic") diagnosticStreamMode = DiagnosticStreamMode::CaptureSynthetic;
+  else if (mode == "camera_staged_dram") diagnosticStreamMode = DiagnosticStreamMode::StagedCamera;
+  else { sendJson(422, "{\"error\":\"invalid_diagnostic_mode\"}"); return; }
+  if (diagnosticStreamMode != DiagnosticStreamMode::Normal) {
+    if (!ensureDiagnosticDramBuffer(bytes)) { diagnosticStreamMode = DiagnosticStreamMode::Normal; sendJson(503, "{\"error\":\"diagnostic_dram_unavailable\"}"); return; }
+    diagnosticPayloadBytes = bytes;
+  }
+  sendJson(200, statusJson());
+}
+
+void handleDiagnosticCapture() {
+  if (!cameraReady || sessionActive) { sendJson(409, "{\"error\":\"camera_busy_or_not_ready\"}"); return; }
+  const uint32_t started = millis();
+  camera_fb_t* fb = esp_camera_fb_get();
+  const uint32_t elapsed = millis() - started;
+  if (!fb) { sendJson(503, "{\"error\":\"capture_failed\"}"); return; }
+  const size_t len=fb->len; const int width=fb->width; const int height=fb->height;
+  esp_camera_fb_return(fb);
+  String json="{\"ok\":true,\"capture_ms\":"+String(elapsed)+",\"frame_bytes\":"+String(len)+",\"width\":"+String(width)+",\"height\":"+String(height)+",\"framebuffer_psram\":"+String(psramFound()?"true":"false")+"}";
+  sendJson(200,json);
+}
+
+bool sendBytesProgressBounded(int fd, const uint8_t* data, size_t length, uint32_t totalStartedMs, uint32_t stallTimeoutMs, uint32_t totalLimitMs, size_t& acceptedBytes, int& terminalErrno) {
+  size_t sent=0; uint32_t lastProgressMs=millis(); terminalErrno=0;
+  while(sent<length){
+    uint32_t now=millis();
+    if(now-totalStartedMs>=totalLimitMs || now-lastProgressMs>=stallTimeoutMs){ terminalErrno=ETIMEDOUT; return false; }
+    int result=::send(fd,data+sent,length-sent,MSG_DONTWAIT);
+    if(result>0){ sent+=static_cast<size_t>(result); acceptedBytes+=static_cast<size_t>(result); lastProgressMs=millis(); delay(1); continue; }
+    if(result==0){ terminalErrno=ECONNRESET; return false; }
+    if(errno==EINTR) continue;
+    if(errno==EAGAIN || errno==EWOULDBLOCK){ if(!waitSocketWritableForProgress(fd,totalStartedMs,lastProgressMs,stallTimeoutMs,totalLimitMs)){terminalErrno=ETIMEDOUT;return false;} continue; }
+    terminalErrno=errno; return false;
+  }
+  return true;
+}
+
+bool sendStagedFrame(int fd, const uint8_t* header, size_t headerLength, const uint8_t* payload, size_t payloadLength, uint32_t started, uint32_t stallMs, uint32_t totalMs, size_t& accepted, int& terminalErrno) {
+  accepted=0; terminalErrno=0;
+  if(!sendBytesProgressBounded(fd,header,headerLength,started,stallMs,totalMs,accepted,terminalErrno)) return false;
+  uint8_t stage[kDiagnosticStageBytes];
+  for(size_t offset=0; offset<payloadLength; offset+=sizeof(stage)){
+    size_t n=min(sizeof(stage),payloadLength-offset); memcpy(stage,payload+offset,n);
+    if(!sendBytesProgressBounded(fd,stage,n,started,stallMs,totalMs,accepted,terminalErrno)) return false;
+  }
+  return true;
+}
+
 void handleCapture() {
   if (!cameraReady || sessionActive) {
     controlServer.send(409, "text/plain", "Capture is available only while the streaming session is idle.");
@@ -708,86 +798,33 @@ void updateFpsWindow() {
 
 void sendNextFrameIfDue() {
   if (!sessionActive || !(streamClient && streamClient.connected())) return;
+  const uint32_t nowUs=micros(); if(static_cast<int32_t>(nowUs-nextFrameDueUs)<0) return;
+  const uint32_t periodUs=1000000UL/(targetFps>0?targetFps:1); nextFrameDueUs+=periodUs;
+  if(static_cast<int32_t>(nowUs-nextFrameDueUs)>static_cast<int32_t>(periodUs)) nextFrameDueUs=nowUs+periodUs;
 
-  const uint32_t nowUs = micros();
-  if (static_cast<int32_t>(nowUs - nextFrameDueUs) < 0) return;
-
-  const uint32_t periodUs = 1000000UL / (targetFps > 0 ? targetFps : 1);
-  nextFrameDueUs += periodUs;
-  if (static_cast<int32_t>(nowUs - nextFrameDueUs) > static_cast<int32_t>(periodUs)) {
-    // Never "catch up" by sending old work. Schedule from now when behind.
-    nextFrameDueUs = nowUs + periodUs;
+  camera_fb_t* fb=nullptr; const uint8_t* payload=nullptr; size_t payloadLength=0;
+  if(diagnosticStreamMode==DiagnosticStreamMode::SyntheticDram){
+    if(!ensureDiagnosticDramBuffer(diagnosticPayloadBytes)){++streamSendFailures;closeStreamClient();return;}
+    lastCaptureMs=0; payload=diagnosticDramBuffer; payloadLength=diagnosticPayloadBytes; lastFrameWidth=0; lastFrameHeight=0;
+  } else {
+    const uint32_t captureStarted=millis(); fb=esp_camera_fb_get(); lastCaptureMs=millis()-captureStarted;
+    if(!fb){++streamSendFailures;closeStreamClient();return;}
+    lastFrameBytes=static_cast<uint32_t>(fb->len); lastFrameWidth=static_cast<uint16_t>(fb->width); lastFrameHeight=static_cast<uint16_t>(fb->height);
+    if(diagnosticStreamMode==DiagnosticStreamMode::CaptureSynthetic){
+      size_t wanted=min(diagnosticPayloadBytes,kDiagnosticMaxPayloadBytes); if(!ensureDiagnosticDramBuffer(wanted)){esp_camera_fb_return(fb);++streamSendFailures;closeStreamClient();return;}
+      esp_camera_fb_return(fb); fb=nullptr; payload=diagnosticDramBuffer; payloadLength=wanted;
+    } else { payload=fb->buf; payloadLength=fb->len; }
   }
-
-  const uint32_t captureStarted = millis();
-  camera_fb_t* fb = esp_camera_fb_get();
-  lastCaptureMs = millis() - captureStarted;
-  if (!fb) {
-    ++streamSendFailures;
-    closeStreamClient();
-    return;
-  }
-
-  lastFrameBytes = static_cast<uint32_t>(fb->len);
-  lastFrameWidth = static_cast<uint16_t>(fb->width);
-  lastFrameHeight = static_cast<uint16_t>(fb->height);
-  // R6 deliberately sends the configured JPEG as-is. TCP may segment any
-  // payload size; a lwIP send buffer is not a maximum JPEG size.
-
-  ++sequenceNumber;
-  uint8_t header[kFrameHeaderBytes];
-  memcpy(header, kFrameMagic, sizeof(kFrameMagic));
-  putU32be(header + 4, static_cast<uint32_t>(fb->len));
-  putU32be(header + 8, sequenceNumber);
-  putU32be(header + 12, millis());
-
-  const int fd = streamClient.fd();
-  const bool warmup = streamClientSuccessfulFrames < AITL_WARMUP_SUCCESS_FRAMES;
-  const uint32_t stallTimeoutMs = warmup ? AITL_WARMUP_STALL_TIMEOUT_MS : AITL_FRAME_STALL_TIMEOUT_MS;
-  const uint32_t totalLimitMs = warmup ? AITL_WARMUP_TOTAL_SEND_LIMIT_MS : AITL_FRAME_TOTAL_SEND_LIMIT_MS;
-  const uint32_t sendStarted = millis();
-  size_t acceptedBytes = 0;
-  int terminalErrno = 0;
-  const bool payloadOk = fd >= 0 && sendFrameVectoredProgressBounded(
-      fd,
-      header,
-      sizeof(header),
-      fb->buf,
-      fb->len,
-      sendStarted,
-      stallTimeoutMs,
-      totalLimitMs,
-      acceptedBytes,
-      terminalErrno);
-  lastSendMs = millis() - sendStarted;
-  lastSendAcceptedBytes = static_cast<uint32_t>(acceptedBytes);
-  lastSendErrno = terminalErrno;
-  lastSendWarmup = warmup;
-  updateSendTelemetry(lastSendMs);
-  esp_camera_fb_return(fb);
-
-  if (!payloadOk) {
-    ++streamSendFailures;
-    if (terminalErrno == ETIMEDOUT) ++streamDeadlineDrops;
-    Serial.printf(
-        "TCP send failed frame=%luB send=%lums accepted=%lu errno=%d rssi=%d bssid=%s channel=%d; quality/resolution preserved\n",
-        static_cast<unsigned long>(lastFrameBytes),
-        static_cast<unsigned long>(lastSendMs),
-        static_cast<unsigned long>(lastSendAcceptedBytes),
-        lastSendErrno,
-        WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127,
-        WiFi.status() == WL_CONNECTED ? WiFi.BSSIDstr().c_str() : "offline",
-        WiFi.status() == WL_CONNECTED ? WiFi.channel() : -1);
-    // A partial length-prefixed frame invalidates this socket. Close it and wait
-    // for the PC reconnect worker; never degrade future JPEG quality/resolution.
-    closeStreamClient();
-    return;
-  }
-
-  ++streamClientSuccessfulFrames;
-  ++streamFrameCount;
-  lastFrameAtMs = millis();
-  updateFpsWindow();
+  lastFrameBytes=static_cast<uint32_t>(payloadLength);
+  ++sequenceNumber; uint8_t header[kFrameHeaderBytes]; memcpy(header,kFrameMagic,sizeof(kFrameMagic)); putU32be(header+4,static_cast<uint32_t>(payloadLength)); putU32be(header+8,sequenceNumber); putU32be(header+12,millis());
+  const int fd=streamClient.fd(); const bool warmup=streamClientSuccessfulFrames<AITL_WARMUP_SUCCESS_FRAMES;
+  const uint32_t stallTimeoutMs=warmup?AITL_WARMUP_STALL_TIMEOUT_MS:AITL_FRAME_STALL_TIMEOUT_MS; const uint32_t totalLimitMs=warmup?AITL_WARMUP_TOTAL_SEND_LIMIT_MS:AITL_FRAME_TOTAL_SEND_LIMIT_MS;
+  const uint32_t sendStarted=millis(); size_t acceptedBytes=0; int terminalErrno=0; bool payloadOk=false;
+  if(fd>=0 && diagnosticStreamMode==DiagnosticStreamMode::StagedCamera) payloadOk=sendStagedFrame(fd,header,sizeof(header),payload,payloadLength,sendStarted,stallTimeoutMs,totalLimitMs,acceptedBytes,terminalErrno);
+  else if(fd>=0) payloadOk=sendFrameVectoredProgressBounded(fd,header,sizeof(header),payload,payloadLength,sendStarted,stallTimeoutMs,totalLimitMs,acceptedBytes,terminalErrno);
+  lastSendMs=millis()-sendStarted; lastSendAcceptedBytes=static_cast<uint32_t>(acceptedBytes); lastSendErrno=terminalErrno; lastSendWarmup=warmup; updateSendTelemetry(lastSendMs); if(fb)esp_camera_fb_return(fb);
+  if(!payloadOk){++streamSendFailures;if(terminalErrno==ETIMEDOUT)++streamDeadlineDrops;Serial.printf("TCP send failed mode=%s frame=%luB send=%lums accepted=%lu errno=%d rssi=%d bssid=%s channel=%d; quality/resolution preserved\\n",diagnosticModeName(),static_cast<unsigned long>(lastFrameBytes),static_cast<unsigned long>(lastSendMs),static_cast<unsigned long>(lastSendAcceptedBytes),lastSendErrno,WiFi.status()==WL_CONNECTED?WiFi.RSSI():-127,WiFi.status()==WL_CONNECTED?WiFi.BSSIDstr().c_str():"offline",WiFi.status()==WL_CONNECTED?WiFi.channel():-1);closeStreamClient();return;}
+  ++streamClientSuccessfulFrames; ++streamFrameCount; lastFrameAtMs=millis(); updateFpsWindow();
 }
 
 void printPeriodicStatus() {
@@ -828,7 +865,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL V037 R6 quality-preserving TCP ESP32-CAM node");
+  Serial.println("AiTL V037 R7 diagnostic-isolation TCP ESP32-CAM node");
 
   cameraReady = initCamera();
   connectWifi();
@@ -838,6 +875,8 @@ void setup() {
   controlServer.on("/start", HTTP_POST, handleStart);
   controlServer.on("/stop", HTTP_POST, handleStop);
   controlServer.on("/capture", HTTP_GET, handleCapture);
+  controlServer.on("/diag/mode", HTTP_POST, handleDiagnosticMode);
+  controlServer.on("/diag/capture", HTTP_GET, handleDiagnosticCapture);
   controlServer.onNotFound([]() { sendJson(404, "{\"error\":\"not_found\"}"); });
   controlServer.begin();
 
