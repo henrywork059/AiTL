@@ -30,6 +30,8 @@ MAX_TARGET_FPS = 30
 DEFAULT_TARGET_FPS = 15
 
 CONTROL_TIMEOUT_SECONDS = 2.5
+CONTROL_RETRY_ATTEMPTS = 3
+CONTROL_RETRY_BACKOFF_SECONDS = 0.15
 STREAM_CONNECT_TIMEOUT_SECONDS = 2.0
 STREAM_READ_TIMEOUT_SECONDS = 2.0
 STATUS_REFRESH_SECONDS = 2.0
@@ -228,6 +230,11 @@ class RemoteCameraService:
 
     def __init__(self, *, frame_sink: FrameSink | None = None) -> None:
         self._lock = RLock()
+        # ESP WebServer is single-threaded. Frontend status polling, Connect,
+        # Start/Stop and the reconnect worker can otherwise overlap control
+        # requests from different FastAPI threads. Serialize those requests per
+        # camera session so one weak-radio HTTP transaction cannot starve another.
+        self._control_lock = RLock()
         self._frame_condition = Condition(self._lock)
         self._stop_event = Event()
         self._thread: Thread | None = None
@@ -360,6 +367,56 @@ class RemoteCameraService:
                 details={"host": host, "path": path},
             )
         return parsed
+
+    @staticmethod
+    def _is_retryable_control_error(exc: AppError) -> bool:
+        # Only retry transport-level failures. HTTP responses, protocol errors and
+        # validation failures are deterministic and should be returned immediately.
+        return (
+            exc.code == ErrorCode.CAMERA_NOT_CONNECTED
+            and "reason" in exc.details
+            and "http_status" not in exc.details
+        )
+
+    def _request_control(
+        self,
+        host: str,
+        path: str,
+        method: str = "GET",
+        query: dict[str, str] | None = None,
+    ) -> dict:
+        """Serialize and retry low-rate ESP HTTP control operations.
+
+        The ESP32 WebServer handles one control client at a time. PC Studio also
+        polls status in the background, so all control traffic for one ESP must be
+        serialized. A weak Wi-Fi interval can lose one tiny HTTP transaction even
+        while the station remains associated; retrying a fresh connection is safe
+        because AiTL's /status, /config, /start and /stop operations are idempotent.
+        """
+        with self._control_lock:
+            for attempt in range(1, CONTROL_RETRY_ATTEMPTS + 1):
+                try:
+                    return self._json_requester(host, path, method, query)
+                except AppError as exc:
+                    if not self._is_retryable_control_error(exc) or attempt >= CONTROL_RETRY_ATTEMPTS:
+                        raise
+
+                    delay = CONTROL_RETRY_BACKOFF_SECONDS * attempt
+                    logger.warning(
+                        "Transient ESP control request failed; retrying",
+                        extra={
+                            "host": host,
+                            "control_path": path,
+                            "method": method,
+                            "attempt": attempt,
+                            "max_attempts": CONTROL_RETRY_ATTEMPTS,
+                            "retry_delay_ms": int(round(delay * 1000)),
+                            "reason": exc.details.get("reason"),
+                        },
+                    )
+                    time.sleep(delay)
+
+        raise AssertionError("ESP control retry loop ended unexpectedly")
 
     @staticmethod
     def _configure_pc_stream_socket(sock: socket.socket) -> None:
@@ -579,7 +636,7 @@ class RemoteCameraService:
     def connect(self, *, host: str, source_id: str) -> dict:
         """Connect to status/control only; zero image transfer is preserved."""
         normalized_host = normalize_private_lan_ipv4(host)
-        device = self._json_requester(normalized_host, "/status", "GET", None)
+        device = self._request_control(normalized_host, "/status", "GET", None)
         if device.get("camera_ready") is False:
             raise AppError(
                 ErrorCode.CAMERA_NOT_CONNECTED,
@@ -612,8 +669,10 @@ class RemoteCameraService:
         return self.status()
 
     def _arm_esp_session(self, host: str, settings: dict, fps: int) -> dict:
-        applied = self._json_requester(host, "/config", "POST", self._settings_query(settings, fps))
-        started = self._json_requester(host, "/start", "POST", None)
+        # Keep config -> start atomic relative to background status polling.
+        with self._control_lock:
+            applied = self._request_control(host, "/config", "POST", self._settings_query(settings, fps))
+            started = self._request_control(host, "/start", "POST", None)
         self._assert_matching_firmware(started, host)
         if started.get("session_active") is not True:
             raise AppError(
@@ -638,7 +697,7 @@ class RemoteCameraService:
         if not requested or settings is None:
             return False
 
-        device = self._json_requester(host, "/status", "GET", None)
+        device = self._request_control(host, "/status", "GET", None)
         self._assert_matching_firmware(device, host)
         now_ms = int(time.time() * 1000)
         with self._lock:
@@ -700,15 +759,19 @@ class RemoteCameraService:
             )
 
         self._stop_worker()
-        try:
-            self._json_requester(host, "/stop", "POST", None)
-        except AppError:
-            pass
+        # Keep the best-effort stop + config + start sequence contiguous with
+        # respect to frontend status polling. The lock is re-entrant because
+        # _request_control() and _arm_esp_session() also serialize individually.
+        with self._control_lock:
+            try:
+                self._request_control(host, "/stop", "POST", None)
+            except AppError:
+                pass
 
-        with self._lock:
-            self._target_fps = fps
-            self._settings = dict(settings)
-        self._arm_esp_session(host, settings, fps)
+            with self._lock:
+                self._target_fps = fps
+                self._settings = dict(settings)
+            self._arm_esp_session(host, settings, fps)
 
         with self._lock:
             self._streaming_requested = True
@@ -762,7 +825,7 @@ class RemoteCameraService:
 
         if host is not None:
             try:
-                device = self._json_requester(host, "/stop", "POST", None)
+                device = self._request_control(host, "/stop", "POST", None)
                 with self._lock:
                     self._device_status = device
                     self._device_reachable = True
@@ -890,7 +953,7 @@ class RemoteCameraService:
             return
 
         try:
-            device = self._json_requester(host, "/status", "GET", None)
+            device = self._request_control(host, "/status", "GET", None)
             self._assert_matching_firmware(device, host)
             now_ms = int(time.time() * 1000)
             with self._lock:

@@ -30,6 +30,19 @@ The earlier R4 failure chain was therefore self-amplifying: a transient slow/fai
 - Keep legacy adaptive telemetry keys at zero for UI/API compatibility during the same V037 candidate.
 - PC Studio's existing automatic persistent-TCP reconnect/session-recovery worker remains unchanged; manual **Disconnect** still intentionally stops reconnection and clears the selected live connection.
 
+## R7 control-connection reliability repair
+
+Physical R6 streaming could remain healthy, but repeated manual **Connect** attempts sometimes returned HTTP 502 while the ESP serial log still showed `wifiDisc=0` / `wifiRec=0` and the station remained on the same BSSID. The failed attempts correlated with transient RSSI around roughly -72 to -74 dBm. PC Studio also polls `/api/camera/remote/status` in parallel with button actions, while the ESP Arduino `WebServer` is single-threaded.
+
+R7 therefore hardens only the PC control plane:
+
+- Serialize all HTTP control operations per `RemoteCameraService` so background status refresh, Connect, Start/Stop and recovery cannot overlap requests to the same ESP.
+- Retry transport-level control failures up to three times on fresh HTTP connections with short bounded backoff. This specifically covers timeouts/socket failures where the ESP may still be associated and recover on the next packet exchange.
+- Keep `/status`, `/config`, `/start` and `/stop` semantics unchanged; these operations are idempotent, so retrying a lost control transaction is safe.
+- Do not retry real HTTP responses, validation errors or protocol incompatibility; deterministic failures still surface immediately.
+- Keep the Start sequence serialized across best-effort `/stop` -> `/config` -> `/start` so UI polling cannot interleave the sequence.
+- No ESP firmware reflash is required for R7. The R6 quality-preserving camera/TCP data plane is unchanged.
+
 ## Deliberate non-changes
 
 - No UDP transport.

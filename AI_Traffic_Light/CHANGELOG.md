@@ -18,6 +18,8 @@
 - R6 uses one UXGA-capable PSRAM framebuffer with `CAMERA_GRAB_WHEN_EMPTY`, keeps 20 MHz XCLK, flushes the pending idle frame at new TCP-client connection, and retains freshness-first scheduling with no catch-up backlog.
 - R6 relaxes steady-state send guardrails to 700 ms no-progress / 1500 ms total (1200 / 2000 ms during connection warmup), while retaining non-blocking vectored `sendmsg`, `TCP_NODELAY`, keepalive, deterministic partial-frame socket close, and the existing PC reconnect/session-recovery worker.
 - R6 adds RSSI/BSSID/channel and ESP Wi-Fi disconnect/reconnect telemetry. Legacy R2/R4 adaptive keys remain zero-valued for same-candidate API compatibility, and Camera Sources now presents the quality-preserving policy plus Wi-Fi diagnostics instead of the obsolete payload-target controls.
+- R7 fixes intermittent PC Studio **Connect** 502 failures observed while the R6 ESP remained Wi-Fi-associated: all low-rate HTTP control operations are now serialized per camera session, preventing frontend `/remote/status` polling from racing button/reconnect traffic against the ESP's single-threaded WebServer.
+- R7 retries only transport-level ESP control failures up to three times using fresh HTTP connections and short bounded backoff. Real HTTP responses, validation failures and protocol incompatibilities still fail immediately instead of being hidden by retries. The persistent TCP JPEG data plane and R6 firmware are unchanged.
 - No ESP-side inference, UDP transport, physical/public-road signal authority or rewrite of runtime camera-profile data is introduced.
 ## 0_3_6 — Low-latency binary TCP multi-ESP camera input
 
