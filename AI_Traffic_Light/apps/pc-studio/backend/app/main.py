@@ -14,6 +14,7 @@ from app.core.logging_config import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
 from app.core.project_version import PROJECT_VERSION
 from app.routes.camera import router as camera_router
+from app.routes.camera_diagnostics import router as camera_diagnostics_router
 from app.routes.dataset import router as dataset_router
 from app.routes.experiments import router as experiments_router
 from app.routes.health import router as health_router
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(smoke_router, prefix="/api/smoke", tags=["smoke"])
     app.include_router(mock_router, prefix="/api/mock", tags=["mock"])
     app.include_router(camera_router, prefix="/api/camera", tags=["camera"])
+    app.include_router(camera_diagnostics_router, prefix="/api/camera/diagnostics", tags=["camera diagnostics"])
     app.include_router(inference_router, prefix="/api/inference", tags=["inference"])
     app.include_router(zones_router, prefix="/api/zones", tags=["zones"])
     app.include_router(traffic_router, prefix="/api/traffic", tags=["traffic"])

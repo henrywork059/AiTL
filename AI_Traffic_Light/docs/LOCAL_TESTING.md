@@ -1,49 +1,42 @@
-# Local Testing — V037
+# Local Testing — V038
 
 Expected release state:
 
 ```text
-version: 0_3_7
-previous_version: 0_3_6
+version: 0_3_8
+previous_version: 0_3_7
 passed_baseline: 0_2_4
 ```
 
-After the extracted V037 files are on GitHub `main`, use the normal updater:
+After the extracted V038 files are on GitHub `main`, use the normal updater:
 
 ```powershell
 Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 .\scripts\update_test_run.ps1
 ```
 
-If the patch was overlaid directly onto the local working tree instead, use `-SkipUpdate`.
+If the patch was deliberately overlaid directly onto the local working tree instead, use `-SkipUpdate`.
 
+## Focused V038 checks
 
-## Normal updater worktree behavior
+- Existing V037/R6 ESP firmware and `aitl-tcp-jpeg-v1` remain compatible; no ESP reflash is required for the diagnostics page.
+- **Operate → Camera Test** appears as a separate page; `App.tsx` remains composition-only.
+- With no saved/selected ESP, Diagnose is disabled and the page tells the user to configure Camera Sources first.
+- With a selected ESP, one Diagnose action calls `POST /api/camera/diagnostics/run` and waits for the staged report.
+- The service serializes diagnostic runs so two one-click tests cannot compete for the same camera.
+- A run temporarily quiesces the selected stream and simulation when necessary, then restores saved settings/FPS and the previous connection/stream/simulation state.
+- Control probes, protocol/camera readiness, Wi-Fi, direct stream, direct stream + status polling, and normal PC Studio managed-stream checks are all returned in the standard success envelope.
+- A direct stream failure with increased ESP `stream_send_failures` / `stream_deadline_drops` classifies as `esp_camera_tcp_send_stall`.
+- Direct streaming passing while the managed worker fails classifies as `pc_studio_stream_integration`.
+- Direct streaming passing until status polling is added classifies as `control_stream_contention`.
+- Weak RSSI with otherwise working transport is a warning rather than falsely blaming the camera sensor.
+- The diagnostic report never claims public-road authority or production camera validation.
 
-V037 R3 makes the runner read-only for tracked project/release files. A normal successful run must not leave `CHANGELOG.md`, `projectVersion.ts`, or any other tracked source modified. The updater still refuses to pull across genuine tracked edits and still preserves untracked runtime data.
+## Physical acceptance check
 
-If upgrading a PC that was previously dirtied by the historical V036 finalizer, restore only those already-generated metadata edits once before pulling R3. After R3 is installed, this cleanup should not recur.
-
-## Focused V037 R6 checks
-
-- Firmware keeps `sendmsg(..., MSG_DONTWAIT)`, TCP_NODELAY/keepalive and the V036-compatible `ATL1` frame format.
-- PSRAM camera configuration uses exactly one framebuffer with `CAMERA_GRAB_WHEN_EMPTY`; XCLK remains 20 MHz.
-- R2/R4 payload-target, partial-window learning, q=50 escalation and effective-resolution downshift code is absent.
-- `/config` applies the saved JPEG quality and frame size directly; effective quality/size mirror the saved settings.
-- A failed partial frame closes the client socket but does not modify JPEG quality or resolution.
-- Status exposes `quality_preserving_transport`, send EWMA/slow-frame count, RSSI, BSSID, channel and ESP Wi-Fi disconnect/reconnect counts.
-- PC accepts `aitl-camera-v037` and migration-compatible `aitl-camera-v036`; the wire format remains `aitl-tcp-jpeg-v1`.
-- Multi-ESP switching, simulation pause/resume, Live AI and Dataset Capture remain intact.
-
-## Physical R6 check
-
-1. Flash `AiTL_ESP32_CAM_V037.ino` and confirm `AiTL V037 R6 quality-preserving TCP ESP32-CAM node`.
-2. Start with 320 × 240 / JPEG quality 24 / 5–15 FPS.
-3. Confirm Serial Monitor reports `fixed=yes`, `q=<saved>/<saved>`, RSSI, BSSID and channel.
-4. Confirm image quality does not automatically collapse after a slow send: there must be no q=50 escalation and no runtime resolution downshift.
-5. Under healthy Wi-Fi, `client=on` should remain stable and `failures`/`deadlines` should not climb continuously.
-6. If the network slows, achieved FPS may fall below target. That is expected; freshness is preferred over queueing old frames.
-7. If a send actually fails, the ESP closes that partial-frame socket and PC Studio should enter reconnecting then return to TCP JPEG connected without changing the saved image settings.
-8. Compare the displayed BSSID/RSSI with the earlier strong and weak mesh/AP associations when diagnosing a recurrence.
-
-The R6 acceptance criterion is stability **without image-quality self-degradation**, not forcing every requested FPS regardless of available Wi-Fi throughput.
+1. Keep the current V037/R6 firmware on the ESP and confirm its IP in Serial Monitor.
+2. Save/select that IP in Camera Sources.
+3. Open **Camera Test** and press **Diagnose camera** once.
+4. Confirm the page completes without a command-line helper and displays a diagnosis, layer checks, transport metrics, and recommended action.
+5. Confirm the previous camera stream/simulation state is restored after the run.
+6. For the currently observed failure, verify the report distinguishes whether the direct camera/TCP path itself fails or whether failure appears only in the normal PC Studio worker.

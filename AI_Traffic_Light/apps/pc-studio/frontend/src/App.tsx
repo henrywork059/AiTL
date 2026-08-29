@@ -14,6 +14,7 @@ import {
 import { AppStatusBar } from "./components/AppStatusBar";
 import { AppShell } from "./layout/AppShell";
 import { useSerialPolling } from "./lib/useSerialPolling";
+import { CameraDiagnosticsPage } from "./pages/CameraDiagnosticsPage";
 import { CameraSourcesPage } from "./pages/CameraSourcesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DatasetCapturePage } from "./pages/DatasetCapturePage";
@@ -191,6 +192,8 @@ export default function App() {
             changingMode={changingCameraMode}
           />
         );
+      case "camera_diagnostics":
+        return <CameraDiagnosticsPage />;
       case "zone_editor":
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":

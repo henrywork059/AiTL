@@ -318,7 +318,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div>
               <h2>Camera input</h2>
               <p className="placeholder-copy">
-                V037 R2 keeps several ESP32-CAM sessions available and adapts JPEG compression before oversized frames enter TCP, reducing stale-frame pressure. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline.
+                Saved ESP profiles keep the selected OV2640 image settings while the binary TCP stream carries complete JPEG frames. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline; use Camera Test when a physical connection is unstable.
               </p>
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>

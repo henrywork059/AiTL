@@ -1,0 +1,59 @@
+AiTL V038 — one-click camera diagnostics
+===========================================
+
+Candidate version: 0_3_8
+Previous candidate: 0_3_7
+Passed baseline remains: 0_2_4
+ESP firmware: unchanged; keep V037 R6 quality-preserving firmware flashed
+
+Behavior
+--------
+- Adds Operate -> Camera Test / Camera Diagnostics.
+- One Diagnose camera action runs staged control, direct TCP, polling-contention, and managed-stream checks.
+- Returns evidence-based likely-failure classification and recommendations.
+- Restores previous saved camera values and connection/stream/simulation state where possible.
+- Does not change the ESP firmware or aitl-tcp-jpeg-v1 wire format.
+
+Changed/new files and SHA256
+----------------------------
+- AI_Traffic_Light/CHANGELOG.md  SHA256=86fe357ac19999b0807e85faa68fb8d4d2b32a8fcd44513ca569cb796d59a2cf
+- AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_8.txt  SHA256=b82e38984ae396a185d4020d1f31ffe167ef8d093a2084dff7efe9873c63ebd3
+- AI_Traffic_Light/VERSION  SHA256=4848c06c9991a15d31192db35147e0e60bb37fb8abf84dd684b2a8599551184b
+- AI_Traffic_Light/apps/pc-studio/backend/README.md  SHA256=54e33bf71a53493a370dc0ca5a486a5a5f2e99ab8c82ea49b397b127ee934adc
+- AI_Traffic_Light/apps/pc-studio/backend/app/main.py  SHA256=1c7bcb665cbc5a4c406237f2c92c9f3188d9eae04426fdd4090e9f580666343b
+- AI_Traffic_Light/apps/pc-studio/backend/app/routes/camera_diagnostics.py  SHA256=4aca1798583605362c6b0b42ef9ceb84cdf037dcadb6380541b74764bbfec1e2
+- AI_Traffic_Light/apps/pc-studio/backend/app/services/camera_diagnostics.py  SHA256=afea49e4f03b3d59e0d42451020aa129c2a79433d98827cd11be7fde307f1662
+- AI_Traffic_Light/apps/pc-studio/backend/app/services/template_state.py  SHA256=f6be80a851da86872a5df9fb273c4943bdee491469f0b8a21cf6ba9862a22c29
+- AI_Traffic_Light/apps/pc-studio/frontend/README.md  SHA256=d36d96b8059f51cc53e511226ef81967819d07a70e3df1ec122f1d9712774f16
+- AI_Traffic_Light/apps/pc-studio/frontend/src/App.tsx  SHA256=0c549fce11f2a632e43beb657ef676e87c64e6c1d8df776a8989c73726b94f7d
+- AI_Traffic_Light/apps/pc-studio/frontend/src/constants/appNavigation.ts  SHA256=58c907f3d546d8351947a06213b5f459cd4741de09d3a2ea1a125b379373d6c9
+- AI_Traffic_Light/apps/pc-studio/frontend/src/constants/projectVersion.ts  SHA256=73d60def4ec44ec27af698c4531b9acf3b712d3e40f0c445d7622c212f5ba67e
+- AI_Traffic_Light/apps/pc-studio/frontend/src/lib/cameraDiagnosticsApi.ts  SHA256=28abe62157b211fba5e355a2b9409b78f27e4260c0e5615496c2aec3cfae8ab2
+- AI_Traffic_Light/apps/pc-studio/frontend/src/pages/CameraDiagnosticsPage.tsx  SHA256=5f59478d75013dedc310fd84c2ee965d223ec15eebe4dab42e60a176a44d8c8d
+- AI_Traffic_Light/apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx  SHA256=7d02db31678393877ed62799bbd5fba05a49307c156259186d0fbad9afb44e2d
+- AI_Traffic_Light/apps/pc-studio/frontend/src/types/app.ts  SHA256=6ae30f41a61a0a904bfd0fdae4c4b28b9cffef6a3344562be1eac6f9fa0ad46e
+- AI_Traffic_Light/docs/API_CONTRACTS.md  SHA256=1a18118c5d932340fb4f318285604d7ceb00718318720d55b2d1762a47a7b3a0
+- AI_Traffic_Light/docs/LOCAL_TESTING.md  SHA256=85e8cfef2e47ecfe65ef1ecf6a871ab0103697c63a7d84bff8252f5ad0da7f14
+- AI_Traffic_Light/docs/PATCH_0_3_8.md  SHA256=a0bacf29d0a78e1189dcba6d72051ab4687dcb96a353610d4c4232f41d876136
+- AI_Traffic_Light/docs/PC_STUDIO_FUNCTION_LIST.md  SHA256=fb5edcf06a3e98ebc64042eefbd3e2d3dcf0f091e7362f1472a6155587d5d371
+- AI_Traffic_Light/docs/PROJECT_SCOPE.md  SHA256=2dc79f325df18739630709a109625bdf5d0d128fe58e4be939b52b6dcdd0722f
+- AI_Traffic_Light/docs/START_HERE.md  SHA256=1ced7f0f3d4a7111add2170bba94c385340b4b280a44b414cba98a16388c4361
+- AI_Traffic_Light/docs/TEST_READY_CHECKLIST.md  SHA256=1b3be272fa6b000b5ef6308af1a6e978d7e6b2b836724f3114605c1a23a34aa8
+- AI_Traffic_Light/scripts/test_camera_diagnostics.py  SHA256=8ae75aff877759c6c72bfc06e42c60e2c4f3bef892531adab56a8e284a49309f
+
+Validation performed before packaging
+-------------------------------------
+- Python syntax compilation for changed backend Python and regression files: PASS.
+- Targeted diagnostic-classifier harness for healthy, sender-stall, invalid-JPEG, control-contention, PC-integration, flaky-control, weak-RSSI, unreachable, incompatible-firmware, and camera-not-ready cases: PASS.
+- TypeScript/TSX transpile syntax checks for changed frontend sources: PASS.
+- V038 release/API/navigation static checks: PASS.
+- CHANGELOG V037-and-earlier history preservation check: PASS.
+- Existing V037 API contract preservation before the V038 addition: PASS.
+- Camera Sources stale-copy change limited to the intended paragraph: PASS.
+- Patch-tree generated/runtime-file exclusion scan: PASS.
+- ZIP path/member/integrity validation: performed after archive creation.
+
+Checks still required on the owner complete repository
+------------------------------------------------------
+- Normal update_test_run.ps1 full backend regressions, structure check, frontend typecheck/build, and live smoke.
+- Physical one-click Camera Test against the ESP32-CAM.

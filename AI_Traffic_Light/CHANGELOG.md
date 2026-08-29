@@ -1,4 +1,15 @@
 # Changelog
+## 0_3_8 — One-click camera diagnostics
+
+- Created V038 / `0_3_8` at the owner's explicit request after V037; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Added a separate **Camera Diagnostics / Camera Test** page under Operate with one **Diagnose camera** action for the currently selected saved ESP.
+- Added `POST /api/camera/diagnostics/run` and a dedicated `CameraDiagnosticService`; the route remains thin and the service owns staged measurement, classification, and state restoration.
+- One diagnostic run measures repeated ESP `/status` control reachability/latency, protocol and camera readiness, RSSI/BSSID/channel, direct `ATL1`/JPEG receiving, direct receiving with concurrent status polling, and the normal `RemoteCameraManager` / `RemoteCameraService` stream path.
+- Added evidence-based diagnoses for control-unreachable, incompatible firmware, camera-not-ready, ESP camera/TCP send stall, direct-stream failure, HTTP-control/stream contention, PC Studio stream integration, intermittent control-plane response, weak Wi-Fi margin, and healthy-now.
+- Diagnostics temporarily use the selected camera's saved image settings at 5 FPS, then restore the original saved FPS/settings plus prior connected/streaming/simulation state; runtime camera-profile data is not replaced by the patch.
+- Existing V037/R6 ESP firmware, `aitl-camera-v037` identity, and `aitl-tcp-jpeg-v1` wire format remain unchanged, so V038 does not require an ESP reflash.
+- No UDP transport, ESP-side inference, persistent diagnostic history, new stable error code, or physical/public-road signal authority is introduced.
+
 ## 0_3_7 — Quality-preserving ESP streaming
 
 - Created V037 / `0_3_7` at the owner's explicit request after V036; V024 / `0_2_4` remains the owner-confirmed passed baseline.

@@ -1,22 +1,19 @@
-# V037 R6 Acceptance Checklist
+# V038 Acceptance Checklist
 
-- [ ] `VERSION` is `0_3_7`; previous is `0_3_6`; passed baseline remains `0_2_4`.
-- [ ] PlatformIO and standalone Arduino V037 firmware compile for AI Thinker ESP32-CAM.
-- [ ] Connect remains status-only with zero image bytes.
-- [ ] V037 keeps `aitl-tcp-jpeg-v1` and the 16-byte `ATL1` header.
-- [ ] V037 firmware reports `aitl-camera-v037`; PC accepts V037 and V036 binary-TCP nodes during migration.
-- [ ] New camera defaults remain QVGA / JPEG 24 / 15 FPS; existing saved profiles are preserved.
-- [ ] PSRAM camera path uses `fb_count=1`, `CAMERA_GRAB_WHEN_EMPTY`, 20 MHz XCLK.
-- [ ] No R2/R4 ~5 KB payload target, partial-window target learning, local oversize rejection, q=50 pressure escalation or effective-resolution downshift remains active.
-- [ ] `effective_jpeg_quality == configured_jpeg_quality` while streaming.
-- [ ] `effective_frame_size == configured_frame_size` while streaming.
-- [ ] Legacy adaptive target/drop/learn/downshift counters remain zero.
-- [ ] A slow/failed TCP send cannot change JPEG quality or resolution.
-- [ ] Status and Camera Sources expose RSSI, BSSID, channel and Wi-Fi recovery counters.
-- [ ] Successful `accepted` bytes equal JPEG bytes + 16-byte ATL1 header and `errno=0`.
-- [ ] Multi-ESP profiles, simultaneous background streams, selected-source isolation and source-switch freshness guards still pass.
-- [ ] Simulation pause/resume, browser preview, Live AI and Dataset Capture still work.
+- [ ] `VERSION` is `0_3_8`; previous is `0_3_7`; passed baseline remains `0_2_4`.
+- [ ] Existing V037/R6 ESP firmware remains accepted by V038; no wire-protocol change or mandatory reflash was introduced.
+- [ ] Navigation contains **Camera Test / Camera Diagnostics** under Operate.
+- [ ] A selected saved ESP is clearly shown before a diagnostic run.
+- [ ] One **Diagnose camera** button runs the entire staged test without a separate Python/PowerShell diagnostic helper.
+- [ ] The diagnostic route uses the standard API envelope and request ID.
+- [ ] ESP control reachability, protocol compatibility, camera readiness and Wi-Fi telemetry are checked.
+- [ ] Direct ATL1/JPEG streaming is measured while bypassing the normal PC Studio stream worker.
+- [ ] A second direct stream phase adds `/status` polling so control/stream contention can be distinguished.
+- [ ] The normal PC Studio managed stream path is then measured separately.
+- [ ] ESP send-failure/deadline deltas, disconnect counts, FPS/frame counts, RSSI/BSSID and accepted-byte/errno telemetry are surfaced when available.
+- [ ] Diagnosis distinguishes control unreachable, firmware mismatch, camera not ready, direct ESP camera/TCP stall, control-stream contention, PC Studio integration failure, weak Wi-Fi margin, and healthy-now cases.
+- [ ] Diagnostic runs are mutually exclusive and cannot overlap against one selected ESP.
+- [ ] The previous saved FPS/settings, connection/stream state and simulation state are restored after the run; restoration failure is displayed explicitly.
+- [ ] Existing Camera Sources, Live AI, simulation, Dataset Capture, multi-ESP selection and V037/R6 transport regressions remain passing.
 - [ ] Python compile, structure check, focused/inherited regressions, frontend typecheck/build and live smoke pass on the complete repository.
-- [ ] Physical QVGA/JPEG24 test runs for at least two minutes without continuously increasing reconnect/failure counts on a healthy BSSID.
-- [ ] A deliberately/transiently slow link may lower achieved FPS or reconnect, but image quality remains at the saved setting.
-- [ ] Owner explicitly accepts V037 before `passed_baseline` changes.
+- [ ] Owner explicitly accepts V038 before `passed_baseline` changes.

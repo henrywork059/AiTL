@@ -107,3 +107,16 @@ A V037 R6 device `/status` additionally reports:
 For same-candidate compatibility, the previous `adaptive_quality_adjustments`, `adaptive_payload_target_bytes`, `adaptive_local_frame_drops`, `adaptive_window_learns`, `adaptive_resolution_downshifts`, and `adaptive_resolution_recoveries` keys remain present but stay zero in R6. They must not be interpreted as active adaptation.
 
 These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.
+
+
+## V038 one-click camera diagnostics
+
+`POST /api/camera/diagnostics/run`
+
+No request body is required. The endpoint diagnoses the currently selected saved ESP camera. If no saved camera is selected, it returns the existing camera-not-connected error envelope with HTTP 409; V038 introduces no new stable error code.
+
+The route delegates staged testing and state restoration to `CameraDiagnosticService`. A successful standard-envelope response contains a report with `run_id`, `source_id`, `host`, `overall`, `diagnosis_code`, `title`, `summary`, `confidence`, `checks`, `metrics`, `likely_causes`, `recommendations`, `state_restored`, `restore_error`, `diagnostic_target_fps`, and `prototype_only`.
+
+The diagnostic stages are: repeated direct ESP `/status` probes; firmware/wire-protocol and camera-readiness checks; RSSI/BSSID/channel inspection; direct `ATL1`/JPEG receiving that bypasses the normal PC Studio stream worker; direct receiving while `/status` polling runs concurrently; the normal `RemoteCameraManager` / `RemoteCameraService` managed stream; and restoration of the prior camera/simulation state.
+
+The measurement stream uses the selected profile's saved image settings at a conservative 5 FPS. The service then restores the original saved FPS/settings and prior connected/streaming/simulation state. Diagnostic evidence does not change the `ATL1` packet format, the R6 quality-preserving ESP behavior, or public-road/signal-control authority.

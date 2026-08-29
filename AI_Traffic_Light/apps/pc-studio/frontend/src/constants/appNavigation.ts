@@ -7,6 +7,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dashboard: { id: "dashboard", label: "Dashboard", shortLabel: "Dashboard", description: "System health, release state, validation checks, and the capabilities available in this local prototype.", status: "test-ready" },
   live_ai: { id: "live_ai", label: "Live AI", shortLabel: "Live AI", description: "Run the selected local detection model on camera or simulation frames and inspect detections, zones, tracks, and simulated signal context.", status: "test-ready" },
   camera_sources: { id: "camera_sources", label: "Camera Sources", shortLabel: "Cameras", description: "Use the built-in traffic simulation or receive JPEG/PNG frames from a camera node on the local network.", status: "test-ready" },
+  camera_diagnostics: { id: "camera_diagnostics", label: "Camera Diagnostics", shortLabel: "Camera Test", description: "Run one-click staged diagnostics against the selected ESP camera and identify the most likely failing control, Wi-Fi, direct-stream, contention, or PC Studio layer.", status: "test-ready" },
   zone_editor: { id: "zone_editor", label: "Zone Editor", shortLabel: "Zones", description: "Define traffic decision zones, analytics regions, and counting lines directly against the current camera reference frame.", status: "test-ready" },
   traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Define ranked traffic scenarios from metrics or class counts in zones, configure protected timing, inspect the winning signal response, and review decision history.", status: "test-ready" },
   traffic_analytics: { id: "traffic_analytics", label: "Traffic Analytics", shortLabel: "Analytics", description: "Inspect sampled occupancy separately from tracked flow events, with time filters, summaries, charts, and CSV export.", status: "test-ready" },
@@ -20,7 +21,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
 };
 
 export const APP_SECTIONS: AppSection[] = [
-  { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources] },
+  { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources, PAGE_DETAILS.camera_diagnostics] },
   { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
   { id: "data", label: "Data & models", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry] },
   { id: "system", label: "System", pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs] },

@@ -1,0 +1,49 @@
+AiTL V038 one-click camera diagnostics
+======================================
+
+Candidate version: 0_3_8
+Previous candidate: 0_3_7
+Passed baseline remains: 0_2_4
+
+Purpose
+-------
+- Add an Operate -> Camera Test / Camera Diagnostics page.
+- Let the user select/save an ESP normally, then press one Diagnose camera button.
+- Automatically isolate ESP control, protocol/camera readiness, Wi-Fi margin,
+  direct ATL1/JPEG transport, control/stream contention, and the normal PC
+  Studio stream worker.
+- Return a likely-failure diagnosis with measured evidence and recommended next action.
+- Restore the camera's original saved settings/FPS and previous connection/
+  streaming/simulation state after the diagnostic where possible.
+
+Firmware
+--------
+Keep the existing V037 R6 quality-preserving ESP32-CAM firmware installed.
+V038 does not change the ESP firmware or aitl-tcp-jpeg-v1 wire format, so no
+ESP reflash is required for this patch.
+
+Apply through GitHub
+--------------------
+1. Extract this ZIP.
+2. Upload/commit the extracted AI_Traffic_Light/... files to GitHub main,
+   preserving every path. Do not upload only the ZIP.
+3. On the PC run the normal updater from AI_Traffic_Light:
+
+   .\scripts\update_test_run.ps1
+
+4. Do not use -SkipUpdate when the patch exists only on GitHub.
+5. In Camera Sources, save/select the ESP camera profile you want to test.
+6. Open Operate -> Camera Test and press Diagnose camera once.
+
+Expected result
+---------------
+The page runs staged checks and returns a result such as:
+- ESP camera-to-TCP sender is stalling
+- HTTP control traffic disrupts camera streaming
+- Direct stream works but PC Studio managed stream fails
+- ESP control endpoint is unreachable
+- Wi-Fi margin is weak
+- Camera path is healthy in this run
+
+The report also shows the measured HTTP, RSSI/BSSID, frame, disconnect,
+ESP-send-failure/deadline, and managed-worker evidence used for the diagnosis.
