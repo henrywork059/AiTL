@@ -6,7 +6,6 @@ ARDUINO = ROOT / "apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V037/AiTL_
 CONFIG = ROOT / "apps/device-camera/esp32-cam/include/aitl_config.h"
 REMOTE = ROOT / "apps/pc-studio/backend/app/services/remote_camera.py"
 PAGE = ROOT / "apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx"
-VERSION = ROOT / "VERSION"
 
 
 def main() -> int:
@@ -15,11 +14,12 @@ def main() -> int:
     config = CONFIG.read_text(encoding="utf-8")
     remote = REMOTE.read_text(encoding="utf-8")
     page = PAGE.read_text(encoding="utf-8")
-    version = VERSION.read_text(encoding="utf-8")
 
-    assert "version: 0_3_7" in version
-    assert "previous_version: 0_3_6" in version
-    assert "passed_baseline: 0_2_4" in version
+    # This regression owns the inherited V037 R6 transport contract, not the
+    # repository's current release metadata. VERSION consistency is validated
+    # separately by scripts/check_structure.py and the current-candidate tests.
+    # Keeping current/previous-version assertions here would make this historical
+    # transport regression fail every time a later candidate legitimately starts.
 
     for path, text in ((PLATFORMIO, platformio), (ARDUINO, arduino)):
         assert "aitl-camera-v037" in text, path
@@ -47,7 +47,7 @@ def main() -> int:
         # Network failures must never rewrite image quality or resolution.
         assert "quality_preserving_transport" in text, path
         assert "adaptive_quality_enabled" in text, path
-        assert 'adaptive_quality_enabled\\\":false' in text, path
+        assert 'adaptive_quality_enabled\\":false' in text, path
         assert "quality/resolution preserved" in text, path
         assert "sensor->set_quality(sensor, settings.jpegQuality)" in text, path
         assert "sensor->set_framesize(sensor, settings.frameSize)" in text, path
@@ -97,11 +97,11 @@ def main() -> int:
     assert "ESP payload target" not in page
     assert "TCP window learns" not in page
 
-    print("[PASS] V037 R6 preserves ATL1/TCP framing and V036 migration compatibility")
-    print("[PASS] R6 removes the false 3.8-5 KB single-window payload controller")
-    print("[PASS] R6 preserves configured JPEG quality/resolution across TCP failures")
-    print("[PASS] R6 uses one WHEN_EMPTY framebuffer and keeps 20 MHz XCLK")
-    print("[PASS] R6 exposes RSSI/BSSID/channel and Wi-Fi recovery telemetry")
+    print("[PASS] inherited V037 R6 preserves ATL1/TCP framing and V036 migration compatibility")
+    print("[PASS] inherited R6 removes the false 3.8-5 KB single-window payload controller")
+    print("[PASS] inherited R6 preserves configured JPEG quality/resolution across TCP failures")
+    print("[PASS] inherited R6 uses one WHEN_EMPTY framebuffer and keeps 20 MHz XCLK")
+    print("[PASS] inherited R6 exposes RSSI/BSSID/channel and Wi-Fi recovery telemetry")
     return 0
 
 
