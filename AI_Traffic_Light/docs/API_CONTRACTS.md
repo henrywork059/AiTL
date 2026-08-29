@@ -98,6 +98,9 @@ A V037 device `/status` may additionally report:
 - `configured_jpeg_quality`: the PC-saved OV2640 quality floor;
 - `effective_jpeg_quality`: the current quality number after adaptive compression;
 - `adaptive_quality_adjustments`: number of runtime quality changes;
-- `send_ewma_ms`: exponentially weighted send time.
+- `send_ewma_ms`: exponentially weighted send time;
+- `adaptive_payload_target_bytes`: current maximum JPEG payload target before local oversize skipping;
+- `adaptive_local_frame_drops`: captured oversized JPEGs skipped locally before any ATL1 bytes were written;
+- `adaptive_window_learns`: number of times a partial TCP send lowered the conservative payload target.
 
 These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.

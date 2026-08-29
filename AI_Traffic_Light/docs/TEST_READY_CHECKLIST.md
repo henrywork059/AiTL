@@ -15,3 +15,9 @@
 - [ ] Physical QVGA/JPEG24/15 FPS test runs for at least two minutes without continuously increasing reconnect/failure counts.
 - [ ] Physical measured FPS/send latency is materially better than the owner's V036 R6 observation under comparable Wi-Fi conditions.
 - [ ] Owner explicitly accepts V037 before `passed_baseline` changes.
+
+- [ ] V037 R2 skips oversized frames locally while adaptive compression can still increase, rather than sending a known-oversize ATL1 record and forcing a reconnect.
+- [ ] `adaptive_payload_target_bytes` starts at 5000 B and can learn a lower safe target from a partial TCP send.
+- [ ] After initial convergence, `adaptive_local_frame_drops` does not increase continuously during a stable scene.
+- [ ] Successful `accepted` bytes equal JPEG bytes + 16-byte ATL1 header and `errno=0`.
+- [ ] Camera Sources displays payload target, oversize local-drop count and TCP-window learn count.

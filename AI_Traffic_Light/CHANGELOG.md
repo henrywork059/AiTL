@@ -1,17 +1,16 @@
 # Changelog
-
-## 0_3_7 — Adaptive low-latency ESP streaming
+## 0_3_7 — Adaptive single-window ESP streaming
 
 - Created V037 / `0_3_7` at the owner's explicit request after V036; V024 / `0_2_4` remains the owner-confirmed passed baseline.
-- Kept the V036 multi-ESP architecture and `aitl-tcp-jpeg-v1` ATL1 length-prefixed TCP JPEG wire format so PC-side framing, selected-source isolation, simulation coexistence, Live AI, capture, zones and analytics remain compatible.
-- Added V037 ESP adaptive JPEG pressure control: slow/large/failed sends temporarily raise the OV2640 JPEG quality number (stronger compression), while sustained fast/small delivery gradually recovers toward the saved configured quality.
-- Bounded adaptive compression so it never goes below the user's configured compression setting and normally tops out at quality number 40; already-higher configured compression is preserved.
-- Added configured/effective JPEG quality, adaptive adjustment count and send-time EWMA to ESP status/serial diagnostics.
-- Changed only new-camera defaults to QVGA / JPEG 24 / 15 FPS across firmware, backend profile defaults and frontend defaults; existing saved camera profiles remain untouched.
-- PC Studio identifies `aitl-camera-v037` as current and also accepts V036 binary-TCP camera nodes during migration because the image wire format is unchanged. V035 HTTP/MJPEG firmware remains incompatible.
-- Preserved R6 non-blocking vectored `sendmsg`, TCP_NODELAY/keepalive, connection warm-up bounds and freshness-first scheduling. V037 does not switch to UDP in this candidate.
-- No ESP-side inference, physical/public-road signal control, or safety-certification claim is introduced.
-
+- Preserved the V036 multi-ESP architecture, PC-controlled session lifecycle, 16-byte `ATL1` framing and `aitl-tcp-jpeg-v1` wire format.
+- Added adaptive ESP-side JPEG compression with QVGA / JPEG 24 / 15 FPS defaults for new profiles while preserving existing saved profiles.
+- R2 targets roughly 5000-byte JPEG payloads, below the classic ESP32 lwIP default TCP send-buffer boundary observed in physical V036 testing.
+- R2 skips oversized captures locally while compression can still increase, avoiding partial length-prefixed frames and avoidable reconnects during adaptation.
+- R2 learns a lower conservative payload target from real partial-send accepted-byte evidence and uses proportional compression steps for large oversize gaps.
+- R2 increases the bounded adaptive compression ceiling to JPEG quality number 50 and slows recovery until strong payload headroom is sustained.
+- PC Studio requests a 256 KiB receive buffer and Camera Sources exposes effective/configured quality, send EWMA, payload target, local oversize-drop count and window-learn count.
+- PC Studio remains migration-compatible with `aitl-camera-v036` nodes using the same TCP frame protocol, but V037 adaptive behavior requires V037 firmware.
+- No ESP-side inference, UDP transport, physical/public-road signal authority or rewrite of runtime camera-profile data is introduced.
 ## 0_3_6 — Low-latency binary TCP multi-ESP camera input
 
 - Created V036 / `0_3_6` after V035 to improve physical ESP32-CAM streaming speed and reduce end-to-end latency; V024 / `0_2_4` remained the owner-confirmed passed baseline.
@@ -23,7 +22,6 @@
 - Hardened switching against stale caches, in-flight source races and retired-session late frames; added numeric resolution display and retained simulation compatibility.
 - Same-candidate physical repairs progressed through non-blocking send, progress-bounded send and R6 connection-warmup vectored send after hardware logs exposed TCP buffer/backpressure behavior.
 - No ESP-side inference, public-road control, or new stable error code was introduced.
-
 ## 0_3_5 — Resilient low-latency ESP streaming
 
 - Created V035 / `0_3_5` at the owner's explicit request after V034 to further improve physical-camera speed, connection stability and the streaming workflow; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -37,7 +35,6 @@
 - Matching ESP firmware adds TCP_NODELAY, HTTPD TCP keepalive, shorter send/receive timeouts, two writes per MJPEG frame instead of three, stream-client status, and less disruptive Wi-Fi reconnect handling.
 - Simulation still suspends physical image transfer and automatically resumes it afterward.
 - No ESP-side inference, public-road control, or independent simultaneous multi-camera frame store is introduced.
-
 ## 0_3_4 — Low-latency persistent ESP MJPEG transport
 
 - Created V034 / `0_3_4` at the owner's explicit request after V033 to improve physical-camera streaming speed and reduce latency; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -50,7 +47,6 @@
 - Starting Camera Sources simulation pauses/closes the active ESP image stream; stopping simulation reopens it without reconfiguring the session.
 - Updated inherited V033 remote-camera regressions to validate persistent MJPEG transport and compatibility behavior.
 - No ESP-side inference, multi-camera independent buffer store, physical signal output, or public-road control path is introduced.
-
 ## 0_3_3 — PC-controlled on-demand ESP camera session
 
 - Created V033 / `0_3_3` at the owner's explicit request after V032; V032 remains the previous candidate and V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -61,7 +57,6 @@
 - Added matching Arduino IDE V033 firmware whose `/capture` and `:81/stream` endpoints refuse image transfer unless a PC-started session is active.
 - Built-in simulation pauses PC frame requests without discarding the configured ESP session, and frame requests resume afterward.
 - No physical/public-road signal command path is introduced.
-
 ## 0_3_2 — PC-pull ESP32-CAM integration
 
 - Created V032 / `0_3_2` at the owner's explicit request while V031 remained unaccepted; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -71,7 +66,6 @@
 - Added Camera Sources ESP IP/source controls, connect/reconnect/disconnect state, remote health telemetry, direct MJPEG preview with backend-frame fallback, and simulation coexistence.
 - Starting simulation pauses remote ESP ingestion and stopping simulation resumes it; the existing raw JPEG/PNG POST receiver remains backward compatible.
 - Added focused remote-camera regression coverage. No ESP-side inference, physical signal output, or public-road traffic-control authority is introduced.
-
 ## 0_3_1 — Persistent normalized decision evidence
 
 - Created V031 / `0_3_1` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V030 as the previous unaccepted candidate.
@@ -92,7 +86,6 @@
 - Added arbitration context/metrics/transition events and normalized evidence `context.arbitration`; documented that the seven network modes remain comparison/ablation modes rather than one all-features-integrated controller.
 - Corrected stale V027 headings/version expectations in V031 local-testing and acceptance guidance and strengthened the handoff workflow toward atomic commits/PRs plus an immutable accepted tag after explicit owner acceptance.
 - Same-candidate V031 explanation hardening: live `decision_context.requested_service` now requires explicit active service-request lifecycle evidence instead of treating the legacy stale-capable `pending_request` flag as causal state; added a focused regression for this distinction.
-
 ## 0_3_0 — Vehicle-class-aware cooperative two-intersection simulation
 
 - Created V030 / `0_3_0` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V029 as the previous unaccepted candidate.
@@ -106,7 +99,6 @@
 - Added request fields for class profile, enable flag, selected class, weight, minimum waiting count, and maximum extension; no new stable error code was required.
 - Added focused V030 class-aware regression including direct protected-bound, pedestrian-protection, neutral-weight, deterministic-profile, disabled-layer-equivalence, persistence and CSV checks while retaining V027/V028/V029 regressions.
 - Synthetic class generation is simulator evidence only; no live class-accuracy, public-transit priority, hardware/public-road control, or safety claim is introduced.
-
 ## 0_2_9 — Simulated emergency-priority cooperative two-intersection simulation
 
 - Created V029 / `0_2_9` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V028 as the previous unaccepted candidate.
@@ -118,7 +110,6 @@
 - Added request fields for emergency enable/time/type, downstream lookahead, and maximum green extension; no new stable error code was required.
 - Added focused V029 regression including direct protected-bound/emergency-crossing-guard tests while retaining V027 cooperation and V028 pedestrian-aware regressions.
 - Live emergency recognition, hardware/public-road pre-emption, cabinet integration, and safety-certification claims remain out of scope.
-
 ## 0_2_8 — Pedestrian-aware cooperative two-intersection simulation
 
 - Created V028 / `0_2_8` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline and V027 as the previous unaccepted candidate.
@@ -130,7 +121,6 @@
 - Strengthened V027 cooperation so waiting **or crossing** pedestrian demand prevents neighbour coordination from shortening pedestrian WALK/CLEAR.
 - Added pedestrian-awareness events/provenance, network metrics, pairwise Pedestrian-aware-vs-Cooperative comparisons, and aligned four-mode CSV fields.
 - Added request bounds for max pedestrian wait, synthetic crossing clearance time, and clearance reserve. Emergency priority and live cross-camera pedestrian identity remain inactive.
-
 ## 0_2_7 — Bounded cooperative two-intersection network simulation
 
 - Created V027 / `0_2_7` at the owner's explicit request while keeping V024 / `0_2_4` as the owner-confirmed passed baseline; V026 remains the previous unaccepted candidate.
@@ -142,7 +132,6 @@
 - Expanded network CSV export to aligned Fixed / Adaptive / Cooperative source/destination/network fields plus cooperation action/incoming/ETA/applied columns.
 - Added bounded request fields for cooperation lookahead, max extension, and minimum incoming vehicles; reused existing traffic-rule/network validation error paths.
 - Kept network experiments isolated from the live camera/controller runtime. Emergency priority, live cross-camera transfer/identity, measured travel-time prediction, general N-intersection cooperative orchestration, and physical/public-road traffic control remain outside V027.
-
 ## 0_2_6 — Deterministic two-intersection network simulation
 
 - Created V026 / `0_2_6` at the owner's explicit request while V025 remained unaccepted; `previous_version` is `0_2_5` and the owner-confirmed `passed_baseline` remains V024 / `0_2_4`.
@@ -156,7 +145,6 @@
 - Added focused deterministic regression coverage for arrival-plan repeatability, two independent intersection states, exact configured link travel time, transfer evidence, persistence/list/get/delete/CSV, and missing-link rejection.
 - The existing PC Studio Simulation Lab UI remains the single-junction Fixed-vs-Adaptive surface in V026; the network experiment is API/test-first so the next cooperation patch can compare against a stable independent-control baseline.
 - Cooperative neighbour-informed timing, emergency priority, real emergency perception, and physical/public-road traffic control remain disabled.
-
 ## 0_2_5 — Ranked signal scenarios and simulation telemetry
 
 - Same-candidate documentation hardening: added `docs/DOCUMENTATION_MAP.md` and `docs/PROJECT_SCOPE.md`, removed stale current-version/placeholder ownership from durable human/agent/workflow/versioning/debugging/UI guides and PC Studio app READMEs, refreshed data semantics, and clarified documentation authority/maintenance rules.
@@ -181,7 +169,6 @@
 - Added a compact one-page Simulation Lab presentation with top-level run controls, stored-run dropdown, Summary / Waiting & queues / Throughput / Signal behavior / Raw samples tabs, Fixed/Adaptive sample toggles, page-size selection, and pagination/internal scrolling so telemetry does not become one long dashboard.
 - Added focused ranked-scenario and deterministic experiment regression coverage. Simulation Lab now snapshots configured zones and supplies synthetic per-zone/per-class observations so zone-based scenarios can be exercised in isolated Adaptive runs. Existing V024 persistence/polling hardening, V022 tracking/flow, V021 occupancy, dataset/training/inference/model workflows, and prototype-only safety boundaries remain preserved.
 - Physical/public-road traffic control remains disabled; experiment results are local synthetic benchmark data only.
-
 ## 0_2_4 — Maintenance hardening and polling optimization
 
 - Refined the signal-aware simulator presentation by shrinking the top-left metadata banner and the right-side pedestrian signal display so more of the synthetic roadway remains visible in Live AI and Camera views.
@@ -202,7 +189,6 @@
 - Added focused atomic-persistence regression coverage and repository architecture guards against fixed shared `.tmp` files, direct JSON writes in migrated services, or reintroduced top-level `setInterval` polling.
 - Preserved V023 adaptive signal behavior and Material-derived PC Studio design system, V022 tracking/flow, V021 occupancy, dataset/training/inference/model workflows, request IDs, logging, and prototype-only safety boundaries.
 - No API endpoints, schemas, or stable error-code definitions changed. Physical/public-road traffic control remains disabled.
-
 ## 0_2_3 — Configurable adaptive signal rules
 
 - Same-candidate Material dark-theme refinement: use the Material 2 `#121212` base, explicit 0/1/2/4/8dp surface-lightness ramp, low-opacity on-surface borders, Blue Grey light/desaturated interaction tones, and sparse light semantic accents so dark mode communicates elevation and hierarchy without neon/AI-dashboard coloring.
@@ -225,7 +211,6 @@
 - Added signal policy/status/config/test/preview/history APIs using the existing request-ID/envelope conventions.
 - Kept V022 tracking/flow, V021 occupancy, dataset/training/inference/model management, zones, settings/logs, and the prototype-only safety boundary intact.
 - Physical public-road traffic control remains disabled.
-
 ## 0_2_2 — Cross-frame tracking and flow analytics
 
 - Added a lightweight class-aware centroid/IoU tracker that assigns stable prototype `track_id` values across consecutive detection frames and deduplicates repeated processing of the same source frame.
@@ -240,7 +225,6 @@
 - Preserved V021 signal-aware simulation, occupancy/counting-region analytics, capture lifecycle, zone overlays, training/inference/model management, settings/logs, and the prototype-only safety boundary.
 - The tracker is intentionally lightweight: heavy occlusion, abrupt motion, or crowded same-class crossings can still cause ID loss/swaps. Unique-passage figures apply only to recorded counting-line events, not to all detections seen.
 - Physical public-road traffic control remains disabled.
-
 ## 0_2_1 — Traffic occupancy analytics and counting regions
 
 - Added persistent detection-backed pedestrian/vehicle occupancy history sampled while the backend runs.
@@ -257,7 +241,6 @@
 - In simulation mode, `/api/traffic/state.phase` now reflects the exact signal the synthetic agents obey while the detection-driven phase/decision are retained as `recommended_*` metadata for comparison.
 - Preserved V020 capture deletion, camera-aligned zones, Live AI zone/signal overlays, and V017 training/inference/settings/logging behavior.
 - Physical public-road traffic control remains disabled.
-
 ## 0_2_0 — Camera-aligned zones and capture lifecycle
 
 - Added permanent capture deletion from Dataset Capture and Dataset Review. Deleting a capture removes its image, paired metadata, and saved manual-label document.
@@ -274,7 +257,6 @@
 - Reworked AI-agent/developer instructions around the current architecture, candidate acceptance gate, runtime-data preservation, evidence reporting, and changed-files-only packaging; added a concise AI-agent checklist.
 - Preserved V017 convergence monitoring, patience-based early stopping, persistent settings/logs, traffic logic, labeling, training, model management, and prototype-only safety boundaries.
 - Physical public-road traffic control remains disabled.
-
 ## 0_1_7 — Training convergence, early stopping, and real prototype tools
 
 - Added per-epoch YOLO training metric history for validation fitness, mAP50-95, mAP50, and available train/validation loss totals.
@@ -290,7 +272,6 @@
 - Added focused training, zone/traffic, settings/logging, and API contract tests plus V017 documentation and acceptance checks.
 - Reuses existing `ATL-ZONE-*`, `ATL-SETTINGS-*`, training, inference, and request-validation error codes; no new stable error-code range was required.
 - Automatic labeling, model export, device firmware completion, and physical public-road traffic control remain disabled.
-
 ## 0_1_6 — Live layout and controllable simulation scene
 
 - Fixed Live AI model/run/path text containment so long trained-model identifiers wrap inside the right-hand model panel instead of overflowing its border.
@@ -304,7 +285,6 @@
 - Added focused camera simulation service/API tests and updated V016 documentation, function status, and acceptance checks.
 - Preserved V015 model management, confidence/visibility controls, capture, labeling, managed YOLO training, and trained-model live inference.
 - Live detections remain prototype/simulation input and do not directly control physical public-road traffic infrastructure.
-
 ## 0_1_5 — Model selection, deletion, and live-visibility controls
 
 - Reviewed the trained-model loading path and replaced the latest-only UX with explicit model selection from discovered local `outputs/training/*/weights/best.pt` runs.
@@ -316,7 +296,6 @@
 - Implemented a working Model Registry page in the frontend with refresh, load, set-default, and delete actions.
 - Updated documentation, error codes, smoke coverage, and local acceptance checks for V015.
 - Live detections still do not control zones or traffic signals; automatic labeling, model export, and physical public-road control remain disabled.
-
 ## 0_1_4 — Trained-model live inference overlay
 
 - Replaced the inference placeholder with a real Ultralytics-backed service that discovers local `outputs/training/*/weights/best.pt` files and loads the newest run.
@@ -328,7 +307,6 @@
 - Preserved the original mock Live AI scene as a fallback when no camera frame exists.
 - Added trained-model inference service tests, smoke coverage, API documentation, and V014 acceptance checks.
 - Live detections do not yet feed zone counts or traffic-light decisions; automatic labeling, model export, and physical public-road control remain disabled.
-
 ## 0_1_3 — Manual labeling and managed YOLO dataset
 
 - Replaced the Dataset Review placeholder with a working captured-frame browser and manual bounding-box label editor.
@@ -342,7 +320,6 @@
 - Connected the existing Train / Export page to the managed `yolo/data.yaml` status while preserving support for other labeled YOLO YAML files inside `datasets/`.
 - Added labeling/build API contracts, stable dataset error codes, service tests, and acceptance documentation.
 - Automatic labeling, live YOLO inference, model export, and physical public-road traffic-light control remain disabled.
-
 ## 0_1_2 — Persistent capture and optional labeled-dataset training
 
 - Replaced the Dataset Capture placeholder with a working receiver/simulation capture page.
@@ -353,7 +330,6 @@
 - Added frontend capture/training controls, strict mutation error handling, tests, and generated-data ignores.
 - Raw captures remain unlabeled; real detection training requires a prepared YOLO dataset and the optional training dependency.
 - Real inference, automatic labeling, model export, and physical traffic-light control remain disabled.
-
 ## 0_1_1 — Camera frame receiver and simulation
 
 - Added an in-memory PC-side endpoint for ESP32/Raspberry Pi JPEG or PNG frame uploads.
@@ -363,7 +339,6 @@
 - Added stable camera validation errors and documented the upload contract.
 - Updated Windows backend launchers to listen on the local network for future camera-node uploads.
 - Real AI inference, training, and physical traffic-light control remain disabled.
-
 ## 0_1_0 — PC Studio test-ready mock version
 
 - Promoted the PC Studio template from layout-only to a local smoke-testable mock version.
@@ -372,7 +347,6 @@
 - Updated visible version labels from 0_0_4 to 0_1_0.
 - Added human testing instructions and a test-ready checklist.
 - Still intentionally excludes real YOLO inference, real camera capture, training, model export, and physical traffic-light control.
-
 ## 0_0_4 — PC Studio app template and function map
 
 - Added the first structured PC Studio frontend template.
@@ -383,7 +357,6 @@
 - Updated backend app wiring to expose the placeholder API structure.
 - Expanded error-code ranges for future camera, inference, zone, dataset, training, model, settings, logs and template metadata.
 - Added human/AI documentation for confirming the PC Studio function list and GUI layout before real implementation.
-
 ## 0_0_3 — Modular code, API contracts, logging, and error codes
 
 - Added coding standards for small, debuggable modules.
@@ -392,7 +365,6 @@
 - Refactored placeholder backend routes into smaller route/core/service modules.
 - Added documentation for API contracts, debugging, logging, and error-code ranges.
 - Added patch notes for **0_0_3**.
-
 ## 0_0_2 — Human and AI-agent instruction docs
 
 - Added root-level `AGENTS.md` for AI agents and coding assistants.
@@ -400,7 +372,6 @@
 - Added `docs/HUMAN_GUIDE.md` with human-facing usage, upload, patch, and safety instructions.
 - Updated README documentation links.
 - Updated version metadata to **0_0_2**.
-
 ## 0_0_1 — Documentation and version cleanup
 
 - Corrected project wording from the earlier “Version 1 / 0.1.0” draft to the chosen **0_0_x** versioning scheme.
@@ -410,7 +381,6 @@
   - `0_0_1` = documentation/version cleanup.
 - Updated documentation roadmap and versioning notes.
 - Updated placeholder UI/backend version labels to avoid old version naming.
-
 ## 0_0_0 — Initial starter skeleton
 
 - Added monorepo project structure.

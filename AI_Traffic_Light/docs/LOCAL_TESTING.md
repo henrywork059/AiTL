@@ -30,7 +30,7 @@ If the patch was overlaid directly onto the local working tree instead, use `-Sk
 
 ## Physical test
 
-1. Flash `AiTL_ESP32_CAM_V037.ino` and confirm `AiTL V037 adaptive-JPEG ESP32-CAM node`.
+1. Flash `AiTL_ESP32_CAM_V037.ino` and confirm `AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node`.
 2. Use 320 × 240 / JPEG 24 / 15 FPS.
 3. Run at least two minutes while moving objects through the frame.
 4. Watch serial values: `fps`, `frame`, `send`, `q`, `ewma`, `adj`, `failures`, `rssi`.
@@ -39,3 +39,22 @@ If the patch was overlaid directly onto the local working tree instead, use `-Sk
 7. On PC Studio confirm frame age remains current, failure streak settles, reconnects do not climb continuously, and measured FPS improves over the V036 test under equivalent conditions.
 
 Do not claim a speed improvement until this physical comparison is completed.
+
+## V037 R2 single-window transport check
+
+After Start Stream, the first few captured frames may be skipped locally while the ESP raises compression. This is expected and should not increment PC reconnects.
+
+Healthy convergence should show:
+
+```text
+targetB=5000 (or a learned lower value)
+localdrop=<small count that stops growing rapidly>
+learn=0 or a small stable count
+frame≈targetB or lower
+accepted≈frame+16
+errno=0
+send normally well below the previous 100–500 ms range
+failures stable
+```
+
+If `q` reaches 50 and frames remain much larger than `targetB`, reduce resolution rather than continuing to increase timeouts.

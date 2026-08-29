@@ -71,4 +71,4 @@ The ESP stream socket uses TCP_NODELAY/keepalive plus a progress-bounded non-blo
 
 
 ### Adaptive JPEG pressure
-V037 retains the ATL1 TCP frame format but monitors send duration and JPEG payload size. Under pressure it temporarily raises the JPEG quality number to reduce bytes; after sustained fast delivery it slowly returns toward the saved configured value. Serial telemetry reports `q=<effective>/<configured>`, `ewma`, and `adj`.
+V037 R2 retains ATL1/TCP but targets a ~5 KB JPEG payload so a complete frame normally fits one classic ESP32 lwIP send window. Oversized captures are dropped locally while compression is increased, avoiding intentional partial-frame reconnects. Partial-send evidence can lower the target further. Serial telemetry reports `q=<effective>/<configured>`, `ewma`, `targetB`, `localdrop`, `learn`, and `adj`.

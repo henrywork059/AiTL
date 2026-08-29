@@ -123,6 +123,9 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
   const deviceConfiguredQuality = typeof remote?.device?.configured_jpeg_quality === "number" ? remote.device.configured_jpeg_quality : null;
   const deviceSendEwma = typeof remote?.device?.send_ewma_ms === "number" ? remote.device.send_ewma_ms : null;
   const deviceQualityAdjustments = typeof remote?.device?.adaptive_quality_adjustments === "number" ? remote.device.adaptive_quality_adjustments : null;
+  const devicePayloadTarget = typeof remote?.device?.adaptive_payload_target_bytes === "number" ? remote.device.adaptive_payload_target_bytes : null;
+  const deviceLocalDrops = typeof remote?.device?.adaptive_local_frame_drops === "number" ? remote.device.adaptive_local_frame_drops : null;
+  const deviceWindowLearns = typeof remote?.device?.adaptive_window_learns === "number" ? remote.device.adaptive_window_learns : null;
   const selectedFrameAvailable = Boolean(
     status?.frame_available
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
@@ -310,7 +313,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div>
               <h2>Camera input</h2>
               <p className="placeholder-copy">
-                V037 keeps several ESP32-CAM sessions available and adapts JPEG compression when Wi-Fi/TCP pressure would otherwise create stale frames. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline.
+                V037 R2 keeps several ESP32-CAM sessions available and adapts JPEG compression before oversized frames enter TCP, reducing stale-frame pressure. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline.
               </p>
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
@@ -503,6 +506,9 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>JPEG quality</span><strong>{deviceEffectiveQuality !== null ? `${deviceEffectiveQuality} effective / ${deviceConfiguredQuality ?? settings.jpeg_quality} saved` : settings.jpeg_quality}</strong></div>
               <div><span>ESP send EWMA</span><strong>{deviceSendEwma !== null ? `${deviceSendEwma.toFixed(0)} ms` : "—"}</strong></div>
               <div><span>Quality adjustments</span><strong>{deviceQualityAdjustments ?? 0}</strong></div>
+              <div><span>ESP payload target</span><strong>{devicePayloadTarget !== null ? `${devicePayloadTarget} B` : "—"}</strong></div>
+              <div><span>Oversize frames skipped</span><strong>{deviceLocalDrops ?? 0}</strong></div>
+              <div><span>TCP window learns</span><strong>{deviceWindowLearns ?? 0}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
               <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
@@ -518,7 +524,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
             <p className="placeholder-copy">
-              V037 uses the same length-prefixed TCP JPEG wire format as V036, while adding adaptive JPEG pressure control in the new firmware. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
+              V037 R2 uses the same length-prefixed TCP JPEG wire format as V036, while targeting JPEG payloads that fit one ESP lwIP send window when practical. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
             </p>
             <code className="endpoint-code">POST {API_BASE}/api/camera/remote/select</code>
           </section>

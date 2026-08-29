@@ -365,6 +365,12 @@ class RemoteCameraService:
     def _configure_pc_stream_socket(sock: socket.socket) -> None:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        # Keep the PC receive window comfortably above several ESP JPEG frames.
+        # This does not change the wire protocol and is safe on Windows/Linux.
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 256 * 1024)
+        except OSError:
+            pass
 
         for option_name, option_value in (
             ("TCP_KEEPIDLE", 3),

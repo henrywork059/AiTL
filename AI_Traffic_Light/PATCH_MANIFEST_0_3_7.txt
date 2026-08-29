@@ -1,4 +1,4 @@
-AiTL V037 / 0_3_7 changed-files manifest
+AiTL V037 / 0_3_7 R2 changed-files manifest
 
 AI_Traffic_Light/CHANGELOG.md
 AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_7.txt

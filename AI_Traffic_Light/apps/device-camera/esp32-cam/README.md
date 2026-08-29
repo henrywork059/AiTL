@@ -84,7 +84,7 @@ Legacy `POST /api/camera/frame` remains available in PC Studio for other device 
 
 This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.
 
-### V037 adaptive transport
-V037 keeps the V036 `ATL1` TCP wire format and R6 vectored non-blocking sender, then adds adaptive JPEG pressure control. The saved/user-configured JPEG quality remains the quality floor. When send time exceeds the target-frame budget, frames are large, or a send fails, firmware temporarily increases the OV2640 JPEG quality number (stronger compression) up to a bounded ceiling. After a sustained run of small/fast frames, it steps back toward the configured quality. Status/serial telemetry exposes configured/effective quality, adjustment count, and send-time EWMA.
+### V037 R2 adaptive single-window transport
+V037 R2 keeps the V036 `ATL1` TCP wire format and R6 vectored non-blocking sender, then targets JPEG payloads near 5 KB. While more compression is available, an oversized capture is discarded locally before any ATL1 bytes are written; the next fresh capture uses a larger JPEG quality number. A partial TCP send can teach the controller a lower safe payload target. Recovery toward the saved quality is slow and requires strong payload headroom. Status/serial telemetry exposes configured/effective quality, payload target, local oversize drops, window-learn count, adjustment count and send-time EWMA.
 
 New profiles default to QVGA / JPEG 24 / 15 FPS; existing saved profiles are preserved. V037 PC Studio remains wire-compatible with V036 camera nodes during migration, but V037 adaptive behavior requires flashing the V037 firmware.

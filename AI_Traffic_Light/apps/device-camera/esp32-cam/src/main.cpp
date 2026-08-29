@@ -15,7 +15,7 @@ namespace {
 
 constexpr char kCameraProtocol[] = "aitl-camera-v037";
 constexpr char kStreamProtocol[] = "aitl-tcp-jpeg-v1";
-constexpr char kFirmwareRevision[] = "v037-adaptive-jpeg-pressure";
+constexpr char kFirmwareRevision[] = "v037-r2-single-window-adaptive";
 constexpr uint8_t kFrameMagic[4] = {'A', 'T', 'L', '1'};
 constexpr size_t kFrameHeaderBytes = 16;
 
@@ -94,6 +94,9 @@ int effectiveJpegQuality = AITL_DEFAULT_JPEG_QUALITY;
 uint32_t adaptiveQualityAdjustments = 0;
 uint32_t adaptiveRecoveryFrames = 0;
 float sendEwmaMs = 0.0f;
+uint32_t adaptivePayloadTargetBytes = AITL_ADAPTIVE_TARGET_FRAME_BYTES;
+uint32_t adaptiveLocalFrameDrops = 0;
+uint32_t adaptiveWindowLearns = 0;
 
 const char* frameSizeName(framesize_t value) {
   switch (value) {
@@ -335,6 +338,9 @@ String statusJson() {
   json += ",\"effective_jpeg_quality\":" + String(effectiveJpegQuality);
   json += ",\"adaptive_quality_adjustments\":" + String(adaptiveQualityAdjustments);
   json += ",\"send_ewma_ms\":" + String(sendEwmaMs, 1);
+  json += ",\"adaptive_payload_target_bytes\":" + String(adaptivePayloadTargetBytes);
+  json += ",\"adaptive_local_frame_drops\":" + String(adaptiveLocalFrameDrops);
+  json += ",\"adaptive_window_learns\":" + String(adaptiveWindowLearns);
   json += ",\"last_frame_bytes\":" + String(lastFrameBytes);
   json += ",\"last_capture_ms\":" + String(lastCaptureMs);
   json += ",\"last_send_ms\":" + String(lastSendMs);
@@ -387,6 +393,7 @@ bool applySettings() {
     effectiveJpegQuality = settings.jpegQuality;
     adaptiveRecoveryFrames = 0;
     sendEwmaMs = 0.0f;
+    adaptivePayloadTargetBytes = AITL_ADAPTIVE_TARGET_FRAME_BYTES;
   }
   return failures == 0;
 }
@@ -404,7 +411,40 @@ bool setEffectiveJpegQuality(int nextQuality) {
   return true;
 }
 
-void adaptJpegPressure(bool success, uint32_t frameBytes, uint32_t sendMs) {
+int compressionStepForOversize(uint32_t frameBytes, uint32_t targetBytes) {
+  if (frameBytes <= targetBytes) return 0;
+  const uint32_t excess = frameBytes - targetBytes;
+  int step = 2 + static_cast<int>(excess / 1800U);
+  if (step > AITL_ADAPTIVE_OVERSIZE_STEP_MAX) step = AITL_ADAPTIVE_OVERSIZE_STEP_MAX;
+  if (step < 2) step = 2;
+  return step;
+}
+
+void learnPayloadTargetFromPartialSend(size_t acceptedBytes, uint32_t frameBytes) {
+  const size_t totalBytes = static_cast<size_t>(frameBytes) + kFrameHeaderBytes;
+  if (acceptedBytes <= kFrameHeaderBytes || acceptedBytes >= totalBytes) return;
+
+  uint32_t observedPayload = static_cast<uint32_t>(acceptedBytes - kFrameHeaderBytes);
+  uint32_t candidate = observedPayload > AITL_ADAPTIVE_WINDOW_MARGIN_BYTES
+      ? observedPayload - AITL_ADAPTIVE_WINDOW_MARGIN_BYTES
+      : AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES;
+  if (candidate < AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES) {
+    candidate = AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES;
+  }
+  if (candidate > AITL_ADAPTIVE_TARGET_FRAME_BYTES) {
+    candidate = AITL_ADAPTIVE_TARGET_FRAME_BYTES;
+  }
+  if (candidate < adaptivePayloadTargetBytes) {
+    adaptivePayloadTargetBytes = candidate;
+    ++adaptiveWindowLearns;
+  }
+}
+
+void adaptJpegPressure(
+    bool success,
+    uint32_t frameBytes,
+    uint32_t sendMs,
+    size_t acceptedBytes = 0) {
   if (sendMs > 0) {
     sendEwmaMs = sendEwmaMs <= 0.0f
         ? static_cast<float>(sendMs)
@@ -423,7 +463,18 @@ void adaptJpegPressure(bool success, uint32_t frameBytes, uint32_t sendMs) {
 
   if (!success) {
     adaptiveRecoveryFrames = 0;
-    setEffectiveJpegQuality(effectiveJpegQuality + AITL_ADAPTIVE_FAILURE_STEP);
+    learnPayloadTargetFromPartialSend(acceptedBytes, frameBytes);
+    int step = AITL_ADAPTIVE_FAILURE_STEP;
+    const int oversizeStep = compressionStepForOversize(frameBytes, adaptivePayloadTargetBytes);
+    if (oversizeStep > step) step = oversizeStep;
+    setEffectiveJpegQuality(effectiveJpegQuality + step);
+    return;
+  }
+
+  if (frameBytes > adaptivePayloadTargetBytes) {
+    adaptiveRecoveryFrames = 0;
+    setEffectiveJpegQuality(
+        effectiveJpegQuality + compressionStepForOversize(frameBytes, adaptivePayloadTargetBytes));
     return;
   }
 
@@ -433,7 +484,11 @@ void adaptJpegPressure(bool success, uint32_t frameBytes, uint32_t sendMs) {
     return;
   }
 
-  if (sendMs <= lowSendMs && frameBytes <= AITL_ADAPTIVE_RECOVERY_FRAME_BYTES
+  const uint32_t recoveryBytes =
+      (adaptivePayloadTargetBytes * AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT) / 100U;
+  if (sendMs <= lowSendMs
+      && frameBytes <= recoveryBytes
+      && frameBytes <= AITL_ADAPTIVE_RECOVERY_FRAME_BYTES
       && effectiveJpegQuality > settings.jpegQuality) {
     ++adaptiveRecoveryFrames;
     if (adaptiveRecoveryFrames >= AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES) {
@@ -675,6 +730,23 @@ void sendNextFrameIfDue() {
     return;
   }
 
+  lastFrameBytes = static_cast<uint32_t>(fb->len);
+  const int adaptiveCeiling = settings.jpegQuality > AITL_ADAPTIVE_MAX_JPEG_QUALITY
+      ? settings.jpegQuality : AITL_ADAPTIVE_MAX_JPEG_QUALITY;
+  if (lastFrameBytes > adaptivePayloadTargetBytes && effectiveJpegQuality < adaptiveCeiling) {
+    ++adaptiveLocalFrameDrops;
+    adaptiveRecoveryFrames = 0;
+    const int step = compressionStepForOversize(lastFrameBytes, adaptivePayloadTargetBytes);
+    setEffectiveJpegQuality(effectiveJpegQuality + step);
+    lastSendMs = 0;
+    lastSendAcceptedBytes = 0;
+    lastSendErrno = EMSGSIZE;
+    lastSendWarmup = streamClientSuccessfulFrames < AITL_WARMUP_SUCCESS_FRAMES;
+    esp_camera_fb_return(fb);
+    nextFrameDueUs = micros() + (AITL_ADAPTIVE_LOCAL_RETRY_MS * 1000U);
+    return;
+  }
+
   ++sequenceNumber;
   uint8_t header[kFrameHeaderBytes];
   memcpy(header, kFrameMagic, sizeof(kFrameMagic));
@@ -701,7 +773,6 @@ void sendNextFrameIfDue() {
       acceptedBytes,
       terminalErrno);
   lastSendMs = millis() - sendStarted;
-  lastFrameBytes = static_cast<uint32_t>(fb->len);
   lastSendAcceptedBytes = static_cast<uint32_t>(acceptedBytes);
   lastSendErrno = terminalErrno;
   lastSendWarmup = warmup;
@@ -710,7 +781,7 @@ void sendNextFrameIfDue() {
   if (!payloadOk) {
     ++streamSendFailures;
     if (terminalErrno == ETIMEDOUT) ++streamDeadlineDrops;
-    adaptJpegPressure(false, lastFrameBytes, lastSendMs);
+    adaptJpegPressure(false, lastFrameBytes, lastSendMs, acceptedBytes);
     // Once any part of a length-prefixed frame is sent, a failure requires closing
     // the connection so the receiver can discard the partial frame deterministically.
     closeStreamClient();
@@ -728,7 +799,7 @@ void printPeriodicStatus() {
   if (millis() - lastStatusAtMs < AITL_SERIAL_STATUS_INTERVAL_MS) return;
   lastStatusAtMs = millis();
   Serial.printf(
-      "ip=%s session=%s client=%s fps=%.1f target=%u frame=%luB capture=%lums send=%lums accepted=%lu errno=%d warmup=%s q=%d/%d ewma=%.0fms adj=%lu failures=%lu rssi=%d\n",
+      "ip=%s session=%s client=%s fps=%.1f target=%u frame=%luB capture=%lums send=%lums accepted=%lu errno=%d warmup=%s q=%d/%d ewma=%.0fms targetB=%lu localdrop=%lu learn=%lu adj=%lu failures=%lu rssi=%d\n",
       WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "offline",
       sessionActive ? "on" : "off",
       (streamClient && streamClient.connected()) ? "on" : "off",
@@ -743,6 +814,9 @@ void printPeriodicStatus() {
       effectiveJpegQuality,
       settings.jpegQuality,
       sendEwmaMs,
+      static_cast<unsigned long>(adaptivePayloadTargetBytes),
+      static_cast<unsigned long>(adaptiveLocalFrameDrops),
+      static_cast<unsigned long>(adaptiveWindowLearns),
       static_cast<unsigned long>(adaptiveQualityAdjustments),
       static_cast<unsigned long>(streamSendFailures),
       WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127);
@@ -754,7 +828,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL V037 adaptive-JPEG ESP32-CAM node");
+  Serial.println("AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node");
 
   cameraReady = initCamera();
   connectWifi();

@@ -7,33 +7,26 @@ CONFIG = ROOT / "apps/device-camera/esp32-cam/include/aitl_config.h"
 REMOTE = ROOT / "apps/pc-studio/backend/app/services/remote_camera.py"
 MANAGER = ROOT / "apps/pc-studio/backend/app/services/remote_camera_manager.py"
 FRONTEND = ROOT / "apps/pc-studio/frontend/src/lib/remoteCameraApi.ts"
+PAGE = ROOT / "apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx"
 VERSION = ROOT / "VERSION"
 
 
-def simulate(configured: int, events: list[tuple[bool, int, int]]) -> list[int]:
-    effective = configured
-    recovery = 0
-    values: list[int] = []
-    for success, frame_bytes, send_ms in events:
-        budget = max(1, 1000 // 15)
-        high = max(20, budget * 85 // 100)
-        low = max(8, budget * 35 // 100)
-        ceiling = max(configured, 40)
-        if not success:
-            recovery = 0
-            effective = min(ceiling, max(configured, effective + 4))
-        elif send_ms > high or frame_bytes > 9000:
-            recovery = 0
-            effective = min(ceiling, max(configured, effective + 2))
-        elif send_ms <= low and frame_bytes <= 7000 and effective > configured:
-            recovery += 1
-            if recovery >= 12:
-                effective = max(configured, effective - 1)
-                recovery = 0
-        else:
-            recovery = 0
-        values.append(effective)
-    return values
+def compression_step(frame_bytes: int, target_bytes: int) -> int:
+    if frame_bytes <= target_bytes:
+        return 0
+    step = 2 + (frame_bytes - target_bytes) // 1800
+    return max(2, min(10, step))
+
+
+def learned_target(current: int, accepted: int, frame_bytes: int) -> int:
+    header = 16
+    total = frame_bytes + header
+    if accepted <= header or accepted >= total:
+        return current
+    observed_payload = accepted - header
+    candidate = observed_payload - 512 if observed_payload > 512 else 3800
+    candidate = max(3800, min(5000, candidate))
+    return min(current, candidate)
 
 
 def main() -> int:
@@ -43,6 +36,7 @@ def main() -> int:
     remote = REMOTE.read_text(encoding="utf-8")
     manager = MANAGER.read_text(encoding="utf-8")
     frontend = FRONTEND.read_text(encoding="utf-8")
+    page = PAGE.read_text(encoding="utf-8")
     version = VERSION.read_text(encoding="utf-8")
 
     assert "version: 0_3_7" in version
@@ -50,48 +44,58 @@ def main() -> int:
     assert "passed_baseline: 0_2_4" in version
 
     for path, text in ((PLATFORMIO, platformio), (ARDUINO, arduino)):
-        assert 'aitl-camera-v037' in text, path
-        assert 'aitl-tcp-jpeg-v1' in text, path
-        assert 'sendmsg(fd, &message, MSG_DONTWAIT)' in text, path
-        assert 'adaptJpegPressure' in text, path
-        assert 'effectiveJpegQuality' in text, path
-        assert 'sendEwmaMs' in text, path
-        assert 'adaptive_quality_adjustments' in text, path
-        assert 'configured_jpeg_quality' in text, path
-        assert 'effective_jpeg_quality' in text, path
-        assert 'AiTL V037 adaptive-JPEG ESP32-CAM node' in text, path
+        assert "aitl-camera-v037" in text, path
+        assert "aitl-tcp-jpeg-v1" in text, path
+        assert "sendmsg(fd, &message, MSG_DONTWAIT)" in text, path
+        assert "compressionStepForOversize" in text, path
+        assert "learnPayloadTargetFromPartialSend" in text, path
+        assert "adaptivePayloadTargetBytes" in text, path
+        assert "adaptiveLocalFrameDrops" in text, path
+        assert "adaptiveWindowLearns" in text, path
+        assert "lastFrameBytes > adaptivePayloadTargetBytes" in text, path
+        assert text.index("lastFrameBytes > adaptivePayloadTargetBytes") < text.index("++sequenceNumber"), path
+        assert "AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node" in text, path
 
     for marker in (
-        '#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_QVGA',
-        '#define AITL_DEFAULT_JPEG_QUALITY 24',
-        '#define AITL_ADAPTIVE_MAX_JPEG_QUALITY 40',
-        '#define AITL_ADAPTIVE_FAILURE_STEP 4',
-        '#define AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES 12U',
+        "#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_QVGA",
+        "#define AITL_DEFAULT_JPEG_QUALITY 24",
+        "#define AITL_ADAPTIVE_MAX_JPEG_QUALITY 50",
+        "#define AITL_ADAPTIVE_TARGET_FRAME_BYTES 5000U",
+        "#define AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES 3800U",
+        "#define AITL_ADAPTIVE_FAILURE_STEP 6",
+        "#define AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES 30U",
     ):
         assert marker in config, marker
         assert marker in arduino, marker
 
     assert 'CAMERA_PROTOCOL = "aitl-camera-v037"' in remote
     assert '"aitl-camera-v036"' in remote
-    assert 'COMPATIBLE_CAMERA_PROTOCOLS' in remote
+    assert "COMPATIBLE_CAMERA_PROTOCOLS" in remote
+    assert "socket.SO_RCVBUF, 256 * 1024" in remote
     assert '"frame_size": "QVGA"' in manager
     assert '"jpeg_quality": 24' in manager
     assert 'frame_size: "QVGA"' in frontend
     assert 'jpeg_quality: 24' in frontend
+    assert "ESP payload target" in page
+    assert "Oversize frames skipped" in page
+    assert "TCP window learns" in page
 
-    pressured = simulate(24, [(True, 14000, 300)] * 5)
-    assert pressured == [26, 28, 30, 32, 34]
-    failed = simulate(24, [(False, 14000, 900)] * 6)
-    assert failed[-1] == 40 and all(24 <= q <= 40 for q in failed)
-    recovery = simulate(24, [(True, 14000, 300)] * 4 + [(True, 5000, 10)] * 24)
-    assert recovery[-1] == 30  # 32 -> 31 -> 30 after two 12-frame recovery windows
-    assert min(recovery) >= 24
-    high_config = simulate(50, [(False, 14000, 900)] * 3)
-    assert high_config == [50, 50, 50], "adaptive logic must never reduce a user's already-high compression setting"
+    # A 20 KB first frame should jump compression strongly rather than causing
+    # several TCP reconnects while stepping by only two quality points.
+    assert compression_step(20000, 5000) == 10
+    assert compression_step(9000, 5000) == 4
+    assert compression_step(5500, 5000) == 2
 
-    print("[PASS] V037 preserves V036 ATL1/TCP framing and R6 non-blocking vectored send")
-    print("[PASS] adaptive JPEG pressure is bounded, failure-responsive, and recovers slowly")
-    print("[PASS] new profile defaults are QVGA / JPEG 24 / 15 FPS while V036 remains migration-compatible")
+    # Physical R6/R5 logs often accepted about 5.3-5.7 KB before stalling.
+    # R2 learns a safe payload below the observed partial-write boundary.
+    assert learned_target(5000, 5744, 20000) == 5000
+    assert learned_target(5000, 5298, 20000) == 4770
+    assert learned_target(4770, 4200, 12000) == 3800
+
+    print("[PASS] V037 R2 preserves ATL1/TCP framing and V036 migration compatibility")
+    print("[PASS] oversized JPEGs are compressed/dropped locally before partial TCP frames")
+    print("[PASS] partial-send evidence learns a conservative one-window payload target")
+    print("[PASS] PC receive buffer and Camera Sources diagnostics are present")
     return 0
 
 
