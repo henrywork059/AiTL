@@ -1,0 +1,54 @@
+AiTL V038 R5 - historical firmware regression robustness repair
+
+Release state
+-------------
+version: 0_3_8
+repair: R5
+passed_baseline remains: 0_2_4
+
+Reason
+------
+V038 R4 preserved the inherited V036/V037 warm-up and non-blocking vectored
+transport behavior but compacted some C++ formatting and intentionally changed
+the instrumented firmware revision to v037-r7-diagnostic-isolation.
+
+Two historical source-structure regressions were still coupled to:
+1. exact whitespace around the warm-up comparison; and
+2. the old v037-r6-quality-preserving-tcp revision string.
+
+R5 makes those historical tests formatting-insensitive and explicitly accepts
+the R7 diagnostic-instrumentation lineage while still proving that normal mode
+uses the inherited non-blocking vectored sender, warm-up gate, timeout bounds,
+quality-preserving settings, one WHEN_EMPTY framebuffer, 20 MHz XCLK, and
+Wi-Fi telemetry.
+
+Changed files
+-------------
+AI_Traffic_Light/scripts/test_v036_firmware_send_structure.py
+AI_Traffic_Light/scripts/test_v037_adaptive_camera_transport.py
+AI_Traffic_Light/PATCH_MANIFEST_0_3_8_R5.txt
+
+Deliberate non-changes
+----------------------
+- No firmware runtime code changed.
+- No backend runtime code changed.
+- No frontend runtime code changed.
+- No API contract changed.
+- No VERSION promotion or passed-baseline change.
+- No ESP reflash is required for R5.
+
+Validation performed against reconstructed current GitHub/R4 artifact state
+---------------------------------------------------------------------------
+PASS: Python compile for both changed regression files.
+PASS: test_camera_diagnostics.py (current V038 R4 candidate-isolation regression).
+PASS: corrected test_v036_firmware_send_structure.py.
+PASS: corrected test_v037_adaptive_camera_transport.py.
+PASS: ZIP CRC/integrity, required AI_Traffic_Light/ prefix, duplicate-member,
+      path-traversal and runtime/generated-file exclusion checks.
+
+Owner verification
+------------------
+Upload/extract these changed files to GitHub main, then run:
+  .\scripts\update_test_run.ps1
+
+The complete owner repository runner remains the final full-suite validation.

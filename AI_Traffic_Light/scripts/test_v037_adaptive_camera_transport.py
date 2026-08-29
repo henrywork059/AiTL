@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORMIO = ROOT / "apps/device-camera/esp32-cam/src/main.cpp"
@@ -8,6 +9,11 @@ REMOTE = ROOT / "apps/pc-studio/backend/app/services/remote_camera.py"
 PAGE = ROOT / "apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx"
 
 
+def compact_cpp(text: str) -> str:
+    """Make structural assertions insensitive to formatting-only whitespace."""
+    return re.sub(r"\s+", "", text)
+
+
 def main() -> int:
     platformio = PLATFORMIO.read_text(encoding="utf-8")
     arduino = ARDUINO.read_text(encoding="utf-8")
@@ -15,28 +21,45 @@ def main() -> int:
     remote = REMOTE.read_text(encoding="utf-8")
     page = PAGE.read_text(encoding="utf-8")
 
-    # This regression owns the inherited V037 R6 transport contract, not the
-    # repository's current release metadata. VERSION consistency is validated
-    # separately by scripts/check_structure.py and the current-candidate tests.
-    # Keeping current/previous-version assertions here would make this historical
-    # transport regression fail every time a later candidate legitimately starts.
+    # This historical regression owns the inherited V037/R6 transport contract,
+    # not the repository's current release metadata or exact source formatting.
+    # V038 R4 intentionally adds R7 diagnostic-isolation instrumentation while
+    # preserving the normal R6 quality-preserving transport behavior.
 
     for path, text in ((PLATFORMIO, platformio), (ARDUINO, arduino)):
+        compact = compact_cpp(text)
+
         assert "aitl-camera-v037" in text, path
         assert "aitl-tcp-jpeg-v1" in text, path
-        assert "v037-r6-quality-preserving-tcp" in text, path
-        assert "sendmsg(fd, &message, MSG_DONTWAIT)" in text, path
+        assert (
+            "v037-r6-quality-preserving-tcp" in text
+            or "v037-r7-diagnostic-isolation" in text
+        ), f"unexpected V037 firmware lineage: {path}"
+
+        assert "sendmsg(fd,&message,MSG_DONTWAIT)" in compact, path
         assert "sendFrameVectoredProgressBounded" in text, path
-        assert "nextFrameDueUs = nowUs + periodUs" in text, path
+        assert "nextFrameDueUs=nowUs+periodUs" in compact, path
+        assert "streamClientSuccessfulFrames<AITL_WARMUP_SUCCESS_FRAMES" in compact, path
+        assert "streamClientSuccessfulFrames=0" in compact, path
+
+        if "v037-r7-diagnostic-isolation" in text:
+            assert "DiagnosticStreamMode::Normal" in text, path
+            assert "diagnosticStreamMode=DiagnosticStreamMode::Normal" in compact, path
+            assert "sendStagedFrame" in text, path
+            assert "camera_staged_dram" in text, path
+            assert (
+                "elseif(fd>=0)payloadOk=sendFrameVectoredProgressBounded" in compact
+            ), f"R7 normal mode no longer uses inherited vectored transport: {path}"
 
         # R6 uses the physically validated one-buffer/WHEN_EMPTY camera path.
-        assert "config.fb_count = 1" in text, path
-        assert "config.grab_mode = CAMERA_GRAB_WHEN_EMPTY" in text, path
-        assert "config.xclk_freq_hz = 20000000" in text, path
-        assert "config.fb_count = 2" not in text, path
+        assert "config.fb_count=1" in compact, path
+        assert "config.grab_mode=CAMERA_GRAB_WHEN_EMPTY" in compact, path
+        assert "config.xclk_freq_hz=20000000" in compact, path
+        assert "config.fb_count=2" not in compact, path
         assert "CAMERA_GRAB_LATEST" not in text, path
 
-        # R2/R4's false single-lwIP-window assumption is intentionally gone.
+        # R2/R4's false single-lwIP-window assumption is intentionally gone
+        # from the normal quality-preserving transport.
         assert "compressionStepForOversize" not in text, path
         assert "learnPayloadTargetFromPartialSend" not in text, path
         assert "downshiftEffectiveFrameSize" not in text, path
@@ -47,12 +70,12 @@ def main() -> int:
         # Network failures must never rewrite image quality or resolution.
         assert "quality_preserving_transport" in text, path
         assert "adaptive_quality_enabled" in text, path
-        assert 'adaptive_quality_enabled\\":false' in text, path
+        assert 'adaptive_quality_enabled\\\":false' in text, path
         assert "quality/resolution preserved" in text, path
-        assert "sensor->set_quality(sensor, settings.jpegQuality)" in text, path
-        assert "sensor->set_framesize(sensor, settings.frameSize)" in text, path
+        assert "sensor->set_quality(sensor,settings.jpegQuality)" in compact, path
+        assert "sensor->set_framesize(sensor,settings.frameSize)" in compact, path
 
-        # BSSID/channel telemetry makes weak mesh/AP association visible.
+        # BSSID/channel telemetry makes weak AP association visible.
         assert "WiFi.BSSIDstr()" in text, path
         assert "WiFi.channel()" in text, path
         assert "wifi_bssid" in text, path
@@ -97,11 +120,10 @@ def main() -> int:
     assert "ESP payload target" not in page
     assert "TCP window learns" not in page
 
-    print("[PASS] inherited V037 R6 preserves ATL1/TCP framing and V036 migration compatibility")
-    print("[PASS] inherited R6 removes the false 3.8-5 KB single-window payload controller")
-    print("[PASS] inherited R6 preserves configured JPEG quality/resolution across TCP failures")
-    print("[PASS] inherited R6 uses one WHEN_EMPTY framebuffer and keeps 20 MHz XCLK")
-    print("[PASS] inherited R6 exposes RSSI/BSSID/channel and Wi-Fi recovery telemetry")
+    print("[PASS] inherited V037 transport preserves ATL1/TCP framing and V036 migration compatibility")
+    print("[PASS] R7 diagnostic instrumentation preserves the normal R6 non-blocking vectored sender")
+    print("[PASS] quality/resolution remain fixed across transport failures")
+    print("[PASS] one WHEN_EMPTY framebuffer, 20 MHz XCLK, warmup guardrails and Wi-Fi telemetry remain intact")
     return 0
 
 
