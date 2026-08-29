@@ -1,0 +1,42 @@
+AiTL V038 R3 - deep camera diagnostic artifact-parity repair
+
+Version state
+- version: 0_3_8 (unchanged same-candidate repair)
+- previous_version: 0_3_7
+- passed_baseline: 0_2_4 (unchanged)
+- ESP firmware: unchanged V037 R6 / aitl-camera-v037 / aitl-tcp-jpeg-v1
+
+Why R3 exists
+The prior R2 artifact mixed snapshots: the packaged service used 8 control probes while the packaged regression fixture still hard-coded 3, and the intended dedicated bottleneck-analysis module was not present in the ZIP. R3 ships one coherent deep-diagnostic implementation and validates the exact packaged artifact rather than a different working directory.
+
+Changed files
+1. AI_Traffic_Light/apps/pc-studio/backend/app/services/camera_diagnostic_analysis.py
+2. AI_Traffic_Light/apps/pc-studio/backend/app/services/camera_diagnostics.py
+3. AI_Traffic_Light/apps/pc-studio/frontend/src/lib/cameraDiagnosticsApi.ts
+4. AI_Traffic_Light/apps/pc-studio/frontend/src/pages/CameraDiagnosticsPage.tsx
+5. AI_Traffic_Light/scripts/test_camera_diagnostics.py
+6. AI_Traffic_Light/PATCH_MANIFEST_0_3_8_R3.txt
+
+R3 diagnostic scope
+- functionality: control, protocol, sensor readiness, saved-setting round trip, start/stop lifecycle, JPEG integrity, managed PC Studio path, state restore
+- load/capacity: 5 / 10 / 15 FPS ladder using unchanged saved JPEG quality/resolution
+- contention: same-load direct streaming with concurrent /status polling
+- stability: 20-second saved-target direct phase with timing/jitter/stall/disconnect/sequence evidence
+- managed path: 10-second RemoteCameraService/Manager phase with per-phase deltas
+- bottlenecks: control latency, RF margin, capture pressure, ESP TCP sender/backpressure, payload/FPS capacity, control-stream contention, PC receive integration
+- diagnostic-induced TCP phase-boundary resets are measured separately and excluded from spontaneous-failure classification
+
+Permanent regression hardening
+- the regression imports EXPECTED_CONTROL_PROBES from production analysis code instead of duplicating the value
+- it asserts CONTROL_PROBE_ATTEMPTS == EXPECTED_CONTROL_PROBES
+- it exercises healthy, sender-stall, invalid-JPEG, contention, PC-integration, sustained-instability, degraded-timing, capacity, control, Wi-Fi, protocol and sensor classifications
+- it exercises bottleneck analysis for load saturation, control latency, polling contention, ESP send-time pressure, stability score and managed-path throughput
+
+Pre-handoff artifact-parity gate
+- reconstructed exact current GitHub V038 main from the published V038 + R1 + R2 artifacts and matched known GitHub blob SHAs for VERSION, camera_diagnostics.py, cameraDiagnosticsApi.ts, CameraDiagnosticsPage.tsx and test_camera_diagnostics.py
+- overlaid the R3 changed files onto that exact base
+- Python compile: PASS
+- exact packaged camera-diagnostic regression logic: PASS
+- TypeScript no-emit compile for changed frontend API/page: PASS
+- package member/path/integrity checks: required before handoff
+- after ZIP creation, extract that ZIP onto the exact-base validation copy and rerun the same targeted checks; validate the artifact, not a separate worktree

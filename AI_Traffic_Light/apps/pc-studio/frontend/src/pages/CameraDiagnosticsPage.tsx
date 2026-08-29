@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   runCameraDiagnostics,
   type CameraDiagnosticCheckStatus,
+  type CameraDiagnosticFindingSeverity,
   type CameraDiagnosticReport,
+  type CameraLoadPhase,
 } from "../lib/cameraDiagnosticsApi";
 import { fetchRemoteCameraStatus, type RemoteCameraStatus } from "../lib/remoteCameraApi";
 
@@ -19,9 +21,21 @@ function overallPillClass(report: CameraDiagnosticReport): string {
   return "status-pill status-info";
 }
 
-function displayNumber(value: number | null, suffix = ""): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-  return `${value}${suffix}`;
+function findingPillClass(severity: CameraDiagnosticFindingSeverity): string {
+  if (severity === "critical") return "status-pill status-planned";
+  if (severity === "warning") return "status-pill status-info";
+  return "status-pill muted";
+}
+
+function displayNumber(value: number | null | undefined, suffix = "", decimals?: number): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const text = decimals === undefined ? String(value) : value.toFixed(decimals);
+  return `${text}${suffix}`;
+}
+
+function phaseResult(phase: CameraLoadPhase): string {
+  const ratio = phase.fps_ratio === undefined ? "" : ` / ${Math.round(phase.fps_ratio * 100)}% target`;
+  return `${phase.measured_fps.toFixed(2)} FPS${ratio}`;
 }
 
 export function CameraDiagnosticsPage() {
@@ -62,13 +76,13 @@ export function CameraDiagnosticsPage() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>One-click camera diagnosis</h2>
+              <h2>Deep one-click camera test</h2>
               <p className="placeholder-copy">
-                PC Studio runs a detailed staged test of control responsiveness, camera lifecycle, direct ATL1/JPEG integrity,
-                sustained throughput, latency/jitter, concurrent status traffic, reconnect behavior, and the normal PC Studio worker.
+                One button checks functionality, sustained stability and practical bottlenecks across ESP control, Wi-Fi,
+                camera/JPEG capture, direct ATL1/TCP transport and the normal PC Studio receive path.
               </p>
             </div>
-            <span className="status-pill status-info">V038</span>
+            <span className="status-pill status-info">V038 R3</span>
           </div>
 
           <div className="settings-list">
@@ -79,23 +93,22 @@ export function CameraDiagnosticsPage() {
           </div>
 
           <p className="small-note">
-            The test temporarily pauses the selected physical stream and simulation if needed. It measures a conservative 5 FPS baseline,
-            then tests the saved target up to 15 FPS for capacity/headroom, verifies reconnect and managed-worker behavior, and restores the previous state.
+            The test uses the saved image quality/resolution, measures 5/10/15 FPS load points, status-poll coexistence,
+            a longer saved-target stability run and the normal PC Studio worker. It then restores and verifies the previous
+            saved FPS/settings, connection/stream state and simulation state.
           </p>
 
           <div className="button-row">
             <button className="primary" type="button" onClick={() => void diagnose()} disabled={running || !activeProfile}>
-              {running ? "Diagnosing camera..." : "Diagnose camera"}
+              {running ? "Testing camera..." : "Diagnose camera"}
             </button>
           </div>
 
-          {!activeProfile && (
-            <p className="error-message">Save and select an ESP camera in Camera Sources first.</p>
-          )}
+          {!activeProfile && <p className="error-message">Save and select an ESP camera in Camera Sources first.</p>}
           {error && <p className="error-message">{error}</p>}
           {running && (
             <p className="small-note">
-              Running detailed staged checks. This normally takes about 40–60 seconds; keep the ESP powered and on the same LAN.
+              Running the deep staged test. Allow about 55–75 seconds and keep the ESP powered in its normal physical position.
             </p>
           )}
         </section>
@@ -104,11 +117,10 @@ export function CameraDiagnosticsPage() {
           <div className="panel-header">
             <div>
               <h2>Diagnosis</h2>
-              <p className="placeholder-copy">The result identifies the most likely failing layer instead of only returning raw socket errors.</p>
+              <p className="placeholder-copy">The final result combines functional failures, stability margin and ranked bottleneck evidence.</p>
             </div>
             {report ? <span className={overallPillClass(report)}>{report.overall}</span> : <span className="status-pill muted">not run</span>}
           </div>
-
           {report ? (
             <>
               <h3>{report.title}</h3>
@@ -116,93 +128,33 @@ export function CameraDiagnosticsPage() {
               <div className="settings-list">
                 <div><span>Diagnosis code</span><code>{report.diagnosis_code}</code></div>
                 <div><span>Confidence</span><code>{report.confidence}</code></div>
-                <div><span>Run ID</span><code>{report.run_id}</code></div>
+                <div><span>Functionality</span><code>{report.functionality.score}% ({report.functionality.passed}/{report.functionality.total})</code></div>
+                <div><span>Stability</span><code>{report.stability.grade} / {report.stability.score}%</code></div>
+                <div><span>Primary bottleneck</span><code>{report.bottleneck_analysis.primary_bottleneck}</code></div>
                 <div><span>Duration</span><code>{(report.duration_ms / 1000).toFixed(1)} s</code></div>
                 <div><span>State restored</span><code>{report.state_restored ? "yes" : "needs attention"}</code></div>
               </div>
             </>
           ) : (
-            <p className="placeholder-copy">Press Diagnose camera to generate a layer-by-layer report.</p>
+            <p className="placeholder-copy">Press Diagnose camera to generate the detailed report.</p>
           )}
         </section>
       </div>
 
       {report && (
         <>
-          <div className="two-column-grid">
-            <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Functionality</h2>
-                  <p className="placeholder-copy">End-to-end functions verified during this run.</p>
-                </div>
-              </div>
-              <div className="settings-list">
-                {Object.entries(report.functionality).map(([name, passed]) => (
-                  <div key={name}><span>{name.replace(/_/g, " ")}</span><code>{passed ? "PASS" : "FAIL"}</code></div>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Stability score</h2>
-                  <p className="placeholder-copy">Combines failures, reconnects, RF events, throughput headroom, and frame timing.</p>
-                </div>
-                <span className={report.stability.score >= 75 ? "status-pill status-implemented" : report.stability.score >= 55 ? "status-pill status-info" : "status-pill status-planned"}>
-                  {report.stability.score}/100 — {report.stability.grade}
-                </span>
-              </div>
-              <div className="settings-list">
-                <div><span>Load target / sustained</span><code>{report.stability.target_fps} / {report.stability.sustained_fps.toFixed(2)} FPS</code></div>
-                <div><span>FPS headroom</span><code>{Math.round(report.stability.fps_headroom_ratio * 100)}%</code></div>
-                <div><span>Frame interval p95 / max</span><code>{displayNumber(report.stability.frame_interval_p95_ms, " ms")} / {displayNumber(report.stability.frame_interval_max_ms, " ms")}</code></div>
-                <div><span>Unexpected ESP send failures</span><code>{report.stability.unexpected_send_failures}</code></div>
-                <div><span>Deadline drops</span><code>{report.stability.deadline_drops}</code></div>
-                <div><span>Wi-Fi disconnect / reconnect</span><code>{report.stability.wifi_disconnects_delta} / {report.stability.wifi_reconnects_delta}</code></div>
-              </div>
-            </section>
-          </div>
-
           <section className="panel">
             <div className="panel-header">
               <div>
-                <h2>Bottleneck analysis</h2>
-                <p className="placeholder-copy">Measured constraints are attributed to the most likely layer instead of being reduced to one generic failure.</p>
-              </div>
-              <span className="status-pill muted">{report.bottlenecks.length} detected</span>
-            </div>
-            {report.bottlenecks.length === 0 ? (
-              <p className="success-message">No material bottleneck was detected during this run.</p>
-            ) : (
-              <div className="settings-list">
-                {report.bottlenecks.map((item, index) => (
-                  <div key={`${item.layer}-${index}`}>
-                    <span><strong>{item.layer}</strong><br /><small>{item.evidence}</small></span>
-                    <span className={item.severity === "high" ? "status-pill status-planned" : "status-pill status-info"}>{item.severity}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Layer checks</h2>
-                <p className="placeholder-copy">Each test isolates a different part of the camera connection path.</p>
+                <h2>Functionality & layer checks</h2>
+                <p className="placeholder-copy">Protocol, camera readiness, setting round-trip, session lifecycle, image integrity, managed receive path and restore are checked separately.</p>
               </div>
               <span className="status-pill muted">{report.checks.length} checks</span>
             </div>
             <div className="settings-list">
               {report.checks.map((check) => (
                 <div key={check.id}>
-                  <span>
-                    <strong>{check.label}</strong>
-                    <br />
-                    <small>{check.detail}</small>
-                  </span>
+                  <span><strong>{check.label}</strong><br /><small>{check.detail}</small></span>
                   <span className={checkPillClass(check.status)}>{check.status}</span>
                 </div>
               ))}
@@ -213,57 +165,99 @@ export function CameraDiagnosticsPage() {
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <h2>Measured transport</h2>
-                  <p className="placeholder-copy">Key evidence used by the diagnosis classifier.</p>
+                  <h2>Sustained stability</h2>
+                  <p className="placeholder-copy">Longer operation at the saved target reveals disconnects, timing jitter and stale-frame stalls that short connection tests miss.</p>
                 </div>
+                <span className={report.stability.grade === "stable" ? "status-pill status-implemented" : report.stability.grade === "unstable" ? "status-pill status-planned" : "status-pill status-info"}>
+                  {report.stability.grade}
+                </span>
               </div>
               <div className="settings-list">
-                <div><span>HTTP control</span><code>{report.metrics.control_successes} ok / {report.metrics.control_failures} fail</code></div>
-                <div><span>Control latency avg / p95 / max</span><code>{displayNumber(report.metrics.control_avg_ms, " ms")} / {displayNumber(report.metrics.control_p95_ms, " ms")} / {displayNumber(report.metrics.control_max_ms, " ms")}</code></div>
-                <div><span>RSSI range</span><code>{report.metrics.rssi_min ?? "—"} .. {report.metrics.rssi_max ?? "—"} dBm</code></div>
-                <div><span>BSSID</span><code>{report.metrics.wifi_bssid ?? "—"}</code></div>
-                <div><span>Direct stream</span><code>{report.metrics.direct_clean_frames} frames / {report.metrics.direct_clean_fps.toFixed(2)} FPS</code></div>
-                <div><span>Direct disconnects / invalid / sequence gaps</span><code>{report.metrics.direct_clean_disconnects} / {report.metrics.direct_clean_bad_frames} / {report.metrics.direct_clean_sequence_gaps}</code></div>
-                <div><span>Direct frame interval p95</span><code>{displayNumber(report.metrics.direct_clean_p95_interval_ms, " ms")}</code></div>
-                <div><span>With status polling</span><code>{report.metrics.direct_polled_frames} frames / {report.metrics.direct_polled_disconnects} disconnects / {report.metrics.direct_polled_bad_frames} invalid</code></div>
-                <div><span>Load test</span><code>{report.metrics.load_fps.toFixed(2)} / {report.metrics.load_target_fps} FPS ({Math.round(report.metrics.load_fps_ratio * 100)}%)</code></div>
-                <div><span>Load throughput / JPEG avg</span><code>{report.metrics.load_throughput_mbps.toFixed(3)} Mbps / {report.metrics.load_payload_avg_bytes} B</code></div>
-                <div><span>Load interval p95 / max</span><code>{displayNumber(report.metrics.load_frame_interval_p95_ms, " ms")} / {displayNumber(report.metrics.load_frame_interval_max_ms, " ms")}</code></div>
-                <div><span>Reconnect test</span><code>{report.metrics.reconnect_success ? "pass" : "fail"} / {displayNumber(report.metrics.reconnect_ms, " ms")}</code></div>
-                <div><span>PC Studio worker</span><code>{report.metrics.managed_frames} frames / {report.metrics.managed_fps.toFixed(2)} FPS / {report.metrics.managed_failed_fetches} failures</code></div>
-                <div><span>ESP send failures total / unexpected</span><code>{report.metrics.device_send_failures_delta} / {report.metrics.device_unexpected_send_failures_delta}</code></div>
-                <div><span>Diagnostic transition resets</span><code>{report.metrics.diagnostic_transition_resets}</code></div>
-                <div><span>ESP deadline drops added</span><code>{report.metrics.device_deadline_drops_delta}</code></div>
-                <div><span>Last send errno</span><code>{report.metrics.last_send_errno ?? "—"}</code></div>
-                <div><span>Last accepted bytes</span><code>{report.metrics.last_send_accepted_bytes ?? "—"}</code></div>
+                <div><span>Stability score</span><code>{report.stability.score}%</code></div>
+                <div><span>Target / achieved</span><code>{report.metrics.stability_target_fps} / {report.metrics.stability_measured_fps.toFixed(2)} FPS</code></div>
+                <div><span>Frame interval p95</span><code>{displayNumber(report.metrics.stability_interval_p95_ms, " ms", 1)}</code></div>
+                <div><span>Worst frame interval</span><code>{displayNumber(report.metrics.stability_interval_max_ms, " ms", 1)}</code></div>
+                <div><span>Interval jitter</span><code>{displayNumber(report.metrics.stability_jitter_ms, " ms", 1)}</code></div>
+                <div><span>Long stalls</span><code>{report.metrics.stability_stall_intervals}</code></div>
+                <div><span>Disconnects / sequence gaps</span><code>{report.metrics.stability_disconnects} / {report.metrics.stability_sequence_gaps}</code></div>
+                <div><span>Invalid JPEGs</span><code>{report.metrics.stability_bad_frames}</code></div>
               </div>
             </section>
 
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <h2>What to do next</h2>
-                  <p className="placeholder-copy">Recommendations are based on the failing layer measured in this run.</p>
+                  <h2>Bottleneck analysis</h2>
+                  <p className="placeholder-copy">Findings are ranked from the strongest limiting evidence to secondary warnings.</p>
                 </div>
+                <span className="status-pill muted">{report.bottleneck_analysis.findings.length} findings</span>
               </div>
-
-              {report.likely_causes.length > 0 && (
-                <>
-                  <h3>Likely causes</h3>
-                  <ul>
-                    {report.likely_causes.map((cause) => <li key={cause}>{cause}</li>)}
-                  </ul>
-                </>
+              {report.bottleneck_analysis.findings.length ? (
+                <div className="settings-list">
+                  {report.bottleneck_analysis.findings.map((finding) => (
+                    <div key={finding.id}>
+                      <span>
+                        <strong>{finding.title}</strong><br />
+                        <small>{finding.evidence} {finding.impact}</small><br />
+                        <small>Action: {finding.recommendation}</small>
+                      </span>
+                      <span className={findingPillClass(finding.severity)}>{finding.layer}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="success-message">No material bottleneck was detected within the tested load range.</p>
               )}
+              <div className="settings-list">
+                <div><span>Estimated sustainable target</span><code>{report.bottleneck_analysis.estimated_sustainable_target_fps || "—"} FPS</code></div>
+                <div><span>Peak measured frame rate</span><code>{report.bottleneck_analysis.peak_measured_fps.toFixed(2)} FPS</code></div>
+                <div><span>Peak measured throughput</span><code>{report.bottleneck_analysis.peak_throughput_mbps.toFixed(3)} Mbps</code></div>
+              </div>
+            </section>
+          </div>
 
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>FPS / throughput load ladder</h2>
+                <p className="placeholder-copy">The same saved JPEG settings are tested at 5, 10 and 15 FPS so an FPS ceiling can be separated from image-quality or protocol failure.</p>
+              </div>
+            </div>
+            <div className="settings-list">
+              {report.load_ladder.map((phase) => (
+                <div key={phase.target_fps}>
+                  <span><strong>{phase.target_fps} FPS target</strong><br /><small>{phase.frames} frames · payload avg {displayNumber(phase.payload_avg_bytes, " B")} · p95 interval {displayNumber(phase.interval_p95_ms, " ms", 1)}</small></span>
+                  <code>{phaseResult(phase)} · {displayNumber(phase.throughput_mbps, " Mbps", 3)}</code>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="two-column-grid">
+            <section className="panel">
+              <div className="panel-header"><div><h2>Control & transport evidence</h2><p className="placeholder-copy">Measured evidence behind the classifier.</p></div></div>
+              <div className="settings-list">
+                <div><span>HTTP control</span><code>{report.metrics.control_successes} ok / {report.metrics.control_failures} fail</code></div>
+                <div><span>Control avg / p95 / max</span><code>{displayNumber(report.metrics.control_avg_ms, "", 1)} / {displayNumber(report.metrics.control_p95_ms, "", 1)} / {displayNumber(report.metrics.control_max_ms, " ms", 1)}</code></div>
+                <div><span>Control jitter</span><code>{displayNumber(report.metrics.control_jitter_ms, " ms", 1)}</code></div>
+                <div><span>RSSI range / BSSID</span><code>{report.metrics.rssi_min ?? "—"}..{report.metrics.rssi_max ?? "—"} dBm / {report.metrics.wifi_bssid ?? "—"}</code></div>
+                <div><span>Status-poll coexistence</span><code>{report.metrics.direct_polled_fps.toFixed(2)} FPS / {report.metrics.status_poll_failures} poll failures</code></div>
+                <div><span>Managed PC Studio</span><code>{report.metrics.managed_fps.toFixed(2)} FPS / {report.metrics.managed_failed_fetches} failures / {report.metrics.managed_reconnects} reconnects</code></div>
+                <div><span>Active ESP send failures / deadlines</span><code>{report.metrics.device_send_failures_delta} / {report.metrics.device_deadline_drops_delta}</code></div>
+                <div><span>Diagnostic boundary resets excluded</span><code>{report.metrics.phase_boundary_send_resets}</code></div>
+                <div><span>ESP send EWMA</span><code>{displayNumber(report.metrics.send_ewma_ms, " ms", 1)}</code></div>
+                <div><span>Last accepted / frame bytes</span><code>{report.metrics.last_send_accepted_bytes ?? "—"} / {report.metrics.last_frame_bytes ?? "—"}</code></div>
+              </div>
+              <p className="small-note">TCP resets caused by intentionally closing a diagnostic phase are counted separately and are not treated as spontaneous stream failures.</p>
+            </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><h2>What to do next</h2><p className="placeholder-copy">Actions are tied to the strongest evidence from this run.</p></div></div>
+              {report.likely_causes.length > 0 && <><h3>Likely causes</h3><ul>{report.likely_causes.map((cause) => <li key={cause}>{cause}</li>)}</ul></>}
               <h3>Recommended action</h3>
-              <ul>
-                {report.recommendations.map((recommendation) => <li key={recommendation}>{recommendation}</li>)}
-              </ul>
-
-              {!report.state_restored && report.restore_error && (
-                <p className="error-message">Restore warning: {report.restore_error}</p>
-              )}
+              <ul>{report.recommendations.map((recommendation) => <li key={recommendation}>{recommendation}</li>)}</ul>
+              {!report.state_restored && report.restore_error && <p className="error-message">Restore warning: {report.restore_error}</p>}
+              <p className="small-note">Run ID: <code>{report.run_id}</code></p>
             </section>
           </div>
         </>
