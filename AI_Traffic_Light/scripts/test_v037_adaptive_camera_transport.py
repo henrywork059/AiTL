@@ -54,7 +54,12 @@ def main() -> int:
         assert "adaptiveWindowLearns" in text, path
         assert "lastFrameBytes > adaptivePayloadTargetBytes" in text, path
         assert text.index("lastFrameBytes > adaptivePayloadTargetBytes") < text.index("++sequenceNumber"), path
-        assert "AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node" in text, path
+        assert "downshiftEffectiveFrameSize" in text, path
+        assert "effectiveFrameSize" in text, path
+        assert "AITL_ADAPTIVE_HARD_FRAME_BYTES" in text, path
+        assert "effectiveJpegQuality < adaptiveCeiling" in text, path
+        assert "changedPressure = downshiftEffectiveFrameSize()" in text, path
+        assert "AiTL V037 R4 adaptive-resolution ESP32-CAM node" in text, path
 
     for marker in (
         "#define AITL_DEFAULT_FRAME_SIZE FRAMESIZE_QVGA",
@@ -64,6 +69,8 @@ def main() -> int:
         "#define AITL_ADAPTIVE_MIN_TARGET_FRAME_BYTES 3800U",
         "#define AITL_ADAPTIVE_FAILURE_STEP 6",
         "#define AITL_ADAPTIVE_RECOVERY_SUCCESS_FRAMES 30U",
+        "#define AITL_ADAPTIVE_HARD_FRAME_BYTES 6500U",
+        "#define AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES 60U",
     ):
         assert marker in config, marker
         assert marker in arduino, marker
@@ -79,6 +86,8 @@ def main() -> int:
     assert "ESP payload target" in page
     assert "Oversize frames skipped" in page
     assert "TCP window learns" in page
+    assert "ESP effective size" in page
+    assert "Resolution adaptations" in page
 
     # A 20 KB first frame should jump compression strongly rather than causing
     # several TCP reconnects while stepping by only two quality points.
@@ -92,8 +101,8 @@ def main() -> int:
     assert learned_target(5000, 5298, 20000) == 4770
     assert learned_target(4770, 4200, 12000) == 3800
 
-    print("[PASS] V037 R2 preserves ATL1/TCP framing and V036 migration compatibility")
-    print("[PASS] oversized JPEGs are compressed/dropped locally before partial TCP frames")
+    print("[PASS] V037 R4 preserves ATL1/TCP framing and V036 migration compatibility")
+    print("[PASS] oversized JPEGs compress first, then downshift effective resolution instead of leaking past the target")
     print("[PASS] partial-send evidence learns a conservative one-window payload target")
     print("[PASS] PC receive buffer and Camera Sources diagnostics are present")
     return 0

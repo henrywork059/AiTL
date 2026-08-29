@@ -30,6 +30,20 @@ Physical V036 R6 testing proved the persistent TCP path could stay connected and
 - Extended `test_update_test_run_script.py` to reject reintroduction of the historical finalizer or tracked-file write operations.
 - This is a same-candidate V037 repair. Camera transport, adaptive JPEG behavior, APIs and firmware are unchanged from R2.
 
+## V037 R4 adaptive-resolution repair
+
+Physical R2 logs exposed a logic bug: once `effective_jpeg_quality` reached the configured adaptive ceiling, the local oversize guard stopped dropping frames and sent them even when `frame_bytes > adaptive_payload_target_bytes`. This produced the observed `q=50` / `targetB=3800` / `frame=8–22 KB` combination and reintroduced 200–1400 ms TCP sends.
+
+R4 changes the pressure ladder to:
+
+1. increase JPEG compression while headroom remains;
+2. if the JPEG is still oversized at maximum compression, drop that capture locally and lower only the **effective runtime resolution** one step;
+3. retry with a fresh frame;
+4. restore effective resolution slowly after sustained send-time/payload headroom;
+5. only then recover JPEG quality toward the saved setting.
+
+The user's saved `frame_size` is never rewritten. Runtime adaptation is bounded to the existing supported OV2640 frame-size ladder and remains visible through configured/effective frame-size plus downshift/recovery telemetry. A hard oversize guard prevents a very large frame from leaking onto TCP even at the smallest resolution.
+
 ## Deliberate non-changes
 
 - No UDP transport in V037 R2. This revision first attacks the specific TCP send-window behavior demonstrated by the V036 physical logs.

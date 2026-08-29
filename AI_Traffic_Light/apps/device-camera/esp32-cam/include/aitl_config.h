@@ -93,7 +93,7 @@
 #endif
 
 
-// R2 single-window controller: the classic ESP32 Arduino/lwIP default TCP
+// R4 single-window + adaptive-resolution controller: the classic ESP32 Arduino/lwIP default TCP
 // send buffer is about 5744 bytes. Keeping a JPEG below this target lets the
 // whole ATL1+JPEG record be queued without waiting for a second ACK window.
 #ifndef AITL_ADAPTIVE_TARGET_FRAME_BYTES
@@ -113,6 +113,12 @@
 #endif
 #ifndef AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT
 #define AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT 72U
+#endif
+#ifndef AITL_ADAPTIVE_HARD_FRAME_BYTES
+#define AITL_ADAPTIVE_HARD_FRAME_BYTES 6500U
+#endif
+#ifndef AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES
+#define AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES 60U
 #endif
 
 #ifndef AITL_WIFI_CONNECT_TIMEOUT_MS

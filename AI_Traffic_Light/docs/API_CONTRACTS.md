@@ -101,6 +101,10 @@ A V037 device `/status` may additionally report:
 - `send_ewma_ms`: exponentially weighted send time;
 - `adaptive_payload_target_bytes`: current maximum JPEG payload target before local oversize skipping;
 - `adaptive_local_frame_drops`: captured oversized JPEGs skipped locally before any ATL1 bytes were written;
-- `adaptive_window_learns`: number of times a partial TCP send lowered the conservative payload target.
+- `adaptive_window_learns`: number of times a partial TCP send lowered the conservative payload target;
+- `configured_frame_size`: the PC-saved resolution ceiling;
+- `effective_frame_size`: the temporary runtime resolution after V037 R4 pressure adaptation;
+- `adaptive_resolution_downshifts` / `adaptive_resolution_recoveries`: runtime size-adaptation counters;
+- `last_frame_width` / `last_frame_height`: actual dimensions of the most recently captured JPEG.
 
 These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.

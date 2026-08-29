@@ -1,4 +1,4 @@
-// AiTL V037 PlatformIO firmware (adaptive JPEG pressure control over persistent TCP).
+// AiTL V037 PlatformIO firmware (adaptive JPEG pressure + adaptive resolution over persistent TCP).
 #include <Arduino.h>
 #include <errno.h>
 #include <sys/uio.h>
@@ -15,7 +15,7 @@ namespace {
 
 constexpr char kCameraProtocol[] = "aitl-camera-v037";
 constexpr char kStreamProtocol[] = "aitl-tcp-jpeg-v1";
-constexpr char kFirmwareRevision[] = "v037-r2-single-window-adaptive";
+constexpr char kFirmwareRevision[] = "v037-r4-adaptive-resolution";
 constexpr uint8_t kFrameMagic[4] = {'A', 'T', 'L', '1'};
 constexpr size_t kFrameHeaderBytes = 16;
 
@@ -97,6 +97,12 @@ float sendEwmaMs = 0.0f;
 uint32_t adaptivePayloadTargetBytes = AITL_ADAPTIVE_TARGET_FRAME_BYTES;
 uint32_t adaptiveLocalFrameDrops = 0;
 uint32_t adaptiveWindowLearns = 0;
+framesize_t effectiveFrameSize = AITL_DEFAULT_FRAME_SIZE;
+uint32_t adaptiveResolutionDownshifts = 0;
+uint32_t adaptiveResolutionRecoveries = 0;
+uint32_t adaptiveResolutionHeadroomFrames = 0;
+uint16_t lastFrameWidth = 0;
+uint16_t lastFrameHeight = 0;
 
 const char* frameSizeName(framesize_t value) {
   switch (value) {
@@ -111,6 +117,60 @@ const char* frameSizeName(framesize_t value) {
     case FRAMESIZE_UXGA: return "UXGA";
     default: return "VGA";
   }
+}
+
+int adaptiveFrameSizeIndex(framesize_t value) {
+  switch (value) {
+    case FRAMESIZE_QQVGA: return 0;
+    case FRAMESIZE_HQVGA: return 1;
+    case FRAMESIZE_QVGA: return 2;
+    case FRAMESIZE_CIF: return 3;
+    case FRAMESIZE_VGA: return 4;
+    case FRAMESIZE_SVGA: return 5;
+    case FRAMESIZE_XGA: return 6;
+    case FRAMESIZE_SXGA: return 7;
+    case FRAMESIZE_UXGA: return 8;
+    default: return 2;
+  }
+}
+
+framesize_t adaptiveFrameSizeAt(int index) {
+  static constexpr framesize_t sizes[] = {
+      FRAMESIZE_QQVGA, FRAMESIZE_HQVGA, FRAMESIZE_QVGA, FRAMESIZE_CIF, FRAMESIZE_VGA,
+      FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_UXGA};
+  if (index < 0) index = 0;
+  if (index > 8) index = 8;
+  return sizes[index];
+}
+
+bool setEffectiveFrameSize(framesize_t nextSize) {
+  const int configuredIndex = adaptiveFrameSizeIndex(settings.frameSize);
+  int nextIndex = adaptiveFrameSizeIndex(nextSize);
+  if (nextIndex > configuredIndex) nextIndex = configuredIndex;
+  nextSize = adaptiveFrameSizeAt(nextIndex);
+  if (nextSize == effectiveFrameSize) return true;
+  sensor_t* sensor = esp_camera_sensor_get();
+  if (!sensor || sensor->set_framesize(sensor, nextSize) != 0) return false;
+  effectiveFrameSize = nextSize;
+  adaptiveResolutionHeadroomFrames = 0;
+  return true;
+}
+
+bool downshiftEffectiveFrameSize() {
+  const int currentIndex = adaptiveFrameSizeIndex(effectiveFrameSize);
+  if (currentIndex <= 0) return false;
+  if (!setEffectiveFrameSize(adaptiveFrameSizeAt(currentIndex - 1))) return false;
+  ++adaptiveResolutionDownshifts;
+  return true;
+}
+
+bool recoverEffectiveFrameSizeOneStep() {
+  const int currentIndex = adaptiveFrameSizeIndex(effectiveFrameSize);
+  const int configuredIndex = adaptiveFrameSizeIndex(settings.frameSize);
+  if (currentIndex >= configuredIndex) return false;
+  if (!setEffectiveFrameSize(adaptiveFrameSizeAt(currentIndex + 1))) return false;
+  ++adaptiveResolutionRecoveries;
+  return true;
 }
 
 bool parseFrameSize(const String& value, framesize_t& out) {
@@ -341,6 +401,12 @@ String statusJson() {
   json += ",\"adaptive_payload_target_bytes\":" + String(adaptivePayloadTargetBytes);
   json += ",\"adaptive_local_frame_drops\":" + String(adaptiveLocalFrameDrops);
   json += ",\"adaptive_window_learns\":" + String(adaptiveWindowLearns);
+  json += ",\"configured_frame_size\":\"" + String(frameSizeName(settings.frameSize)) + "\"";
+  json += ",\"effective_frame_size\":\"" + String(frameSizeName(effectiveFrameSize)) + "\"";
+  json += ",\"adaptive_resolution_downshifts\":" + String(adaptiveResolutionDownshifts);
+  json += ",\"adaptive_resolution_recoveries\":" + String(adaptiveResolutionRecoveries);
+  json += ",\"last_frame_width\":" + String(lastFrameWidth);
+  json += ",\"last_frame_height\":" + String(lastFrameHeight);
   json += ",\"last_frame_bytes\":" + String(lastFrameBytes);
   json += ",\"last_capture_ms\":" + String(lastCaptureMs);
   json += ",\"last_send_ms\":" + String(lastSendMs);
@@ -391,7 +457,9 @@ bool applySettings() {
   failures += sensor->set_colorbar(sensor, settings.colorbar ? 1 : 0) != 0;
   if (failures == 0) {
     effectiveJpegQuality = settings.jpegQuality;
+    effectiveFrameSize = settings.frameSize;
     adaptiveRecoveryFrames = 0;
+    adaptiveResolutionHeadroomFrames = 0;
     sendEwmaMs = 0.0f;
     adaptivePayloadTargetBytes = AITL_ADAPTIVE_TARGET_FRAME_BYTES;
   }
@@ -486,6 +554,22 @@ void adaptJpegPressure(
 
   const uint32_t recoveryBytes =
       (adaptivePayloadTargetBytes * AITL_ADAPTIVE_RECOVERY_HEADROOM_PERCENT) / 100U;
+
+  if (effectiveFrameSize != settings.frameSize) {
+    if (sendMs <= lowSendMs && frameBytes <= recoveryBytes) {
+      ++adaptiveResolutionHeadroomFrames;
+      if (adaptiveResolutionHeadroomFrames >= AITL_ADAPTIVE_RESOLUTION_RECOVERY_FRAMES) {
+        recoverEffectiveFrameSizeOneStep();
+        adaptiveResolutionHeadroomFrames = 0;
+      }
+    } else {
+      adaptiveResolutionHeadroomFrames = 0;
+    }
+    // Restore configured resolution before spending headroom on JPEG quality.
+    adaptiveRecoveryFrames = 0;
+    return;
+  }
+
   if (sendMs <= lowSendMs
       && frameBytes <= recoveryBytes
       && frameBytes <= AITL_ADAPTIVE_RECOVERY_FRAME_BYTES
@@ -731,20 +815,34 @@ void sendNextFrameIfDue() {
   }
 
   lastFrameBytes = static_cast<uint32_t>(fb->len);
+  lastFrameWidth = static_cast<uint16_t>(fb->width);
+  lastFrameHeight = static_cast<uint16_t>(fb->height);
   const int adaptiveCeiling = settings.jpegQuality > AITL_ADAPTIVE_MAX_JPEG_QUALITY
       ? settings.jpegQuality : AITL_ADAPTIVE_MAX_JPEG_QUALITY;
-  if (lastFrameBytes > adaptivePayloadTargetBytes && effectiveJpegQuality < adaptiveCeiling) {
-    ++adaptiveLocalFrameDrops;
-    adaptiveRecoveryFrames = 0;
-    const int step = compressionStepForOversize(lastFrameBytes, adaptivePayloadTargetBytes);
-    setEffectiveJpegQuality(effectiveJpegQuality + step);
-    lastSendMs = 0;
-    lastSendAcceptedBytes = 0;
-    lastSendErrno = EMSGSIZE;
-    lastSendWarmup = streamClientSuccessfulFrames < AITL_WARMUP_SUCCESS_FRAMES;
-    esp_camera_fb_return(fb);
-    nextFrameDueUs = micros() + (AITL_ADAPTIVE_LOCAL_RETRY_MS * 1000U);
-    return;
+  if (lastFrameBytes > adaptivePayloadTargetBytes) {
+    bool changedPressure = false;
+    if (effectiveJpegQuality < adaptiveCeiling) {
+      const int step = compressionStepForOversize(lastFrameBytes, adaptivePayloadTargetBytes);
+      changedPressure = setEffectiveJpegQuality(effectiveJpegQuality + step);
+    } else {
+      // R2 previously sent the oversize frame once quality hit its ceiling,
+      // defeating the single-window target. R4 instead lowers only the
+      // effective runtime resolution and keeps the user's configured size.
+      changedPressure = downshiftEffectiveFrameSize();
+    }
+
+    if (changedPressure || lastFrameBytes > AITL_ADAPTIVE_HARD_FRAME_BYTES) {
+      ++adaptiveLocalFrameDrops;
+      adaptiveRecoveryFrames = 0;
+      adaptiveResolutionHeadroomFrames = 0;
+      lastSendMs = 0;
+      lastSendAcceptedBytes = 0;
+      lastSendErrno = EMSGSIZE;
+      lastSendWarmup = streamClientSuccessfulFrames < AITL_WARMUP_SUCCESS_FRAMES;
+      esp_camera_fb_return(fb);
+      nextFrameDueUs = micros() + (AITL_ADAPTIVE_LOCAL_RETRY_MS * 1000U);
+      return;
+    }
   }
 
   ++sequenceNumber;
@@ -799,12 +897,15 @@ void printPeriodicStatus() {
   if (millis() - lastStatusAtMs < AITL_SERIAL_STATUS_INTERVAL_MS) return;
   lastStatusAtMs = millis();
   Serial.printf(
-      "ip=%s session=%s client=%s fps=%.1f target=%u frame=%luB capture=%lums send=%lums accepted=%lu errno=%d warmup=%s q=%d/%d ewma=%.0fms targetB=%lu localdrop=%lu learn=%lu adj=%lu failures=%lu rssi=%d\n",
+      "ip=%s session=%s client=%s fps=%.1f target=%u res=%ux%u/%s frame=%luB capture=%lums send=%lums accepted=%lu errno=%d warmup=%s q=%d/%d ewma=%.0fms targetB=%lu localdrop=%lu learn=%lu resdown=%lu resup=%lu adj=%lu failures=%lu rssi=%d\n",
       WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "offline",
       sessionActive ? "on" : "off",
       (streamClient && streamClient.connected()) ? "on" : "off",
       actualFps,
       targetFps,
+      static_cast<unsigned int>(lastFrameWidth),
+      static_cast<unsigned int>(lastFrameHeight),
+      frameSizeName(effectiveFrameSize),
       static_cast<unsigned long>(lastFrameBytes),
       static_cast<unsigned long>(lastCaptureMs),
       static_cast<unsigned long>(lastSendMs),
@@ -817,6 +918,8 @@ void printPeriodicStatus() {
       static_cast<unsigned long>(adaptivePayloadTargetBytes),
       static_cast<unsigned long>(adaptiveLocalFrameDrops),
       static_cast<unsigned long>(adaptiveWindowLearns),
+      static_cast<unsigned long>(adaptiveResolutionDownshifts),
+      static_cast<unsigned long>(adaptiveResolutionRecoveries),
       static_cast<unsigned long>(adaptiveQualityAdjustments),
       static_cast<unsigned long>(streamSendFailures),
       WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127);
@@ -828,7 +931,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL V037 R2 single-window adaptive-JPEG ESP32-CAM node");
+  Serial.println("AiTL V037 R4 adaptive-resolution ESP32-CAM node");
 
   cameraReady = initCamera();
   connectWifi();

@@ -11,6 +11,8 @@
 - PC Studio requests a 256 KiB receive buffer and Camera Sources exposes effective/configured quality, send EWMA, payload target, local oversize-drop count and window-learn count.
 - PC Studio remains migration-compatible with `aitl-camera-v036` nodes using the same TCP frame protocol, but V037 adaptive behavior requires V037 firmware.
 - R3 permanently removes the historical V036 metadata-finalizer hook from the normal update/test/run helper, so validation no longer rewrites tracked `CHANGELOG.md` or frontend version metadata and the next normal Git pull is not blocked by runner-created edits. A post-test cleanliness guard now catches any future helper that dirties tracked source.
+- R4 fixes an R2 physical-test bug where frames larger than the adaptive payload target were sent anyway after JPEG compression reached its ceiling. V037 now drops that capture and temporarily steps only the effective sensor resolution down until the frame fits; sustained low-send-time headroom restores resolution one step at a time before JPEG quality is recovered. Saved resolution remains unchanged.
+- R4 adds configured/effective frame-size, resolution downshift/recovery, and actual frame-dimension telemetry so physical adaptation is visible in Serial Monitor and Camera Sources.
 - No ESP-side inference, UDP transport, physical/public-road signal authority or rewrite of runtime camera-profile data is introduced.
 ## 0_3_6 — Low-latency binary TCP multi-ESP camera input
 

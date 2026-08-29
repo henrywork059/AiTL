@@ -88,3 +88,7 @@ This camera node only supplies images to the local AiTL prototype. It performs n
 V037 R2 keeps the V036 `ATL1` TCP wire format and R6 vectored non-blocking sender, then targets JPEG payloads near 5 KB. While more compression is available, an oversized capture is discarded locally before any ATL1 bytes are written; the next fresh capture uses a larger JPEG quality number. A partial TCP send can teach the controller a lower safe payload target. Recovery toward the saved quality is slow and requires strong payload headroom. Status/serial telemetry exposes configured/effective quality, payload target, local oversize drops, window-learn count, adjustment count and send-time EWMA.
 
 New profiles default to QVGA / JPEG 24 / 15 FPS; existing saved profiles are preserved. V037 PC Studio remains wire-compatible with V036 camera nodes during migration, but V037 adaptive behavior requires flashing the V037 firmware.
+
+
+### V037 R4 adaptive resolution
+If JPEG compression reaches its ceiling and a captured JPEG still exceeds the learned payload budget, the node now drops that capture locally and temporarily lowers the effective sensor resolution one step. This prevents the R2 failure mode where an oversized frame leaked onto TCP after quality reached its ceiling. The configured PC Studio resolution is preserved and is recovered gradually after sustained transport headroom.

@@ -21,3 +21,8 @@
 - [ ] After initial convergence, `adaptive_local_frame_drops` does not increase continuously during a stable scene.
 - [ ] Successful `accepted` bytes equal JPEG bytes + 16-byte ATL1 header and `errno=0`.
 - [ ] Camera Sources displays payload target, oversize local-drop count and TCP-window learn count.
+
+
+- [ ] R4: at maximum JPEG compression, a frame above `adaptive_payload_target_bytes` is not sent merely because the quality ceiling was reached.
+- [ ] R4: effective resolution may downshift under sustained oversize pressure while saved/configured resolution remains unchanged.
+- [ ] R4: sustained headroom recovers effective resolution before JPEG quality recovery; Serial/Camera Sources expose down/up counts and effective size.

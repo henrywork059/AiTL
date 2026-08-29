@@ -126,6 +126,10 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
   const devicePayloadTarget = typeof remote?.device?.adaptive_payload_target_bytes === "number" ? remote.device.adaptive_payload_target_bytes : null;
   const deviceLocalDrops = typeof remote?.device?.adaptive_local_frame_drops === "number" ? remote.device.adaptive_local_frame_drops : null;
   const deviceWindowLearns = typeof remote?.device?.adaptive_window_learns === "number" ? remote.device.adaptive_window_learns : null;
+  const deviceEffectiveFrameSize = typeof remote?.device?.effective_frame_size === "string" ? remote.device.effective_frame_size : null;
+  const deviceConfiguredFrameSize = typeof remote?.device?.configured_frame_size === "string" ? remote.device.configured_frame_size : null;
+  const deviceResolutionDownshifts = typeof remote?.device?.adaptive_resolution_downshifts === "number" ? remote.device.adaptive_resolution_downshifts : null;
+  const deviceResolutionRecoveries = typeof remote?.device?.adaptive_resolution_recoveries === "number" ? remote.device.adaptive_resolution_recoveries : null;
   const selectedFrameAvailable = Boolean(
     status?.frame_available
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
@@ -509,6 +513,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>ESP payload target</span><strong>{devicePayloadTarget !== null ? `${devicePayloadTarget} B` : "—"}</strong></div>
               <div><span>Oversize frames skipped</span><strong>{deviceLocalDrops ?? 0}</strong></div>
               <div><span>TCP window learns</span><strong>{deviceWindowLearns ?? 0}</strong></div>
+              <div><span>ESP effective size</span><strong>{deviceEffectiveFrameSize ? `${deviceEffectiveFrameSize} effective / ${deviceConfiguredFrameSize ?? settings.frame_size} saved` : FRAME_SIZE_DIMENSIONS[settings.frame_size]}</strong></div>
+              <div><span>Resolution adaptations</span><strong>{`${deviceResolutionDownshifts ?? 0} down / ${deviceResolutionRecoveries ?? 0} up`}</strong></div>
               <div><span>Stream reconnects</span><strong>{remote?.stream_reconnects ?? 0}</strong></div>
               <div><span>Session recoveries</span><strong>{remote?.session_recoveries ?? 0}</strong></div>
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>

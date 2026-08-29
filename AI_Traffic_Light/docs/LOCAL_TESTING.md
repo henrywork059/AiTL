@@ -65,3 +65,8 @@ failures stable
 ```
 
 If `q` reaches 50 and frames remain much larger than `targetB`, reduce resolution rather than continuing to increase timeouts.
+
+
+## V037 R4 physical check
+
+After flashing R4, Serial Monitor must identify `AiTL V037 R4 adaptive-resolution ESP32-CAM node`. Start with 320 × 240 / JPEG 24 / 15 FPS. When a frame remains above `targetB` at maximum compression, verify `resdown` increments and `res=<actual>/<effective enum>` steps downward instead of sending the oversized frame. `localdrop` may rise during convergence. Once stable headroom persists, `resup` may increment slowly toward the saved resolution. The saved Camera Sources resolution must not be rewritten by runtime adaptation.
