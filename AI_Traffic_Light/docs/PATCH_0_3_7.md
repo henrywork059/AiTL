@@ -21,6 +21,15 @@ Physical V036 R6 testing proved the persistent TCP path could stay connected and
 - ESP telemetry adds `adaptive_payload_target_bytes`, `adaptive_local_frame_drops` and `adaptive_window_learns` alongside configured/effective JPEG quality and send EWMA.
 - Camera Sources displays these transport diagnostics.
 
+
+## V037 R3 updater/worktree repair
+
+- Removed the automatic V036 metadata-finalizer call from `scripts/update_test_run.ps1`. Candidate metadata must already be committed on GitHub/main (or deliberately overlaid locally); the test runner no longer edits tracked release files.
+- Kept the strict pre-pull dirty-tree safety check for genuine tracked edits. Runtime/untracked files remain allowed and are never cleaned destructively.
+- Added a second tracked-cleanliness assertion after the non-live validation suite so a future test/helper that modifies tracked source fails immediately in that same run rather than breaking the next update.
+- Extended `test_update_test_run_script.py` to reject reintroduction of the historical finalizer or tracked-file write operations.
+- This is a same-candidate V037 repair. Camera transport, adaptive JPEG behavior, APIs and firmware are unchanged from R2.
+
 ## Deliberate non-changes
 
 - No UDP transport in V037 R2. This revision first attacks the specific TCP send-window behavior demonstrated by the V036 physical logs.

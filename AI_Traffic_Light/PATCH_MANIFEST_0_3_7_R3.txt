@@ -1,0 +1,11 @@
+AiTL V037 R3 changed-files manifest
+
+AI_Traffic_Light/VERSION
+AI_Traffic_Light/CHANGELOG.md
+AI_Traffic_Light/docs/PATCH_0_3_7.md
+AI_Traffic_Light/docs/LOCAL_TESTING.md
+AI_Traffic_Light/scripts/update_test_run.ps1
+AI_Traffic_Light/scripts/test_update_test_run_script.py
+AI_Traffic_Light/PATCH_MANIFEST_0_3_7_R3.txt
+
+Purpose: remove the historical V036 metadata-finalizer side effect from the normal runner while preserving strict tracked-work protection. Camera/firmware behavior is unchanged from V037 R2.

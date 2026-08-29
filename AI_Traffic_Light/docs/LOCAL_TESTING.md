@@ -17,11 +17,18 @@ Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
 
 If the patch was overlaid directly onto the local working tree instead, use `-SkipUpdate`.
 
+
+## Normal updater worktree behavior
+
+V037 R3 makes the runner read-only for tracked project/release files. A normal successful run must not leave `CHANGELOG.md`, `projectVersion.ts`, or any other tracked source modified. The updater still refuses to pull across genuine tracked edits and still preserves untracked runtime data.
+
+If upgrading a PC that was previously dirtied by the historical V036 finalizer, restore only those already-generated metadata edits once before pulling R3. After R3 is installed, this cleanup should not recur.
+
 ## Focused V037 checks
 
 - V037 firmware keeps `sendmsg(..., MSG_DONTWAIT)` and the V036 `ATL1` frame format.
 - V037 status reports configured/effective JPEG quality, adjustment count and send EWMA.
-- failed/slow/large sends can only increase the effective JPEG quality number up to 40;
+- failed/slow/large sends can only increase the effective JPEG quality number up to 50;
 - sustained fast/small delivery can only recover toward, never below, the saved configured quality;
 - `/config` resets adaptive quality to the newly saved configured value;
 - PC accepts `aitl-camera-v037` and migration-compatible `aitl-camera-v036`, but rejects V035 HTTP/MJPEG firmware;

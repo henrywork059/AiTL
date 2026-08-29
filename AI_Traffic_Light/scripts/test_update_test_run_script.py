@@ -24,7 +24,22 @@ def main() -> int:
     assert not re.search(r"(?m)^\s*elif\s*\(", text), "PowerShell runner must use elseif, not elif"
     assert re.search(r"(?m)^\s*elseif\s*\(", text), "PowerShell runner should retain the SkipTests dependency branch"
 
+    # The runner must never mutate tracked release metadata. V036's historical
+    # finalizer caused CHANGELOG/projectVersion edits that blocked the next pull.
+    assert "Invoke-CandidateMetadataFinalizer" not in text
+    assert "apply_v036_full_patch.ps1" not in text
+    assert "WriteAllText" not in text
+    assert "Set-Content" not in text
+    assert "Add-Content" not in text
+
+    # Re-check tracked cleanliness after the non-live tests so a future helper
+    # regression is caught immediately instead of breaking the next update run.
+    assert text.count("Assert-NoTrackedChanges") >= 3
+
     print("[PASS] update/test/run helper protects tracked work and only fast-forwards main")
+    print("[PASS] runner no longer invokes any candidate metadata finalizer")
+    print("[PASS] runner remains read-only for tracked release/source files")
+    print("[PASS] post-test tracked-cleanliness guard prevents self-dirtying regressions")
     print("[PASS] pulled runner reloads itself before testing the newly updated code")
     print("[PASS] dependency refresh, automatic live smoke, readiness waits, and strict ports are enforced")
     print("[PASS] PowerShell control-flow syntax uses elseif and rejects Python-style elif")

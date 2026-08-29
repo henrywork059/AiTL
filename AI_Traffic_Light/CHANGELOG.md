@@ -10,6 +10,7 @@
 - R2 increases the bounded adaptive compression ceiling to JPEG quality number 50 and slows recovery until strong payload headroom is sustained.
 - PC Studio requests a 256 KiB receive buffer and Camera Sources exposes effective/configured quality, send EWMA, payload target, local oversize-drop count and window-learn count.
 - PC Studio remains migration-compatible with `aitl-camera-v036` nodes using the same TCP frame protocol, but V037 adaptive behavior requires V037 firmware.
+- R3 permanently removes the historical V036 metadata-finalizer hook from the normal update/test/run helper, so validation no longer rewrites tracked `CHANGELOG.md` or frontend version metadata and the next normal Git pull is not blocked by runner-created edits. A post-test cleanliness guard now catches any future helper that dirties tracked source.
 - No ESP-side inference, UDP transport, physical/public-road signal authority or rewrite of runtime camera-profile data is introduced.
 ## 0_3_6 — Low-latency binary TCP multi-ESP camera input
 
