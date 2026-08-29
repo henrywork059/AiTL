@@ -105,6 +105,23 @@ def main() -> int:
     assert 'shortLabel: "Camera Test"' in nav_text
     print("[PASS] V038 route/service/page/navigation surfaces are wired")
 
+
+    # V038 R2 detailed diagnostics must keep bottleneck/stability evidence first-class.
+    page_text = (ROOT / "apps" / "pc-studio" / "frontend" / "src" / "pages" / "CameraDiagnosticsPage.tsx").read_text(encoding="utf-8")
+    api_text = (ROOT / "apps" / "pc-studio" / "frontend" / "src" / "lib" / "cameraDiagnosticsApi.ts").read_text(encoding="utf-8")
+    assert "Throughput / FPS headroom" in service_text
+    assert "TCP reconnect functionality" in service_text
+    assert "frame_interval_p95_ms" in service_text
+    assert "diagnostic_transition_resets" in service_text
+    assert "device_unexpected_send_failures_delta" in service_text
+    assert "baseline_frames" in service_text and "successful_fetches" in service_text
+    assert "Bottleneck analysis" in page_text
+    assert "Stability score" in page_text
+    assert "Functionality" in page_text
+    assert "CameraDiagnosticBottleneck" in api_text
+    assert "CameraDiagnosticStability" in api_text
+    print("[PASS] V038 R2 exposes functionality, stability, bottleneck, reconnect, and per-phase delta diagnostics")
+
     return 0
 
 

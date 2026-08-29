@@ -120,3 +120,7 @@ The route delegates staged testing and state restoration to `CameraDiagnosticSer
 The diagnostic stages are: repeated direct ESP `/status` probes; firmware/wire-protocol and camera-readiness checks; RSSI/BSSID/channel inspection; direct `ATL1`/JPEG receiving that bypasses the normal PC Studio stream worker; direct receiving while `/status` polling runs concurrently; the normal `RemoteCameraManager` / `RemoteCameraService` managed stream; and restoration of the prior camera/simulation state.
 
 The measurement stream uses the selected profile's saved image settings at a conservative 5 FPS. The service then restores the original saved FPS/settings and prior connected/streaming/simulation state. Diagnostic evidence does not change the `ATL1` packet format, the R6 quality-preserving ESP behavior, or public-road/signal-control authority.
+
+### V038 R2 detailed camera-diagnostic evidence
+
+`POST /api/camera/diagnostics/run` retains the existing envelope and adds detailed report sections: `functionality`, `stability`, and `bottlenecks`. Metrics include control average/p95/max latency, direct-stream sequence gaps and p95 frame interval, bounded load target/achieved FPS and throughput, reconnect result/timing, managed-worker per-phase FPS/counters, total versus unexpected ESP send failures, and diagnostic transition resets. The diagnostic remains state-restoring and does not persist test FPS/settings.

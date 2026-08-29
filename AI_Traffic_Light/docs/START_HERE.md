@@ -28,3 +28,4 @@ Open **Operate → Camera Test** after saving/selecting an ESP in Camera Sources
 7. restoration of the previous camera/simulation state.
 
 The result reports a likely failing layer plus evidence and next action. Diagnostics use the saved image settings at 5 FPS temporarily and restore the saved target FPS/settings afterward.
+V038 R2 expands **Camera Test** into a detailed one-click functionality/stability/bottleneck run. It measures control latency distribution, direct and concurrent-control streaming, saved-target throughput headroom, reconnect behavior, normal PC Studio worker performance, and restores the previous camera state.

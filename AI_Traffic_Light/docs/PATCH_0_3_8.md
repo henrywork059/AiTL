@@ -46,3 +46,13 @@ The classifier can report:
 ## Acceptance target
 
 A user with a selected saved ESP camera can open Camera Test, press one button, wait for the staged run, and receive a useful layer-level diagnosis without a separate script or terminal command. Existing camera, simulation, inference and dataset workflows must remain intact.
+
+## R2 detailed diagnostic hardening
+
+The one-click Camera Test now measures three separate goals instead of only classifying a connection failure:
+
+- **Functionality:** control/protocol/sensor readiness, configuration, start/stop, valid JPEG framing, concurrent control, reconnect, and normal PC Studio worker operation.
+- **Stability:** 0–100 score using control failures, disconnects, invalid frames, polling failures, managed-worker failures, unexpected ESP send failures/deadlines, Wi-Fi transitions, FPS headroom, and frame-interval jitter.
+- **Bottlenecks:** evidence-based attribution for HTTP control latency, Wi-Fi RF margin, throughput capacity, latency/jitter, control/data contention, ESP/TCP sender, and PC Studio receive integration.
+
+The direct baseline remains 5 FPS. A bounded load phase also tests the saved target FPS up to 15 FPS without permanently changing the saved profile. Control latency reports average/p95/max; stream phases report throughput, payload size, FPS ratio, connection/first-frame timing, frame-interval average/p95/max/stddev, sequence gaps, invalid JPEGs, and disconnects. A deliberate receiver replacement verifies that the ESP accepts a new TCP client. Send failures caused by that intentional socket replacement are reported separately as diagnostic transition resets and excluded from unexpected-failure classification. The managed-worker phase now uses counter deltas measured only during that phase rather than lifetime counters.

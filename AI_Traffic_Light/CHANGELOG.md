@@ -10,6 +10,10 @@
 - Existing V037/R6 ESP firmware, `aitl-camera-v037` identity, and `aitl-tcp-jpeg-v1` wire format remain unchanged, so V038 does not require an ESP reflash.
 - No UDP transport, ESP-side inference, persistent diagnostic history, new stable error code, or physical/public-road signal authority is introduced.
 
+- V038 R2 expands Camera Test from a short layer check into a detailed functionality, stability, and bottleneck diagnostic while staying on candidate `0_3_8`.
+- R2 adds repeated control latency distribution, camera config/start/stop lifecycle verification, direct JPEG integrity and frame-timing statistics, control-vs-stream contention measurement, saved-target throughput/headroom testing up to 15 FPS, intentional reconnect verification, and normal managed-worker measurement.
+- R2 reports a 0–100 stability score and explicit bottleneck attribution for control latency, RF margin, throughput capacity, frame jitter, control/data contention, ESP/TCP sender, and PC Studio receive integration.
+- R2 changes managed-worker evidence to per-phase counter deltas and separates diagnostic-induced socket-reset send failures from unexpected in-phase ESP failures, avoiding misleading cumulative/transition failure counts.
 ## 0_3_7 — Quality-preserving ESP streaming
 
 - Created V037 / `0_3_7` at the owner's explicit request after V036; V024 / `0_2_4` remains the owner-confirmed passed baseline.

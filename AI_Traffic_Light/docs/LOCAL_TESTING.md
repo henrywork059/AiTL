@@ -40,3 +40,7 @@ If the patch was deliberately overlaid directly onto the local working tree inst
 4. Confirm the page completes without a command-line helper and displays a diagnosis, layer checks, transport metrics, and recommended action.
 5. Confirm the previous camera stream/simulation state is restored after the run.
 6. For the currently observed failure, verify the report distinguishes whether the direct camera/TCP path itself fails or whether failure appears only in the normal PC Studio worker.
+
+## V038 R2 detailed Camera Test
+
+Open **Operate → Camera Test** and press **Diagnose camera** once. Allow roughly 40–60 seconds. Confirm the report shows Functionality, Stability score, Bottleneck analysis, Layer checks, and Measured transport. A healthy run should have no unexpected ESP send failures/deadline drops, no invalid JPEGs, successful reconnect, successful managed-worker phase, and reasonable FPS headroom/frame-interval p95 for the selected image settings. Diagnostic transition resets are intentional receiver-replacement evidence and are not counted as unexpected transport failures.

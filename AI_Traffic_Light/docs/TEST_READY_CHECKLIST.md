@@ -17,3 +17,9 @@
 - [ ] Existing Camera Sources, Live AI, simulation, Dataset Capture, multi-ESP selection and V037/R6 transport regressions remain passing.
 - [ ] Python compile, structure check, focused/inherited regressions, frontend typecheck/build and live smoke pass on the complete repository.
 - [ ] Owner explicitly accepts V038 before `passed_baseline` changes.
+- [ ] Camera Test reports functionality checks, 0–100 stability score, and bottleneck analysis in one run.
+- [ ] Control latency includes average/p95/max across eight probes.
+- [ ] Direct, concurrent-control, load/headroom, reconnect, and managed-worker phases all execute and restore the previous state.
+- [ ] Managed-worker frame/failure/reconnect counters are phase deltas, not lifetime totals.
+- [ ] Intentional diagnostic socket replacement resets are shown separately from unexpected ESP send failures.
+- [ ] Load phase reports target/achieved FPS, FPS ratio, throughput, JPEG size, and p95/max frame interval.

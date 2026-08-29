@@ -23,3 +23,4 @@ The current quality-preserving camera firmware preserves saved image quality/res
 ## Camera diagnostics
 
 `CameraDiagnosticService` owns the one-click diagnostic workflow exposed through `POST /api/camera/diagnostics/run`. It measures the selected saved ESP through direct control probes, direct ATL1/JPEG receiving, direct receiving with concurrent status polling, and the normal manager/service stream path. It returns measured checks plus an evidence-based likely-failure classification and restores the prior selected-camera/simulation state where possible. The diagnostics service does not own traffic-signal logic or physical/public-road authority.
+V038 R2 Camera Diagnostics also measures per-phase stream deltas, throughput/FPS headroom, frame timing/jitter, reconnect behavior, and bottleneck attribution while restoring the previous camera state.

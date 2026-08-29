@@ -39,3 +39,4 @@ The result classifies the most likely failing layer, including control unreachab
 Existing inference, dataset/training, zones, tracking/analytics, signal simulation, network experiments and decision evidence remain available.
 
 Multiple ESP image streams and camera diagnostic results do **not** imply multiple simultaneous independent live signal controllers, ESP-side inference, validated production reliability, or physical/public-road traffic-signal authority.
+- one-click detailed camera diagnostics covering functionality, stability scoring, throughput/jitter, reconnect, and bottleneck attribution;

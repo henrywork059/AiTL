@@ -17,3 +17,4 @@ The current quality-preserving ESP path keeps the configured JPEG quality and re
 ## Camera Test
 
 Camera Diagnostics is a separate Operate page. With a saved camera selected, **Diagnose camera** runs one staged test and reports the most likely failing layer. The page covers ESP control reachability, firmware/camera readiness, Wi-Fi telemetry, direct ATL1/JPEG transport, stream behavior while status polling is active, and the normal PC Studio managed receiver path. Previous camera/simulation state is restored after the run where possible.
+V038 R2 Camera Test presents one-click functionality checks, a 0–100 stability score, detailed transport metrics, and explicit bottleneck attribution.
