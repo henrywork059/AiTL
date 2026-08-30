@@ -1,4 +1,4 @@
-// AiTL 0_3_8 R4 comprehensive camera-transport benchmark firmware.
+// AiTL 0_3_8 R5 comprehensive camera-transport benchmark firmware.
 // DIAGNOSTIC ONLY. Flash temporarily, run test_camera_transport_benchmark.py,
 // then restore the normal AiTL V037 production firmware.
 
@@ -347,7 +347,7 @@ bool sendAtl1Frame(const uint8_t* payload, size_t payloadLength, bool useSendmsg
 
 String statusJson() {
   String json = "{";
-  json += "\"firmware\":\"aitl-0_3_8-r4-transport-benchmark\"";
+  json += "\"firmware\":\"aitl-0_3_8-r5-transport-benchmark\"";
   json += ",\"camera_ready\":" + String(cameraReady ? "true" : "false");
   json += ",\"mode\":\"" + String(modeName()) + "\"";
   json += ",\"atl1_streaming\":" + String(atl1Streaming ? "true" : "false");
@@ -374,6 +374,9 @@ String statusJson() {
   json += ",\"udp_send_failures\":" + String(udpSendFailures);
   json += ",\"udp_last_frame_send_ms\":" + String(udpLastFrameSendMs);
   json += ",\"free_heap\":" + String(ESP.getFreeHeap());
+  json += ",\"uptime_ms\":" + String(millis());
+  json += ",\"internal_total\":" + String(heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  json += ",\"psram_total\":" + String(ESP.getPsramSize());
   json += ",\"internal_free\":" + String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
   json += ",\"internal_largest\":" + String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
   json += ",\"internal_min_free\":" + String(ESP.getMinFreeHeap());
@@ -784,7 +787,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL 0_3_8 R4 comprehensive camera transport benchmark");
+  Serial.println("AiTL 0_3_8 R5 comprehensive camera transport benchmark");
   cameraReady = initCamera();
   connectWifi();
 

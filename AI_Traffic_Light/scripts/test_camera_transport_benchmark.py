@@ -5,7 +5,10 @@ from dataclasses import asdict, dataclass, field
 import http.client
 import json
 import math
+import os
+import platform
 import socket
+import sys
 import statistics
 import struct
 import threading
@@ -23,6 +26,133 @@ ATL1_PORT = 81
 MJPEG_PORT = 84
 CONTROL_TIMEOUT = 8.0
 STREAM_TIMEOUT = 8.0
+
+BENCHMARK_REVISION = "R5"
+REPORT_SCHEMA_VERSION = 3
+
+_PROGRESS = None
+
+
+class ConsoleProgress:
+    def __init__(self, *, host: str, environment: str, quiet: bool = False) -> None:
+        self.host = host
+        self.environment = environment
+        self.quiet = quiet
+        self.run_started = time.perf_counter()
+        self.test_index = 0
+        self.current_label = ""
+
+    def _emit(self, text: str) -> None:
+        if not self.quiet:
+            print(text, flush=True)
+
+    def banner(self, *, local_ip: str, settings: dict[str, Any]) -> None:
+        self._emit("")
+        self._emit("=" * 92)
+        self._emit(f"AiTL 0_3_8 {BENCHMARK_REVISION} CAMERA TRANSPORT BENCHMARK")
+        self._emit(f"ESP host        : {self.host}")
+        self._emit(f"PC local IP     : {local_ip}")
+        self._emit(f"Environment     : {self.environment}")
+        self._emit(
+            "Camera settings : "
+            f"{settings.get('frame_size')} / JPEG q={settings.get('jpeg_quality')} / "
+            f"primary {settings.get('fps')} FPS / {settings.get('frames')} frames"
+        )
+        self._emit("=" * 92)
+
+    def section(self, title: str) -> None:
+        self._emit("")
+        self._emit(f"--- {title} ---")
+
+    def start(self, label: str, context: str = "") -> None:
+        self.test_index += 1
+        self.current_label = label
+        suffix = f" | {context}" if context else ""
+        elapsed = time.perf_counter() - self.run_started
+        self._emit(f"[{self.test_index:02d}] START  +{elapsed:6.1f}s | {label}{suffix}")
+
+    def frame(self, completed: int, total: int, detail: str = "") -> None:
+        suffix = f" | {detail}" if detail else ""
+        self._emit(f"     RUN    {completed:>2}/{total:<2} | {self.current_label}{suffix}")
+
+    def finish(self, result: "TestResult") -> None:
+        fps = "-" if result.measured_fps is None else f"{result.measured_fps:.2f}"
+        self._emit(
+            f"     {result.status:<6} {result.frames}/{result.requested_frames} frames | "
+            f"{fps} FPS | {result.elapsed_ms or 0:.0f} ms | {result.key}"
+        )
+
+
+def _progress_frame(completed: int, total: int, detail: str = "") -> None:
+    if _PROGRESS is not None:
+        _PROGRESS.frame(completed, total, detail)
+
+
+def safe_device_status(host: str) -> dict[str, Any]:
+    try:
+        return http_json(host, "/status")
+    except Exception as exc:
+        return {"status_error": f"{type(exc).__name__}: {exc}"}
+
+
+_COUNTER_FIELDS = (
+    "frame_count", "send_failures", "deadline_drops",
+    "mjpeg_frames_sent", "mjpeg_failures",
+    "udp_frames_sent", "udp_packets_sent", "udp_send_failures",
+)
+
+
+def device_deltas(before: dict[str, Any], after: dict[str, Any]) -> dict[str, int]:
+    output: dict[str, int] = {}
+    for key in _COUNTER_FIELDS:
+        try:
+            output[key] = int(after.get(key, 0) or 0) - int(before.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return output
+
+
+def resource_snapshot(status: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "uptime_ms", "rssi", "bssid", "channel", "free_heap", "internal_free",
+        "internal_largest", "internal_min_free", "psram_free", "psram_total",
+        "internal_total", "last_frame_bytes", "last_capture_ms", "last_send_ms",
+        "last_accepted_bytes", "last_errno", "mode", "stall_timeout_ms",
+        "total_send_limit_ms", "chunk_bytes",
+    )
+    return {key: status.get(key) for key in keys if key in status}
+
+
+def enrich_result(host: str, value: Any, before: dict[str, Any], started_epoch_ms: int,
+                  started_perf: float) -> Any:
+    result = value[0] if isinstance(value, tuple) and value and isinstance(value[0], TestResult) else value
+    if not isinstance(result, TestResult):
+        return value
+    after = safe_device_status(host)
+    result.telemetry = dict(result.telemetry or {})
+    result.telemetry["benchmark_timing"] = {
+        "started_at_ms": started_epoch_ms,
+        "ended_at_ms": int(time.time() * 1000),
+        "wall_elapsed_ms": round((time.perf_counter() - started_perf) * 1000.0, 1),
+    }
+    result.telemetry["device_before"] = before
+    result.telemetry["device_after"] = after
+    result.telemetry["counter_deltas"] = device_deltas(before, after)
+    result.telemetry["resource_before"] = resource_snapshot(before)
+    result.telemetry["resource_after"] = resource_snapshot(after)
+    if _PROGRESS is not None:
+        _PROGRESS.finish(result)
+    return value
+
+
+def execute_test(host: str, label: str, fn: Callable[[], Any], *, context: str = "") -> Any:
+    if _PROGRESS is not None:
+        _PROGRESS.start(label, context)
+    before = safe_device_status(host)
+    started_epoch_ms = int(time.time() * 1000)
+    started_perf = time.perf_counter()
+    value = fn()
+    return enrich_result(host, value, before, started_epoch_ms, started_perf)
 
 
 @dataclass
@@ -51,7 +181,7 @@ def _http(host: str, path: str, method: str = 'GET', query: dict[str, Any] | Non
     connection = http.client.HTTPConnection(host, CONTROL_PORT, timeout=timeout)
     try:
         connection.request(method, target, body=b'' if method != 'GET' else None,
-                           headers={'Connection': 'close', 'User-Agent': 'AiTL-R4-Transport-Benchmark'})
+                           headers={'Connection': 'close', 'User-Agent': 'AiTL-R5-Transport-Benchmark'})
         response = connection.getresponse()
         payload = response.read(512 * 1024)
         headers = {k.lower(): v for k, v in response.getheaders()}
@@ -89,15 +219,31 @@ def read_exact(sock: socket.socket, size: int) -> bytes:
 
 
 def start_status_poller(host: str, stop: threading.Event, interval: float = 0.25) -> tuple[threading.Thread, dict[str, Any]]:
-    state: dict[str, Any] = {'successes': 0, 'failures': 0, 'latencies_ms': [], 'errors': []}
+    state: dict[str, Any] = {'successes': 0, 'failures': 0, 'latencies_ms': [], 'errors': [], 'samples': []}
+    poll_started = time.perf_counter()
 
     def worker() -> None:
         while not stop.wait(interval):
             started = time.perf_counter()
             try:
-                http_json(host, '/status')
+                sample = http_json(host, '/status')
+                latency_ms = (time.perf_counter() - started) * 1000.0
                 state['successes'] += 1
-                state['latencies_ms'].append((time.perf_counter() - started) * 1000.0)
+                state['latencies_ms'].append(latency_ms)
+                if len(state['samples']) < 160:
+                    state['samples'].append({
+                        'elapsed_ms': round((time.perf_counter() - poll_started) * 1000.0, 1),
+                        'latency_ms': round(latency_ms, 1),
+                        **resource_snapshot(sample),
+                        'frame_count': sample.get('frame_count'),
+                        'send_failures': sample.get('send_failures'),
+                        'deadline_drops': sample.get('deadline_drops'),
+                        'mjpeg_frames_sent': sample.get('mjpeg_frames_sent'),
+                        'mjpeg_failures': sample.get('mjpeg_failures'),
+                        'udp_frames_sent': sample.get('udp_frames_sent'),
+                        'udp_packets_sent': sample.get('udp_packets_sent'),
+                        'udp_send_failures': sample.get('udp_send_failures'),
+                    })
             except Exception as exc:  # diagnostic collector
                 state['failures'] += 1
                 if len(state['errors']) < 8:
@@ -112,12 +258,30 @@ def finish_status_poller(stop: threading.Event, thread: threading.Thread, state:
     stop.set()
     thread.join(timeout=2.0)
     latencies = state.get('latencies_ms') or []
+    samples = list(state.get('samples') or [])
+    def vals(key: str) -> list[float]:
+        out: list[float] = []
+        for sample in samples:
+            value = sample.get(key)
+            if isinstance(value, (int, float)):
+                out.append(float(value))
+        return out
     return {
         'successes': int(state.get('successes', 0)),
         'failures': int(state.get('failures', 0)),
         'avg_ms': round(statistics.mean(latencies), 1) if latencies else None,
+        'p95_ms': round(sorted(latencies)[max(0, math.ceil(len(latencies) * .95) - 1)], 1) if latencies else None,
         'max_ms': round(max(latencies), 1) if latencies else None,
         'errors': list(state.get('errors') or []),
+        'samples': samples,
+        'sample_summary': {
+            'rssi_min': min(vals('rssi')) if vals('rssi') else None,
+            'rssi_max': max(vals('rssi')) if vals('rssi') else None,
+            'internal_free_min': min(vals('internal_free')) if vals('internal_free') else None,
+            'internal_largest_min': min(vals('internal_largest')) if vals('internal_largest') else None,
+            'free_heap_min': min(vals('free_heap')) if vals('free_heap') else None,
+            'psram_free_min': min(vals('psram_free')) if vals('psram_free') else None,
+        },
     }
 
 
@@ -173,19 +337,28 @@ def test_snapshot_polling(host: str, frames: int, fps: int) -> TestResult:
     total_bytes = 0
     errors: list[str] = []
     latencies: list[float] = []
-    for _ in range(frames):
+    frame_records: list[dict[str, Any]] = []
+    for index in range(1, frames + 1):
         frame_started = time.perf_counter()
+        record: dict[str, Any] = {'index': index}
         try:
             status, payload, _ = _http(host, '/capture')
             latency = time.perf_counter() - frame_started
-            latencies.append(latency * 1000.0)
-            if status == 200 and jpeg_ok(payload):
+            latency_ms = latency * 1000.0
+            latencies.append(latency_ms)
+            valid = status == 200 and jpeg_ok(payload)
+            record.update({'ok': valid, 'http_status': status, 'bytes': len(payload), 'latency_ms': round(latency_ms, 1)})
+            if valid:
                 good += 1
                 total_bytes += len(payload)
             else:
                 errors.append(f'HTTP {status} or invalid JPEG')
         except Exception as exc:
-            errors.append(f'{type(exc).__name__}: {exc}')
+            message = f'{type(exc).__name__}: {exc}'
+            errors.append(message)
+            record.update({'ok': False, 'error': message, 'latency_ms': round((time.perf_counter() - frame_started) * 1000.0, 1)})
+        frame_records.append(record)
+        _progress_frame(index, frames, f"{'OK' if record.get('ok') else 'FAIL'}; {record.get('bytes', 0)} B; {record.get('latency_ms')} ms")
         spent = time.perf_counter() - frame_started
         if spent < deadline_period:
             time.sleep(deadline_period - spent)
@@ -193,9 +366,19 @@ def test_snapshot_polling(host: str, frames: int, fps: int) -> TestResult:
     detail = f'{good}/{frames} complete snapshots; avg request {statistics.mean(latencies):.1f} ms' if latencies else f'{good}/{frames}; no successful requests'
     if errors:
         detail += f'; errors={errors[:3]}'
+    telemetry = {
+        'frame_records': frame_records,
+        'latency_ms': {
+            'avg': round(statistics.mean(latencies), 1) if latencies else None,
+            'min': round(min(latencies), 1) if latencies else None,
+            'max': round(max(latencies), 1) if latencies else None,
+            'p95': round(sorted(latencies)[max(0, math.ceil(len(latencies) * .95) - 1)], 1) if latencies else None,
+        },
+        'errors': errors[:20],
+    }
     return make_result(key='snapshot_polling', name=f'HTTP snapshot polling @ {fps} FPS', transport='HTTP snapshot',
-                       requested=frames, frames=good, elapsed_s=elapsed, bytes_received=total_bytes, detail=detail)
-
+                       requested=frames, frames=good, elapsed_s=elapsed, bytes_received=total_bytes, detail=detail,
+                       telemetry=telemetry)
 
 def configure_atl1(host: str, mode: str, fps: int, stall_ms: int, total_ms: int,
                    payload_bytes: int, chunk_bytes: int) -> None:
@@ -215,6 +398,7 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
               poll_status: bool = False, production_candidate: bool = True) -> TestResult:
     sock: socket.socket | None = None
     arrivals: list[float] = []
+    frame_records: list[dict[str, Any]] = []
     total_bytes = 0
     error: str | None = None
     started = time.perf_counter()
@@ -232,9 +416,10 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
             pass
         if poll_status:
             poll_thread, poll_state = start_status_poller(host, poll_stop)
-        for _ in range(frames):
+        for index in range(1, frames + 1):
+            frame_started = time.perf_counter()
             header = read_exact(sock, ATL1_HEADER.size)
-            magic, length, _seq, _uptime = ATL1_HEADER.unpack(header)
+            magic, length, seq, source_uptime = ATL1_HEADER.unpack(header)
             if magic != ATL1_MAGIC:
                 raise ValueError(f'bad ATL1 magic {magic!r}')
             if length <= 0 or length > 8 * 1024 * 1024:
@@ -242,8 +427,22 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
             payload = read_exact(sock, length)
             if not jpeg_ok(payload):
                 raise ValueError('payload did not contain complete JPEG markers')
+            now = time.perf_counter()
             total_bytes += len(header) + len(payload)
-            arrivals.append(time.perf_counter())
+            arrivals.append(now)
+            interval_ms = (arrivals[-1] - arrivals[-2]) * 1000.0 if len(arrivals) >= 2 else None
+            record = {
+                'index': index,
+                'sequence': seq,
+                'source_uptime_ms': source_uptime,
+                'payload_bytes': length,
+                'receive_elapsed_ms': round((now - frame_started) * 1000.0, 1),
+                'arrival_from_phase_start_ms': round((now - started) * 1000.0, 1),
+                'interval_ms': round(interval_ms, 1) if interval_ms is not None else None,
+                'jpeg_valid': True,
+            }
+            frame_records.append(record)
+            _progress_frame(index, frames, f"seq={seq}; {length} B; recv={record['receive_elapsed_ms']} ms")
     except Exception as exc:
         error = f'{type(exc).__name__}: {exc}'
     finally:
@@ -264,6 +463,7 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
         except Exception as exc:
             telemetry = {'status_error': f'{type(exc).__name__}: {exc}'}
     got = len(arrivals)
+    intervals = [(b - a) * 1000.0 for a, b in zip(arrivals, arrivals[1:])]
     detail = f'{got}/{frames} complete frames'
     if error:
         detail += f'; {error}'
@@ -272,6 +472,28 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
                    f"errno={telemetry.get('last_errno')}, internal_free={telemetry.get('internal_free')}")
     if poll_status:
         detail += f"; /status {poll.get('successes', 0)} ok/{poll.get('failures', 0)} fail"
+    telemetry = {
+        **telemetry,
+        'mode_requested': mode,
+        'test_parameters': {
+            'fps': fps, 'frames': frames, 'stall_ms': stall_ms, 'total_ms': total_ms,
+            'payload_bytes_control': payload_bytes, 'chunk_bytes': chunk_bytes,
+            'pc_socket_rcvbuf_requested': 256 * 1024,
+        },
+        'frame_records': frame_records,
+        'frame_size_bytes': [item['payload_bytes'] for item in frame_records],
+        'sequence_numbers': [item['sequence'] for item in frame_records],
+        'interval_ms': {
+            'values': [round(x, 1) for x in intervals],
+            'avg': round(statistics.mean(intervals), 1) if intervals else None,
+            'p95': round(sorted(intervals)[max(0, math.ceil(len(intervals) * .95) - 1)], 1) if intervals else None,
+            'max': round(max(intervals), 1) if intervals else None,
+            'jitter_stddev': round(statistics.pstdev(intervals), 1) if len(intervals) >= 2 else 0.0,
+        },
+        'receiver_error': error,
+        'status_poll': poll,
+        'socket_role': 'minimal raw Python receiver; no decode/UI/inference',
+    }
     result = make_result(key=key, name=label, transport='ATL1/TCP', requested=frames, frames=got,
                          elapsed_s=elapsed, bytes_received=total_bytes, detail=detail, telemetry=telemetry,
                          status_poll=poll, production_candidate=production_candidate)
@@ -279,15 +501,17 @@ def test_atl1(host: str, *, key: str, label: str, mode: str, fps: int, frames: i
         result.measured_fps = round((got - 1) / max(0.001, arrivals[-1] - arrivals[0]), 2)
     return result
 
-
 def configure_mjpeg(host: str, frames: int, fps: int) -> None:
     http_json(host, '/mjpeg/config', 'POST', {'frames': frames, 'fps': fps})
 
 
-def parse_mjpeg_stream(sock: socket.socket, requested_frames: int) -> tuple[list[bytes], int]:
+def parse_mjpeg_stream(sock: socket.socket, requested_frames: int) -> tuple[list[bytes], int, list[dict[str, Any]]]:
     buffer = bytearray()
     frames: list[bytes] = []
+    records: list[dict[str, Any]] = []
     total_read = 0
+    started = time.perf_counter()
+    previous_arrival: float | None = None
     while len(frames) < requested_frames:
         chunk = sock.recv(65536)
         if not chunk:
@@ -300,7 +524,6 @@ def parse_mjpeg_stream(sock: socket.socket, requested_frames: int) -> tuple[list
                 break
             header_blob = bytes(buffer[:header_end])
             if b'Content-Type: image/jpeg' not in header_blob:
-                # Initial HTTP header; discard and continue.
                 del buffer[:header_end + 4]
                 continue
             length = None
@@ -317,11 +540,21 @@ def parse_mjpeg_stream(sock: socket.socket, requested_frames: int) -> tuple[list
                 break
             payload = bytes(buffer[header_end + 4:header_end + 4 + length])
             frames.append(payload)
+            arrival = time.perf_counter()
+            interval_ms = (arrival - previous_arrival) * 1000.0 if previous_arrival is not None else None
+            previous_arrival = arrival
+            records.append({
+                'index': len(frames),
+                'payload_bytes': len(payload),
+                'jpeg_valid': jpeg_ok(payload),
+                'arrival_from_phase_start_ms': round((arrival - started) * 1000.0, 1),
+                'interval_ms': round(interval_ms, 1) if interval_ms is not None else None,
+            })
+            _progress_frame(len(frames), requested_frames, f"{len(payload)} B; JPEG={'OK' if jpeg_ok(payload) else 'BAD'}")
             del buffer[:needed]
             if len(frames) >= requested_frames:
                 break
-    return frames, total_read
-
+    return frames, total_read, records
 
 def test_mjpeg(host: str, frames: int, fps: int, poll_status: bool = True) -> TestResult:
     sock: socket.socket | None = None
@@ -331,6 +564,7 @@ def test_mjpeg(host: str, frames: int, fps: int, poll_status: bool = True) -> Te
     poll_state: dict[str, Any] | None = None
     error: str | None = None
     parsed: list[bytes] = []
+    records: list[dict[str, Any]] = []
     total_read = 0
     try:
         configure_mjpeg(host, frames, fps)
@@ -340,7 +574,7 @@ def test_mjpeg(host: str, frames: int, fps: int, poll_status: bool = True) -> Te
         sock.sendall(request)
         if poll_status:
             poll_thread, poll_state = start_status_poller(host, poll_stop)
-        parsed, total_read = parse_mjpeg_stream(sock, frames)
+        parsed, total_read, records = parse_mjpeg_stream(sock, frames)
     except Exception as exc:
         error = f'{type(exc).__name__}: {exc}'
     finally:
@@ -357,15 +591,29 @@ def test_mjpeg(host: str, frames: int, fps: int, poll_status: bool = True) -> Te
         except Exception as exc:
             telemetry = {'status_error': f'{type(exc).__name__}: {exc}'}
     good = sum(1 for frame in parsed if jpeg_ok(frame))
+    intervals = [float(item['interval_ms']) for item in records if item.get('interval_ms') is not None]
     detail = f'{good}/{frames} complete JPEG parts'
     if error:
         detail += f'; {error}'
     if poll_status:
         detail += f"; /status {poll.get('successes', 0)} ok/{poll.get('failures', 0)} fail"
+    telemetry = {
+        **telemetry,
+        'test_parameters': {'fps': fps, 'frames': frames, 'port': MJPEG_PORT},
+        'frame_records': records,
+        'frame_size_bytes': [len(frame) for frame in parsed],
+        'interval_ms': {
+            'values': intervals,
+            'avg': round(statistics.mean(intervals), 1) if intervals else None,
+            'p95': round(sorted(intervals)[max(0, math.ceil(len(intervals) * .95) - 1)], 1) if intervals else None,
+            'max': round(max(intervals), 1) if intervals else None,
+        },
+        'receiver_error': error,
+        'status_poll': poll,
+    }
     return make_result(key='mjpeg', name=f'Dedicated-port MJPEG @ {fps} FPS', transport='HTTP MJPEG',
                        requested=frames, frames=good, elapsed_s=elapsed, bytes_received=total_read,
                        detail=detail, telemetry=telemetry, status_poll=poll)
-
 
 def local_ip_for(host: str) -> str:
     probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -385,8 +633,10 @@ def test_udp(host: str, frames: int, fps: int, chunk_bytes: int = 1200) -> TestR
     started = time.perf_counter()
     reassembly: dict[int, dict[str, Any]] = {}
     complete: dict[int, bytes] = {}
+    completion_records: list[dict[str, Any]] = []
     packets = 0
     malformed = 0
+    duplicate_chunks = 0
     error: str | None = None
     poll_stop = threading.Event()
     poll_thread: threading.Thread | None = None
@@ -405,7 +655,7 @@ def test_udp(host: str, frames: int, fps: int, chunk_bytes: int = 1200) -> TestR
         deadline = time.monotonic() + max(6.0, frames / max(1, fps) + 4.0)
         while time.monotonic() < deadline and len(complete) < frames:
             try:
-                packet, _addr = recv.recvfrom(2048)
+                packet, addr = recv.recvfrom(2048)
             except socket.timeout:
                 continue
             packets += 1
@@ -417,7 +667,9 @@ def test_udp(host: str, frames: int, fps: int, chunk_bytes: int = 1200) -> TestR
             if magic != UDP_MAGIC or payload_length != len(payload) or chunk_count == 0 or chunk_index >= chunk_count:
                 malformed += 1
                 continue
-            item = reassembly.setdefault(seq, {'frame_length': frame_length, 'chunk_count': chunk_count, 'chunks': {}})
+            item = reassembly.setdefault(seq, {'frame_length': frame_length, 'chunk_count': chunk_count, 'chunks': {}, 'first_packet_ms': round((time.perf_counter() - started) * 1000.0, 1)})
+            if chunk_index in item['chunks']:
+                duplicate_chunks += 1
             item['chunks'][chunk_index] = (offset, payload)
             if len(item['chunks']) == chunk_count:
                 frame = bytearray(frame_length)
@@ -428,8 +680,18 @@ def test_udp(host: str, frames: int, fps: int, chunk_bytes: int = 1200) -> TestR
                         valid = False
                         break
                     frame[chunk_offset:end] = chunk_payload
-                if valid and jpeg_ok(bytes(frame)):
-                    complete[seq] = bytes(frame)
+                frame_bytes = bytes(frame)
+                if valid and jpeg_ok(frame_bytes):
+                    complete[seq] = frame_bytes
+                    completion_records.append({
+                        'sequence': seq,
+                        'frame_bytes': frame_length,
+                        'chunks': chunk_count,
+                        'first_packet_ms': item.get('first_packet_ms'),
+                        'completed_ms': round((time.perf_counter() - started) * 1000.0, 1),
+                        'source_ip': addr[0],
+                    })
+                    _progress_frame(len(complete), frames, f"seq={seq}; {frame_length} B; chunks={chunk_count}")
                 del reassembly[seq]
         try:
             http_json(host, '/udp/stop', 'POST')
@@ -457,10 +719,25 @@ def test_udp(host: str, frames: int, fps: int, chunk_bytes: int = 1200) -> TestR
     if error:
         detail += f'; {error}'
     detail += f"; /status {poll.get('successes', 0)} ok/{poll.get('failures', 0)} fail"
+    telemetry = {
+        **telemetry,
+        'test_parameters': {'fps': fps, 'frames': frames, 'chunk_bytes': chunk_bytes, 'pc_port': local_port, 'pc_ip': local_ip},
+        'completion_records': completion_records,
+        'packets_received': packets,
+        'packets_sent_reported': expected_packets,
+        'estimated_packet_loss': packet_loss,
+        'malformed_packets': malformed,
+        'duplicate_chunks': duplicate_chunks,
+        'incomplete_frames_at_deadline': [
+            {'sequence': seq, 'received_chunks': len(item['chunks']), 'expected_chunks': item['chunk_count'], 'frame_length': item['frame_length']}
+            for seq, item in sorted(reassembly.items())[:20]
+        ],
+        'receiver_error': error,
+        'status_poll': poll,
+    }
     return make_result(key='udp', name=f'UDP freshness-first JPEG @ {fps} FPS', transport='UDP JPEG', requested=frames,
                        frames=good, elapsed_s=elapsed, bytes_received=sum(len(x) for x in complete.values()),
                        detail=detail, telemetry=telemetry, status_poll=poll, packet_loss=packet_loss)
-
 
 def score_candidate(result: TestResult, target_fps: int) -> float:
     if not result.production_candidate:
@@ -574,32 +851,150 @@ def diagnose(results: dict[str, TestResult], target_fps: int) -> dict[str, Any]:
     }
 
 
+
+def build_analysis_evidence(results: dict[str, TestResult], diagnosis: dict[str, Any]) -> dict[str, Any]:
+    def view(key: str) -> dict[str, Any]:
+        item = results.get(key)
+        if item is None:
+            return {'present': False}
+        telemetry = item.telemetry or {}
+        after = telemetry.get('device_after') if isinstance(telemetry.get('device_after'), dict) else telemetry
+        before = telemetry.get('device_before') if isinstance(telemetry.get('device_before'), dict) else {}
+        frame_bytes = after.get('last_frame_bytes') or telemetry.get('last_frame_bytes')
+        accepted = after.get('last_accepted_bytes') or telemetry.get('last_accepted_bytes')
+        try:
+            accepted_ratio = round(float(accepted) / max(1.0, float(frame_bytes)), 4) if accepted is not None and frame_bytes else None
+        except (TypeError, ValueError):
+            accepted_ratio = None
+        poll = telemetry.get('status_poll') if isinstance(telemetry.get('status_poll'), dict) else {}
+        return {
+            'present': True,
+            'status': item.status,
+            'frames': item.frames,
+            'requested_frames': item.requested_frames,
+            'completion_ratio': item.completion_ratio,
+            'measured_fps': item.measured_fps,
+            'elapsed_ms': item.elapsed_ms,
+            'bytes_received': item.bytes_received,
+            'packet_loss': item.packet_loss,
+            'last_errno': after.get('last_errno'),
+            'last_send_ms': after.get('last_send_ms'),
+            'last_frame_bytes': frame_bytes,
+            'last_accepted_bytes': accepted,
+            'accepted_ratio': accepted_ratio,
+            'rssi_before': before.get('rssi'),
+            'rssi_after': after.get('rssi'),
+            'internal_free_before': before.get('internal_free'),
+            'internal_free_after': after.get('internal_free'),
+            'internal_largest_before': before.get('internal_largest'),
+            'internal_largest_after': after.get('internal_largest'),
+            'poll_successes': poll.get('successes'),
+            'poll_failures': poll.get('failures'),
+            'poll_summary': poll.get('sample_summary'),
+            'counter_deltas': telemetry.get('counter_deltas'),
+            'receiver_error': telemetry.get('receiver_error'),
+            'detail': item.detail,
+        }
+
+    pairs = {
+        'timeout_1200_vs_5000': {'left': view('direct_sendmsg_1200'), 'right': view('direct_sendmsg_5000')},
+        'direct_sendmsg_vs_plain_send': {'left': view('direct_sendmsg_5000'), 'right': view('direct_send')},
+        'direct_psram_vs_staged_dram': {'left': view('direct_send'), 'right': view('staged_send')},
+        'direct_psram_vs_full_dram_copy': {'left': view('direct_send'), 'right': view('dram_copy_send')},
+        'dram_copy_sendmsg_vs_send': {'left': view('dram_copy_sendmsg'), 'right': view('dram_copy_send')},
+        'real_camera_vs_synthetic_sendmsg': {'left': view('direct_sendmsg_5000'), 'right': view('synthetic_sendmsg')},
+        'real_camera_vs_synthetic_send': {'left': view('direct_send'), 'right': view('synthetic_send')},
+        'persistent_tcp_vs_mjpeg': {'left': view('dram_copy_send'), 'right': view('mjpeg')},
+        'persistent_tcp_vs_udp': {'left': view('dram_copy_send'), 'right': view('udp')},
+        'snapshot_vs_mjpeg': {'left': view('snapshot_polling'), 'right': view('mjpeg')},
+    }
+
+    hypotheses: list[dict[str, Any]] = []
+    def add(name: str, confidence: str, evidence: list[str]) -> None:
+        hypotheses.append({'hypothesis': name, 'confidence': confidence, 'evidence': evidence})
+
+    p = lambda key: results.get(key) is not None and results[key].status == 'PASS'
+    f = lambda key: results.get(key) is not None and results[key].status == 'FAIL'
+    if f('direct_sendmsg_1200') and p('direct_sendmsg_5000'):
+        add('configured timeout is materially contributing', 'high', ['1.2 s sendmsg fails while 5 s sendmsg passes'])
+    if f('direct_sendmsg_5000') and p('direct_send'):
+        add('sendmsg/vectored-write implementation is implicated', 'high', ['same direct PSRAM source fails with sendmsg and passes with plain send'])
+    if f('direct_send') and (p('staged_send') or p('dram_copy_send')):
+        add('direct PSRAM-to-socket access is implicated', 'high', ['camera data passes only after internal-DRAM staging/copy'])
+    if f('direct_sendmsg_5000') and p('synthetic_sendmsg'):
+        add('payload memory/camera interaction is more likely than generic sendmsg/lwIP', 'medium-high', ['synthetic internal-DRAM sendmsg passes while real-camera direct sendmsg fails'])
+    if f('mjpeg') and f('dram_copy_send') and p('udp'):
+        add('persistent TCP/backpressure/lwIP path is implicated', 'high', ['UDP passes while persistent TCP variants fail'])
+    if f('mjpeg') and f('dram_copy_send') and f('udp'):
+        add('Wi-Fi/power/general ESP resource pressure is implicated', 'high', ['independent persistent TCP, MJPEG and UDP transports fail'])
+    if not hypotheses:
+        add('no single dominant transport fault isolated', 'medium', [str(diagnosis.get('likely_bottleneck') or 'mixed evidence')])
+
+    memory_rows = []
+    for key, item in results.items():
+        if not isinstance(item, TestResult) or item.status == 'SKIP':
+            continue
+        v = view(key)
+        memory_rows.append({
+            'key': key,
+            'internal_free_before': v.get('internal_free_before'),
+            'internal_free_after': v.get('internal_free_after'),
+            'internal_largest_before': v.get('internal_largest_before'),
+            'internal_largest_after': v.get('internal_largest_after'),
+            'rssi_before': v.get('rssi_before'),
+            'rssi_after': v.get('rssi_after'),
+            'poll_summary': v.get('poll_summary'),
+        })
+
+    return {
+        'primary_diagnosis_code': diagnosis.get('diagnosis_code'),
+        'comparative_pairs': pairs,
+        'hypothesis_ranking': hypotheses,
+        'resource_and_rf_by_test': memory_rows,
+        'analysis_hints': [
+            'A failure at nearly 100% accepted bytes still counts as a failed JPEG frame; inspect accepted_ratio and progress_trace.',
+            'If raw Python ATL1 passes but normal V038 PC Studio managed streaming later fails, focus on PC-side worker/backpressure rather than ESP transport.',
+            'Compare resource minima during status polling, not only before/after values, because transient internal-RAM pressure can recover after a phase.',
+            'Repeat the same benchmark on another AP/hotspot and power source if multiple unrelated transports fail.',
+        ],
+    }
+
+
 def run_load_ladder(host: str, base_results: dict[str, TestResult], payload_bytes: int, frames: int, frame_size: str,
                     jpeg_quality: int) -> list[TestResult]:
     _ = (frame_size, jpeg_quality)
     ladder: list[TestResult] = []
+    if _PROGRESS is not None:
+        _PROGRESS.section('LOAD / HEADROOM FOLLOW-UP')
     for fps in (10, 15):
         if base_results.get('dram_copy_send') and base_results['dram_copy_send'].status == 'PASS':
-            ladder.append(test_atl1(host, key=f'dram_copy_send_{fps}', label=f'ATL1 DRAM-copy send() @ {fps} FPS',
-                                    mode='dram_copy_send', fps=fps, frames=frames, stall_ms=2000, total_ms=3000,
-                                    payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False))
+            label = f'ATL1 DRAM-copy send() @ {fps} FPS'
+            ladder.append(execute_test(host, label, lambda fps=fps, label=label: test_atl1(
+                host, key=f'dram_copy_send_{fps}', label=label, mode='dram_copy_send', fps=fps, frames=frames,
+                stall_ms=2000, total_ms=3000, payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False),
+                context='load ladder'))
         if base_results.get('staged_send') and base_results['staged_send'].status == 'PASS':
-            ladder.append(test_atl1(host, key=f'staged_send_{fps}', label=f'ATL1 staged send() @ {fps} FPS',
-                                    mode='staged_send', fps=fps, frames=frames, stall_ms=2000, total_ms=3000,
-                                    payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False))
+            label = f'ATL1 staged send() @ {fps} FPS'
+            ladder.append(execute_test(host, label, lambda fps=fps, label=label: test_atl1(
+                host, key=f'staged_send_{fps}', label=label, mode='staged_send', fps=fps, frames=frames,
+                stall_ms=2000, total_ms=3000, payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False),
+                context='load ladder'))
         if base_results.get('mjpeg') and base_results['mjpeg'].status == 'PASS':
-            ladder.append(test_mjpeg(host, frames, fps, poll_status=False))
-            ladder[-1].key = f'mjpeg_{fps}'
-            ladder[-1].name = f'Dedicated-port MJPEG @ {fps} FPS'
+            label = f'Dedicated-port MJPEG @ {fps} FPS'
+            item = execute_test(host, label, lambda fps=fps: test_mjpeg(host, frames, fps, poll_status=False), context='load ladder')
+            item.key = f'mjpeg_{fps}'
+            item.name = label
+            ladder.append(item)
         if base_results.get('udp') and base_results['udp'].status == 'PASS':
-            ladder.append(test_udp(host, frames, fps))
-            ladder[-1].key = f'udp_{fps}'
-            ladder[-1].name = f'UDP freshness-first JPEG @ {fps} FPS'
+            label = f'UDP freshness-first JPEG @ {fps} FPS'
+            item = execute_test(host, label, lambda fps=fps: test_udp(host, frames, fps), context='load ladder')
+            item.key = f'udp_{fps}'
+            item.name = label
+            ladder.append(item)
     return ladder
 
-
 def print_table(results: list[TestResult], target_fps: int) -> None:
-    print('\nAiTL 0_3_8 R4 camera transport benchmark\n')
+    print('\nAiTL 0_3_8 R5 camera transport benchmark\n')
     print(f"{'Test':42} {'Result':6} {'Frames':>8} {'FPS':>7} {'Score':>6}  Detail")
     print('-' * 145)
     for item in results:
@@ -610,7 +1005,8 @@ def print_table(results: list[TestResult], target_fps: int) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='AiTL 0_3_8 R4 comprehensive ESP32-CAM transport benchmark')
+    global _PROGRESS
+    parser = argparse.ArgumentParser(description='AiTL 0_3_8 R5 comprehensive ESP32-CAM transport benchmark')
     parser.add_argument('--host', required=True, help='ESP32-CAM private-LAN IPv4 address')
     parser.add_argument('--frames', type=int, default=8, help='Frames per primary streaming phase')
     parser.add_argument('--fps', type=int, default=5, help='Primary comparison FPS')
@@ -620,6 +1016,7 @@ def main() -> int:
     parser.add_argument('--environment-label', default='default-network', help='Label for AP/power/environment comparison')
     parser.add_argument('--chunk-sweep', action='store_true', help='Run staged-send chunk sweep 256/512/1024/1460/2920')
     parser.add_argument('--no-load-ladder', action='store_true', help='Skip 10/15 FPS follow-up on passing live candidates')
+    parser.add_argument('--quiet', action='store_true', help='Suppress live per-test/per-frame progress; final table still prints')
     args = parser.parse_args()
 
     if args.frames < 2 or args.frames > 50:
@@ -629,44 +1026,93 @@ def main() -> int:
     if args.jpeg_quality < 4 or args.jpeg_quality > 63:
         raise SystemExit('--jpeg-quality must be 4..63')
 
+    run_started_epoch_ms = int(time.time() * 1000)
+    run_started_perf = time.perf_counter()
     host = args.host.strip()
+    local_ip = local_ip_for(host)
+    _PROGRESS = ConsoleProgress(host=host, environment=args.environment_label, quiet=args.quiet)
+    settings = {'frame_size': args.frame_size, 'jpeg_quality': args.jpeg_quality, 'fps': args.fps, 'frames': args.frames}
+    _PROGRESS.banner(local_ip=local_ip, settings=settings)
+
+    _PROGRESS.section('PREFLIGHT')
+    _PROGRESS.start('ESP firmware / readiness probe', f'http://{host}:{CONTROL_PORT}/status')
     initial = http_json(host, '/status')
-    if not str(initial.get('firmware', '')).startswith('aitl-0_3_8-r4-transport-benchmark'):
-        raise SystemExit('The ESP is not running the AiTL 0_3_8 R4 transport benchmark firmware.')
-    http_json(host, '/config', 'POST', {'frame_size': args.frame_size, 'jpeg_quality': args.jpeg_quality})
+    expected_prefix = 'aitl-0_3_8-r5-transport-benchmark'
+    if not str(initial.get('firmware', '')).startswith(expected_prefix):
+        raise SystemExit(f'The ESP is not running the AiTL 0_3_8 R5 transport benchmark firmware (expected {expected_prefix}).')
+    _PROGRESS._emit(
+        f"     PASS   camera_ready={initial.get('camera_ready')} | RSSI={initial.get('rssi')} dBm | "
+        f"internal_free={initial.get('internal_free')} | largest={initial.get('internal_largest')} | "
+        f"PSRAM_free={initial.get('psram_free')}"
+    )
+    _PROGRESS.start('Apply benchmark image settings', f"{args.frame_size}, JPEG q={args.jpeg_quality}")
+    configured = http_json(host, '/config', 'POST', {'frame_size': args.frame_size, 'jpeg_quality': args.jpeg_quality})
+    _PROGRESS._emit(f"     PASS   frame_size={configured.get('frame_size', args.frame_size)} | jpeg_quality={configured.get('jpeg_quality', args.jpeg_quality)}")
 
     ordered: list[TestResult] = []
-    single, captured_bytes = test_single_capture(host)
+
+    _PROGRESS.section('BASE CAMERA / HTTP CONTROL')
+    single, captured_bytes = execute_test(host, 'HTTP single /capture', lambda: test_single_capture(host), context='camera + one HTTP JPEG')
     ordered.append(single)
-    ordered.append(test_snapshot_polling(host, args.frames, args.fps))
+    ordered.append(execute_test(host, f'HTTP snapshot polling @ {args.fps} FPS',
+                                lambda: test_snapshot_polling(host, args.frames, args.fps),
+                                context='independent-frame fallback'))
     payload_bytes = captured_bytes if 128 <= captured_bytes <= 32768 else 6000
 
-    ordered.append(test_mjpeg(host, args.frames, args.fps, poll_status=True))
-    ordered.append(test_atl1(host, key='direct_sendmsg_1200', label='ATL1 direct PSRAM sendmsg() @ 1.2 s', mode='direct_sendmsg',
-                             fps=1, frames=max(2, min(args.frames, 4)), stall_ms=1200, total_ms=2000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False))
-    ordered.append(test_atl1(host, key='direct_sendmsg_5000', label='ATL1 direct PSRAM sendmsg() @ 5 s', mode='direct_sendmsg',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True))
-    ordered.append(test_atl1(host, key='direct_send', label='ATL1 direct PSRAM plain send()', mode='direct_send',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True))
-    ordered.append(test_atl1(host, key='staged_send', label='ATL1 1460-B DRAM staging + send()', mode='staged_send',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True))
-    ordered.append(test_atl1(host, key='dram_copy_sendmsg', label='ATL1 full JPEG DRAM copy + sendmsg()', mode='dram_copy_sendmsg',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False))
-    ordered.append(test_atl1(host, key='dram_copy_send', label='ATL1 full JPEG DRAM copy + send()', mode='dram_copy_send',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True))
-    ordered.append(test_atl1(host, key='synthetic_sendmsg', label='Synthetic same-size DRAM + sendmsg()', mode='synthetic_sendmsg',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False, production_candidate=False))
-    ordered.append(test_atl1(host, key='synthetic_send', label='Synthetic same-size DRAM + send()', mode='synthetic_send',
-                             fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
-                             payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False, production_candidate=False))
-    ordered.append(test_udp(host, args.frames, args.fps))
+    _PROGRESS.section('PERSISTENT MJPEG / CURRENT ATL1 ISOLATION')
+    ordered.append(execute_test(host, f'Dedicated-port MJPEG @ {args.fps} FPS',
+                                lambda: test_mjpeg(host, args.frames, args.fps, poll_status=True),
+                                context=f'port {MJPEG_PORT}; /status polling active'))
+    ordered.append(execute_test(host, 'ATL1 direct PSRAM sendmsg() @ 1.2 s',
+                                lambda: test_atl1(host, key='direct_sendmsg_1200', label='ATL1 direct PSRAM sendmsg() @ 1.2 s', mode='direct_sendmsg',
+                                                  fps=1, frames=max(2, min(args.frames, 4)), stall_ms=1200, total_ms=2000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False),
+                                context='current-like timeout control; 1 FPS'))
+    ordered.append(execute_test(host, 'ATL1 direct PSRAM sendmsg() @ 5 s',
+                                lambda: test_atl1(host, key='direct_sendmsg_5000', label='ATL1 direct PSRAM sendmsg() @ 5 s', mode='direct_sendmsg',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True),
+                                context='relaxed-timeout A/B; /status polling active'))
+    ordered.append(execute_test(host, 'ATL1 direct PSRAM plain send()',
+                                lambda: test_atl1(host, key='direct_send', label='ATL1 direct PSRAM plain send()', mode='direct_send',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True),
+                                context='sendmsg vs send A/B'))
+
+    _PROGRESS.section('MEMORY-SOURCE ISOLATION')
+    ordered.append(execute_test(host, 'ATL1 1460-B DRAM staging + send()',
+                                lambda: test_atl1(host, key='staged_send', label='ATL1 1460-B DRAM staging + send()', mode='staged_send',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True),
+                                context='PSRAM copied in small DRAM chunks'))
+    ordered.append(execute_test(host, 'ATL1 full JPEG DRAM copy + sendmsg()',
+                                lambda: test_atl1(host, key='dram_copy_sendmsg', label='ATL1 full JPEG DRAM copy + sendmsg()', mode='dram_copy_sendmsg',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False),
+                                context='same real JPEG, internal DRAM source'))
+    ordered.append(execute_test(host, 'ATL1 full JPEG DRAM copy + send()',
+                                lambda: test_atl1(host, key='dram_copy_send', label='ATL1 full JPEG DRAM copy + send()', mode='dram_copy_send',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=True),
+                                context='strongest ATL1 production candidate'))
+
+    _PROGRESS.section('CAMERA-INDEPENDENT TCP CONTROLS')
+    ordered.append(execute_test(host, 'Synthetic same-size DRAM + sendmsg()',
+                                lambda: test_atl1(host, key='synthetic_sendmsg', label='Synthetic same-size DRAM + sendmsg()', mode='synthetic_sendmsg',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False, production_candidate=False),
+                                context=f'synthetic payload ~= captured JPEG ({payload_bytes} B)'))
+    ordered.append(execute_test(host, 'Synthetic same-size DRAM + send()',
+                                lambda: test_atl1(host, key='synthetic_send', label='Synthetic same-size DRAM + send()', mode='synthetic_send',
+                                                  fps=args.fps, frames=args.frames, stall_ms=5000, total_ms=7000,
+                                                  payload_bytes=payload_bytes, chunk_bytes=1460, poll_status=False, production_candidate=False),
+                                context=f'synthetic payload ~= captured JPEG ({payload_bytes} B)'))
+
+    _PROGRESS.section('TCP-BYPASS CONTROL')
+    ordered.append(execute_test(host, f'UDP freshness-first JPEG @ {args.fps} FPS',
+                                lambda: test_udp(host, args.frames, args.fps),
+                                context='removes TCP retransmission/backpressure'))
+
     ordered.extend([
         TestResult(key='websocket_assessment', name='WebSocket binary JPEG', transport='WebSocket/TCP', status='SKIP',
                    detail='Assessment only: still rides TCP/lwIP and adds handshake/framing, so it cannot bypass a lower-layer TCP stall.', production_candidate=False),
@@ -677,10 +1123,14 @@ def main() -> int:
     ])
 
     if args.chunk_sweep:
+        _PROGRESS.section('DRAM STAGING CHUNK-SIZE SWEEP')
         for chunk in (256, 512, 1024, 1460, 2920):
-            ordered.append(test_atl1(host, key=f'staged_{chunk}', label=f'Staged DRAM chunk {chunk} B', mode='staged_send',
-                                     fps=args.fps, frames=max(3, min(args.frames, 6)), stall_ms=5000, total_ms=7000,
-                                     payload_bytes=payload_bytes, chunk_bytes=chunk, poll_status=False))
+            label = f'Staged DRAM chunk {chunk} B'
+            ordered.append(execute_test(host, label,
+                                        lambda chunk=chunk, label=label: test_atl1(host, key=f'staged_{chunk}', label=label, mode='staged_send',
+                                                                                  fps=args.fps, frames=max(3, min(args.frames, 6)), stall_ms=5000, total_ms=7000,
+                                                                                  payload_bytes=payload_bytes, chunk_bytes=chunk, poll_status=False),
+                                        context='chunk-size sensitivity'))
 
     primary = {item.key: item for item in ordered}
     diagnosis = diagnose(primary, args.fps)
@@ -689,30 +1139,61 @@ def main() -> int:
         ladder = run_load_ladder(host, primary, payload_bytes, max(4, min(args.frames, 8)), args.frame_size, args.jpeg_quality)
         ordered.extend(ladder)
 
-    final_status = http_json(host, '/status')
+    final_status = safe_device_status(host)
+    primary = {item.key: item for item in ordered}
+    evidence = build_analysis_evidence(primary, diagnosis)
+    run_finished_epoch_ms = int(time.time() * 1000)
+    run_duration_ms = round((time.perf_counter() - run_started_perf) * 1000.0, 1)
     report = {
-        'schema_version': 2,
+        'schema_version': REPORT_SCHEMA_VERSION,
+        'benchmark_revision': BENCHMARK_REVISION,
         'firmware': initial.get('firmware'),
         'host': host,
+        'pc_local_ip': local_ip,
         'environment_label': args.environment_label,
-        'generated_at_ms': int(time.time() * 1000),
-        'settings': {'frame_size': args.frame_size, 'jpeg_quality': args.jpeg_quality, 'fps': args.fps, 'frames': args.frames},
+        'generated_at_ms': run_finished_epoch_ms,
+        'run_context': {
+            'started_at_ms': run_started_epoch_ms,
+            'finished_at_ms': run_finished_epoch_ms,
+            'duration_ms': run_duration_ms,
+            'python_version': sys.version,
+            'platform': platform.platform(),
+            'os_name': os.name,
+            'console_progress_enabled': not args.quiet,
+            'raw_receiver_note': 'ATL1 benchmark receiver only reads framing/JPEG markers; it performs no UI rendering, inference, image decode, or CameraFrameService publication.',
+        },
+        'settings': settings,
         'reference_frame_bytes': captured_bytes,
         'initial_device': initial,
+        'configured_device': configured,
         'final_device': final_status,
         'diagnosis': diagnosis,
+        'analysis_evidence': evidence,
         'results': [asdict(item) for item in ordered],
+        'test_plan': [
+            {'stage': 'camera', 'tests': ['capture_single', 'snapshot_polling']},
+            {'stage': 'persistent transports', 'tests': ['mjpeg', 'direct_sendmsg_1200', 'direct_sendmsg_5000', 'direct_send']},
+            {'stage': 'memory source', 'tests': ['staged_send', 'dram_copy_sendmsg', 'dram_copy_send']},
+            {'stage': 'synthetic controls', 'tests': ['synthetic_sendmsg', 'synthetic_send']},
+            {'stage': 'TCP bypass', 'tests': ['udp']},
+            {'stage': 'optional', 'tests': ['chunk sweep', '10/15 FPS load ladder']},
+        ],
         'interpretation_notes': {
             'raw_receiver': 'ATL1 tests use a minimal Python socket receiver with no image decode/UI/inference. A pass here but failure in V038 managed-worker diagnostics isolates PC Studio integration/backpressure.',
             'websocket': 'Assessed but intentionally not benchmarked: WebSocket still uses TCP/lwIP and therefore cannot bypass a lower-level TCP stall.',
             'rtsp': 'Assessed but intentionally not benchmarked: it changes the transport stack substantially and is not required unless simpler stable transports are insufficient.',
+            'status_samples': 'Key persistent phases retain up to 160 /status samples with control latency, RSSI, heap/internal-memory and transport counters so transient pressure is visible.',
+            'progress_trace': 'ESP progress_trace shows bytes accepted versus elapsed send time for the most recent bounded send and is preserved in device snapshots.',
         },
     }
     args.output.write_text(json.dumps(report, indent=2), encoding='utf-8')
+
+    _PROGRESS.section('FINAL RESULT')
     print_table(ordered, args.fps)
     print(f"\nDiagnosis: {diagnosis['diagnosis_code']}\n{diagnosis['likely_bottleneck']}")
     print(f"\nRecommended path: {diagnosis['recommended_key']}\n{diagnosis['recommendation']}")
-    print(f'\nSaved report: {args.output.resolve()}')
+    print(f'\nTotal benchmark time: {run_duration_ms / 1000.0:.1f} s')
+    print(f'Saved detailed report: {args.output.resolve()}')
     return 0 if single.status == 'PASS' else 2
 
 
