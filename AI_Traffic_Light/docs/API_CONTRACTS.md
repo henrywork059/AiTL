@@ -115,7 +115,7 @@ These fields are diagnostic device telemetry. They do not change the `ATL1` imag
 
 No request body is required. The endpoint diagnoses the currently selected saved ESP camera. If no saved camera is selected, it returns the existing camera-not-connected error envelope with HTTP 409; V038 introduces no new stable error code.
 
-The route delegates staged testing and state restoration to `CameraDiagnosticService`. A successful standard-envelope response contains a report with `run_id`, `source_id`, `host`, `overall`, `diagnosis_code`, `title`, `summary`, `confidence`, `checks`, `metrics`, `likely_causes`, `recommendations`, `state_restored`, `restore_error`, `diagnostic_target_fps`, and `prototype_only`.
+The route delegates staged testing and state restoration to the camera diagnostic dispatch/service layer. A successful standard-envelope response contains a report with `run_id`, `source_id`, `host`, `overall`, `diagnosis_code`, `title`, `summary`, `confidence`, `checks`, `metrics`, `likely_causes`, `recommendations`, `state_restored`, `restore_error`, `diagnostic_target_fps`, and `prototype_only`.
 
 The diagnostic stages are: repeated direct ESP `/status` probes; firmware/wire-protocol and camera-readiness checks; RSSI/BSSID/channel inspection; direct `ATL1`/JPEG receiving that bypasses the normal PC Studio stream worker; direct receiving while `/status` polling runs concurrently; the normal `RemoteCameraManager` / `RemoteCameraService` managed stream; and restoration of the prior camera/simulation state.
 
@@ -124,3 +124,15 @@ The measurement stream uses the selected profile's saved image settings at a con
 ### V038 R2 detailed camera-diagnostic evidence
 
 `POST /api/camera/diagnostics/run` retains the existing envelope and adds detailed report sections: `functionality`, `stability`, and `bottlenecks`. Metrics include control average/p95/max latency, direct-stream sequence gaps and p95 frame interval, bounded load target/achieved FPS and throughput, reconnect result/timing, managed-worker per-phase FPS/counters, total versus unexpected ESP send failures, and diagnostic transition resets. The diagnostic remains state-restoring and does not persist test FPS/settings.
+
+### V038 integrated benchmark and timing follow-up
+
+When the selected ESP reports the R5 transport-benchmark firmware prefix, the same `POST /api/camera/diagnostics/run` action dispatches to the comprehensive transport benchmark rather than rejecting the firmware as production-incompatible. The response additionally includes `transport_benchmark` with the full snapshot/MJPEG/ATL1/DRAM/synthetic/UDP result matrix and may include `pipeline_timing`.
+
+`pipeline_timing` is diagnostic-only evidence for the recommended passing transport. It reports the target frame period, observed frame interval, ESP-reported camera acquisition and socket-send timing samples, the portion of the interval explained by capture+send, the still-unexplained interval, a short independent `/capture` timing probe, comparison rows for direct plain-send / DRAM-copy / synthetic controls when available, a ranked `dominant_remaining_stage`, confidence, conclusions and the next targeted action. It does not claim firmware-level allocation/copy timing unless those timers are actually present.
+
+The integrated timing follow-up intentionally reuses the already-flashed R5 firmware and does not require an ESP reflash. It adds four independent `/capture` samples after the broad matrix and compares each PC-observed request time with the firmware's existing `last_capture_ms` telemetry. A complete but under-target stream is not treated as fully stable merely because all requested frames arrived; target sustainability requires at least 70% of the requested FPS in the benchmark report mapping.
+
+`GET /api/camera/diagnostics/progress`
+
+Returns the same standard success envelope with the current diagnostic progress snapshot. Fields include `status`, `engine`, `stage`, `current_test`, `test_index`, `frame_current`, `frame_total`, `detail`, `last_line`, `started_at_ms`, `elapsed_ms`, `error`, and a bounded `log_tail`. Progress polling is observational only and does not start, stop or mutate a diagnostic run.
