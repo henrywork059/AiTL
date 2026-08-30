@@ -48,7 +48,7 @@ function phaseResult(phase: CameraLoadPhase): string {
 
 function engineLabel(progress: CameraDiagnosticProgress | null): string {
   if (!progress?.engine) return "Detecting";
-  if (progress.engine === "transport_benchmark") return "R5 full transport benchmark";
+  if (progress.engine === "transport_benchmark") return "R5 transport + timing benchmark";
   if (progress.engine === "standard") return "Production camera diagnostics";
   return progress.engine;
 }
@@ -142,11 +142,11 @@ export function CameraDiagnosticsPage() {
               <h2>Deep one-click camera test</h2>
               <p className="placeholder-copy">
                 One button automatically selects the correct diagnostic engine. Normal AiTL firmware runs the production
-                control/stability/managed-worker checks; R5 benchmark firmware runs the full snapshot, MJPEG, ATL1,
-                sendmsg/send, PSRAM/DRAM, UDP, chunk-size and load-headroom transport matrix.
+                control/stability/managed-worker checks; R5 benchmark firmware runs the full transport matrix and then a
+                targeted real-frame timing follow-up to separate camera acquisition, socket send time and still-unexplained frame time.
               </p>
             </div>
-            <span className="status-pill status-info">V038 R6 integrated</span>
+            <span className="status-pill status-info">V038 R7 timing</span>
           </div>
 
           <div className="settings-list">
@@ -157,8 +157,8 @@ export function CameraDiagnosticsPage() {
           </div>
 
           <p className="small-note">
-            The selected ESP is probed first. R5 transport firmware is benchmarked directly from this page with the saved
-            image settings where supported; normal firmware uses the established state-restoring production diagnostic path.
+            The selected ESP is probed first. R5 transport firmware is benchmarked directly from this page, then four independent
+            /capture requests are compared with the ESP-reported camera acquisition time. No ESP reflash is required for this timing follow-up.
           </p>
 
           <div className="button-row">
@@ -244,6 +244,36 @@ export function CameraDiagnosticsPage() {
                 <div><span>Likely bottleneck</span><code>{report.transport_benchmark.diagnosis.likely_bottleneck}</code></div>
               </div>
               <p className="small-note"><strong>Recommended action:</strong> {report.transport_benchmark.diagnosis.recommendation}</p>
+            </section>
+          )}
+
+          {report.pipeline_timing && (
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Real-frame timing diagnosis</h2>
+                  <p className="placeholder-copy">
+                    The reliable transport candidate is decomposed into ESP camera acquisition, ESP socket-send time and the remaining unaccounted frame interval.
+                  </p>
+                </div>
+                <span className="status-pill status-info">{report.pipeline_timing.dominant_remaining_stage.replace(/_/g, " ")}</span>
+              </div>
+              <div className="settings-list">
+                <div><span>Timing confidence</span><code>{report.pipeline_timing.confidence}</code></div>
+                <div><span>Candidate</span><code>{report.pipeline_timing.candidate_key}</code></div>
+                <div><span>Target / achieved</span><code>{report.pipeline_timing.target_fps} / {report.pipeline_timing.candidate.measured_fps.toFixed(2)} FPS</code></div>
+                <div><span>Target frame period</span><code>{displayNumber(report.pipeline_timing.target_period_ms, " ms", 1)}</code></div>
+                <div><span>Observed frame interval</span><code>{displayNumber(report.pipeline_timing.candidate.observed_interval_ms, " ms", 1)}</code></div>
+                <div><span>ESP capture avg / p95</span><code>{displayNumber(report.pipeline_timing.candidate.capture_ms.avg ?? report.pipeline_timing.capture_probe.esp_capture_ms.avg, "", 1)} / {displayNumber(report.pipeline_timing.candidate.capture_ms.p95 ?? report.pipeline_timing.capture_probe.esp_capture_ms.p95, " ms", 1)}</code></div>
+                <div><span>ESP send avg / p95</span><code>{displayNumber(report.pipeline_timing.candidate.send_ms.avg, "", 1)} / {displayNumber(report.pipeline_timing.candidate.send_ms.p95, " ms", 1)}</code></div>
+                <div><span>Capture + send accounted</span><code>{displayNumber(report.pipeline_timing.accounted_ms, " ms", 1)}</code></div>
+                <div><span>Still unexplained</span><code>{displayNumber(report.pipeline_timing.unexplained_ms, " ms", 1)}{report.pipeline_timing.unexplained_ratio === null ? "" : ` (${Math.round(report.pipeline_timing.unexplained_ratio * 100)}%)`}</code></div>
+                <div><span>HTTP /capture request avg</span><code>{displayNumber(report.pipeline_timing.capture_probe.request_ms.avg, " ms", 1)}</code></div>
+                <div><span>Request time outside camera acquisition</span><code>{displayNumber(report.pipeline_timing.capture_probe.request_minus_capture_ms.avg, " ms", 1)}</code></div>
+                <div><span>Synthetic send control</span><code>{report.pipeline_timing.synthetic_send ? `${report.pipeline_timing.synthetic_send.measured_fps.toFixed(2)} FPS / ${displayNumber(report.pipeline_timing.synthetic_send.send_ms.avg, " ms", 1)}` : "—"}</code></div>
+              </div>
+              {report.pipeline_timing.conclusions.length > 0 && <><h3>Timing conclusions</h3><ul>{report.pipeline_timing.conclusions.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              <p className="small-note"><strong>Next targeted action:</strong> {report.pipeline_timing.next_action}</p>
             </section>
           )}
 
