@@ -133,6 +133,12 @@ When the selected ESP reports the R5 transport-benchmark firmware prefix, the sa
 
 The integrated timing follow-up intentionally reuses the already-flashed R5 firmware and does not require an ESP reflash. It adds four independent `/capture` samples after the broad matrix and compares each PC-observed request time with the firmware's existing `last_capture_ms` telemetry. A complete but under-target stream is not treated as fully stable merely because all requested frames arrived; target sustainability requires at least 70% of the requested FPS in the benchmark report mapping.
 
+### V038 R8 payload and receiver alternative isolation
+
+When an R5 transport-benchmark report is available, the same one-click action additionally runs a focused R8 follow-up without changing ESP firmware. It derives a reference payload from the median real streaming JPEG sizes rather than from the first `/capture`, then adds exact synthetic internal-DRAM payload tests at 5/10/15/reference/20/25 KiB-class sizes, four PC `SO_RCVBUF` requests, and a fast-versus-artificially-throttled PC receiver-drain A/B. The appended rows remain diagnostic controls and are not automatically promoted into production transport choices.
+
+The response may include `alternative_analysis` and `transport_benchmark.alternative_analysis`. These report the reference real-JPEG byte size, exact-size synthetic-versus-real FPS, payload-size curve, receive-buffer sensitivity, receiver-drain sensitivity, findings, assessed alternatives and a next action. The analysis uses the already-benchmarked HTTP/MJPEG `WiFiClient.write()` paths, ATL1 plain `send()`, staged DRAM, UDP and assessment-only WebSocket/RTSP evidence where relevant. Runtime `SO_SNDBUF` tuning is not reported as tested because ESP-IDF/lwIP does not support changing that option by default. Lower-level raw lwIP `tcp_write`/`tcp_output` remains a future firmware A/B rather than a current implemented path.
+
 `GET /api/camera/diagnostics/progress`
 
 Returns the same standard success envelope with the current diagnostic progress snapshot. Fields include `status`, `engine`, `stage`, `current_test`, `test_index`, `frame_current`, `frame_total`, `detail`, `last_line`, `started_at_ms`, `elapsed_ms`, `error`, and a bounded `log_tail`. Progress polling is observational only and does not start, stop or mutate a diagnostic run.
