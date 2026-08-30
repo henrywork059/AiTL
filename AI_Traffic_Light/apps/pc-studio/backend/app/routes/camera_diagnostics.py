@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
-from app.services.camera_diagnostic_dispatch import camera_diagnostic_dispatch_service
+from app.services.camera_diagnostic_enhanced import camera_diagnostic_enhanced_service
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -13,10 +13,10 @@ def run_camera_diagnostics(request: Request) -> dict:
     """Run adaptive one-click diagnostics against the selected ESP camera.
 
     Normal AiTL firmware uses the established production diagnostic pipeline.
-    R5 transport-benchmark firmware automatically runs the full transport matrix
-    and maps its evidence into the same Camera Diagnostics report surface.
+    R5 transport-benchmark firmware runs the full transport matrix, timing
+    attribution and the focused R8 payload/receiver alternative follow-up.
     """
-    data = camera_diagnostic_dispatch_service.run()
+    data = camera_diagnostic_enhanced_service.run()
     logger.info(
         "Camera diagnostics returned",
         extra={
@@ -32,4 +32,4 @@ def run_camera_diagnostics(request: Request) -> dict:
 @router.get("/progress")
 def camera_diagnostic_progress(request: Request) -> dict:
     """Return live phase/test progress for the active Camera Diagnostics run."""
-    return ok(camera_diagnostic_dispatch_service.progress(), request_id=request.state.request_id)
+    return ok(camera_diagnostic_enhanced_service.progress(), request_id=request.state.request_id)
