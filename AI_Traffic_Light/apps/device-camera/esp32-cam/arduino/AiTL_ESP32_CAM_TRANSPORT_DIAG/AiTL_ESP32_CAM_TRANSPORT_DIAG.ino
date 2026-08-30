@@ -1,12 +1,13 @@
-// AiTL 0_3_8 R3 transport-isolation firmware.
-// DIAGNOSTIC-ONLY: flash temporarily to isolate camera/PSRAM/TCP/MJPEG behavior.
-// It does not replace the normal AiTL V037 production firmware.
+// AiTL 0_3_8 R4 comprehensive camera-transport benchmark firmware.
+// DIAGNOSTIC ONLY. Flash temporarily, run test_camera_transport_benchmark.py,
+// then restore the normal AiTL V037 production firmware.
 
 #include <Arduino.h>
 #include <errno.h>
 #include <sys/uio.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <esp_camera.h>
 #include <esp_heap_caps.h>
 #include <lwip/sockets.h>
@@ -22,19 +23,22 @@
 #define AITL_WIFI_PASSWORD "CHANGE_ME"
 #endif
 #ifndef AITL_DEVICE_HOSTNAME
-#define AITL_DEVICE_HOSTNAME "aitl-cam-diag"
+#define AITL_DEVICE_HOSTNAME "aitl-cam-r4-bench"
 #endif
 
 namespace {
 
 constexpr uint16_t CONTROL_PORT = 80;
 constexpr uint16_t ATL1_PORT = 81;
+constexpr uint16_t MJPEG_PORT = 84;
 constexpr uint32_t WIFI_TIMEOUT_MS = 20000;
 constexpr uint32_t SELECT_SLICE_MS = 20;
 constexpr size_t ATL1_HEADER_BYTES = 16;
-constexpr size_t MAX_SYNTHETIC_BYTES = 32768;
-constexpr size_t MAX_TRACE_POINTS = 24;
+constexpr size_t UDP_HEADER_BYTES = 22;
+constexpr size_t MAX_SYNTHETIC_BYTES = 65536;
+constexpr size_t MAX_TRACE_POINTS = 32;
 constexpr uint8_t ATL1_MAGIC[4] = {'A','T','L','1'};
+constexpr uint8_t UDP_MAGIC[4] = {'A','T','U','1'};
 
 // AI Thinker ESP32-CAM pin map.
 constexpr int PWDN_GPIO_NUM = 32;
@@ -54,14 +58,26 @@ constexpr int VSYNC_GPIO_NUM = 25;
 constexpr int HREF_GPIO_NUM = 23;
 constexpr int PCLK_GPIO_NUM = 22;
 
-enum class TransportMode : uint8_t { Direct, Staged, DramCopy, Synthetic };
+enum class TransportMode : uint8_t {
+  DirectSendmsg,
+  DirectSend,
+  StagedSend,
+  DramCopySendmsg,
+  DramCopySend,
+  SyntheticSendmsg,
+  SyntheticSend,
+};
 
 WebServer controlServer(CONTROL_PORT);
 WiFiServer atl1Server(ATL1_PORT, 1);
+WiFiServer mjpegServer(MJPEG_PORT, 1);
+WiFiUDP udp;
 WiFiClient atl1Client;
-TransportMode mode = TransportMode::Direct;
+WiFiClient mjpegClient;
+
+TransportMode mode = TransportMode::DirectSendmsg;
 bool cameraReady = false;
-bool streaming = false;
+bool atl1Streaming = false;
 uint8_t targetFps = 5;
 uint32_t nextFrameDueUs = 0;
 uint32_t sequenceNumber = 0;
@@ -86,13 +102,42 @@ uint32_t lastTraceBytes[MAX_TRACE_POINTS]{};
 uint32_t lastTraceMs[MAX_TRACE_POINTS]{};
 size_t lastTraceCount = 0;
 
+// Dedicated-port MJPEG state.
+uint16_t mjpegFramesRequested = 8;
+uint8_t mjpegTargetFps = 5;
+uint16_t mjpegFramesSent = 0;
+uint32_t mjpegNextFrameDueUs = 0;
+uint32_t mjpegLastSendMs = 0;
+uint32_t mjpegFailures = 0;
+
+// UDP freshness-first JPEG state.
+bool udpStreaming = false;
+IPAddress udpRemoteIp;
+uint16_t udpRemotePort = 0;
+uint16_t udpFramesRequested = 8;
+uint16_t udpFramesSent = 0;
+uint8_t udpTargetFps = 5;
+uint16_t udpChunkBytes = 1200;
+uint32_t udpNextFrameDueUs = 0;
+uint32_t udpPacketsSent = 0;
+uint32_t udpSendFailures = 0;
+uint32_t udpLastFrameSendMs = 0;
+
 const char* modeName() {
   switch (mode) {
-    case TransportMode::Staged: return "staged";
-    case TransportMode::DramCopy: return "dram_copy";
-    case TransportMode::Synthetic: return "synthetic";
-    default: return "direct";
+    case TransportMode::DirectSend: return "direct_send";
+    case TransportMode::StagedSend: return "staged_send";
+    case TransportMode::DramCopySendmsg: return "dram_copy_sendmsg";
+    case TransportMode::DramCopySend: return "dram_copy_send";
+    case TransportMode::SyntheticSendmsg: return "synthetic_sendmsg";
+    case TransportMode::SyntheticSend: return "synthetic_send";
+    default: return "direct_sendmsg";
   }
+}
+
+void putU16be(uint8_t* out, uint16_t value) {
+  out[0] = static_cast<uint8_t>((value >> 8) & 0xFF);
+  out[1] = static_cast<uint8_t>(value & 0xFF);
 }
 
 void putU32be(uint8_t* out, uint32_t value) {
@@ -113,11 +158,15 @@ void recordTrace(size_t accepted, uint32_t startedMs) {
 }
 
 bool ensureInternalBuffer(uint8_t*& buffer, size_t& capacity, size_t wanted) {
-  if (wanted == 0) return false;
+  if (wanted == 0 || wanted > MAX_SYNTHETIC_BYTES) return false;
   if (buffer && capacity >= wanted) return true;
-  if (buffer) heap_caps_free(buffer);
+  if (buffer) {
+    heap_caps_free(buffer);
+    buffer = nullptr;
+    capacity = 0;
+  }
   buffer = static_cast<uint8_t*>(heap_caps_malloc(wanted, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-  if (!buffer) { capacity = 0; return false; }
+  if (!buffer) return false;
   capacity = wanted;
   return true;
 }
@@ -125,6 +174,23 @@ bool ensureInternalBuffer(uint8_t*& buffer, size_t& capacity, size_t wanted) {
 void closeAtl1Client() {
   if (atl1Client) atl1Client.stop();
   atl1Client = WiFiClient();
+}
+
+void closeMjpegClient() {
+  if (mjpegClient) mjpegClient.stop();
+  mjpegClient = WiFiClient();
+}
+
+void resetAtl1Counters() {
+  frameCount = 0;
+  sendFailures = 0;
+  deadlineDrops = 0;
+  lastFrameBytes = 0;
+  lastCaptureMs = 0;
+  lastSendMs = 0;
+  lastAcceptedBytes = 0;
+  lastErrno = 0;
+  resetTrace();
 }
 
 bool waitWritable(int fd, uint32_t startedMs, uint32_t progressMs) {
@@ -233,35 +299,40 @@ bool sendVectoredBounded(int fd, const uint8_t* header, size_t headerLength,
   return true;
 }
 
-bool sendAtl1Frame(const uint8_t* payload, size_t payloadLength, bool staged) {
+bool sendAtl1Frame(const uint8_t* payload, size_t payloadLength, bool useSendmsg, bool staged) {
   const int fd = atl1Client.fd();
   if (fd < 0) { lastErrno = EBADF; return false; }
   uint8_t header[ATL1_HEADER_BYTES];
-  memcpy(header, ATL1_MAGIC, 4);
+  memcpy(header, ATL1_MAGIC, sizeof(ATL1_MAGIC));
   putU32be(header + 4, static_cast<uint32_t>(payloadLength));
   putU32be(header + 8, ++sequenceNumber);
   putU32be(header + 12, millis());
+
   const uint32_t started = millis();
   size_t accepted = 0;
   int terminalErrno = 0;
   resetTrace();
   bool ok = false;
-  if (!staged) {
-    ok = sendVectoredBounded(fd, header, sizeof(header), payload, payloadLength, started, accepted, terminalErrno);
-  } else {
+
+  if (staged) {
     if (!ensureInternalBuffer(stageBuffer, stageCapacity, chunkBytes)) {
       lastErrno = ENOMEM;
       return false;
     }
     ok = sendBytesBounded(fd, header, sizeof(header), started, accepted, terminalErrno);
-    if (ok) {
-      for (size_t offset = 0; offset < payloadLength && ok; offset += chunkBytes) {
-        const size_t n = min(chunkBytes, payloadLength - offset);
-        memcpy(stageBuffer, payload + offset, n);
-        ok = sendBytesBounded(fd, stageBuffer, n, started, accepted, terminalErrno);
-      }
+    for (size_t offset = 0; offset < payloadLength && ok; offset += chunkBytes) {
+      const size_t remain = payloadLength - offset;
+      const size_t n = chunkBytes < remain ? chunkBytes : remain;
+      memcpy(stageBuffer, payload + offset, n);
+      ok = sendBytesBounded(fd, stageBuffer, n, started, accepted, terminalErrno);
     }
+  } else if (useSendmsg) {
+    ok = sendVectoredBounded(fd, header, sizeof(header), payload, payloadLength, started, accepted, terminalErrno);
+  } else {
+    ok = sendBytesBounded(fd, header, sizeof(header), started, accepted, terminalErrno);
+    if (ok) ok = sendBytesBounded(fd, payload, payloadLength, started, accepted, terminalErrno);
   }
+
   lastSendMs = millis() - started;
   lastAcceptedBytes = static_cast<uint32_t>(accepted);
   lastErrno = terminalErrno;
@@ -276,10 +347,10 @@ bool sendAtl1Frame(const uint8_t* payload, size_t payloadLength, bool staged) {
 
 String statusJson() {
   String json = "{";
-  json += "\"firmware\":\"aitl-0_3_8-r3-transport-diag\"";
+  json += "\"firmware\":\"aitl-0_3_8-r4-transport-benchmark\"";
   json += ",\"camera_ready\":" + String(cameraReady ? "true" : "false");
-  json += ",\"streaming\":" + String(streaming ? "true" : "false");
   json += ",\"mode\":\"" + String(modeName()) + "\"";
+  json += ",\"atl1_streaming\":" + String(atl1Streaming ? "true" : "false");
   json += ",\"target_fps\":" + String(targetFps);
   json += ",\"stall_timeout_ms\":" + String(stallTimeoutMs);
   json += ",\"total_send_limit_ms\":" + String(totalSendLimitMs);
@@ -293,9 +364,19 @@ String statusJson() {
   json += ",\"last_send_ms\":" + String(lastSendMs);
   json += ",\"last_accepted_bytes\":" + String(lastAcceptedBytes);
   json += ",\"last_errno\":" + String(lastErrno);
+  json += ",\"mjpeg_client_active\":" + String((mjpegClient && mjpegClient.connected()) ? "true" : "false");
+  json += ",\"mjpeg_frames_sent\":" + String(mjpegFramesSent);
+  json += ",\"mjpeg_failures\":" + String(mjpegFailures);
+  json += ",\"mjpeg_last_send_ms\":" + String(mjpegLastSendMs);
+  json += ",\"udp_streaming\":" + String(udpStreaming ? "true" : "false");
+  json += ",\"udp_frames_sent\":" + String(udpFramesSent);
+  json += ",\"udp_packets_sent\":" + String(udpPacketsSent);
+  json += ",\"udp_send_failures\":" + String(udpSendFailures);
+  json += ",\"udp_last_frame_send_ms\":" + String(udpLastFrameSendMs);
   json += ",\"free_heap\":" + String(ESP.getFreeHeap());
   json += ",\"internal_free\":" + String(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
   json += ",\"internal_largest\":" + String(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  json += ",\"internal_min_free\":" + String(ESP.getMinFreeHeap());
   json += ",\"psram_free\":" + String(ESP.getFreePsram());
   json += ",\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : -127);
   json += ",\"bssid\":\"" + String(WiFi.status() == WL_CONNECTED ? WiFi.BSSIDstr() : "offline") + "\"";
@@ -328,29 +409,38 @@ bool setFrameSize(const String& value) {
 }
 
 void handleConfigure() {
-  if (!cameraReady || streaming) { sendJson(409, "{\"error\":\"busy_or_not_ready\"}"); return; }
+  if (!cameraReady || atl1Streaming || udpStreaming || (mjpegClient && mjpegClient.connected())) {
+    sendJson(409, "{\"error\":\"busy_or_not_ready\"}");
+    return;
+  }
   if (controlServer.hasArg("frame_size") && !setFrameSize(controlServer.arg("frame_size"))) {
-    sendJson(422, "{\"error\":\"invalid_frame_size\"}"); return;
+    sendJson(422, "{\"error\":\"invalid_frame_size\"}");
+    return;
   }
   if (controlServer.hasArg("jpeg_quality")) {
     const int q = controlServer.arg("jpeg_quality").toInt();
     sensor_t* sensor = esp_camera_sensor_get();
     if (!sensor || q < 4 || q > 63 || sensor->set_quality(sensor, q) != 0) {
-      sendJson(422, "{\"error\":\"invalid_jpeg_quality\"}"); return;
+      sendJson(422, "{\"error\":\"invalid_jpeg_quality\"}");
+      return;
     }
   }
   sendJson(200, statusJson());
 }
 
 void handleMode() {
-  if (streaming) { sendJson(409, "{\"error\":\"streaming\"}"); return; }
+  if (atl1Streaming) { sendJson(409, "{\"error\":\"streaming\"}"); return; }
   if (!controlServer.hasArg("mode")) { sendJson(422, "{\"error\":\"missing_mode\"}"); return; }
   const String requested = controlServer.arg("mode");
-  if (requested == "direct") mode = TransportMode::Direct;
-  else if (requested == "staged") mode = TransportMode::Staged;
-  else if (requested == "dram_copy") mode = TransportMode::DramCopy;
-  else if (requested == "synthetic") mode = TransportMode::Synthetic;
+  if (requested == "direct_sendmsg") mode = TransportMode::DirectSendmsg;
+  else if (requested == "direct_send") mode = TransportMode::DirectSend;
+  else if (requested == "staged_send") mode = TransportMode::StagedSend;
+  else if (requested == "dram_copy_sendmsg") mode = TransportMode::DramCopySendmsg;
+  else if (requested == "dram_copy_send") mode = TransportMode::DramCopySend;
+  else if (requested == "synthetic_sendmsg") mode = TransportMode::SyntheticSendmsg;
+  else if (requested == "synthetic_send") mode = TransportMode::SyntheticSend;
   else { sendJson(422, "{\"error\":\"invalid_mode\"}"); return; }
+
   if (controlServer.hasArg("fps")) {
     const int fps = controlServer.arg("fps").toInt();
     if (fps < 1 || fps > 20) { sendJson(422, "{\"error\":\"invalid_fps\"}"); return; }
@@ -384,7 +474,10 @@ void handleMode() {
 }
 
 void handleCapture() {
-  if (!cameraReady || streaming) { controlServer.send(409, "text/plain", "camera busy or not ready"); return; }
+  if (!cameraReady || atl1Streaming || udpStreaming || (mjpegClient && mjpegClient.connected())) {
+    controlServer.send(409, "text/plain", "camera busy or not ready");
+    return;
+  }
   const uint32_t started = millis();
   camera_fb_t* fb = esp_camera_fb_get();
   lastCaptureMs = millis() - started;
@@ -399,48 +492,72 @@ void handleCapture() {
   esp_camera_fb_return(fb);
 }
 
-void handleMjpeg() {
-  if (!cameraReady || streaming) { controlServer.send(409, "text/plain", "camera busy or not ready"); return; }
-  int frames = controlServer.hasArg("frames") ? controlServer.arg("frames").toInt() : 10;
+void handleMjpegConfig() {
+  if (mjpegClient && mjpegClient.connected()) { sendJson(409, "{\"error\":\"mjpeg_active\"}"); return; }
+  int frames = controlServer.hasArg("frames") ? controlServer.arg("frames").toInt() : 8;
   int fps = controlServer.hasArg("fps") ? controlServer.arg("fps").toInt() : 5;
-  if (frames < 1) frames = 1;
-  if (frames > 40) frames = 40;
-  if (fps < 1) fps = 1;
-  if (fps > 15) fps = 15;
-  WiFiClient client = controlServer.client();
-  client.setNoDelay(true);
-  client.print("HTTP/1.1 200 OK\r\n");
-  client.print("Content-Type: multipart/x-mixed-replace; boundary=aitlframe\r\n");
-  client.print("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
-  const uint32_t periodMs = 1000U / static_cast<uint32_t>(fps);
-  for (int i = 0; i < frames && client.connected(); ++i) {
-    const uint32_t frameStarted = millis();
-    camera_fb_t* fb = esp_camera_fb_get();
-    if (!fb) break;
-    lastFrameBytes = static_cast<uint32_t>(fb->len);
-    client.printf("--aitlframe\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", static_cast<unsigned int>(fb->len));
-    client.write(fb->buf, fb->len);
-    client.print("\r\n");
-    esp_camera_fb_return(fb);
-    const uint32_t elapsed = millis() - frameStarted;
-    if (elapsed < periodMs) delay(periodMs - elapsed);
+  if (frames < 1 || frames > 50 || fps < 1 || fps > 15) { sendJson(422, "{\"error\":\"invalid_mjpeg_config\"}"); return; }
+  mjpegFramesRequested = static_cast<uint16_t>(frames);
+  mjpegTargetFps = static_cast<uint8_t>(fps);
+  mjpegFramesSent = 0;
+  mjpegFailures = 0;
+  mjpegLastSendMs = 0;
+  sendJson(200, statusJson());
+}
+
+void handleUdpConfig() {
+  if (udpStreaming) { sendJson(409, "{\"error\":\"udp_active\"}"); return; }
+  if (!controlServer.hasArg("remote_ip") || !controlServer.hasArg("remote_port")) {
+    sendJson(422, "{\"error\":\"missing_udp_target\"}"); return;
   }
-  client.print("--aitlframe--\r\n");
-  client.flush();
-  client.stop();
+  IPAddress parsed;
+  if (!parsed.fromString(controlServer.arg("remote_ip"))) { sendJson(422, "{\"error\":\"invalid_udp_ip\"}"); return; }
+  const int port = controlServer.arg("remote_port").toInt();
+  const int frames = controlServer.hasArg("frames") ? controlServer.arg("frames").toInt() : 8;
+  const int fps = controlServer.hasArg("fps") ? controlServer.arg("fps").toInt() : 5;
+  const int chunk = controlServer.hasArg("chunk_bytes") ? controlServer.arg("chunk_bytes").toInt() : 1200;
+  if (port < 1 || port > 65535 || frames < 1 || frames > 50 || fps < 1 || fps > 15 || chunk < 256 || chunk > 1400) {
+    sendJson(422, "{\"error\":\"invalid_udp_config\"}"); return;
+  }
+  udpRemoteIp = parsed;
+  udpRemotePort = static_cast<uint16_t>(port);
+  udpFramesRequested = static_cast<uint16_t>(frames);
+  udpTargetFps = static_cast<uint8_t>(fps);
+  udpChunkBytes = static_cast<uint16_t>(chunk);
+  udpFramesSent = 0;
+  udpPacketsSent = 0;
+  udpSendFailures = 0;
+  udpLastFrameSendMs = 0;
+  sendJson(200, statusJson());
 }
 
 void handleStart() {
   if (!cameraReady) { sendJson(503, "{\"error\":\"camera_not_ready\"}"); return; }
   closeAtl1Client();
-  streaming = true;
+  resetAtl1Counters();
+  atl1Streaming = true;
   nextFrameDueUs = micros();
   sendJson(200, statusJson());
 }
 
 void handleStop() {
-  streaming = false;
+  atl1Streaming = false;
   closeAtl1Client();
+  sendJson(200, statusJson());
+}
+
+void handleUdpStart() {
+  if (!cameraReady || udpRemotePort == 0) { sendJson(409, "{\"error\":\"udp_not_configured\"}"); return; }
+  udpFramesSent = 0;
+  udpPacketsSent = 0;
+  udpSendFailures = 0;
+  udpStreaming = true;
+  udpNextFrameDueUs = micros();
+  sendJson(200, statusJson());
+}
+
+void handleUdpStop() {
+  udpStreaming = false;
   sendJson(200, statusJson());
 }
 
@@ -507,7 +624,7 @@ void configureClient(WiFiClient& client) {
 }
 
 void acceptAtl1Client() {
-  if (!streaming || (atl1Client && atl1Client.connected())) return;
+  if (!atl1Streaming || (atl1Client && atl1Client.connected())) return;
   closeAtl1Client();
   WiFiClient candidate = atl1Server.accept();
   if (!candidate) return;
@@ -516,8 +633,8 @@ void acceptAtl1Client() {
   nextFrameDueUs = micros();
 }
 
-void sendNextIfDue() {
-  if (!streaming || !(atl1Client && atl1Client.connected())) return;
+void sendNextAtl1IfDue() {
+  if (!atl1Streaming || !(atl1Client && atl1Client.connected())) return;
   const uint32_t nowUs = micros();
   if (static_cast<int32_t>(nowUs - nextFrameDueUs) < 0) return;
   const uint32_t periodUs = 1000000UL / (targetFps > 0 ? targetFps : 1U);
@@ -528,7 +645,12 @@ void sendNextIfDue() {
   size_t payloadLength = 0;
   uint8_t* dramCopy = nullptr;
 
-  if (mode == TransportMode::Synthetic) {
+  const bool synthetic = mode == TransportMode::SyntheticSendmsg || mode == TransportMode::SyntheticSend;
+  const bool dramCopyMode = mode == TransportMode::DramCopySendmsg || mode == TransportMode::DramCopySend;
+  const bool staged = mode == TransportMode::StagedSend;
+  const bool useSendmsg = mode == TransportMode::DirectSendmsg || mode == TransportMode::DramCopySendmsg || mode == TransportMode::SyntheticSendmsg;
+
+  if (synthetic) {
     if (!ensureInternalBuffer(syntheticBuffer, syntheticCapacity, syntheticBytes)) {
       lastErrno = ENOMEM; ++sendFailures; closeAtl1Client(); return;
     }
@@ -545,7 +667,7 @@ void sendNextIfDue() {
     if (!fb) { lastErrno = EIO; ++sendFailures; closeAtl1Client(); return; }
     payload = fb->buf;
     payloadLength = fb->len;
-    if (mode == TransportMode::DramCopy) {
+    if (dramCopyMode) {
       dramCopy = static_cast<uint8_t*>(heap_caps_malloc(payloadLength, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
       if (!dramCopy) {
         lastErrno = ENOMEM; ++sendFailures; esp_camera_fb_return(fb); closeAtl1Client(); return;
@@ -558,39 +680,138 @@ void sendNextIfDue() {
   }
 
   lastFrameBytes = static_cast<uint32_t>(payloadLength);
-  const bool staged = mode == TransportMode::Staged;
-  const bool ok = sendAtl1Frame(payload, payloadLength, staged);
+  const bool ok = sendAtl1Frame(payload, payloadLength, useSendmsg, staged);
   if (fb) esp_camera_fb_return(fb);
   if (dramCopy) heap_caps_free(dramCopy);
   if (!ok) closeAtl1Client();
 }
 
-} // namespace
+void acceptMjpegClient() {
+  if (mjpegClient && mjpegClient.connected()) return;
+  closeMjpegClient();
+  WiFiClient candidate = mjpegServer.accept();
+  if (!candidate) return;
+  candidate.setTimeout(400);
+  candidate.setNoDelay(true);
+  const uint32_t headerDeadline = millis() + 500;
+  while (candidate.connected() && millis() < headerDeadline) {
+    if (!candidate.available()) { delay(1); continue; }
+    String line = candidate.readStringUntil('\n');
+    if (line == "\r" || line.length() == 0) break;
+  }
+  candidate.print("HTTP/1.1 200 OK\r\n");
+  candidate.print("Content-Type: multipart/x-mixed-replace; boundary=aitlframe\r\n");
+  candidate.print("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
+  mjpegClient = candidate;
+  mjpegFramesSent = 0;
+  mjpegFailures = 0;
+  mjpegLastSendMs = 0;
+  mjpegNextFrameDueUs = micros();
+}
+
+void sendNextMjpegIfDue() {
+  if (!(mjpegClient && mjpegClient.connected())) return;
+  if (mjpegFramesSent >= mjpegFramesRequested) {
+    mjpegClient.print("--aitlframe--\r\n");
+    closeMjpegClient();
+    return;
+  }
+  const uint32_t nowUs = micros();
+  if (static_cast<int32_t>(nowUs - mjpegNextFrameDueUs) < 0) return;
+  const uint32_t periodUs = 1000000UL / (mjpegTargetFps > 0 ? mjpegTargetFps : 1U);
+  mjpegNextFrameDueUs = nowUs + periodUs;
+
+  const uint32_t captureStarted = millis();
+  camera_fb_t* fb = esp_camera_fb_get();
+  lastCaptureMs = millis() - captureStarted;
+  if (!fb) { ++mjpegFailures; closeMjpegClient(); return; }
+  lastFrameBytes = static_cast<uint32_t>(fb->len);
+  const uint32_t sendStarted = millis();
+  mjpegClient.printf("--aitlframe\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", static_cast<unsigned int>(fb->len));
+  const size_t written = mjpegClient.write(fb->buf, fb->len);
+  mjpegClient.print("\r\n");
+  mjpegLastSendMs = millis() - sendStarted;
+  esp_camera_fb_return(fb);
+  if (written != lastFrameBytes) { ++mjpegFailures; closeMjpegClient(); return; }
+  ++mjpegFramesSent;
+}
+
+void sendNextUdpIfDue() {
+  if (!udpStreaming) return;
+  if (udpFramesSent >= udpFramesRequested) { udpStreaming = false; return; }
+  const uint32_t nowUs = micros();
+  if (static_cast<int32_t>(nowUs - udpNextFrameDueUs) < 0) return;
+  const uint32_t periodUs = 1000000UL / (udpTargetFps > 0 ? udpTargetFps : 1U);
+  udpNextFrameDueUs = nowUs + periodUs;
+
+  const uint32_t captureStarted = millis();
+  camera_fb_t* fb = esp_camera_fb_get();
+  lastCaptureMs = millis() - captureStarted;
+  if (!fb) { ++udpSendFailures; return; }
+  lastFrameBytes = static_cast<uint32_t>(fb->len);
+  const uint32_t frameSeq = ++sequenceNumber;
+  const uint16_t chunkCount = static_cast<uint16_t>((fb->len + udpChunkBytes - 1U) / udpChunkBytes);
+  const uint32_t sendStarted = millis();
+  bool frameOk = true;
+  for (uint16_t index = 0; index < chunkCount; ++index) {
+    const size_t offset = static_cast<size_t>(index) * udpChunkBytes;
+    const size_t remain = fb->len - offset;
+    const uint16_t n = static_cast<uint16_t>(udpChunkBytes < remain ? udpChunkBytes : remain);
+    uint8_t header[UDP_HEADER_BYTES];
+    memcpy(header, UDP_MAGIC, sizeof(UDP_MAGIC));
+    putU32be(header + 4, frameSeq);
+    putU16be(header + 8, index);
+    putU16be(header + 10, chunkCount);
+    putU32be(header + 12, static_cast<uint32_t>(fb->len));
+    putU32be(header + 16, static_cast<uint32_t>(offset));
+    putU16be(header + 20, n);
+    if (!udp.beginPacket(udpRemoteIp, udpRemotePort)) { frameOk = false; break; }
+    udp.write(header, sizeof(header));
+    udp.write(fb->buf + offset, n);
+    if (!udp.endPacket()) { frameOk = false; break; }
+    ++udpPacketsSent;
+    delay(1);
+  }
+  udpLastFrameSendMs = millis() - sendStarted;
+  esp_camera_fb_return(fb);
+  if (frameOk) ++udpFramesSent;
+  else ++udpSendFailures;
+}
+
+}  // namespace
 
 void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println();
-  Serial.println("AiTL 0_3_8 R3 transport-isolation diagnostic firmware");
+  Serial.println("AiTL 0_3_8 R4 comprehensive camera transport benchmark");
   cameraReady = initCamera();
   connectWifi();
+
   controlServer.on("/status", HTTP_GET, [](){ sendJson(200, statusJson()); });
   controlServer.on("/config", HTTP_POST, handleConfigure);
   controlServer.on("/mode", HTTP_POST, handleMode);
   controlServer.on("/start", HTTP_POST, handleStart);
   controlServer.on("/stop", HTTP_POST, handleStop);
   controlServer.on("/capture", HTTP_GET, handleCapture);
-  controlServer.on("/mjpeg", HTTP_GET, handleMjpeg);
+  controlServer.on("/mjpeg/config", HTTP_POST, handleMjpegConfig);
+  controlServer.on("/udp/config", HTTP_POST, handleUdpConfig);
+  controlServer.on("/udp/start", HTTP_POST, handleUdpStart);
+  controlServer.on("/udp/stop", HTTP_POST, handleUdpStop);
   controlServer.onNotFound([](){ sendJson(404, "{\"error\":\"not_found\"}"); });
   controlServer.begin();
+
   atl1Server.begin();
   atl1Server.setNoDelay(true);
+  mjpegServer.begin();
+  mjpegServer.setNoDelay(true);
+
   Serial.printf("Camera ready: %s\n", cameraReady ? "yes" : "no");
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("ESP IP: %s\n", WiFi.localIP().toString().c_str());
-    Serial.printf("Control: http://%s/status\n", WiFi.localIP().toString().c_str());
-    Serial.printf("MJPEG test: http://%s/mjpeg\n", WiFi.localIP().toString().c_str());
-    Serial.printf("ATL1 test: tcp://%s:%u\n", WiFi.localIP().toString().c_str(), ATL1_PORT);
+    Serial.printf("Control/snapshot: http://%s:%u\n", WiFi.localIP().toString().c_str(), CONTROL_PORT);
+    Serial.printf("ATL1 benchmark: tcp://%s:%u\n", WiFi.localIP().toString().c_str(), ATL1_PORT);
+    Serial.printf("MJPEG benchmark: http://%s:%u/stream\n", WiFi.localIP().toString().c_str(), MJPEG_PORT);
   }
 }
 
@@ -598,7 +819,10 @@ void loop() {
   controlServer.handleClient();
   if (WiFi.status() == WL_CONNECTED) {
     acceptAtl1Client();
-    sendNextIfDue();
+    acceptMjpegClient();
+    sendNextAtl1IfDue();
+    sendNextMjpegIfDue();
+    sendNextUdpIfDue();
   }
   delay(1);
 }

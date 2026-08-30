@@ -1,15 +1,7 @@
-AiTL V038 R4 — exhaustive camera transport candidate isolation
-
-Same project candidate: 0_3_8. Passed baseline remains 0_2_4.
-
-IMPORTANT: R4 adds diagnostic-only ESP firmware support and therefore requires reflashing the ESP32-CAM with the included Arduino/PlatformIO firmware before the new candidate-isolation matrix can run. Normal production stream protocol remains aitl-tcp-jpeg-v1.
-
-Isolation phases:
-1. camera-only capture with no TCP image payload
-2. internal-DRAM synthetic TCP with no camera activity
-3. camera capture/DMA load + internal-DRAM synthetic TCP
-4. normal direct camera framebuffer (PSRAM) -> lwIP TCP
-5. real JPEG copied through 1460-byte internal-RAM staging -> TCP
-6. normal PC Studio managed receiver
-
-These phases distinguish: LAN/AP/TCP/lwIP independent of camera; camera/Wi-Fi scheduling coexistence; direct PSRAM framebuffer-to-lwIP interaction; general real-camera transport/backpressure; HTTP control-plane instability; and PC Studio receive/session integration. Saved image quality/resolution are restored and no adaptive compression/downshift is reintroduced.
+AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_8_R4.txt
+AI_Traffic_Light/PATCH_MANIFEST_0_3_8_R4.txt
+AI_Traffic_Light/docs/CAMERA_TRANSPORT_BENCHMARK_R4.md
+AI_Traffic_Light/scripts/test_camera_transport_benchmark.py
+AI_Traffic_Light/scripts/compare_camera_transport_reports.py
+AI_Traffic_Light/apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_TRANSPORT_DIAG/AiTL_ESP32_CAM_TRANSPORT_DIAG.ino
+AI_Traffic_Light/apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_TRANSPORT_DIAG/secrets.example.h

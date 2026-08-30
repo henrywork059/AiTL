@@ -1,0 +1,18 @@
+AiTL 0_3_8 R4 CAMERA TRANSPORT BENCHMARK
+
+Release state:
+- Candidate remains 0_3_8 (same-candidate diagnostic revision).
+- passed_baseline remains 0_2_4.
+- Production V037 firmware is NOT replaced by this diagnostic sketch.
+
+Apply:
+1. Extract this ZIP over the repository root so every member lands under AI_Traffic_Light/.
+2. In the diagnostic Arduino sketch folder, copy secrets.example.h to secrets.h and add Wi-Fi credentials.
+3. Flash AiTL_ESP32_CAM_TRANSPORT_DIAG.ino temporarily.
+4. Run:
+   python .\AI_Traffic_Light\scripts\test_camera_transport_benchmark.py --host <ESP_IP> --frames 8 --fps 5 --chunk-sweep --environment-label home-router
+5. Send back camera_transport_benchmark.json.
+6. If broad failures occur, repeat on another 2.4 GHz AP/hotspot and compare with compare_camera_transport_reports.py.
+7. Restore normal V037 production firmware after the test.
+
+Do not change VERSION or passed_baseline from this diagnostic overlay alone.
