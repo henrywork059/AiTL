@@ -17,7 +17,7 @@ export type CameraDiagnosticCheck = {
 
 export type CameraLoadPhase = {
   target_fps: number;
-  duration_seconds?: number;
+  duration_seconds?: number | null;
   frames: number;
   bytes_received?: number;
   throughput_mbps?: number;
@@ -138,9 +138,61 @@ export type CameraDiagnosticMetrics = {
   stability_bad_frames: number;
 };
 
-
 export type CameraCandidateFinding = { code: string; layer: string; confidence: string; evidence: string; action: string };
 export type CameraCandidateIsolation = { supported: boolean; primary_candidate: string; findings: CameraCandidateFinding[]; ruled_out: string[]; matrix: Record<string, boolean> };
+
+export type CameraTransportBenchmarkResult = {
+  key: string;
+  name: string;
+  transport: string;
+  status: "PASS" | "FAIL" | "SKIP" | string;
+  requested_frames: number;
+  frames: number;
+  bytes_received: number;
+  elapsed_ms: number | null;
+  measured_fps: number | null;
+  completion_ratio: number;
+  packet_loss?: number | null;
+  detail: string;
+  production_candidate: boolean;
+};
+
+export type CameraTransportBenchmarkReport = {
+  schema_version: number;
+  benchmark_revision: string;
+  firmware: string | null;
+  host: string;
+  environment_label: string;
+  settings: Record<string, unknown>;
+  diagnosis: {
+    diagnosis_code: string;
+    likely_bottleneck: string;
+    recommended_key: string | null;
+    recommendation: string;
+    ranking: Array<{ key: string; name: string; score: number; status: string }>;
+  };
+  analysis_evidence: {
+    hypothesis_ranking?: Array<{ hypothesis: string; confidence: string; evidence: string[] }>;
+    comparative_pairs?: Record<string, unknown>;
+  };
+  results: CameraTransportBenchmarkResult[];
+};
+
+export type CameraDiagnosticProgress = {
+  status: "idle" | "running" | "completed" | "failed" | string;
+  engine: "probing" | "standard" | "transport_benchmark" | null | string;
+  stage: string;
+  current_test: string | null;
+  test_index: number | null;
+  frame_current: number | null;
+  frame_total: number | null;
+  detail: string | null;
+  last_line: string | null;
+  started_at_ms: number | null;
+  elapsed_ms: number;
+  error: string | null;
+  log_tail: string[];
+};
 
 export type CameraDiagnosticReport = {
   run_id: string;
@@ -181,10 +233,15 @@ export type CameraDiagnosticReport = {
   diagnostic_target_fps: number;
   diagnostic_load_targets: number[];
   prototype_only: boolean;
+  transport_benchmark?: CameraTransportBenchmarkReport;
 };
 
 export async function runCameraDiagnostics(): Promise<CameraDiagnosticReport> {
   return requestJsonStrict<CameraDiagnosticReport>(`${API_BASE}/api/camera/diagnostics/run`, {
     method: "POST",
   });
+}
+
+export async function fetchCameraDiagnosticProgress(): Promise<CameraDiagnosticProgress> {
+  return requestJsonStrict<CameraDiagnosticProgress>(`${API_BASE}/api/camera/diagnostics/progress`);
 }
