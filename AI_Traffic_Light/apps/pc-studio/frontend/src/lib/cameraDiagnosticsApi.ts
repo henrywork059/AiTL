@@ -157,6 +157,58 @@ export type CameraTransportBenchmarkResult = {
   production_candidate: boolean;
 };
 
+export type CameraTimingStats = {
+  count: number;
+  avg: number | null;
+  p95: number | null;
+  max: number | null;
+};
+
+export type CameraPipelineTimingRow = {
+  key: string;
+  status: string;
+  measured_fps: number;
+  target_fps: number;
+  target_period_ms: number;
+  observed_interval_ms: number | null;
+  capture_ms: CameraTimingStats;
+  send_ms: CameraTimingStats;
+  accounted_ms: number;
+  unexplained_ms: number;
+  accounted_ratio: number | null;
+  sample_count: number;
+};
+
+export type CameraCaptureTimingProbe = {
+  attempts: number;
+  successes: number;
+  failures: number;
+  request_ms: CameraTimingStats;
+  esp_capture_ms: CameraTimingStats;
+  request_minus_capture_ms: CameraTimingStats;
+  records: Array<Record<string, unknown>>;
+  errors: string[];
+};
+
+export type CameraPipelineTimingAnalysis = {
+  candidate_key: string;
+  dominant_remaining_stage: string;
+  confidence: string;
+  target_fps: number;
+  target_period_ms: number;
+  candidate: CameraPipelineTimingRow;
+  direct_plain_send: CameraPipelineTimingRow | null;
+  dram_copy_send: CameraPipelineTimingRow | null;
+  synthetic_send: CameraPipelineTimingRow | null;
+  capture_probe: CameraCaptureTimingProbe;
+  accounted_ms: number;
+  unexplained_ms: number;
+  unexplained_ratio: number | null;
+  conclusions: string[];
+  next_action: string;
+  followup_duration_ms?: number;
+};
+
 export type CameraTransportBenchmarkReport = {
   schema_version: number;
   benchmark_revision: string;
@@ -176,6 +228,7 @@ export type CameraTransportBenchmarkReport = {
     comparative_pairs?: Record<string, unknown>;
   };
   results: CameraTransportBenchmarkResult[];
+  pipeline_timing_analysis?: CameraPipelineTimingAnalysis;
 };
 
 export type CameraDiagnosticProgress = {
@@ -233,6 +286,7 @@ export type CameraDiagnosticReport = {
   diagnostic_target_fps: number;
   diagnostic_load_targets: number[];
   prototype_only: boolean;
+  pipeline_timing?: CameraPipelineTimingAnalysis | null;
   transport_benchmark?: CameraTransportBenchmarkReport;
 };
 
