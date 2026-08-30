@@ -1,0 +1,27 @@
+AiTL 0_3_8 R5 runner integration fix
+
+Purpose
+- Keep scripts/test_camera_transport_benchmark.py as a manual physical ESP32-CAM benchmark that requires --host.
+- Prevent update_test_run.ps1 from auto-running that hardware CLI without arguments.
+- Preserve automated coverage with scripts/test_camera_transport_benchmark_logic.py, which exercises diagnosis/ranking/evidence logic without hardware.
+
+Recommended apply workflow
+1. Extract the ZIP and upload/commit the changed files as one atomic update to GitHub main (or commit the overlay locally).
+2. Do not leave these tracked source edits uncommitted: update_test_run.ps1 deliberately rejects a dirty tracked working tree.
+3. On the Windows PC, from the repository root:
+   git status --short
+   git pull --ff-only origin main
+4. Re-run the normal helper:
+   .\AI_Traffic_Light\scripts\update_test_run.ps1 -SkipUpdate
+
+Expected automatic-test behavior
+- test_camera_transport_benchmark.py is reported as excluded from the automatic no-hardware regression sweep.
+- test_camera_transport_benchmark_logic.py runs automatically and should print PASS lines.
+- The normal frontend build, live backend smoke, and PC Studio startup continue afterward if all other checks pass.
+
+Run the physical benchmark separately after flashing the R5 benchmark firmware:
+python .\AI_Traffic_Light\scripts\test_camera_transport_benchmark.py --host YOUR_ESP_IP --frames 8 --fps 5 --chunk-sweep --environment-label home-router
+
+Release state
+- This is a same-candidate 0_3_8 R5 integration repair.
+- It does not change VERSION or passed_baseline.

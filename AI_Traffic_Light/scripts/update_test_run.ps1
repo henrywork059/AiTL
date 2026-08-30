@@ -138,12 +138,27 @@ if (-not $SkipTests) {
         Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
         Run-Step "Project structure" { & $python ".\scripts\check_structure.py" }
 
+        # test_camera_transport_benchmark.py is a physical ESP32-CAM benchmark CLI.
+        # It requires --host and intentionally is not part of the no-hardware
+        # regression sweep. Its diagnosis/ranking logic is covered by the separate
+        # test_camera_transport_benchmark_logic.py offline regression.
+        $manualHardwareTests = @(
+            "test_camera_transport_benchmark.py"
+        )
+
         $tests = Get-ChildItem ".\scripts\test_*.py" |
-            Where-Object { $_.Name -ne "test_backend_smoke.py" } |
+            Where-Object { $_.Name -ne "test_backend_smoke.py" -and $_.Name -notin $manualHardwareTests } |
             Sort-Object Name
 
         foreach ($test in $tests) {
             Run-Step "Backend regression: $($test.Name)" { & $python $test.FullName }
+        }
+
+        foreach ($manualTest in $manualHardwareTests) {
+            if (Test-Path (Join-Path ".\scripts" $manualTest)) {
+                Write-Host "`n=== Hardware benchmark excluded from automatic regression: $manualTest ===" -ForegroundColor DarkCyan
+                Write-Host "Run it manually with --host after the ESP benchmark firmware is flashed."
+            }
         }
     }
     finally {
