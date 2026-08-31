@@ -6,6 +6,8 @@ V0311 / `0_3_11` is the current unaccepted candidate after V0310. V024 / `0_2_4`
 
 V0311 adds one PC Studio workspace for representing installed/model AiTL junctions as nodes and directed topology lines, assigning saved ESP cameras to those junctions, and exposing the current prototype traffic/pedestrian/event/warning context without overstating the existing inference architecture.
 
+The same candidate also includes a documentation/workflow hardening pass so future development can be performed with a shorter preflight, automatic focused-regression discovery, a safer release-metadata order and fewer stale architecture/version claims.
+
 ## Implemented
 
 - Reuses the established `config/intersections.json` network configuration rather than creating a parallel junction database.
@@ -21,6 +23,23 @@ V0311 adds one PC Studio workspace for representing installed/model AiTL junctio
 - Saved ESP cameras can be assigned/reassigned from the page. Multiple cameras can be assigned to one junction and one assigned source can be marked primary.
 - Node badges show vehicle load, pedestrian load, camera count, phase, event count and warning count.
 - The detail panel exposes current live state, camera health/FPS, topology links, events and warnings.
+- Registers Junction Network topology, camera assignment and honest live observability in the frontend `FUNCTION_REGISTRY` so capability/status surfaces stay synchronized with navigation.
+
+## Same-candidate review / workflow hardening
+
+Code/document review found and corrected a stale durable architecture claim: `ARCHITECTURE.md` still described the older two-PSRAM-framebuffer production camera path even though V0310 production actually uses one framebuffer + `CAMERA_GRAB_LATEST`. The durable architecture/code-ownership/function docs now match the production source.
+
+Future patch workflow is simplified with:
+
+- new `docs/PATCH_PLAYBOOK.md` containing the short preflight, owner-module shortcuts, implementation order, release bundle, regression naming, code-review gate and one-command owner validation;
+- revised `AGENTS.md`, `AI_AGENT_GUIDE.md`, `AI_AGENT_CHECKLIST.md`, `DEVELOPMENT_WORKFLOW.md`, `DOCUMENTATION_MAP.md` and `HUMAN_GUIDE.md` so routine work reads fewer documents and follows one consistent sequence;
+- explicit **release bundle first, root `VERSION` last** guidance for an explicitly requested new candidate, preventing the earlier class of structure failures where `VERSION` advanced before patch/changelog/frontend/current-testing metadata existed;
+- explicit zero-argument `scripts/test_*.py` convention because `update_test_run.ps1` already auto-discovers those regressions;
+- stronger runner regression assertions preserving automatic test discovery and hardware-test separation;
+- new `scripts/test_release_documentation_consistency.py`, automatically included by the normal runner, checking current/previous/baseline release-document alignment, frontend version alignment, playbook safeguards, and durable production architecture markers;
+- strengthened Junction Network frontend regression requiring navigation, App routing **and** central function-registry wiring.
+
+No production ESP transport or traffic-control behavior is changed by this hardening pass.
 
 ## Live-data boundary
 
@@ -42,17 +61,21 @@ Therefore:
 - No automatic cross-camera tracking/identity matching is added.
 - No public-road/cabinet signal control is added.
 - Existing network simulation/cooperation/emergency/class/pedestrian experiment semantics remain unchanged.
+- `passed_baseline` remains `0_2_4` until explicit owner acceptance.
 
 ## Validation focus
 
 The automatic local workflow should verify:
 
 1. project structure/version consistency;
-2. existing intersection-network regression plus V0311 primary-source/layout validation;
-3. V0311 overview-service regression for multi-camera assignment, camera health, live source mapping, event/warning projection and unavailable non-selected junctions;
-4. backend/API regressions;
-5. frontend TypeScript typecheck and production build;
-6. live backend smoke sequence and normal PC Studio startup.
+2. `scripts/test_release_documentation_consistency.py` release/playbook/architecture safeguards;
+3. update/test/run helper regression including automatic `test_*.py` discovery;
+4. existing intersection-network regression plus V0311 primary-source/layout validation;
+5. V0311 overview-service regression for multi-camera assignment, camera health, live source mapping, event/warning projection and unavailable non-selected junctions;
+6. V0311 frontend structure regression including navigation/App/function-registry/API/type/style wiring;
+7. backend/API regressions;
+8. frontend TypeScript typecheck and production build;
+9. live backend smoke sequence and normal PC Studio startup.
 
 ## Owner acceptance checks
 
@@ -68,7 +91,8 @@ After the normal one-command update/test/run workflow passes:
 8. With one ESP selected/streaming, verify that its resolved junction can display live traffic/pedestrian information while another unselected junction remains clearly unavailable rather than showing copied/fabricated counts.
 9. Disconnect or make an assigned ESP unavailable and verify a camera warning is visible.
 10. Trigger an existing simulation/test ranked scenario or pedestrian service and verify the selected observation junction displays the corresponding event badge/detail.
-11. Verify Camera Sources, Live AI, Camera Diagnostics, zones, analytics, dataset and simulation pages still operate normally.
-12. Do not change `passed_baseline` until the owner explicitly accepts V0311.
+11. Verify Dashboard/function-status presentation includes the Junction Network capabilities rather than omitting the implemented feature.
+12. Verify Camera Sources, Live AI, Camera Diagnostics, zones, analytics, dataset and simulation pages still operate normally.
+13. Do not change `passed_baseline` until the owner explicitly accepts V0311.
 
 AiTL remains a local/student-scale prototype with no physical/public-road traffic-signal authority.
