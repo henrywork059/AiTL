@@ -1,2 +1,2 @@
-export const PROJECT_VERSION = "0_3_10";
-export const PROJECT_VERSION_LABEL = "0_3_10 R10-tuned production camera pipeline candidate";
+export const PROJECT_VERSION = "0_3_11";
+export const PROJECT_VERSION_LABEL = "0_3_11 junction network visualization candidate";
