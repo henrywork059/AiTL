@@ -11,10 +11,10 @@ camera or synthetic scene
 → local object detection
 → zones/tracking/counting
 → simulated signal scenario evaluation
-→ explanation, analytics, and experiment results in PC Studio
+→ explanation, analytics, experiments and junction visualization in PC Studio
 ```
 
-It also contains a local dataset/training workflow and a developing multi-intersection/network foundation.
+It also contains a local dataset/training workflow, multiple saved ESP camera inputs, an editable Junction Network view, and simulation/evidence foundations for multi-intersection work.
 
 AiTL is **not** a certified public-road traffic-control system and does not connect its simulated decisions to public traffic infrastructure.
 
@@ -24,7 +24,7 @@ For current project state:
 
 1. Read `../VERSION`.
 2. Read `START_HERE.md`.
-3. Read `PROJECT_SCOPE.md` to distinguish implemented, foundation, and planned capabilities.
+3. Read `PROJECT_SCOPE.md` to distinguish implemented, foundation, simulation-only and planned capabilities.
 4. Use `LOCAL_TESTING.md` / `TEST_READY_CHECKLIST.md` when testing the current candidate.
 5. Use `DOCUMENTATION_MAP.md` if documents appear to disagree.
 
@@ -32,15 +32,21 @@ For current project state:
 
 ### PC Studio
 
-React/Vite frontend + FastAPI backend. Current prototype functions include camera receiving/simulation, inference, zones, tracking/analytics, dataset/training/model tools, ranked simulated signal scenarios, experiment telemetry, and network/explanation foundation.
+React/Vite frontend + FastAPI backend. Prototype functions include camera receiving/simulation, inference, zones, tracking/analytics, dataset/training/model tools, ranked simulated signal scenarios, experiment telemetry, camera diagnostics and Junction Network configuration/observability.
 
 ### Device camera
 
-ESP32-CAM or similar nodes act as lightweight frame sources. Heavy AI, training, signal-policy logic, analytics, and future network cooperation belong on the PC side.
+ESP32-CAM or similar nodes act as lightweight frame sources. Heavy AI, training, signal-policy logic and analytics belong on the PC side. Several ESP sessions may be saved/streamed, but only one selected source currently feeds the shared live AI/traffic pipeline.
+
+### Junction Network
+
+The Junction Network page can represent several installed/model junctions as nodes and directed links. One junction may be assigned several saved ESP cameras. It can display camera health and current traffic/pedestrian/events/warnings for the junction resolved from the selected live source.
+
+This visualization does **not** mean all junctions are simultaneously inferred. Unobserved junctions intentionally show unavailable live traffic values rather than copied values from the selected source.
 
 ### Runtime data
 
-Local datasets, outputs, trained models, labels, zone/settings/signal/network config, histories, and experiment results are valuable working data. They are not source-patch content.
+Local datasets, outputs, trained models, labels, camera profiles, zone/settings/signal/network config, histories, and experiment results are valuable working data. They are not source-patch content.
 
 ## 4. Understand the data categories
 
@@ -51,6 +57,7 @@ Do not interpret every number as the same type of traffic measurement:
 - **Zone/class observation** — detector-class count inside a polygon for a scenario evaluation.
 - **Simulation experiment telemetry** — synthetic numeric simulator output.
 - **Network link** — configured topology metadata; not proof that vehicles actually transferred between intersections.
+- **Junction node position** — logical PC Studio canvas location; not GPS/geospatial truth.
 
 The lightweight tracker can lose/swap identities in difficult scenes, so track-derived figures remain prototype measurements.
 
@@ -62,62 +69,53 @@ A scenario may use controller metrics or a class count in a configured zone. The
 
 ## 6. Network and future capabilities
 
-AiTL is being designed to grow toward:
+AiTL is designed to grow toward stronger live multi-intersection cooperation, emergency priority, pedestrian-aware control, vehicle-class handling and explainable decisions.
 
-- multi-intersection cooperation;
-- emergency priority;
-- stronger pedestrian-aware control;
-- different vehicle-class handling;
-- explainable decisions.
+Supporting features have different completion levels. `PROJECT_SCOPE.md` is the authority. A configured junction/link/camera assignment is not proof that simultaneous live multi-junction AI or cooperative physical control is operating.
 
-Some supporting foundations already exist, but these capabilities have different completion levels. `PROJECT_SCOPE.md` is the authoritative capability-status guide. Do not present a planned/foundation feature as operational.
+## 7. Routine Windows workflow — use one command
 
-## 7. Safe GitHub patch workflow
-
-A patch ZIP contains **changed files only**.
-
-1. Download the patch ZIP and manifest.
-2. Verify the ZIP/member list if desired.
-3. Extract the ZIP.
-4. Upload the extracted files into their matching paths under `AI_Traffic_Light/` on GitHub `main`.
-5. Do not upload only the ZIP as a repository file.
-6. Use a clear commit message describing the candidate and change.
-
-Before uploading, confirm the patch contains no datasets, outputs, trained models, secrets, caches, or personal/private media.
-
-## 8. Safe Windows update after GitHub upload
-
-Stop the running backend/frontend first. From the repository root:
+For normal update, full automated validation and PC Studio launch, use:
 
 ```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
-git status --short
-git pull --ff-only origin main
-Get-Content .\AI_Traffic_Light\VERSION
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-Do **not** use `git clean -fd`. If `git status` shows local work you care about, inspect/preserve it before pulling rather than deleting it.
+This is the default workflow. You normally do **not** need to manually:
 
-The repository's `scripts/update_test_run.ps1` may be used when the current candidate documentation says it is appropriate.
+- run `git pull` separately;
+- maintain a list of regression scripts;
+- kill an old AiTL backend/frontend on ports 8000/5173;
+- run frontend typecheck/build separately;
+- start backend/frontend separately.
+
+The helper protects tracked local edits before updating, preserves untracked runtime data, reloads itself after the pull, auto-runs the offline regression set, runs frontend checks, safely replaces only AiTL-owned listeners, performs live backend smoke, and opens PC Studio.
+
+If an unrelated program owns port 8000/5173, the runner refuses to terminate it automatically.
+
+Use individual commands from `LOCAL_TESTING.md` only when diagnosing the stage that failed.
+
+## 8. Git/runtime-data safety
+
+Do **not** use `git clean -fd` as a routine fix. Do not delete datasets, outputs, models, labels, configs or caches merely to make an update run.
+
+If the runner reports tracked local edits, inspect/commit/restore those edits deliberately. Untracked runtime data shown by `git status` is expected and does not need to be removed just because it appears in the status output.
+
+Before sharing source changes, confirm no datasets, outputs, trained models, secrets, caches, or personal/private media were committed.
 
 ## 9. Testing a candidate
 
-Use the exact current commands in `LOCAL_TESTING.md`. A normal validation includes:
-
-- Python compile/structure checks;
-- backend regression scripts;
-- live smoke with backend running;
-- frontend typecheck/build;
-- manual PC Studio acceptance checks;
-- repository/ZIP hygiene checks.
+The normal runner covers the automated suite. The current candidate's `TEST_READY_CHECKLIST.md` contains the manual behavior checks automation cannot prove, such as physical ESP performance or visual interaction.
 
 Automated tests make a candidate test-ready; they do **not** make it the passed baseline.
+
+When reporting a problem, copy the first failed section and error from the runner rather than rerunning many unrelated commands. That makes diagnosis faster.
 
 ## 10. Owner acceptance rule
 
 The owner is the only authority that promotes a candidate.
 
-If root `VERSION` shows `version` different from `passed_baseline`, the candidate remains unaccepted. After testing, the owner should explicitly state that it passes/works before a later repository update changes `passed_baseline`.
+If root `VERSION` shows `version` different from `passed_baseline`, the candidate remains unaccepted. After testing, explicitly state that the candidate passes/works before a later repository update changes `passed_baseline`.
 
 ## 11. Data privacy
 
