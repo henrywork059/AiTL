@@ -1,25 +1,25 @@
-# V038 Acceptance Checklist
+# V039 Acceptance Checklist
 
-- [ ] `VERSION` is `0_3_8`; previous is `0_3_7`; passed baseline remains `0_2_4`.
-- [ ] Existing V037/R6 ESP firmware remains accepted by V038; no wire-protocol change or mandatory reflash was introduced.
-- [ ] Navigation contains **Camera Test / Camera Diagnostics** under Operate.
-- [ ] A selected saved ESP is clearly shown before a diagnostic run.
-- [ ] One **Diagnose camera** button runs the entire staged test without a separate Python/PowerShell diagnostic helper.
-- [ ] The diagnostic route uses the standard API envelope and request ID.
-- [ ] ESP control reachability, protocol compatibility, camera readiness and Wi-Fi telemetry are checked.
-- [ ] Direct ATL1/JPEG streaming is measured while bypassing the normal PC Studio stream worker.
-- [ ] A second direct stream phase adds `/status` polling so control/stream contention can be distinguished.
-- [ ] The normal PC Studio managed stream path is then measured separately.
-- [ ] ESP send-failure/deadline deltas, disconnect counts, FPS/frame counts, RSSI/BSSID and accepted-byte/errno telemetry are surfaced when available.
-- [ ] Diagnosis distinguishes control unreachable, firmware mismatch, camera not ready, direct ESP camera/TCP stall, control-stream contention, PC Studio integration failure, weak Wi-Fi margin, and healthy-now cases.
-- [ ] Diagnostic runs are mutually exclusive and cannot overlap against one selected ESP.
-- [ ] The previous saved FPS/settings, connection/stream state and simulation state are restored after the run; restoration failure is displayed explicitly.
-- [ ] Existing Camera Sources, Live AI, simulation, Dataset Capture, multi-ESP selection and V037/R6 transport regressions remain passing.
-- [ ] Python compile, structure check, focused/inherited regressions, frontend typecheck/build and live smoke pass on the complete repository.
-- [ ] Owner explicitly accepts V038 before `passed_baseline` changes.
-- [ ] Camera Test reports functionality checks, 0–100 stability score, and bottleneck analysis in one run.
-- [ ] Control latency includes average/p95/max across eight probes.
-- [ ] Direct, concurrent-control, load/headroom, reconnect, and managed-worker phases all execute and restore the previous state.
-- [ ] Managed-worker frame/failure/reconnect counters are phase deltas, not lifetime totals.
-- [ ] Intentional diagnostic socket replacement resets are shown separately from unexpected ESP send failures.
-- [ ] Load phase reports target/achieved FPS, FPS ratio, throughput, JPEG size, and p95/max frame interval.
+- [ ] `VERSION` is `0_3_9`; previous is `0_3_8`; passed baseline remains `0_2_4`.
+- [ ] `docs/PATCH_0_3_9.md`, `CHANGELOG.md`, and the shared frontend `PROJECT_VERSION` all identify the same V039 candidate.
+- [ ] The normal command is reusable from any PowerShell working directory:
+
+  ```powershell
+  & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
+  ```
+
+- [ ] The helper requires local `main`, refuses tracked local edits, and updates only with `git pull --ff-only origin main`.
+- [ ] The pulled runner reloads itself before continuing so the newest workflow is used.
+- [ ] Backend/training dependencies, Python compile, structure check, backend regressions, frontend dependencies/typecheck/build, Git whitespace/cleanliness and live backend smoke all run in the normal full workflow.
+- [ ] If an older AiTL PC Studio backend is listening on port 8000, the helper identifies its AiTL ownership and stops the relevant process tree automatically.
+- [ ] If an older AiTL frontend is listening on port 5173, the helper identifies its AiTL ownership and stops the relevant process tree automatically.
+- [ ] After restart, backend health succeeds on port 8000 and the frontend becomes ready on strict port 5173.
+- [ ] A second normal invocation while PC Studio is already running completes without a separate manual port-kill step.
+- [ ] An unrelated application using 8000 or 5173 is never terminated automatically and causes a clear safety error instead.
+- [ ] Runtime/user data is preserved; no `git clean` or destructive generated-data cleanup is used.
+- [ ] `scripts/test_update_test_run_script.py` covers idempotent AiTL restart ownership and unrelated-port protection.
+- [ ] V038/R10 Camera Diagnostics remains functionally unchanged, including adaptive production/R5/R8/R9/R10 dispatch and diagnostic state restoration.
+- [ ] Existing Camera Sources, Live AI, simulation, Dataset Capture/Review, training, model management, analytics, signal logic and network-simulation regressions remain passing.
+- [ ] No stable API envelope, error-code, production camera protocol or signal-control behavior changes in V039.
+- [ ] Physical/public-road traffic-control authority remains out of scope.
+- [ ] Owner explicitly accepts V039 before `passed_baseline` changes.
