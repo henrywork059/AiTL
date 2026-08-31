@@ -36,12 +36,33 @@ def main() -> int:
     # regression is caught immediately instead of breaking the next update run.
     assert text.count("Assert-NoTrackedChanges") >= 3
 
+    # Re-running the same command must safely replace an existing AiTL PC Studio
+    # process tree instead of making the user manually free ports 8000/5173.
+    assert "Stop-AiTLPortOwner" in text
+    assert 'Stop-AiTLPortOwner -Port 5173 -Role "frontend"' in text
+    assert 'Stop-AiTLPortOwner -Port 8000 -Role "backend"' in text
+    assert "Get-CimInstance Win32_Process" in text
+    assert "Get-AiTLProcessTreeRoot" in text
+    assert "taskkill /PID" in text and "/T /F" in text
+    assert "$backendMarker = $backendDir.ToLowerInvariant()" in text
+    assert "$frontendMarker = $frontendDir.ToLowerInvariant()" in text
+    assert "which is not identifiable as this AiTL" in text
+    assert "It will not be terminated automatically" in text
+    assert text.index('Stop-AiTLPortOwner -Port 8000 -Role "backend"') < text.index("Start-Process -FilePath $shellExe")
+
+    # The obsolete behavior should not return: known AiTL listeners are now
+    # restarted automatically, while unrelated listeners remain protected.
+    assert "Stop the existing backend/process before running this helper" not in text
+    assert "Stop the existing frontend/process before running this helper" not in text
+
     print("[PASS] update/test/run helper protects tracked work and only fast-forwards main")
     print("[PASS] runner no longer invokes any candidate metadata finalizer")
     print("[PASS] runner remains read-only for tracked release/source files")
     print("[PASS] post-test tracked-cleanliness guard prevents self-dirtying regressions")
     print("[PASS] pulled runner reloads itself before testing the newly updated code")
     print("[PASS] dependency refresh, automatic live smoke, readiness waits, and strict ports are enforced")
+    print("[PASS] existing AiTL backend/frontend processes are safely replaced on repeated runs")
+    print("[PASS] unrelated processes using PC Studio ports are never terminated automatically")
     print("[PASS] PowerShell control-flow syntax uses elseif and rejects Python-style elif")
     print("[PASS] helper never uses destructive git clean")
     return 0
