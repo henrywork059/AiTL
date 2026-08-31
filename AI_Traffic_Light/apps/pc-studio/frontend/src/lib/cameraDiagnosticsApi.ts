@@ -155,6 +155,7 @@ export type CameraTransportBenchmarkResult = {
   packet_loss?: number | null;
   detail: string;
   production_candidate: boolean;
+  telemetry?: Record<string, unknown>;
 };
 
 export type CameraTimingStats = {
@@ -209,6 +210,38 @@ export type CameraPipelineTimingAnalysis = {
   followup_duration_ms?: number;
 };
 
+export type CameraArchitectureMethod = {
+  method: string;
+  tested: boolean;
+  purpose: string;
+};
+
+export type CameraArchitectureAnalysis = {
+  classification: string;
+  confidence: "high" | "medium" | "low" | string;
+  target_fps: number;
+  manual_mjpeg_fps: number;
+  httpd_direct_mjpeg_fps: number;
+  cached_mjpeg_fps: number;
+  httpd_bulk_mbps: number;
+  raw_bulk_nodelay_mbps: number;
+  raw_bulk_nagle_mbps: number;
+  best_camera_fps: number;
+  best_bulk_mbps: number;
+  bulk_headroom: string;
+  httpd_vs_manual_ratio: number | null;
+  cached_vs_direct_ratio: number | null;
+  nagle_sensitivity_ratio: number | null;
+  reset_reason: string;
+  power_evidence: string;
+  rssi: number;
+  recommended_key: string;
+  findings: string[];
+  likely_layers: string[];
+  methods_assessed: CameraArchitectureMethod[];
+  next_action: string;
+};
+
 export type CameraTransportBenchmarkReport = {
   schema_version: number;
   benchmark_revision: string;
@@ -226,14 +259,16 @@ export type CameraTransportBenchmarkReport = {
   analysis_evidence: {
     hypothesis_ranking?: Array<{ hypothesis: string; confidence: string; evidence: string[] }>;
     comparative_pairs?: Record<string, unknown>;
+    architecture_analysis?: CameraArchitectureAnalysis;
   };
   results: CameraTransportBenchmarkResult[];
   pipeline_timing_analysis?: CameraPipelineTimingAnalysis;
+  architecture_analysis?: CameraArchitectureAnalysis;
 };
 
 export type CameraDiagnosticProgress = {
   status: "idle" | "running" | "completed" | "failed" | string;
-  engine: "probing" | "standard" | "transport_benchmark" | null | string;
+  engine: "probing" | "standard" | "transport_benchmark" | "architecture_benchmark" | null | string;
   stage: string;
   current_test: string | null;
   test_index: number | null;
@@ -287,6 +322,7 @@ export type CameraDiagnosticReport = {
   diagnostic_load_targets: number[];
   prototype_only: boolean;
   pipeline_timing?: CameraPipelineTimingAnalysis | null;
+  architecture_analysis?: CameraArchitectureAnalysis;
   transport_benchmark?: CameraTransportBenchmarkReport;
 };
 
