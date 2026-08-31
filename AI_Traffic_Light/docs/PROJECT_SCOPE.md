@@ -8,6 +8,7 @@ AiTL implements a local PC-controlled ESP32-CAM input path with:
 - PC-owned OV2640 runtime configuration;
 - persistent low-latency length-prefixed TCP JPEG image transport;
 - quality-preserving V037/R6 behavior that keeps configured JPEG quality and resolution fixed across transport pressure;
+- V0310 production tuning that uses one framebuffer, `CAMERA_GRAB_LATEST` on PSRAM, and bounded plain TCP sends while retaining the existing ATL1 wire/session contract;
 - transport/session recovery after temporary network or ESP restart;
 - a persistent list of saved ESP private-LAN IP addresses and per-camera settings;
 - several independent ESP stream workers/newest-frame caches that may run concurrently;
@@ -18,12 +19,33 @@ Source switching is freshness-guarded: the previous selected physical frame is c
 
 Camera diagnostics are local prototype evidence. A run may temporarily quiesce the selected stream/simulation, measure the selected camera using its saved image settings at a conservative target FPS, and restore the prior state. A diagnostic label identifies the most likely failing layer; it is not a certification of network, detector, or camera reliability.
 
+## Junction installation / topology view
+
+V0311 implements a logical Junction Network workspace over the existing intersection-network configuration.
+
+Implemented scope includes:
+
+- persistent junction identity, label, enabled state, signal-profile metadata and logical canvas position;
+- directed topology links with approach/travel-time metadata;
+- assignment of multiple source/camera ids to one junction;
+- one optional primary source per junction;
+- exclusive source ownership across junctions so a live source maps to one junction only;
+- saved ESP camera health/reachability/streaming/FPS observability per assigned junction;
+- live vehicle/pedestrian load, phase/decision, event and warning projection for the junction resolved from the shared selected source;
+- explicit unavailable state for junctions that do not currently own the shared observation.
+
+The Junction Network canvas is logical topology, not GIS/geographic positioning. Configured lines represent topology metadata; they do not prove observed traffic transfer or activate cooperative signal control.
+
+## Current capability boundary
+
 This does not imply:
 
 - ESP-side inference;
 - validated production detector accuracy;
-- simultaneous independent inference/traffic-controller pipelines for all connected cameras;
+- simultaneous independent inference/traffic-controller pipelines for all connected cameras/junctions;
+- multi-camera image fusion at one junction;
 - automatic cross-camera object identity/transfer matching;
+- live emergency-vehicle recognition/pre-emption;
 - physical/public-road traffic-signal authority.
 
-Existing cooperation, pedestrian, class, emergency and explainability/evidence features retain their documented prototype/simulation provenance. Multiple physical camera inputs are a data-source foundation for later multi-intersection work; they do not by themselves activate live cooperative control.
+Existing cooperation, pedestrian, class, emergency and explainability/evidence features retain their documented prototype/simulation provenance. Multiple physical camera inputs plus V0311 camera-to-junction assignments are a stronger data/configuration foundation for later multi-intersection work; they do not by themselves activate live cooperative control.
