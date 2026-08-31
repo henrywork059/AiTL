@@ -87,20 +87,29 @@ def main() -> int:
 
     firmware_path = ROOT / "apps" / "device-camera" / "esp32-cam" / "arduino" / "AiTL_ESP32_CAM_ARCH_DIAG" / "AiTL_ESP32_CAM_ARCH_DIAG.ino"
     firmware_text = firmware_path.read_text(encoding="utf-8")
-    check("aitl-0_3_8-r9-architecture-benchmark" in firmware_text, "R9 firmware exposes a unique adaptive-dispatch marker")
-    check("#include <esp_http_server.h>" in firmware_text and "httpd_resp_send_chunk" in firmware_text, "R9 physically benchmarks the older esp_http_server chunked sender")
-    check("CAMERA_GRAB_LATEST" in firmware_text and "config.fb_count = 2" in firmware_text, "R9 restores the older two-buffer latest-frame camera architecture")
-    check("cacheCaptureTask" in firmware_text and "/cached.mjpeg" in firmware_text, "R9 contains an independent Pi-style latest-frame producer/consumer path")
-    check("/bulk.bin" in firmware_text and "RAW_BULK_PORT" in firmware_text, "R9 contains camera-free HTTPD and raw TCP bulk controls")
-    check("TCP_NODELAY" in firmware_text and "rawBulkNoDelay" in firmware_text, "R9 can compare raw TCP with Nagle disabled and enabled")
-    check("ESP_RST_BROWNOUT" in firmware_text, "R9 exposes software brownout reset evidence without claiming voltage measurement")
+    check("aitl-0_3_8-r9-architecture-benchmark" in firmware_text, "R9/R10 firmware preserves the unique adaptive-dispatch marker")
+    check("#include <esp_http_server.h>" in firmware_text and "httpd_resp_send_chunk" in firmware_text, "R9/R10 physically benchmarks the older esp_http_server chunked sender")
+    check(
+        "CAMERA_GRAB_LATEST" in firmware_text
+        and "CAMERA_GRAB_WHEN_EMPTY" in firmware_text
+        and "config.fb_count = cameraUsesPsram ? fbCount : 1" in firmware_text
+        and "config.grab_mode = cameraUsesPsram ? grabMode : CAMERA_GRAB_WHEN_EMPTY" in firmware_text,
+        "R10 exposes configurable one/two-buffer and latest/when-empty camera modes",
+    )
+    check("/camera/reinit" in firmware_text and "tuning_revision\\\":\\\"R10" in firmware_text, "R10 exposes runtime framebuffer reinitialization and a tuning revision marker")
+    check("cacheCaptureTask" in firmware_text and "/cached.mjpeg" in firmware_text, "R9/R10 contains an independent Pi-style latest-frame producer/consumer path")
+    check("/bulk.bin" in firmware_text and "RAW_BULK_PORT" in firmware_text, "R9/R10 contains camera-free HTTPD and raw TCP bulk controls")
+    check("rawBulkChunkBytes" in firmware_text and "chunk" in firmware_text, "R10 can sweep raw TCP application write sizes")
+    check("TCP_NODELAY" in firmware_text and "rawBulkNoDelay" in firmware_text, "R9/R10 can compare raw TCP with Nagle disabled and enabled")
+    check("ESP_RST_BROWNOUT" in firmware_text, "R9/R10 exposes software brownout reset evidence without claiming voltage measurement")
 
     enhanced_path = BACKEND / "app" / "services" / "camera_diagnostic_enhanced.py"
     enhanced_text = enhanced_path.read_text(encoding="utf-8")
-    check("R9_FIRMWARE_PREFIX" in enhanced_text and "camera_architecture_diagnostic_service.run" in enhanced_text, "one-click Camera Diagnostics automatically dispatches R9 firmware")
+    check("R10_TUNING_REVISION" in enhanced_text and "camera_tuning_diagnostic_service.run" in enhanced_text, "one-click Camera Diagnostics dispatches R10 before the shared R9 firmware marker")
+    check("R9_FIRMWARE_PREFIX" in enhanced_text and "camera_architecture_diagnostic_service.run" in enhanced_text, "one-click Camera Diagnostics still dispatches legacy R9 firmware")
     check("run_alternative_followup" in enhanced_text, "existing R5 to R8 alternative follow-up remains wired")
 
-    print("\nR9 camera architecture diagnostics offline regression passed. No ESP hardware was required.")
+    print("\nR9/R10 camera architecture diagnostics offline regression passed. No ESP hardware was required.")
     return 0
 
 
