@@ -1,6 +1,6 @@
-# Start Here — V039
+# Start Here — V0310
 
-V039 / `0_3_9` is the current unaccepted candidate. V038 / `0_3_8` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V0310 / `0_3_10` is the current unaccepted candidate. V039 / `0_3_9` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
 
 ## Normal Windows workflow
 
@@ -10,25 +10,40 @@ For routine update, validation and launch, use the same command from any PowerSh
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-V039 makes this workflow idempotent. After the fast-forward update and full validation sequence, the helper may stop an existing listener on ports 8000/5173 only when Win32 process metadata identifies it as belonging to this AiTL PC Studio backend/frontend process tree. An unrelated process using either port is never terminated automatically and still blocks startup with a safety error. Runtime/user data is preserved.
+The V039 idempotent restart behavior remains: the helper may stop listeners on 8000/5173 only when Win32 process evidence identifies them as this repository's AiTL PC Studio process tree. Unrelated listeners are protected. Runtime/user data is preserved.
 
-## Camera transport
+## V0310 production camera transport
 
-V039 keeps the V038/R10 camera-diagnostics work and the existing quality-preserving V037/R6 production ESP firmware and `aitl-tcp-jpeg-v1` transport:
+V0310 applies the R10 physical tuning result to the real ESP camera path while deliberately keeping the PC Studio protocol unchanged:
 
 ```text
 PC Connect -> ESP /status only
 PC Start -> /config -> /start -> persistent TCP :81
-ESP -> ATL1 header + configured JPEG
+ESP camera -> FB1 / CAMERA_GRAB_LATEST on PSRAM
+ATL1 header + configured JPEG -> bounded plain send() writes, max 11680 B/write
 selected ESP -> CameraFrameService -> preview / Live AI / capture / zones / analytics
 ```
 
-Configured JPEG quality and resolution remain fixed across production transport pressure. The production camera firmware still reports the V037-compatible identity/protocol; V039 does not change the production camera wire format.
+The wire contract remains `aitl-camera-v037` compatible and `aitl-tcp-jpeg-v1`, so the existing PC receiver and saved multi-camera profiles continue to work. V0310's serial startup marker identifies the tuned production firmware.
 
-## One-click Camera Diagnostics
+Saved Camera Sources frame size, JPEG quality and target FPS remain authoritative. V0310 does **not** silently force R10's diagnostic JPEG-quality recommendation and does not reintroduce automatic quality/resolution degradation.
 
-Open **Operate → Camera Test** after saving/selecting an ESP in Camera Sources. Press **Diagnose camera** once. PC Studio automatically chooses the appropriate diagnostic path for production, R5/R8 transport, R9 architecture, or R10 tuning firmware.
+The Pi-style newest-frame cache is not added because the strong-Wi-Fi R10 run showed no matched-target throughput gain. Freshness is instead maintained by `CAMERA_GRAB_LATEST`, no catch-up backlog and the existing complete-frame/reconnect policy.
 
-R10's dedicated diagnostic sketch can sweep framebuffer count/grab mode, 3/5/10/15 FPS, newest-frame caching, JPEG quality, TCP write size, transfer size and repeatability, then restore the pre-test camera state. R10 remains diagnostic-only and does not replace production firmware.
+## Firmware to flash
 
-The report provides measured evidence, likely bottleneck classification and a recommended prototype profile while preserving the local/student-scale simulation-only safety boundary.
+For the production V0310 test, flash:
+
+```text
+apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V0310/AiTL_ESP32_CAM_V0310.ino
+```
+
+The separate `AiTL_ESP32_CAM_ARCH_DIAG` sketch remains the R10 diagnostic benchmark and should only be used when re-running the framebuffer/FPS/network matrix.
+
+## Physical target
+
+At the same good Wi-Fi position used for the successful R10 run, request 15 FPS with the existing saved image settings. V0310 should now be tested on the **actual Camera Sources production path**. A useful acceptance target is a stable approximately 10–12 FPS with complete JPEGs, no sustained send-deadline loop, no unexpected reconnect churn, and unchanged configured image quality/resolution.
+
+The earlier 12.43 FPS value belongs to the diagnostic R10 path and is not claimed for production until this V0310 firmware is physically verified.
+
+AiTL remains a local/student-scale prototype; physical/public-road traffic-signal authority is out of scope.
