@@ -3,6 +3,7 @@ export type AppPageId =
   | "live_ai"
   | "camera_sources"
   | "camera_diagnostics"
+  | "junction_network"
   | "zone_editor"
   | "traffic_logic"
   | "traffic_analytics"
