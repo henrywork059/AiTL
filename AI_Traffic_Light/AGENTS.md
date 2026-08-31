@@ -1,23 +1,30 @@
 # AGENTS.md — mandatory rules for AiTL coding agents
 
-This is the first repository instruction for any AI coding agent, assistant, or automation working inside `AI_Traffic_Light/`.
+This is the mandatory repository instruction for any AI coding agent, assistant, or automation working inside `AI_Traffic_Light/`.
 
-## 1. Read order before changing anything
+## 1. Fast read order
 
-Read in this order:
+Do **not** reread the entire documentation set for every small patch.
 
-1. `VERSION` — authoritative candidate, status, previous version, passed baseline, and notes.
-2. `AGENTS.md` — mandatory repository rules.
-3. `docs/DOCUMENTATION_MAP.md` — which documents are authoritative, current, durable, or historical.
-4. `docs/PROJECT_SCOPE.md` — implemented/foundation/planned capability boundaries.
-5. `docs/AI_AGENT_GUIDE.md` and `docs/AI_AGENT_CHECKLIST.md` — execution protocol.
-6. Task-specific contracts, source, tests, and current patch/testing docs.
+Start with:
 
-When a task depends on repository state, inspect current GitHub `main` before producing a patch. Do not substitute an older local snapshot, conversation summary, historical patch note, or remembered version for current repository evidence.
+1. `VERSION` — authoritative candidate/status/previous/passed baseline.
+2. `AGENTS.md` — these mandatory rules.
+3. `docs/PATCH_PLAYBOOK.md` — short implementation/release/test sequence.
+4. affected source + focused tests + task-specific contract.
+
+Then open as needed:
+
+- `docs/DOCUMENTATION_MAP.md` — document authority/update ownership;
+- `docs/PROJECT_SCOPE.md` — capability/evidence boundaries;
+- `docs/AI_AGENT_GUIDE.md` — detailed architecture/development rationale;
+- current `PATCH_*`, `LOCAL_TESTING`, `TEST_READY_CHECKLIST` — candidate-specific testing/acceptance.
+
+When repository state matters, inspect current GitHub `main`. Never substitute a conversation summary, old local snapshot, historical patch note, or remembered version for current repository evidence.
 
 ## 2. Release-state gate
 
-`VERSION` is the only release-state authority. It must contain:
+`VERSION` is the only release-state authority and must contain:
 
 ```text
 version
@@ -29,77 +36,102 @@ notes
 
 Rules:
 
-- Never promote a candidate because automated tests/builds pass.
-- Never infer acceptance because code is on GitHub `main`.
-- If `version != passed_baseline`, treat the current version as unaccepted unless the owner explicitly says otherwise.
-- Repair an unaccepted candidate as the same candidate unless the owner explicitly requests a new version.
+- `version != passed_baseline` means the current version is unaccepted unless the owner explicitly says otherwise.
+- Continue/fix/review/harden an unaccepted candidate as the **same candidate** by default.
+- Increment patch `Z` only when the owner explicitly requests the next patch/version.
+- Never promote a candidate because tests/builds pass or because code is on `main`.
 - Change `passed_baseline` only after explicit owner acceptance.
-- Version skips are allowed only when explicitly requested by the owner.
-- Long-lived guides must not duplicate a hard-coded "current version" snapshot. Current candidate detail belongs in `VERSION`, `docs/START_HERE.md`, and `docs/PATCH_<version>.md`.
 
-## 3. Project scope and safety boundary
+### New-version release-bundle rule
+
+For an explicitly requested new candidate, prepare these first:
+
+```text
+docs/PATCH_<version>.md
+CHANGELOG.md
+docs/START_HERE.md
+docs/LOCAL_TESTING.md
+docs/TEST_READY_CHECKLIST.md
+apps/pc-studio/frontend/src/constants/projectVersion.ts
+```
+
+Then update root `VERSION` **last**, or commit the release bundle atomically when tooling permits. Do not create a `main` state where `VERSION` points to missing/stale release surfaces.
+
+## 3. Safety/capability boundary
 
 AiTL is a local/student-scale computer-vision and traffic-light simulation prototype.
-
-Allowed work includes camera receiving/simulation, local detection/inference, dataset capture/review/manual labeling, local model training, camera-aligned zones/counting lines, tracking/analytics, simulated signal policies, ranked scenarios, seeded synthetic experiments, generic intersection/network metadata, explanation context, and model-junction/classroom demonstrations.
 
 Do not implement, document, or imply:
 
 - direct public-road signal control;
 - traffic-cabinet/controller integration;
 - bypassing signal safety interlocks;
-- certified or production autonomous authority;
-- a perception capability that the active detector/source does not actually provide.
+- certified/production autonomous authority;
+- perception capability unsupported by the active detector/source.
 
-Traffic decisions and phases remain simulation/recommendation/display outputs only. Use `docs/PROJECT_SCOPE.md` when describing planned capabilities.
+Use exact status words: **implemented**, **foundation**, **simulation-only**, **planned**, **out of scope**.
+
+Multiple saved/streaming cameras and multiple junction assignments do **not** imply simultaneous multi-camera/multi-junction inference. A configured topology link does **not** prove observed vehicle transfer or live cooperation. Synthetic/manual evidence must stay labeled synthetic/manual.
 
 ## 4. Architecture ownership
 
 ### Backend
 
 ```text
-app/main.py       app creation, middleware, handlers, router wiring only
-app/routes/       HTTP translation only; routes stay thin
+app/main.py       wiring/middleware/handlers only
+app/routes/       HTTP translation only
 app/services/     business/state/filesystem/inference/training logic
-app/models.py     Pydantic request/response models
-app/core/         envelopes, errors, logging, middleware, version metadata, shared persistence
+app/models.py     Pydantic request contracts
+app/core/         envelopes/errors/logging/middleware/version/shared persistence
 ```
 
-Use central `ErrorCode`/`AppError`, request IDs, and structured logging. Backend release metadata comes from root `VERSION` through `app/core/project_version.py`.
+Important owners:
 
-Signal-policy ownership stays in `app/services/signal_rules.py`. Exactly one eligible ranked scenario wins an arbitration evaluation. Protected phase ordering/timing guards remain controller-owned. `app/services/simulation_experiments.py` remains isolated from live camera/controller state. `app/services/network_simulation_experiments.py` owns the isolated current multi-mode two-intersection benchmark and protected simulation-only policy layers; it must not mutate live camera/controller state. `app/services/network_policy_arbiter.py` is the pure V031 network-overlay priority selector: it chooses one higher-level overlay owner per intersection/tick but does not mutate timing itself. `app/services/decision_evidence.py` owns the additive normalized V031 network evidence projection/export and must not perform signal arbitration.
+- selected frame/simulation — `camera_frames.py`;
+- one physical ESP session/transport — `remote_camera.py`;
+- saved multi-ESP registry/session arbitration — `remote_camera_manager.py`;
+- junction/source/topology/layout — `intersection_network.py`;
+- read-only Junction Network projection — `junction_network_overview.py`;
+- protected simulated signal arbitration — `signal_rules.py`;
+- isolated network benchmark — `network_simulation_experiments.py`;
+- pure network overlay priority selection — `network_policy_arbiter.py`;
+- live explanation projection — `decision_context.py`;
+- stored normalized network evidence — `decision_evidence.py`.
 
-Network/topology identity belongs in `app/services/intersection_network.py`. Structured live explanation projection belongs in `app/services/decision_context.py`; normalized stored network-experiment evidence belongs in `app/services/decision_evidence.py`. V031 network transfer, cooperation, pedestrian-aware, vehicle-class-aware, scenario, and emergency evidence are simulator evidence only. A configured/live neighbour link still does not imply observed real transfer, live cooperation, live class priority, emergency priority, or multi-camera live-controller operation.
+Do not create a parallel controller, camera registry, intersection database, or evidence arbiter.
 
 ### Frontend
 
 ```text
-src/App.tsx          composition/top-level coordination
-src/pages/           page-level UI/state
-src/components/      reusable UI
-src/api.ts           typed API functions
+src/App.tsx       composition/top-level coordination
+src/pages/        page behavior/state
+src/components/   reusable presentation
+src/lib/*Api.ts   typed feature HTTP calls
 src/lib/apiClient.ts envelope/error handling
-src/lib/useSerialPolling.ts non-overlapping async refresh
-src/types.ts/types/  shared domain/API types
-src/constants/       navigation/release metadata
+src/lib/useSerialPolling.ts non-overlapping periodic async work
+src/types*/       shared API/domain types
+src/constants/    navigation/version/function catalog
 ```
 
-Do not turn `App.tsx` into a page-specific business-logic container. Prefer serial polling for periodic async work that could overlap. Dense telemetry should remain grouped with tabs/panels/filters/pagination rather than a single unbounded page.
+Do not turn `App.tsx` into page-specific business logic. Keep high-frequency polling serial/non-overlapping.
 
-## 5. Data and semantics invariants
+## 5. Data/semantics invariants
 
-Preserve these distinctions unless the task explicitly changes them:
+Preserve unless the task explicitly changes them:
 
-- **occupancy** = sampled presence in a frame/region;
+- **occupancy** = sampled presence;
 - **flow** = track-derived line/region events;
-- **zone/class counts** = per-frame detector observations for scenario conditions;
-- **experiment telemetry** = isolated synthetic simulator/controller output;
-- **network links** = configured topology metadata in live state; `network-experiments` may generate explicit synthetic transfer, predicted-arrival, coordination, pedestrian, vehicle-class, and emergency events over a selected link;
-- **observation provenance** must identify simulation/manual sources rather than presenting them as AI detections.
+- **zone/class counts** = per-frame detector observations;
+- **experiment telemetry** = isolated synthetic output;
+- **network links** = configured topology metadata in live state;
+- **junction node position** = logical UI layout, not GPS;
+- **observation provenance** = explicit AI/simulation/manual/unavailable source.
 
-Canonical boxes remain in original-image coordinates. Zone geometry remains in the validated reference coordinate system; display scaling is presentation-only.
+Canonical boxes remain original-image coordinates. Zone geometry remains in its validated reference coordinate system.
 
-## 6. API contract
+The shared live pipeline currently has one selected `CameraFrameService` source. Do not copy its live occupancy/decision data onto unobserved junctions.
+
+## 6. API/error/logging contract
 
 JSON success:
 
@@ -113,17 +145,20 @@ JSON error:
 {"ok": false, "error": {"code": "...", "message": "...", "details": {}}, "meta": {"request_id": "..."}}
 ```
 
-Binary/image/CSV responses preserve `X-Request-ID`. Update `docs/API_CONTRACTS.md` when HTTP behavior changes and synchronize `error_codes.py` with `docs/ERROR_CODES.md` when stable errors change.
+Binary/image/CSV responses preserve `X-Request-ID`.
+
+When HTTP/schema behavior changes, update `docs/API_CONTRACTS.md` and focused tests. When stable errors change, synchronize `error_codes.py` and `docs/ERROR_CODES.md`.
 
 ## 7. Runtime/user data is not patch content
 
-Never use destructive cleanup such as `git clean -fd`. Preserve local runtime/user data, including:
+Never use destructive cleanup such as `git clean -fd`. Preserve:
 
 ```text
 datasets/
 outputs/
 *.pt
 manual labels
+config/remote_cameras.json
 config/zones.json
 config/runtime_settings.json
 config/signal_rules.json
@@ -134,98 +169,103 @@ dist/
 caches
 ```
 
-Patch archives must never contain runtime/generated data.
+Patch archives/source commits must not add generated/runtime data.
 
-## 8. Change strategy
+## 8. Low-risk implementation order
 
-Before editing:
+For non-trivial work:
 
-1. resolve release state from `VERSION`;
-2. identify the smallest responsible modules;
-3. inspect affected tests/contracts/data formats;
-4. decide whether the request repairs the current candidate or explicitly starts a new version;
-5. write down material assumptions rather than silently broadening scope.
+1. resolve release state;
+2. identify the smallest owner module;
+3. inspect existing focused regression/contract;
+4. implement domain/service behavior;
+5. add/update a focused deterministic regression;
+6. add route/API/type/frontend wiring only as required;
+7. update only affected contract/scope/architecture/function docs;
+8. synchronize release bundle only if a new candidate was explicitly requested;
+9. hand off to the normal owner runner.
 
-Extend the existing architecture instead of building a parallel controller or duplicate data model. For multi-intersection, emergency, pedestrian, vehicle-class-aware, and explainability work, follow the dependency/evidence boundaries in `docs/PROJECT_SCOPE.md` and `docs/ROADMAP.md`.
+Prefer extension of existing services/data models over parallel abstractions.
 
-## 9. Testing evidence must be precise
+## 9. Regression rule
 
-Run relevant checks available in the environment, normally:
+`scripts/update_test_run.ps1` auto-discovers zero-argument `scripts/test_*.py` regressions.
 
-- Python compile;
-- focused backend service/unit/regression tests;
-- live API smoke when practical;
-- `scripts/check_structure.py`;
-- frontend typecheck/build when affected or for release validation;
-- `git diff --check` in the complete repository;
-- version/runtime-file scans;
-- patch ZIP validation.
+Therefore:
 
-Report separately:
+- ordinary offline regressions should be deterministic zero-argument `test_*.py` files;
+- test the semantic invariant, not only file/string presence;
+- add a small wiring guard when several files/registries must stay connected;
+- hardware/interactive utilities requiring `--host`, credentials, special firmware or user input must not accidentally become ordinary automatic regressions unless explicitly excluded/documented by the runner.
 
-- checks actually run in the current environment;
-- targeted/synthetic checks;
-- checks still required on the owner's complete local repository.
+## 10. Validation evidence must be precise
 
-Never describe a check as passed if it did not run.
-
-## 10. Documentation policy
-
-Use `docs/DOCUMENTATION_MAP.md` before editing documentation.
-
-For a patch, update only documents whose responsibilities changed. Keep long-lived guidance version-agnostic. Put current-candidate facts in `START_HERE.md`, `PATCH_<version>.md`, `LOCAL_TESTING.md`, and `TEST_READY_CHECKLIST.md`. Do not rewrite historical changelog/patch facts to make them look current.
-
-Claims must match implementation status:
-
-- **implemented** — working code path exists and has relevant evidence;
-- **foundation** — schema/service/context exists but target behavior is inactive;
-- **simulation-only** — works only in the local simulator/test path;
-- **planned** — no completed behavior yet;
-- **out of scope** — explicitly excluded.
-
-## 11. Patch packaging and handoff
-
-Create a **changed-files-only** ZIP. Every member starts with `AI_Traffic_Light/`. Run `scripts/validate_patch_zip.py` when available, compare the ZIP member list with the intended manifest, and calculate SHA-256.
-
-Handoff must include:
-
-- why the patch stays on/increments the version;
-- changed files;
-- behavior/doc changes and deliberate non-changes;
-- tests/checks actually run;
-- checks not run;
-- exact owner acceptance checks;
-- ZIP/manifest hashes.
-
-The owner uploads the **extracted changed files** to GitHub `main`; uploading only the ZIP is insufficient. Prefer applying the overlay locally and pushing one atomic Git commit (or merging one PR) rather than uploading files piecemeal. If web upload is used, verify every manifest member is present in the same resulting candidate commit before treating GitHub as the patch base.
-
-After explicit owner acceptance, update `passed_baseline` in repository metadata before normal next-version development. When the owner's Git workflow permits it, also create an immutable tag such as `passed-0_3_1` on the accepted commit so a known-good checkout/rollback target exists; the root `VERSION` file remains the release-state authority.
-
-## 12. Local update safety after GitHub upload
-
-Start with:
+Normal owner validation:
 
 ```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL"
-git status --short
-git pull --ff-only origin main
-Get-Content .\AI_Traffic_Light\VERSION
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-Only pull when the working tree situation is understood. Preserve runtime data and do not invent cleanup steps to force a pull.
+It updates, reloads itself, installs/refreshes dependencies, compiles, runs structure + auto-discovered regressions, typechecks/builds frontend, checks tracked-tree cleanliness, safely restarts only AiTL-owned PC Studio processes, runs live smoke, and opens PC Studio.
 
-## 13. When uncertain
+Use individual commands only to diagnose a failed stage.
 
-Choose the smallest safe interpretation that preserves accepted behavior, current candidate state, data semantics, and the prototype-only safety boundary. If repository evidence and an old document disagree, prefer current code/contracts/`VERSION` and update the stale durable document as part of the patch when appropriate.
+Agent handoff must separate:
 
-### Network policy-arbitration rule
+- checks actually run in the current environment;
+- targeted/static review evidence;
+- checks still required on the owner's complete local repository/hardware.
 
-In the isolated network benchmark, ranked scenarios are the controller-owned base policy and higher-level network overlays must not compete through call order. Use the pure network policy arbiter and one overlay owner per intersection/tick. Current priority order is incident hold > active pedestrian crossing > simulated emergency priority > pedestrian max-wait > configured regular vehicle-class priority > network cooperation. Post-advisory signal reads must use non-reapplying snapshot semantics. The existing seven modes are comparison/ablation modes; do not claim class-aware and emergency-priority overlays are simultaneously integrated unless a future explicit integrated mode is implemented and tested.
+Never describe an unrun check as passed.
 
-### Persistent decision-evidence rule
+## 11. Documentation policy
 
-V031 `decision_evidence` is an additive schema-versioned projection over detailed experiment histories. Keep stable fields/context/provenance/source references, deterministic evidence IDs, and backward projection for older stored runs. Do not move arbitration or timing logic into `decision_evidence.py`, do not delete detailed mode-specific histories merely because the normalized ledger exists, and do not embed volatile random run IDs inside individual records when that would break seeded repeatability.
+Use `docs/DOCUMENTATION_MAP.md`.
 
-### Vehicle-class evidence rule
+- Keep durable guides version-agnostic.
+- Put current candidate detail in release-bundle/current-testing docs.
+- Fix durable architecture/ownership text in the same candidate when code makes it stale.
+- Do not rewrite historical patch/changelog facts to make them current.
+- Keep limitations adjacent to capability claims.
 
-V030 regular class generation is synthetic simulator input. Keep `synthetic_vehicle_class_demand` provenance on class-aware experiment evidence. Unknown/unmapped regular labels normalize to `other`. Do not present V030 class profiles or class-priority outcomes as detector accuracy, live transit priority, or public-road authority. A configured class weight of `1.0` is neutral; class-aware timing must remain within the existing protected phase/cycle bounds and must not shorten active pedestrian WALK/CLEAR demand.
+## 12. Code-review gate before handoff
+
+Review changed code for:
+
+- ownership violations/duplicate state;
+- stale/wrong-source data after switching;
+- overlapping polling;
+- missing state restoration/cleanup (`finally` where appropriate);
+- persistent writes bypassing atomic helpers;
+- backward config/data compatibility;
+- unbounded histories/UI growth;
+- undocumented magic thresholds;
+- reset/delete/reassignment edge cases;
+- missing navigation/function/API registration;
+- docs stronger or older than implementation.
+
+For visual editors, also review narrow screens, long identifiers, empty/default states, unsaved edits during live polling, and persistence round-trip.
+
+## 13. Network policy/evidence invariants
+
+In isolated network experiments, ranked scenarios remain controller-owned base policy. Higher-level network overlays use one explicit owner per intersection/tick; they must not compete through call order. Preserve the documented priority order and non-reapplying snapshot semantics in `network_policy_arbiter.py` / network experiment tests.
+
+Normalized `decision_evidence` remains an additive projection over detailed histories; it must not become an arbitration/timing owner and must preserve deterministic IDs/provenance/backward projection.
+
+Vehicle-class/emergency/cooperation evidence remains synthetic experiment evidence unless a later explicit live implementation provides and tests real provenance.
+
+## 14. Handoff/acceptance
+
+Keep handoff concise:
+
+```text
+Version decision
+Implemented
+Deliberately unchanged/not implemented
+Checks actually run
+Checks still required locally
+Manual acceptance focus
+Passed baseline
+```
+
+The owner alone promotes a candidate. After explicit acceptance, update repository `passed_baseline` before normal next-version development; an immutable accepted tag may also be created when the owner's Git workflow permits it.
