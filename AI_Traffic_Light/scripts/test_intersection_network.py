@@ -113,8 +113,19 @@ def main() -> None:
         reloaded = IntersectionNetworkService(config_path=path)
         assert reloaded.get() == saved
 
+        # Explicit null is a real user choice in V0311 and must not silently
+        # normalize back to the first assigned source.
+        no_primary = deepcopy(config)
+        no_primary["intersections"][1]["primary_source_id"] = None
+        no_primary_saved = service.save(no_primary)
+        assert no_primary_saved["intersections"][1]["source_ids"] == ["camera_b", "1camera_b"]
+        assert no_primary_saved["intersections"][1]["primary_source_id"] is None
+        assert IntersectionNetworkService(config_path=path).get()["intersections"][1]["primary_source_id"] is None
+        service.save(saved)
+
         # Schema 1 remains backward compatible: V0311 fills deterministic layout
-        # and primary-source metadata for older intersection records.
+        # and primary-source metadata for older intersection records that omit
+        # the new fields. This is intentionally distinct from explicit null.
         legacy = deepcopy(config)
         for item in legacy["intersections"]:
             item.pop("position", None)
