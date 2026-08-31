@@ -178,8 +178,15 @@ class IntersectionNetworkService:
                     )
                 claimed_sources[source_id] = intersection_id
 
-            primary_raw = str(raw.get("primary_source_id") or "").strip()
-            primary_source_id = primary_raw or (source_ids[0] if source_ids else None)
+            # V0311 distinguishes an old schema-1 record that omitted the new
+            # field from a user explicitly choosing "None" in Junction Network.
+            # Missing keeps the backward-compatible first-source default;
+            # explicit null/blank remains null and must persist as such.
+            if "primary_source_id" in raw:
+                primary_raw = str(raw.get("primary_source_id") or "").strip()
+                primary_source_id = primary_raw or None
+            else:
+                primary_source_id = source_ids[0] if source_ids else None
             if primary_source_id is not None and primary_source_id not in source_ids:
                 cls._invalid(
                     "primary_source_id must be one of the intersection source_ids.",
