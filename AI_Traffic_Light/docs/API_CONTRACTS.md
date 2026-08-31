@@ -139,6 +139,25 @@ When an R5 transport-benchmark report is available, the same one-click action ad
 
 The response may include `alternative_analysis` and `transport_benchmark.alternative_analysis`. These report the reference real-JPEG byte size, exact-size synthetic-versus-real FPS, payload-size curve, receive-buffer sensitivity, receiver-drain sensitivity, findings, assessed alternatives and a next action. The analysis uses the already-benchmarked HTTP/MJPEG `WiFiClient.write()` paths, ATL1 plain `send()`, staged DRAM, UDP and assessment-only WebSocket/RTSP evidence where relevant. Runtime `SO_SNDBUF` tuning is not reported as tested because ESP-IDF/lwIP does not support changing that option by default. Lower-level raw lwIP `tcp_write`/`tcp_output` remains a future firmware A/B rather than a current implemented path.
 
+### V038 R9 architecture bottleneck isolation
+
+When the selected ESP reports firmware beginning `aitl-0_3_8-r9-architecture-benchmark`, the same `POST /api/camera/diagnostics/run` action dispatches to the focused R9 architecture benchmark. R9 requires the dedicated diagnostic sketch to be flashed first; it is not part of normal production firmware and it does not change the production camera protocol.
+
+R9 physically compares six paths on the same ESP, camera, access point and PC:
+
+- manual `WiFiServer` / `WiFiClient` multipart MJPEG, representing the current/R5-style Arduino writer;
+- `esp_http_server` + `httpd_resp_send_chunk()` direct MJPEG, reproducing the older V035 server architecture;
+- a FreeRTOS newest-frame producer/cache feeding `esp_http_server`, modeling the Pi-style decoupled producer/consumer design;
+- camera-free `esp_http_server` bulk TCP;
+- camera-free raw `WiFiClient` bulk with `TCP_NODELAY` enabled;
+- camera-free raw `WiFiClient` bulk with Nagle enabled.
+
+The R9 camera configuration restores the older PSRAM-capable two-framebuffer `CAMERA_GRAB_LATEST` strategy for the HTTPD comparison. `/status` also exposes the effective framebuffer count/location/grab mode, HTTPD readiness, reset reason including software brownout evidence, RSSI/BSSID/channel and memory telemetry. Reset reason is evidence only; R9 does not measure supply voltage and a non-brownout reset does not prove that the power rail never sagged.
+
+A successful R9 response additionally includes `architecture_analysis` and `transport_benchmark.architecture_analysis`. The classifier can report `manual_socket_sender_regression`, `capture_send_coupling`, `camera_or_jpeg_pipeline_specific`, `common_network_or_esp_stack_bottleneck`, `httpd_architecture_healthy`, or `mixed_architecture_bottleneck`. Camera-free bulk below 1 Mbit/s is treated as evidence that the slowdown exists outside OV2640/JPEG work; camera-free bulk at or above 5 Mbit/s is treated as substantial common-path headroom. A 1.5x or greater HTTPD/manual frame-rate advantage is evidence against the manual socket writer, while a 1.5x or greater cached/direct advantage at useful target throughput is evidence for capture/send coupling. These thresholds are diagnostic heuristics, not release criteria.
+
+R9 does not automatically replace ATL1, promote a firmware architecture, modify saved camera profiles permanently, add a stable error code, or grant physical/public-road signal-control authority. Any transport chosen from R9 evidence still requires a normal production-firmware patch and the usual owner acceptance workflow.
+
 `GET /api/camera/diagnostics/progress`
 
-Returns the same standard success envelope with the current diagnostic progress snapshot. Fields include `status`, `engine`, `stage`, `current_test`, `test_index`, `frame_current`, `frame_total`, `detail`, `last_line`, `started_at_ms`, `elapsed_ms`, `error`, and a bounded `log_tail`. Progress polling is observational only and does not start, stop or mutate a diagnostic run.
+Returns the same standard success envelope with the current diagnostic progress snapshot. Fields include `status`, `engine`, `stage`, `current_test`, `test_index`, `frame_current`, `frame_total`, `detail`, `last_line`, `started_at_ms`, `elapsed_ms`, `error`, and a bounded `log_tail`. `engine` may now be `architecture_benchmark` while R9 is active. Progress polling is observational only and does not start, stop or mutate a diagnostic run.
