@@ -1,33 +1,88 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
+from app.services.camera_architecture_diagnostics import (
+    R9_FIRMWARE_PREFIX,
+    camera_architecture_diagnostic_service,
+)
 from app.services.camera_diagnostic_dispatch import camera_diagnostic_dispatch_service
 from app.services.camera_transport_alternatives import run_alternative_followup
 
 
 class CameraDiagnosticEnhancedService:
-    """Add focused R8 transport alternatives after the established adaptive diagnostic.
+    """Adaptive one-click camera diagnostics for production, R5/R8 and R9 firmware.
 
-    Normal production firmware behavior is unchanged. The follow-up only runs when
-    the base report contains an R5 transport-benchmark report.
+    Normal production firmware behavior is unchanged. R5 firmware receives the
+    established broad benchmark plus R8 payload/receiver follow-up. R9 firmware
+    runs the focused server/producer-consumer/camera-free architecture isolation.
     """
 
     def _progress(self, stage: str, current_test: str) -> None:
-        # CameraDiagnosticDispatchService owns the progress state used by the
-        # existing /progress endpoint. This collaborator update keeps the R8
-        # follow-up visible without creating a second progress store.
+        is_r9 = str(stage).startswith("R9")
         camera_diagnostic_dispatch_service._set(  # noqa: SLF001 - same service boundary
             status="running",
-            engine="transport_benchmark",
+            engine="architecture_benchmark" if is_r9 else "transport_benchmark",
             stage=stage,
             current_test=current_test,
             frame_current=None,
             frame_total=None,
-            detail="R8 focused alternative follow-up",
+            detail="R9 architecture bottleneck isolation" if is_r9 else "R8 focused alternative follow-up",
         )
 
+    def _probe_selected_firmware(self) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+        profile = camera_diagnostic_dispatch_service._profile()  # noqa: SLF001
+        if not profile:
+            return None, {}
+        host = str(profile.get("host") or "")
+        status, payload = camera_diagnostic_dispatch_service._http(host, "/status")  # noqa: SLF001
+        return profile, payload if status == 200 and isinstance(payload, dict) else {}
+
     def run(self) -> dict[str, Any]:
+        camera_diagnostic_dispatch_service._set(  # noqa: SLF001
+            status="running",
+            engine="adaptive",
+            stage="Preflight",
+            current_test="Detect selected ESP diagnostic firmware",
+            test_index=None,
+            frame_current=None,
+            frame_total=None,
+            detail="Choose production, R5/R8 transport, or R9 architecture diagnostic engine.",
+            last_line=None,
+            started_at_ms=int(time.time() * 1000),
+            elapsed_ms=0,
+            error=None,
+            log_tail=[],
+        )
+        profile, device_status = self._probe_selected_firmware()
+        firmware = str(device_status.get("firmware") or "")
+        if profile and firmware.startswith(R9_FIRMWARE_PREFIX):
+            self._progress("R9 PREFLIGHT", "Architecture benchmark firmware detected")
+            try:
+                report = camera_architecture_diagnostic_service.run(profile, progress=self._progress)
+            except Exception as exc:
+                message = f"R9 architecture diagnostic failed: {type(exc).__name__}: {exc}"
+                camera_diagnostic_dispatch_service._set(  # noqa: SLF001
+                    status="failed",
+                    engine="architecture_benchmark",
+                    stage="Failed",
+                    current_test="R9 architecture diagnostic",
+                    detail=message,
+                    error=message,
+                )
+                raise
+            camera_diagnostic_dispatch_service._set(  # noqa: SLF001
+                status="completed",
+                engine="architecture_benchmark",
+                stage="Complete",
+                current_test="R9 architecture diagnosis ready",
+                detail=f"R9 classification: {report.get('diagnosis_code')}",
+                error=None,
+            )
+            report["diagnostic_revision"] = "V038 R9 architecture"
+            return report
+
         report = camera_diagnostic_dispatch_service.run()
         raw = report.get("transport_benchmark")
         if not isinstance(raw, dict):
