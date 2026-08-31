@@ -1,29 +1,42 @@
 # AI Agent Guide
 
-Detailed operating guide for AI coding agents working on **AI Traffic Light (AiTL)**. `../AGENTS.md` is mandatory and takes priority when instructions overlap.
+Detailed operating guide for AI coding agents working on **AI Traffic Light (AiTL)**. `../AGENTS.md` is mandatory and takes priority. For routine patch execution, use `PATCH_PLAYBOOK.md`; this guide explains the architecture/decision rules behind it.
 
 ## 1. Mental model
 
-AiTL is a local prototype with several deliberately separate data/control paths:
+AiTL has several deliberately separate paths.
+
+### Shared live camera/inference path
 
 ```text
-camera/upload/simulation frame
+saved ESP sessions / built-in simulation
+→ one selected CameraFrameService source
 → local inference
 → tracking + zones
 → occupancy / flow / zone-class observations
 → ranked simulated signal controller
-→ PC Studio explanation/visualization
+→ explanation / analytics / UI
 ```
+
+Several ESP sessions may run, but **one selected source** feeds the shared live AI/traffic pipeline.
+
+### Junction topology/observability path
 
 ```text
-configured intersection/source identity + neighbour links
-→ network context
-→ decision explanation context
+config/intersections.json
+→ IntersectionNetworkService
+→ source/junction mapping + directed links + node layout
+
+RemoteCameraManager health
++ selected CameraFrameService source
++ current traffic/decision state
+→ JunctionNetworkOverviewService
+→ Junction Network page
 ```
 
-The second path is currently a **foundation**: topology/context does not itself create multi-intersection cooperation.
+Junction topology, layout, multi-camera assignment and camera/live-status visualization are implemented. Simultaneous independent inference/controller pipelines for all junctions are **not** implemented. Only the junction resolved from the current shared source receives live traffic values.
 
-Data/model workflow:
+### Data/model path
 
 ```text
 capture + metadata
@@ -34,239 +47,236 @@ capture + metadata
 → local inference
 ```
 
-Isolated experiment workflows:
+### Isolated experiment paths
 
-```text
-saved signal profile + zone snapshot + density/seed
-→ separate single-junction Fixed simulator/controller
-→ separate single-junction Adaptive simulator/controller
-→ aligned synthetic telemetry
-```
-
-```text
-configured directed link + seeded exogenous arrivals
-→ independent source-intersection controller runtime
-→ explicit synthetic transfer pipeline
-→ independent destination-intersection controller runtime
-→ per-intersection + network telemetry
-```
-
-V027 adds a **simulation-only cooperative mode** on top of the V026 independent-control baseline. Cooperation is claimable only for the isolated two-intersection experiment because predicted synthetic neighbour arrivals can change bounded downstream timing.
-
-No path converts these outputs into public-road signal commands.
+Single-junction and network experiments use separate deterministic simulator/controller state and synthetic provenance. They do not mutate the live camera/controller runtime and do not create public-road authority.
 
 ## 2. Resolve authority before coding
 
-Use `DOCUMENTATION_MAP.md`. For repository state:
+Use `DOCUMENTATION_MAP.md`. When repository state matters:
 
 1. owner's explicit current instruction;
 2. current GitHub `main` source/tests/contracts;
-3. root `VERSION`;
-4. `AGENTS.md` + `PROJECT_SCOPE.md`;
+3. root `VERSION` for release state;
+4. `AGENTS.md` + `PROJECT_SCOPE.md` for mandatory boundaries;
 5. current candidate docs;
 6. durable guides;
 7. historical docs.
 
-If a durable guide contains an obsolete current-version claim, do not follow the stale claim. Fix the durable guide when that is within patch scope.
+Do not let a historical patch note or stale durable sentence override current code/`VERSION`.
 
-## 3. Version-state decision gate
+## 3. Start with the short playbook
 
-Read all `VERSION` fields before editing.
-
-### `version != passed_baseline`
-
-Current version is an unaccepted candidate unless the owner explicitly says otherwise. Repair/harden the same candidate by default.
-
-### Owner explicitly confirms acceptance
-
-Promote `passed_baseline` only in a repository update that records that explicit decision. Normal next-version work may then proceed from the accepted state unless the owner directs otherwise.
-
-Never infer acceptance from unit tests, builds, upload to `main`, a test-ready label, or agent judgment.
-
-## 4. Capability-claim gate
-
-Before documenting a capability, classify it using `PROJECT_SCOPE.md`:
-
-- implemented;
-- foundation;
-- simulation-only;
-- planned;
-- out of scope.
-
-A schema, toggle, source ID, configured link, class label, or placeholder does not prove the target behavior is implemented. For example, a neighbour link is topology metadata until a real multi-intersection simulator/controller uses neighbour information to alter a bounded decision.
-
-## 5. Preflight inspection
-
-For a non-trivial patch inspect, as relevant:
+Before broad reading, use `PATCH_PLAYBOOK.md` to record:
 
 ```text
-VERSION
-AGENTS.md
-DOCUMENTATION_MAP.md
-PROJECT_SCOPE.md
-relevant source + tests
-API_CONTRACTS.md
-ERROR_CODES.md / error_codes.py
-DATA_FORMAT.md / schemas
-ARCHITECTURE.md / CODE_STRUCTURE.md
-LOCAL_TESTING.md
-TEST_READY_CHECKLIST.md
-PATCH_<version>.md
+version/status/previous/baseline
+same candidate or explicit new candidate
+owning modules
+contracts affected
+focused regression
+runtime data at risk
 ```
 
-Inspect nearby modules before adding a new abstraction. Reuse existing services/types/helpers when ownership already matches.
+This avoids spending most of a patch rediscovering repository structure.
 
-## 6. Change-size decision rules
+## 4. Version-state gate
 
-Prefer the smallest cohesive change. Refactor when duplication or ownership ambiguity materially blocks the request, not merely because a file is long.
+### Unaccepted candidate
 
-For planned network features, extend the current ranked-scenario/controller architecture rather than creating a separate "smart" controller. V027 consumes explicit synthetic neighbour/arrival context while preserving independent per-intersection controller state. Future network work should generalize this evidence without creating a second controller architecture. Do not hard-code exactly two intersections into generic topology services.
+If `version != passed_baseline`, continue/repair/harden the same candidate unless the owner explicitly requests a new version.
 
-## 7. Backend implementation protocol
+### Explicit new candidate
 
-### Routes
+Prepare the release bundle first and update root `VERSION` **last**, or commit the full bundle atomically when tooling permits. Do not create an inconsistent `main` where the new `VERSION` exists before its patch doc/changelog/current testing/frontend version surfaces.
 
-Routes translate HTTP input/output only:
+### Acceptance
 
-- Pydantic input where applicable;
-- service call;
-- standard envelope or binary response;
-- request ID;
-- logging at the appropriate boundary.
+Only explicit owner acceptance changes `passed_baseline`. Tests/builds/main-branch presence do not imply acceptance.
 
-Do not place filesystem, topology validation, arbitration, training, or inference algorithms in routes.
+## 5. Capability-claim gate
 
-### Services
+Before documenting a capability, classify it:
 
-Services own domain behavior/side effects. Important ownership includes:
+- **implemented** — working code path exists;
+- **foundation** — supporting schema/service exists but target behavior is inactive;
+- **simulation-only** — behavior is confined to simulator/test path;
+- **planned** — no completed target behavior;
+- **out of scope** — explicitly excluded.
 
-- camera state: `camera_frames.py`;
-- detection/inference: inference service;
-- zones/occupancy: zones + traffic history;
-- tracking/flow: tracking + traffic flow;
+Examples:
+
+- several saved cameras = implemented multi-camera session/input support;
+- several cameras assigned to a junction = implemented configuration/observability;
+- one selected camera feeding AI = current live inference architecture;
+- several configured links = topology metadata, not observed vehicle transfer;
+- network experiment cooperation/emergency/class events = synthetic experiment evidence unless current live code explicitly implements otherwise.
+
+## 6. Ownership rules
+
+### Backend
+
+- `routes/` — HTTP translation only;
+- `services/` — domain behavior/state/filesystem/inference/training;
+- `models.py` — Pydantic requests/contracts;
+- `core/` — envelope/errors/logging/middleware/version/shared persistence.
+
+Important owners:
+
+- selected frame/simulation: `camera_frames.py`;
+- one physical ESP session: `remote_camera.py`;
+- saved multi-ESP registry/session arbitration: `remote_camera_manager.py`;
+- junction/source/topology/layout: `intersection_network.py`;
+- read-only Junction Network projection: `junction_network_overview.py`;
 - signal arbitration: `signal_rules.py`;
-- isolated single-junction A/B simulation: `simulation_experiments.py`;
-- isolated two-intersection network benchmark: `network_simulation_experiments.py`;
-- intersection/topology identity: `intersection_network.py`;
-- non-controlling explanation projection: `decision_context.py`.
+- isolated single-junction experiments: `simulation_experiments.py`;
+- isolated network experiments: `network_simulation_experiments.py`;
+- pure network overlay priority selection: `network_policy_arbiter.py`;
+- live explanation projection: `decision_context.py`;
+- stored normalized network evidence: `decision_evidence.py`.
 
-### Core
+Do not create a second camera registry, intersection database, signal controller or evidence arbiter when an owner already exists.
 
-Cross-cutting envelopes, stable errors, request middleware, logging, root-version metadata, and shared atomic JSON primitives belong in `app/core/`.
+### Frontend
 
-## 8. Frontend implementation protocol
+- `App.tsx` — composition/top-level coordination only;
+- `pages/` — page state/interaction;
+- `components/` — reusable presentation;
+- `lib/*Api.ts` / API layer — typed HTTP calls;
+- `types/` — shared response/domain shapes;
+- `constants/` — navigation/release/function catalog;
+- `useSerialPolling` — non-overlapping periodic async refresh.
 
-Keep page behavior in pages, reusable rendering in components, HTTP logic in the API layer, and shared response shapes in TypeScript types.
+## 7. Low-risk implementation order
 
-For overlays, persist canonical image/reference coordinates and scale only for display. For dense analytics/experiments/explanations, use tabs/panels/details/dropdowns/filtering/internal scrolling rather than an unbounded dashboard.
+Use:
 
-Periodic async polling must not overlap. Prefer the shared serial scheduler or an equivalent self-scheduling pattern.
+```text
+domain/service behavior
+→ focused regression
+→ route/API/type wiring
+→ frontend wiring
+→ contract/scope/architecture docs
+→ release bundle (only for explicit new version)
+→ full owner runner
+```
 
-## 9. Data-integrity and semantics protocol
+This keeps defects near the changed owner and avoids version/doc churn while code is still moving.
 
-Treat datasets, labels, runtime config, models, histories, and experiment outputs as user data.
+## 8. Regression rules
+
+The normal runner automatically discovers zero-argument `scripts/test_*.py` files.
+
+A good focused regression:
+
+- exercises the semantic invariant directly;
+- uses temporary paths/fakes instead of private runtime data;
+- is deterministic;
+- requires no user input;
+- fails clearly with one cause;
+- may add a small wiring/structure guard when a feature spans backend/frontend registration.
+
+Do not accidentally name a hardware CLI that requires `--host`, Wi-Fi credentials, special firmware or manual interaction as an ordinary automatic regression unless the runner explicitly excludes it.
+
+## 9. Data integrity and state review
+
+Treat datasets, labels, runtime config, camera profiles, models, histories and experiment outputs as user data.
+
+When state/persistence changes, review:
+
+- old-config migration/defaults;
+- source/session generation and stale cache behavior;
+- atomic writes/locks;
+- reset/delete/reassignment behavior;
+- failure cleanup/restoration;
+- polling vs unsaved edits;
+- bounded histories/caches.
+
+Never use destructive cleanup merely to make tests/pulls pass.
+
+## 10. Semantics and provenance
 
 Never conflate:
 
 - occupancy with flow;
-- a zone/class per-frame count with throughput;
-- configured travel time with measured arrival time;
-- Simulation Lab data with live histories;
-- manual/synthetic events with AI detections.
+- per-frame zone/class counts with throughput;
+- configured travel time with measured transfer;
+- logical junction canvas position with geospatial/GPS location;
+- simulation/manual evidence with AI detection;
+- multiple camera sessions with simultaneous multi-camera inference.
 
-When changing deletion/build/persistence logic, define paired files, failure behavior, locks, stale markers, and stable error paths.
+Canonical detection boxes stay in original-image coordinates. Zone geometry stays in its validated reference coordinate system; display scaling is presentation-only.
 
-## 10. Signal and network safety protocol
+## 11. Signal/network safety
 
-Ranked scenarios may alter bounded **simulated** phase timing or request protected service sooner. Preserve protected minimums, maximums, cycle limits, phase sequence, stale fallback, persistence/cooldown, and incident recovery.
+Ranked scenarios remain bounded simulated policies. Preserve protected minimums, maximums, cycle limits, phase order, stale fallback, persistence/cooldown and incident recovery.
 
-For future multi-intersection cooperation:
+Network experiment overlays must not compete by call order. Keep pure arbitration ownership and explicit synthetic provenance. Do not relabel simulation emergency/class/cooperation evidence as live perception or public-road control.
 
-- use per-intersection controller/runtime state;
-- use explicit transfer/arrival events or predictions;
-- retain deterministic protected local safety bounds;
-- record which neighbour context changed a decision;
-- compare cooperative against independent control in the same seeded demand scenario.
+## 12. API/error/logging
 
-For emergency priority, begin with simulation/configured events unless a compatible detector is intentionally introduced. Record event lifecycle and recovery. Do not equate an arbitrary class label with validated emergency recognition.
+Use standard envelopes and central stable error codes. Binary/image/CSV responses retain `X-Request-ID`.
 
-## 11. API/error/logging protocol
+When HTTP/schema/error behavior changes, update the contract and focused regression in the same candidate. A route should normally be input validation → service call → envelope/logging.
 
-Use the standard envelopes and central stable error codes. Do not invent one-off route error JSON. Binary/image/CSV responses retain `X-Request-ID`.
+## 13. Documentation synchronization
 
-When endpoints/schemas/errors change, update contract docs and focused tests in the same patch.
+Use `DOCUMENTATION_MAP.md`.
 
-## 12. Testing protocol
-
-Use the backend `.venv` when available. Typical validation:
-
-```powershell
-python -m compileall .\apps\pc-studio\backend\app .\scripts
-python .\scripts\check_structure.py
-```
-
-Then run focused and inherited regressions relevant to the changed ownership. Run live `test_backend_smoke.py` with the backend active when practical.
-
-Frontend:
-
-```powershell
-npm ci
-npm run typecheck
-npm run build
-```
-
-Repository/handoff hygiene:
+For a new candidate, treat these as one release bundle:
 
 ```text
-git diff --check
-version-surface check
-runtime/generated-file exclusion scan
-patch ZIP validation
-manifest comparison
-SHA-256
+PATCH_<version>.md
+CHANGELOG.md
+START_HERE.md
+LOCAL_TESTING.md
+TEST_READY_CHECKLIST.md
+frontend projectVersion.ts
+VERSION (last)
 ```
 
-State clearly what did and did not run.
+Update durable architecture/function/scope docs only when their responsibility changed. If code changes a durable configuration (for example framebuffer mode), update the architecture text immediately so a future agent does not restore an obsolete design based on stale documentation.
 
-## 13. Documentation synchronization protocol
+## 14. Validation
 
-Follow `DOCUMENTATION_MAP.md` instead of mechanically editing every document.
+Routine owner validation uses:
 
-Long-lived guides should describe rules without hard-coded current release state. Current candidate details belong in `VERSION`, `START_HERE`, current `PATCH_*`, `LOCAL_TESTING`, and `TEST_READY_CHECKLIST`.
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
+```
 
-When planned scope changes, update `PROJECT_SCOPE.md` and `ROADMAP.md`. When architecture ownership changes, update `ARCHITECTURE.md` and `CODE_STRUCTURE.md`. When the API/data/error contract changes, update its dedicated contract.
+It pulls, reloads itself, refreshes dependencies, compiles, runs structure + automatic regressions, typechecks/builds frontend, checks tracked-tree hygiene, safely restarts AiTL-owned processes, runs live smoke and opens PC Studio.
 
-## 14. Patch assembly protocol
+Use individual commands only to diagnose the failed stage. State clearly what actually ran in the agent environment and what still requires the owner's complete local repository/hardware.
 
-Build from an explicit changed-file manifest, not the project root. Every archive member begins with `AI_Traffic_Light/`. Exclude runtime/generated content. Validate archive integrity and compare members to the intended manifest.
+## 15. Code-review questions before handoff
 
-## 15. Handoff protocol
+Ask:
 
-Tell the owner exactly:
+- Is behavior in the correct owner?
+- Did I create duplicate state/schema?
+- Can source switching expose stale/wrong-source data?
+- Can polling overlap or overwrite unsaved edits?
+- Does failure restore prior state?
+- Is persistence atomic/backward-compatible?
+- Is the UI bounded/responsive for empty/long/error states?
+- Is any magic threshold undocumented?
+- Does the function/navigation registry reflect the implemented page?
+- Do durable docs match actual production configuration?
+- Does any capability sentence claim more than code/evidence supports?
 
-- candidate/version decision;
-- files changed;
-- implemented vs foundation/planned changes;
-- limitations;
-- checks actually run;
-- checks still required locally;
-- acceptance steps;
-- archive/manifest hash.
+## 16. Handoff
 
-Do not mark a passed baseline until explicit owner acceptance.
+Keep the result evidence-based:
 
-## 16. Common failure patterns
+```text
+Version decision
+Implemented
+Deliberately unchanged/not implemented
+Automated checks actually run
+Checks still required locally
+Manual acceptance focus
+Passed baseline
+```
 
-- using a stale durable guide as release truth;
-- silently starting a new version while a candidate is unaccepted;
-- claiming configured topology as active cooperation;
-- claiming a detector class/manual flag as a validated perception capability;
-- putting service logic in routes;
-- duplicating controller/arbitration logic in a network module;
-- growing `App.tsx` into a domain container;
-- summing occupancy into throughput;
-- losing provenance between AI/simulation/manual observations;
-- destructive cleanup of runtime/user data;
-- full-repository patch ZIPs;
-- reporting unrun tests as passed;
-- rewriting historical version facts during documentation cleanup.
+Never mark a candidate passed without explicit owner acceptance.
