@@ -6,6 +6,7 @@ from app.models import IntersectionNetworkConfigRequest, SignalRulesConfigReques
 from app.services.camera_frames import camera_frame_service
 from app.services.decision_context import build_decision_context
 from app.services.intersection_network import intersection_network_service
+from app.services.junction_network_overview import junction_network_overview_service
 from app.services.object_tracking import object_tracking_service
 from app.services.signal_rules import signal_rules_service
 from app.services.traffic_flow import traffic_flow_service
@@ -81,6 +82,22 @@ def intersection_network(request: Request) -> dict:
         },
         request_id=request.state.request_id,
     )
+
+
+@router.get("/network/overview")
+def junction_network_overview(request: Request) -> dict:
+    data = junction_network_overview_service.overview()
+    logger.info(
+        "Junction network overview returned",
+        extra={
+            "request_id": request.state.request_id,
+            "junction_count": data.get("summary", {}).get("junction_count"),
+            "assigned_esp_camera_count": data.get("summary", {}).get("assigned_esp_camera_count"),
+            "observation_intersection_id": data.get("observation_intersection_id"),
+            "observation_provenance": data.get("observation_provenance"),
+        },
+    )
+    return ok(data, request_id=request.state.request_id)
 
 
 @router.put("/network")
