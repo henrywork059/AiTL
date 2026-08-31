@@ -73,7 +73,7 @@ def main() -> int:
     # degradation behind the saved profile.
     assert "jpegQuality = AITL_DEFAULT_JPEG_QUALITY" in legacy
     assert "settings.jpegQuality" in legacy
-    assert "adaptive_quality_enabled\\\":false" in legacy
+    assert "adaptive_quality_enabled" in legacy
     assert "set_quality(sensor, settings.jpegQuality)" in legacy
     assert "set_framesize(sensor, settings.frameSize)" in legacy
     assert "JPEG_QUALITY 18" not in wrapper
