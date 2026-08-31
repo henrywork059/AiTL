@@ -48,7 +48,8 @@ function phaseResult(phase: CameraLoadPhase): string {
 
 function engineLabel(progress: CameraDiagnosticProgress | null): string {
   if (!progress?.engine) return "Detecting";
-  if (progress.engine === "transport_benchmark") return "R5 transport + timing benchmark";
+  if (progress.engine === "architecture_benchmark") return "R9 architecture benchmark";
+  if (progress.engine === "transport_benchmark") return "R5 transport + R7/R8 follow-up";
   if (progress.engine === "standard") return "Production camera diagnostics";
   return progress.engine;
 }
@@ -141,12 +142,12 @@ export function CameraDiagnosticsPage() {
             <div>
               <h2>Deep one-click camera test</h2>
               <p className="placeholder-copy">
-                One button automatically selects the correct diagnostic engine. Normal AiTL firmware runs the production
-                control/stability/managed-worker checks; R5 benchmark firmware runs the full transport matrix and then a
-                targeted real-frame timing follow-up to separate camera acquisition, socket send time and still-unexplained frame time.
+                One button selects the correct diagnostic engine. Normal AiTL firmware runs production checks; R5 firmware runs the
+                transport matrix plus R7/R8 timing, payload and receiver isolation; R9 firmware compares the current manual sender with
+                the older esp_http_server architecture, a Pi-style latest-frame cache and camera-free TCP controls.
               </p>
             </div>
-            <span className="status-pill status-info">V038 R7 timing</span>
+            <span className="status-pill status-info">V038 R9 architecture</span>
           </div>
 
           <div className="settings-list">
@@ -157,8 +158,8 @@ export function CameraDiagnosticsPage() {
           </div>
 
           <p className="small-note">
-            The selected ESP is probed first. R5 transport firmware is benchmarked directly from this page, then four independent
-            /capture requests are compared with the ESP-reported camera acquisition time. No ESP reflash is required for this timing follow-up.
+            R7/R8 reuse R5 firmware without another flash. The R9 architecture comparison is different: flash the dedicated
+            <code> AiTL_ESP32_CAM_ARCH_DIAG </code> sketch first, then press Diagnose camera. R9 is diagnostic-only and does not replace production firmware.
           </p>
 
           <div className="button-row">
@@ -219,7 +220,7 @@ export function CameraDiagnosticsPage() {
                 <div>
                   <h2>Full transport benchmark matrix</h2>
                   <p className="placeholder-copy">
-                    Same-device comparison of fallback and isolation paths. Synthetic payloads are diagnostic controls and are not production recommendations.
+                    Same-device comparison of fallback and isolation paths. Synthetic/bulk controls are diagnostic evidence and are not automatic production recommendations.
                   </p>
                 </div>
                 <span className="status-pill status-info">{report.transport_benchmark.benchmark_revision}</span>
@@ -244,6 +245,48 @@ export function CameraDiagnosticsPage() {
                 <div><span>Likely bottleneck</span><code>{report.transport_benchmark.diagnosis.likely_bottleneck}</code></div>
               </div>
               <p className="small-note"><strong>Recommended action:</strong> {report.transport_benchmark.diagnosis.recommendation}</p>
+            </section>
+          )}
+
+          {report.architecture_analysis && (
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Architecture bottleneck isolation</h2>
+                  <p className="placeholder-copy">
+                    R9 compares the current manual sender, the older V035-style HTTPD sender, a Pi-style latest-frame cache and camera-free TCP on the same hardware/network.
+                  </p>
+                </div>
+                <span className="status-pill status-info">{report.architecture_analysis.classification.replace(/_/g, " ")}</span>
+              </div>
+              <div className="settings-list">
+                <div><span>Confidence</span><code>{report.architecture_analysis.confidence}</code></div>
+                <div><span>Target FPS</span><code>{report.architecture_analysis.target_fps}</code></div>
+                <div><span>Manual WiFiClient MJPEG</span><code>{report.architecture_analysis.manual_mjpeg_fps.toFixed(2)} FPS</code></div>
+                <div><span>Old esp_http_server direct</span><code>{report.architecture_analysis.httpd_direct_mjpeg_fps.toFixed(2)} FPS</code></div>
+                <div><span>Pi-style latest-frame cache</span><code>{report.architecture_analysis.cached_mjpeg_fps.toFixed(2)} FPS</code></div>
+                <div><span>HTTPD camera-free bulk</span><code>{report.architecture_analysis.httpd_bulk_mbps.toFixed(3)} Mbps</code></div>
+                <div><span>Raw bulk / TCP_NODELAY</span><code>{report.architecture_analysis.raw_bulk_nodelay_mbps.toFixed(3)} Mbps</code></div>
+                <div><span>Raw bulk / Nagle</span><code>{report.architecture_analysis.raw_bulk_nagle_mbps.toFixed(3)} Mbps</code></div>
+                <div><span>HTTPD / manual ratio</span><code>{displayNumber(report.architecture_analysis.httpd_vs_manual_ratio, "x", 2)}</code></div>
+                <div><span>Cached / direct ratio</span><code>{displayNumber(report.architecture_analysis.cached_vs_direct_ratio, "x", 2)}</code></div>
+                <div><span>Nagle sensitivity</span><code>{report.architecture_analysis.nagle_sensitivity_ratio === null ? "—" : `${Math.round(report.architecture_analysis.nagle_sensitivity_ratio * 100)}%`}</code></div>
+                <div><span>Network headroom</span><code>{report.architecture_analysis.bulk_headroom}</code></div>
+                <div><span>ESP reset / power evidence</span><code>{report.architecture_analysis.reset_reason} / {report.architecture_analysis.power_evidence}</code></div>
+                <div><span>RSSI</span><code>{report.architecture_analysis.rssi} dBm</code></div>
+              </div>
+              {report.architecture_analysis.findings.length > 0 && <><h3>Evidence</h3><ul>{report.architecture_analysis.findings.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              {report.architecture_analysis.likely_layers.length > 0 && <p className="small-note"><strong>Likely layers:</strong> {report.architecture_analysis.likely_layers.join("; ")}</p>}
+              <h3>Alternative methods assessed</h3>
+              <div className="settings-list">
+                {report.architecture_analysis.methods_assessed.map((item) => (
+                  <div key={item.method}>
+                    <span><strong>{item.method}</strong><br /><small>{item.purpose}</small></span>
+                    <span className={item.tested ? "status-pill status-implemented" : "status-pill muted"}>{item.tested ? "TESTED" : "PRIOR/FUTURE"}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="small-note"><strong>Next targeted action:</strong> {report.architecture_analysis.next_action}</p>
             </section>
           )}
 
@@ -319,7 +362,7 @@ export function CameraDiagnosticsPage() {
             </section>
 
             <section className="panel">
-              <div className="panel-header"><div><h2>Candidate isolation matrix</h2><p className="placeholder-copy">Separates camera-independent TCP, camera load, direct PSRAM sending, DRAM staging/copy, MJPEG/UDP fallbacks and the production managed receiver where applicable.</p></div><span className="status-pill muted">{report.candidate_isolation.supported ? report.candidate_isolation.primary_candidate : "firmware support required"}</span></div>
+              <div className="panel-header"><div><h2>Candidate isolation matrix</h2><p className="placeholder-copy">Separates camera-independent TCP, camera load, direct sender architecture, latest-frame caching and other fallbacks where applicable.</p></div><span className="status-pill muted">{report.candidate_isolation.supported ? report.candidate_isolation.primary_candidate : "firmware support required"}</span></div>
               {!report.candidate_isolation.supported ? <p className="error-message">Flash a compatible diagnostic-isolation ESP firmware, then rerun Diagnose camera.</p> : <>
                 <div className="settings-list">{Object.entries(report.candidate_isolation.matrix).map(([name, passed]) => <div key={name}><span>{name.replace(/_/g," ")}</span><code>{passed ? "PASS" : "FAIL"}</code></div>)}</div>
                 {report.candidate_isolation.findings.map((item) => <div key={item.code} className="small-note"><strong>{item.code}</strong> — {item.evidence}<br />Action: {item.action}</div>)}
@@ -391,7 +434,7 @@ export function CameraDiagnosticsPage() {
                 <div><span>ESP send EWMA</span><code>{displayNumber(report.metrics.send_ewma_ms, " ms", 1)}</code></div>
                 <div><span>Last accepted / frame bytes</span><code>{report.metrics.last_send_accepted_bytes ?? "—"} / {report.metrics.last_frame_bytes ?? "—"}</code></div>
               </div>
-              <p className="small-note">R5 benchmark firmware intentionally isolates transports. The managed PC Studio worker is verified after the selected fix is moved back into normal compatible firmware.</p>
+              <p className="small-note">Diagnostic benchmark firmware intentionally isolates transports. The normal PC Studio managed worker is verified again only after the selected fix is moved back into compatible production firmware.</p>
             </section>
 
             <section className="panel">
