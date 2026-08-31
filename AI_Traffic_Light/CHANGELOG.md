@@ -1,4 +1,15 @@
 # Changelog
+## 0_3_10 — R10-tuned production camera pipeline
+
+- Created V0310 / `0_3_10` at the owner's explicit request after V039; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Applied the strongest R10 physical tuning evidence to the actual ESP32-CAM production path while preserving the existing PC Studio session/API/wire contract.
+- Kept one framebuffer and changed the PSRAM production grab policy from `CAMERA_GRAB_WHEN_EMPTY` to the R10-selected `CAMERA_GRAB_LATEST` freshness policy.
+- Kept port 81 `aitl-tcp-jpeg-v1` / 16-byte `ATL1` framing but replaced the inherited real `sendmsg()` hot path with bounded plain non-blocking `send()` operations capped at the R10-winning 11,680-byte application write size.
+- Preserved TCP_NODELAY/keepalive, progress/deadline limits, deterministic failed-frame socket close, no-catch-up scheduling, PC reconnect/session recovery, multi-camera selection and downstream CameraFrameService behavior.
+- Preserved PC-owned frame size, JPEG quality and target FPS; V0310 does not force the diagnostic q18 result and does not restore automatic quality/resolution degradation.
+- Did not add the Pi-style newest-frame cache because the strong-Wi-Fi R10 run showed no matched-target throughput benefit; the dedicated R10 diagnostic firmware remains available for A/B comparison.
+- Added PlatformIO and Arduino IDE V0310 production entrypoints plus focused regression coverage. Physical acceptance still requires reflashing V0310 and measuring the real production ATL1 path; the diagnostic 12.43 FPS result is not relabeled as production evidence.
+
 ## 0_3_9 — Idempotent update / test / run workflow
 
 - Created V039 / `0_3_9` as the next small candidate patch after V038; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -168,7 +179,7 @@
 - Kept network experiments isolated from the live camera/controller runtime. Emergency priority, live cross-camera transfer/identity, measured travel-time prediction, general N-intersection cooperative orchestration, and physical/public-road traffic control remain outside V027.
 ## 0_2_6 — Deterministic two-intersection network simulation
 
-- Created V026 / `0_2_6` at the owner's explicit request while V025 remained unaccepted; `previous_version` is `0_2_5` and the owner-confirmed `passed_baseline` remains V024 / `0_2_4`.
+- Created V026 / `0_2_6` after V025 while V025 remained unaccepted; `previous_version` is `0_2_5` and the owner-confirmed `passed_baseline` remains V024 / `0_2_4`.
 - Added an isolated deterministic two-intersection network experiment service that selects one enabled directed topology link and models its configured upstream/downstream intersections simultaneously.
 - Each simulated intersection owns a separate signal-controller runtime using the existing ranked-scenario/phase implementation; V026 does not relabel one global controller as two intersections.
 - Fixed and Adaptive network runs receive the same seeded exogenous vehicle/pedestrian arrival plan; the stored scenario includes demand counts and a SHA-256 plan fingerprint for auditability. Upstream policy outcomes may change when transfer candidates are discharged, which intentionally changes downstream transfer-arrival timing as an experiment outcome.
