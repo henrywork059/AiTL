@@ -51,15 +51,167 @@ function Assert-NoTrackedChanges {
     }
 }
 
-function Test-LocalPortInUse {
+function Get-ListeningProcessIds {
     param([int]$Port)
 
+    $ids = @()
     if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
-        return [bool](Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+        $ids = @(
+            Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty OwningProcess
+        )
+    }
+    else {
+        $pattern = "^\s*TCP\s+\S+:$Port\s+\S+\s+LISTENING\s+(\d+)\s*$"
+        foreach ($line in (netstat -ano)) {
+            if ($line -match $pattern) {
+                $ids += [int]$Matches[1]
+            }
+        }
     }
 
-    $match = netstat -ano | Select-String -Pattern ":$Port\s+.*LISTENING"
-    return [bool]$match
+    return @($ids | Where-Object { $_ -and $_ -gt 0 } | Sort-Object -Unique)
+}
+
+function Test-LocalPortInUse {
+    param([int]$Port)
+    return (Get-ListeningProcessIds -Port $Port).Count -gt 0
+}
+
+function Get-ProcessRecord {
+    param([int]$ProcessId)
+
+    if (-not (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    return Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+}
+
+function Test-AiTLProcessRecord {
+    param(
+        [object]$ProcessRecord,
+        [int]$Port
+    )
+
+    if (-not $ProcessRecord) {
+        return $false
+    }
+
+    $combined = "$($ProcessRecord.ExecutablePath) $($ProcessRecord.CommandLine)".ToLowerInvariant()
+    $backendMarker = $backendDir.ToLowerInvariant()
+    $frontendMarker = $frontendDir.ToLowerInvariant()
+
+    if ($Port -eq 8000) {
+        return $combined.Contains($backendMarker) -and (
+            $combined.Contains("uvicorn") -or
+            $combined.Contains("app.main:app") -or
+            $combined.Contains("powershell") -or
+            $combined.Contains("pwsh")
+        )
+    }
+
+    if ($Port -eq 5173) {
+        return $combined.Contains($frontendMarker) -and (
+            $combined.Contains("vite") -or
+            $combined.Contains("npm") -or
+            $combined.Contains("node") -or
+            $combined.Contains("powershell") -or
+            $combined.Contains("pwsh")
+        )
+    }
+
+    return $false
+}
+
+function Get-AiTLProcessTreeRoot {
+    param(
+        [int]$ProcessId,
+        [int]$Port
+    )
+
+    $current = Get-ProcessRecord -ProcessId $ProcessId
+    if (-not (Test-AiTLProcessRecord -ProcessRecord $current -Port $Port)) {
+        return $null
+    }
+
+    $root = $current
+    $visited = @{}
+    while ($current -and $current.ParentProcessId -gt 0) {
+        if ($visited.ContainsKey([string]$current.ProcessId)) {
+            break
+        }
+        $visited[[string]$current.ProcessId] = $true
+
+        $parent = Get-ProcessRecord -ProcessId ([int]$current.ParentProcessId)
+        if (-not (Test-AiTLProcessRecord -ProcessRecord $parent -Port $Port)) {
+            break
+        }
+
+        $root = $parent
+        $current = $parent
+    }
+
+    return $root
+}
+
+function Wait-LocalPortFree {
+    param(
+        [int]$Port,
+        [int]$TimeoutSeconds = 10
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-LocalPortInUse -Port $Port)) {
+            return
+        }
+        Start-Sleep -Milliseconds 200
+    }
+
+    throw "Timed out waiting for port $Port to become free."
+}
+
+function Stop-AiTLPortOwner {
+    param(
+        [int]$Port,
+        [string]$Role
+    )
+
+    $listeners = @(Get-ListeningProcessIds -Port $Port)
+    if ($listeners.Count -eq 0) {
+        return
+    }
+
+    if (-not (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) {
+        throw "Port $Port is already in use and this PowerShell cannot inspect the owner safely. Stop that process manually and rerun."
+    }
+
+    $roots = @{}
+    foreach ($listenerPid in $listeners) {
+        $record = Get-ProcessRecord -ProcessId ([int]$listenerPid)
+        if (-not (Test-AiTLProcessRecord -ProcessRecord $record -Port $Port)) {
+            $description = if ($record) { "$($record.Name) PID $listenerPid" } else { "PID $listenerPid" }
+            throw "Port $Port is owned by $description, which is not identifiable as this AiTL $Role. It will not be terminated automatically."
+        }
+
+        $root = Get-AiTLProcessTreeRoot -ProcessId ([int]$listenerPid) -Port $Port
+        if (-not $root) {
+            throw "Could not identify the AiTL $Role process tree using port $Port. Stop it manually and rerun."
+        }
+        $roots[[string]$root.ProcessId] = $root
+    }
+
+    foreach ($entry in $roots.GetEnumerator()) {
+        $root = $entry.Value
+        Write-Host "Stopping existing AiTL $Role process tree (PID $($root.ProcessId)) on port $Port..." -ForegroundColor DarkCyan
+        & taskkill /PID $root.ProcessId /T /F | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to stop existing AiTL $Role process tree PID $($root.ProcessId)."
+        }
+    }
+
+    Wait-LocalPortFree -Port $Port -TimeoutSeconds 10
 }
 
 function Wait-HttpReady {
@@ -106,7 +258,7 @@ if (-not $SkipUpdate) {
     }
 
     # The pull may have replaced this helper. Re-enter it from disk so the
-    # newly pulled version owns all dependency, test, and startup behavior.
+    # newly pulled version owns all dependency, test, restart, and startup behavior.
     Write-Host "`nReloading the updated runner from the pulled code..." -ForegroundColor Cyan
     if ($SkipTests) {
         & $PSCommandPath -SkipUpdate -SkipTests
@@ -197,12 +349,12 @@ elseif (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
     }
 }
 
-if (Test-LocalPortInUse 8000) {
-    throw "Port 8000 is already in use. Stop the existing backend/process before running this helper."
-}
-if (Test-LocalPortInUse 5173) {
-    throw "Port 5173 is already in use. Stop the existing frontend/process before running this helper."
-}
+# Make the command idempotent: a prior PC Studio run should not force the user
+# to find/kill ports manually. Only process trees whose executable/command line
+# points back into this AiTL backend/frontend are terminated. Any unrelated port
+# owner is protected and causes a clear error instead.
+Stop-AiTLPortOwner -Port 5173 -Role "frontend"
+Stop-AiTLPortOwner -Port 8000 -Role "backend"
 
 Write-Host "`nAll requested non-live checks passed. Starting PC Studio..." -ForegroundColor Green
 
