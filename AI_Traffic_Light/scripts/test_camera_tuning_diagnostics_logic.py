@@ -6,7 +6,11 @@ BACKEND = ROOT / "apps" / "pc-studio" / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.services.camera_tuning_diagnostics import analyze_tuning_results, choose_best_fb_config
+from app.services.camera_tuning_diagnostics import (
+    CameraTuningDiagnosticService,
+    analyze_tuning_results,
+    choose_best_fb_config,
+)
 
 
 def check(condition: bool, message: str) -> None:
@@ -35,20 +39,27 @@ def stream_row(
     }
     if jpeg_quality is not None:
         telemetry["jpeg_quality"] = jpeg_quality
-    frames = 4
+    frames = 6
     return {
         "key": key,
         "status": "PASS",
         "requested_frames": frames,
         "frames": frames,
         "bytes_received": frames * 16000,
-        "elapsed_ms": frames * 1000.0 / max(0.01, measured_fps),
+        "elapsed_ms": max(1.0, (frames - 1) * 1000.0 / max(0.01, measured_fps)),
         "measured_fps": measured_fps,
         "telemetry": telemetry,
     }
 
 
-def bulk_row(key: str, experiment: str, mbps: float, *, chunk_bytes: int = 1460, requested_bytes: int = 128 * 1024) -> dict:
+def bulk_row(
+    key: str,
+    experiment: str,
+    mbps: float,
+    *,
+    chunk_bytes: int = 1460,
+    requested_bytes: int = 128 * 1024,
+) -> dict:
     return {
         "key": key,
         "status": "PASS",
@@ -94,6 +105,19 @@ def main() -> int:
     best = choose_best_fb_config(base)
     check(best["fb_count"] == 2 and best["grab_mode"] == "latest", "R10 selects the strongest framebuffer/grab-mode profile")
     check(best["sustainable_fps"] == 15, "R10 sustainable target uses the 70% target threshold across the FPS ladder")
+
+    service = CameraTuningDiagnosticService()
+    service._mjpeg = lambda host, port, path: {"frames": 6, "bytes": 96000, "elapsed_ms": 1000.0}  # type: ignore[method-assign]
+    direct_result = service._stream("127.0.0.1", architecture="direct_httpd", target_fps=5, frames=6)
+    check(direct_result["requested"] == 6, "R10 calls the inherited three-argument MJPEG helper and preserves requested frame count")
+    interval_row = service._stream_row(
+        "interval-test",
+        "Interval cadence test",
+        direct_result,
+        target_fps=5,
+        telemetry={"experiment": "fb_fps", "fb_count": 2, "grab_mode": "latest", "transport": "test"},
+    )
+    check(interval_row["measured_fps"] == 5.0, "R10 finite-stream FPS uses completed inter-frame intervals instead of frames/elapsed overcounting")
 
     cached = [
         stream_row(f"cached-{target}", "cached_fps", target, fps)
@@ -170,8 +194,15 @@ def main() -> int:
 
     enhanced_path = BACKEND / "app" / "services" / "camera_diagnostic_enhanced.py"
     enhanced_text = enhanced_path.read_text(encoding="utf-8")
-    check("tuning_revision == R10_TUNING_REVISION" in enhanced_text, "adaptive dispatch distinguishes R10 from legacy R9 using ESP status")
+    r10_dispatch = enhanced_text.index("tuning_revision == R10_TUNING_REVISION")
+    legacy_r9_dispatch = enhanced_text.index("if profile and firmware.startswith(R9_FIRMWARE_PREFIX):", r10_dispatch + 1)
+    check(r10_dispatch < legacy_r9_dispatch, "adaptive dispatch checks R10 before the shared legacy R9 firmware marker")
     check("camera_tuning_diagnostic_service.run" in enhanced_text, "one-click Camera Diagnostics invokes the R10 tuning service")
+
+    tuning_path = BACKEND / "app" / "services" / "camera_tuning_diagnostics.py"
+    tuning_text = tuning_path.read_text(encoding="utf-8")
+    check("finally:" in tuning_text and "R10 RESTORE" in tuning_text, "R10 restoration is protected by a finally path after mid-matrix failures")
+    check("completed_frame_intervals" in tuning_text, "R10 report records the corrected finite-stream FPS measurement basis")
 
     print("\nR10 camera tuning diagnostics offline regression passed. No ESP hardware was required.")
     return 0
