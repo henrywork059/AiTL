@@ -56,7 +56,7 @@ Do not begin with version/document churn before the implementation shape is know
 
 ## 4. Regression rule that saves time
 
-`scripts/update_test_run.ps1` automatically runs every zero-argument `scripts/test_*.py` file except its documented hardware-only exclusions.
+`scripts/update_test_run.ps1` automatically runs every zero-argument `scripts/test_*.py` file except its documented preflight/hardware-only exclusions.
 
 Therefore:
 
@@ -67,6 +67,8 @@ Therefore:
 - do **not** create a normal `test_*.py` file that unexpectedly requires `--host`, special hardware, credentials or user input.
 
 A focused regression should verify the important semantic claim, not just that a string/file exists.
+
+Cheap repository guards run before dependency refresh. A broken release bundle, stale durable architecture, runner syntax/structure issue, or Python compile error should therefore fail before time is spent on pip/npm work.
 
 ## 5. Release bundle — treat it as one unit
 
@@ -128,6 +130,7 @@ Review changed code for:
 - unbounded lists/history/UI growth;
 - magic thresholds whose meaning is undocumented;
 - compatibility with existing saved config;
+- nullable/optional fields that are accidentally normalized into a value;
 - source/provenance ambiguity;
 - routes containing service logic;
 - release/docs claiming behavior that code does not perform.
@@ -140,7 +143,8 @@ For frontend visual editors also check:
 - resize/narrow-screen behavior;
 - identifiers/long text overflow;
 - destructive/reassignment confirmation;
-- persistence round-trip.
+- persistence round-trip;
+- whether an explicit `None`/disabled choice actually survives save/reload.
 
 ## 8. One owner validation command
 
@@ -150,7 +154,27 @@ Routine owner validation should use the repository runner rather than an ad-hoc 
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-It performs fast-forward update, reloads itself, refreshes dependencies, compiles, checks structure, auto-runs offline regressions, typechecks/builds the frontend, checks tracked-tree cleanliness, safely replaces an old AiTL PC Studio instance, runs live smoke, and relaunches PC Studio.
+The normal command:
+
+1. fast-forwards `main` and reloads the newly pulled runner;
+2. runs cheap compile/structure/release/runner guards first;
+3. refreshes Python dependencies only when backend requirement manifests changed in that Git update;
+4. refreshes frontend dependencies only when `package.json`/`package-lock.json` changed or `node_modules` is missing;
+5. auto-runs the offline regression suite;
+6. typechecks/builds the frontend;
+7. checks tracked-tree cleanliness;
+8. safely replaces an old AiTL PC Studio instance;
+9. runs live backend smoke and relaunches PC Studio.
+
+Full validation is still performed even when dependency installation is skipped. Only redundant dependency installation is avoided.
+
+If the local environment is damaged or a dependency was removed manually, force a dependency refresh with:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -RefreshDependencies
+```
+
+Direct `-SkipUpdate` use is deliberately conservative and refreshes dependencies because it has no Git-update manifest hint.
 
 Use individual commands only when debugging a failing stage.
 
