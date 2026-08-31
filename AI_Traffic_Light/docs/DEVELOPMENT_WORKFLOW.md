@@ -123,6 +123,8 @@ For new behavior:
 
 Hardware-only diagnostics should be clearly separated/documented so normal regression does not fail merely because hardware is absent.
 
+The structure/release/runner guards run before dependency installation, so repository metadata mistakes fail early. Ordinary feature regressions run after the environment is ready.
+
 ## 6. Preserve runtime data and state
 
 Never use `git clean -fd`. Preserve runtime/user data such as datasets, outputs, models, labels, zones/settings, signal/network configuration, camera profiles, traffic histories, and experiments.
@@ -130,11 +132,14 @@ Never use `git clean -fd`. Preserve runtime/user data such as datasets, outputs,
 When changing stateful services/UI, review:
 
 - backward loading of existing config;
+- explicit `null`/None choices versus omitted-field migration defaults;
 - state restoration after failure;
 - source switching/stale-cache behavior;
 - reset/delete/reassignment behavior;
 - atomic persistence and locks;
 - live polling vs unsaved edits.
+
+A field being optional in the UI/API must not be silently converted back into a value unless that normalization is explicitly part of the contract.
 
 ## 7. Synchronize documentation by responsibility
 
@@ -165,17 +170,30 @@ The helper:
 
 ```text
 fast-forward pulls origin/main
+→ records which dependency manifests changed
 → reloads the pulled runner
-→ refreshes Python/training dependencies
 → Python compile
-→ structure/version validation
-→ every automatic zero-argument scripts/test_*.py regression
-→ frontend npm ci + typecheck + production build
+→ structure/current-release consistency checks
+→ runner self-regression
+→ refresh Python dependencies only when requirements changed
+→ every remaining automatic zero-argument scripts/test_*.py regression
+→ refresh frontend dependencies only when package manifests changed or node_modules is missing
+→ frontend typecheck + production build
 → git diff --check + tracked-tree cleanliness
 → safely replace only AiTL-owned processes on 8000/5173
 → start backend + live smoke
 → start frontend
 ```
+
+Skipping unchanged dependency installation does **not** skip tests/build/smoke. It removes only redundant `pip install` / `npm ci` work.
+
+If the local Python/Node dependency environment has been manually damaged or becomes inconsistent, force dependency refresh with:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -RefreshDependencies
+```
+
+Direct `-SkipUpdate` use refreshes dependencies conservatively because there is no Git update diff to prove the manifests were unchanged.
 
 Use individual commands only when diagnosing the stage that failed. This keeps the human workflow stable even as the regression list grows.
 
@@ -194,6 +212,7 @@ Review the changed area for:
 - unbounded storage/UI growth;
 - undocumented magic thresholds;
 - old-config compatibility;
+- optional/null fields whose saved behavior differs from the UI/API contract;
 - provenance ambiguity;
 - capability claims stronger than implementation.
 
