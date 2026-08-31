@@ -1,6 +1,7 @@
 param(
     [switch]$SkipUpdate,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$RefreshDependencies
 )
 
 $ErrorActionPreference = "Stop"
@@ -251,23 +252,70 @@ if (-not $SkipUpdate) {
         Assert-MainBranch
         Assert-NoTrackedChanges
         Run-Step "Git status before update" { git status --short }
+
+        $beforeHead = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $beforeHead) {
+            throw "Unable to resolve the current Git commit before update."
+        }
+
         Run-Step "Update from origin/main" { git pull --ff-only origin main }
+
+        $afterHead = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $afterHead) {
+            throw "Unable to resolve the current Git commit after update."
+        }
+
+        $changedPaths = @()
+        if ($beforeHead -ne $afterHead) {
+            $changedPaths = @(& git diff --name-only "$beforeHead..$afterHead")
+            if ($LASTEXITCODE -ne 0) {
+                throw "Unable to determine files changed by the update."
+            }
+        }
+
+        $backendDependencyChanged = @(
+            $changedPaths | Where-Object {
+                $_ -match '^AI_Traffic_Light/apps/pc-studio/backend/requirements(?:-training)?\.txt$'
+            }
+        ).Count -gt 0
+        $frontendDependencyChanged = @(
+            $changedPaths | Where-Object {
+                $_ -match '^AI_Traffic_Light/apps/pc-studio/frontend/(?:package\.json|package-lock\.json)$'
+            }
+        ).Count -gt 0
+
+        # Pass only coarse dependency hints into the newly pulled runner. They
+        # are process-environment hints, not tracked files, and are consumed and
+        # cleared immediately by the reloaded invocation.
+        $env:AITL_BACKEND_DEPS_CHANGED = if ($backendDependencyChanged) { "1" } else { "0" }
+        $env:AITL_FRONTEND_DEPS_CHANGED = if ($frontendDependencyChanged) { "1" } else { "0" }
     }
     finally {
         Pop-Location
     }
 
-    # The pull may have replaced this helper. Re-enter it from disk so the
-    # newly pulled version owns all dependency, test, restart, and startup behavior.
     Write-Host "`nReloading the updated runner from the pulled code..." -ForegroundColor Cyan
+    $reloadArgs = @("-SkipUpdate")
     if ($SkipTests) {
-        & $PSCommandPath -SkipUpdate -SkipTests
+        $reloadArgs += "-SkipTests"
     }
-    else {
-        & $PSCommandPath -SkipUpdate
+    if ($RefreshDependencies) {
+        $reloadArgs += "-RefreshDependencies"
     }
+    & $PSCommandPath @reloadArgs
     return
 }
+
+$backendDependencyHint = $env:AITL_BACKEND_DEPS_CHANGED
+$frontendDependencyHint = $env:AITL_FRONTEND_DEPS_CHANGED
+Remove-Item Env:AITL_BACKEND_DEPS_CHANGED -ErrorAction SilentlyContinue
+Remove-Item Env:AITL_FRONTEND_DEPS_CHANGED -ErrorAction SilentlyContinue
+
+# A normal one-command update sets each hint to 0 or 1 from the actual Git
+# update. Direct -SkipUpdate use has no trustworthy hint, so it refreshes
+# dependencies conservatively. -RefreshDependencies always forces a refresh.
+$backendDependenciesNeedRefresh = $RefreshDependencies -or $backendDependencyHint -ne "0"
+$frontendDependenciesNeedRefresh = $RefreshDependencies -or $frontendDependencyHint -ne "0" -or -not (Test-Path (Join-Path $frontendDir "node_modules"))
 
 if (Test-Path $versionFile) {
     Write-Host "`n=== Current project version ===" -ForegroundColor Cyan
@@ -276,31 +324,62 @@ if (Test-Path $versionFile) {
 
 # IMPORTANT: this runner is read-only with respect to tracked project source and
 # release metadata. Candidate metadata must already be committed on GitHub/main
-# (or deliberately overlaid by the developer) before validation. Historical
-# metadata-finalizer hooks are intentionally not run here because they made the
-# next normal git pull fail on runner-created tracked edits.
+# before validation. Historical metadata-finalizer hooks are intentionally not
+# run because they made the next normal git pull fail on runner-created edits.
+
+$preflightTests = @(
+    "test_release_documentation_consistency.py",
+    "test_update_test_run_script.py"
+)
 
 if (-not $SkipTests) {
+    Push-Location $projectRoot
+    try {
+        # Cheap stdlib-only checks run before dependency refresh. This catches
+        # release/document/runner mistakes before spending time on pip or npm.
+        Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
+        Run-Step "Project structure" { & $python ".\scripts\check_structure.py" }
+        Run-Step "Release documentation consistency" { & $python ".\scripts\test_release_documentation_consistency.py" }
+        Run-Step "Update/test/run runner regression" { & $python ".\scripts\test_update_test_run_script.py" }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+if ($backendDependenciesNeedRefresh) {
     Push-Location $projectRoot
     try {
         Run-Step "Backend dependencies" { & $python -m pip install -r ".\apps\pc-studio\backend\requirements.txt" }
         if (Test-Path ".\apps\pc-studio\backend\requirements-training.txt") {
             Run-Step "Backend training dependencies" { & $python -m pip install -r ".\apps\pc-studio\backend\requirements-training.txt" }
         }
-        Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
-        Run-Step "Project structure" { & $python ".\scripts\check_structure.py" }
+    }
+    finally {
+        Pop-Location
+    }
+}
+else {
+    Write-Host "`n=== Backend dependencies ===" -ForegroundColor DarkCyan
+    Write-Host "Skipped: dependency manifests did not change in this Git update. Use -RefreshDependencies to force reinstall/check."
+}
 
+if (-not $SkipTests) {
+    Push-Location $projectRoot
+    try {
         # These camera transport scripts are physical ESP32-CAM CLIs. They require
         # --host and intentionally are not part of the no-hardware regression sweep.
-        # The current R5 benchmark diagnosis/ranking logic is covered by the separate
-        # test_camera_transport_benchmark_logic.py offline regression.
         $manualHardwareTests = @(
             "test_camera_transport_benchmark.py",
             "test_camera_transport_isolation.py"
         )
 
         $tests = Get-ChildItem ".\scripts\test_*.py" |
-            Where-Object { $_.Name -ne "test_backend_smoke.py" -and $_.Name -notin $manualHardwareTests } |
+            Where-Object {
+                $_.Name -ne "test_backend_smoke.py" -and
+                $_.Name -notin $manualHardwareTests -and
+                $_.Name -notin $preflightTests
+            } |
             Sort-Object Name
 
         foreach ($test in $tests) {
@@ -317,10 +396,25 @@ if (-not $SkipTests) {
     finally {
         Pop-Location
     }
+}
 
+if ($frontendDependenciesNeedRefresh) {
     Push-Location $frontendDir
     try {
         Run-Step "Frontend dependencies" { npm ci }
+    }
+    finally {
+        Pop-Location
+    }
+}
+else {
+    Write-Host "`n=== Frontend dependencies ===" -ForegroundColor DarkCyan
+    Write-Host "Skipped: package manifests did not change and node_modules exists. Use -RefreshDependencies to force npm ci."
+}
+
+if (-not $SkipTests) {
+    Push-Location $frontendDir
+    try {
         Run-Step "Frontend typecheck" { npm run typecheck }
         Run-Step "Frontend production build" { npm run build }
     }
@@ -334,15 +428,6 @@ if (-not $SkipTests) {
         # Guard against any future test/helper regression that silently dirties
         # tracked source files. Untracked runtime/generated data remains allowed.
         Assert-NoTrackedChanges
-    }
-    finally {
-        Pop-Location
-    }
-}
-elseif (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
-    Push-Location $frontendDir
-    try {
-        Run-Step "Frontend dependencies" { npm ci }
     }
     finally {
         Pop-Location
