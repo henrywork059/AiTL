@@ -30,6 +30,8 @@ These are intentionally updated when the active candidate changes:
 | `docs/TEST_READY_CHECKLIST.md` | Owner acceptance checklist |
 | `CHANGELOG.md` | Chronological release/candidate history |
 
+Treat those six release surfaces plus the shared frontend version constant as a **release bundle**. For a new candidate, prepare the supporting files first and update root `VERSION` last (or commit the whole release bundle atomically). This avoids a temporary repository state where `VERSION` points at documentation/version surfaces that do not exist yet.
+
 Do not duplicate current version numbers into unrelated durable guides unless the text is clearly an example or historical reference.
 
 ## 3. Durable instruction/guidance documents
@@ -39,6 +41,7 @@ These should stay useful across version changes:
 | Document | Responsibility |
 | --- | --- |
 | `AGENTS.md` | Mandatory AI/coding-agent repository rules |
+| `docs/PATCH_PLAYBOOK.md` | Fast-path patch order, release-bundle rule, regression naming and handoff definition-of-done |
 | `docs/AI_AGENT_GUIDE.md` | Detailed AI development protocol |
 | `docs/AI_AGENT_CHECKLIST.md` | Short execution checklist |
 | `docs/HUMAN_GUIDE.md` | Human orientation, safe update/test/use workflow |
@@ -57,6 +60,8 @@ These should stay useful across version changes:
 | `docs/PC_STUDIO_FUNCTION_LIST.md` | Current functional capability catalog |
 | `docs/ROADMAP.md` | Planned dependency order and evidence milestones |
 
+For routine coding work, read the mandatory authority files and then use `PATCH_PLAYBOOK.md` as the short execution path. Open the longer guides only for the parts of the task that need them.
+
 ## 4. Historical documents
 
 Older `docs/PATCH_*.md`, one-off validation notes, and previous changelog sections are historical evidence. Preserve their original release context. Do not edit old version numbers just because a repository-wide text search finds them.
@@ -67,14 +72,14 @@ For each patch, update documents based on what changed:
 
 | Change type | Minimum docs to review |
 | --- | --- |
-| Candidate/version state | `VERSION`, `CHANGELOG`, `START_HERE`, patch/testing/checklist docs |
+| Candidate/version state | release bundle: `VERSION`, `CHANGELOG`, `START_HERE`, patch/testing/checklist, frontend version source |
 | Backend/frontend behavior | `README`, function list, patch doc, testing/checklist |
 | API endpoint/schema | `API_CONTRACTS`, models/types tests, patch/testing docs |
 | Stable error | `error_codes.py`, `ERROR_CODES`, tests |
 | Persisted data/coordinates | `DATA_FORMAT`, architecture/patch/tests |
 | Architecture/ownership | `ARCHITECTURE`, `CODE_STRUCTURE`, agent guides |
 | Planned scope/priorities | `PROJECT_SCOPE`, `ROADMAP` |
-| Workflow/packaging | `AGENTS`, agent guides/checklist, `DEVELOPMENT_WORKFLOW`, `HUMAN_GUIDE` |
+| Workflow/packaging | `PATCH_PLAYBOOK`, agent guides/checklist, `DEVELOPMENT_WORKFLOW`, `HUMAN_GUIDE` |
 
 ## 6. Writing rules
 
@@ -85,15 +90,18 @@ For each patch, update documents based on what changed:
 - Do not describe a configured interface or schema as an active behavior.
 - Avoid phrases such as "will eventually" in current function lists; place future work in `PROJECT_SCOPE.md`/`ROADMAP.md` instead.
 - Prefer links to the authority rather than copying a release-state fact into many files.
+- When code and durable architecture docs disagree, fix the durable docs in the same candidate rather than leaving the contradiction for the next agent.
 
 ## 7. Review before handoff
 
-Before packaging a documentation-affecting patch, verify:
+Before handing off a documentation-affecting patch, verify:
 
+- current release bundle is synchronized with root `VERSION`;
 - no durable guide contains an obsolete "current version" claim;
 - links/file references exist;
-- current patch/baseline matches root `VERSION`;
 - implemented/foundation/planned labels match code;
 - current API/error docs match source;
+- architecture docs match actual production configuration (for example framebuffer/transport ownership);
 - acceptance instructions describe checks the owner can actually perform;
-- safety wording remains prototype/simulation-only.
+- safety wording remains prototype/simulation-only;
+- a focused zero-argument `scripts/test_*.py` regression exists when a durable invariant can be checked automatically.
