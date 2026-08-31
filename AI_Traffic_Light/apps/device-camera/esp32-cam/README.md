@@ -2,7 +2,7 @@
 
 This folder contains the AI Thinker ESP32-CAM firmware used by PC Studio.
 
-The current architecture is PC-initiated:
+The production architecture remains PC-initiated:
 
 ```text
 ESP boot → Wi-Fi → idle
@@ -17,17 +17,22 @@ The ESP does **not** need the PC's IP address. It only needs its own Wi-Fi crede
 
 - HTTP port 80: `/status`, `/config`, `/start`, `/stop`, optional idle `/capture`.
 - TCP port 81: one low-latency binary JPEG stream.
-- Frame format: 16-byte `ATL1` header (`length`, `sequence`, `uptime_ms`) followed by the JPEG.
+- Frame format: 16-byte `ATL1` header (`length`, `sequence`, `uptime_ms`) followed by the complete JPEG.
 - Browser preview is produced by PC Studio; browsers never connect directly to port 81.
+
+V0310 keeps this wire format deliberately so the existing PC receiver and saved multi-camera profiles remain compatible.
 
 ## PlatformIO
 
-The checked-in target is:
+The checked-in target uses:
 
 ```ini
 board = esp32cam
 framework = arduino
+build_src_filter = +<main_v0310.cpp>
 ```
+
+`src/main_v0310.cpp` wraps the mature session implementation and applies the current R10-backed production tuning.
 
 Create the local secret file:
 
@@ -48,44 +53,64 @@ pio device monitor -b 115200
 
 ## Arduino IDE
 
-A standalone sketch is provided at:
+The V0310 production sketch is:
 
 ```text
-arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino
+arduino/AiTL_ESP32_CAM_V0310/AiTL_ESP32_CAM_V0310.ino
 ```
 
-Copy `secrets.example.h` to `secrets.h` inside that sketch folder, enter Wi-Fi credentials, then upload as an **AI Thinker ESP32-CAM** target using the installed ESP32 Arduino core.
+Keep the sketch inside the full pulled repository because it intentionally reuses the adjacent V037 implementation instead of duplicating the mature control/session code. Copy its `secrets.example.h` to `secrets.h`, enter Wi-Fi credentials, then upload as an **AI Thinker ESP32-CAM** target using the installed ESP32 Arduino core.
 
-## First physical test
+The separate `arduino/AiTL_ESP32_CAM_ARCH_DIAG/` sketch is the R10 diagnostic benchmark; it is not the production firmware.
 
-Use for a new V037 profile:
+## Production defaults and saved settings
+
+New-camera defaults remain:
 
 ```text
 320 × 240 (QVGA)
 JPEG quality 24
-15 FPS
+15 FPS requested target
 ```
 
-Expected Serial output includes the ESP IP, stream client state, actual FPS, frame bytes, capture time and send time. Test 20 FPS only after 15 FPS is stable.
+PC Studio `/config` remains authoritative, so an existing saved profile continues to control resolution, JPEG quality and target FPS. V0310 does not silently force the R10 diagnostic q18 recommendation.
 
-## Low-latency behavior
+## V0310 low-latency behavior
 
-When PSRAM exists, R6 allocates one UXGA-capable PSRAM framebuffer with `CAMERA_GRAB_WHEN_EMPTY`, keeps the 20 MHz camera clock, then applies the PC-selected runtime resolution and JPEG quality. This keeps runtime size changes available without the continuous two-buffer `CAMERA_GRAB_LATEST` pipeline used by R4.
+R10 physical testing in a strong-Wi-Fi position compared framebuffer count/grab mode, target FPS, newest-frame caching, JPEG quality and TCP write sizing. V0310 applies only the findings that can be moved into production without changing the wire/API contract:
 
-The stream keeps `TCP_NODELAY`, keepalive and progress-bounded non-blocking vectored sends. A slow link lowers achieved FPS naturally because the scheduler never queues catch-up work. If a partial ATL1 frame times out, the ESP closes that client socket and waits for PC Studio to reconnect. The saved JPEG quality and resolution are not changed as a network-pressure response.
+- one framebuffer is retained;
+- the PSRAM path uses `CAMERA_GRAB_LATEST` for freshness;
+- the inherited bounded sender uses plain non-blocking `send()` rather than a real vectored `sendmsg()` hot path;
+- each application send is capped at 11,680 bytes, the best raw-TCP write size in the R10 sweep;
+- TCP/lwIP remains responsible for packet segmentation;
+- `TCP_NODELAY`, keepalive, bounded no-progress/total-send limits and deterministic failed-frame socket close remain active;
+- the scheduler never queues catch-up work;
+- PC Studio reconnect/session recovery remains unchanged;
+- configured JPEG quality and resolution are never changed automatically because of network pressure.
 
-Status and Serial Monitor expose send EWMA, slow-frame count, RSSI, BSSID, channel and Wi-Fi disconnect/reconnect counters. Legacy R2/R4 adaptive telemetry keys remain zero-valued for same-candidate compatibility.
+The Pi-style newest-frame cache is not part of production V0310 because the R10 strong-Wi-Fi run showed no matched-target FPS improvement over direct capture/send.
+
+## Physical performance target
+
+The R10 diagnostic reached 12.43 FPS at a 15 FPS target in the good Wi-Fi position. That value belongs to the diagnostic path and is not automatically a production result.
+
+After flashing V0310, test the real Camera Sources path at the same location. A useful candidate target is approximately 10–12 FPS sustained with complete JPEGs, no sustained send-deadline failure loop, no unexpected reconnect churn, and unchanged configured image quality/resolution.
+
+If the production ATL1 path remains materially slower than the R10 camera ladder, the next comparison should isolate ATL1 framing/PC receiving versus the diagnostic HTTPD path rather than adding framebuffer/cache complexity.
+
+## Telemetry
+
+Status and Serial Monitor expose actual FPS, frame bytes, capture/send time, send EWMA, slow-frame count, RSSI, BSSID, channel and Wi-Fi disconnect/reconnect counters. The V0310 Arduino/PlatformIO entrypoint also prints an explicit `AiTL V0310 R10-tuned production pipeline active` startup marker.
+
+Legacy R2/R4 adaptive telemetry keys remain zero-valued for compatibility with existing PC Studio surfaces.
 
 ## Compatibility
 
-PC Studio's current binary stream requires compatible firmware. V035 HTTP/MJPEG firmware is rejected during Connect; V036 binary TCP remains accepted during migration because it uses the same `aitl-tcp-jpeg-v1` wire format.
+The production HTTP identity remains V037-compatible while the wire stream remains `aitl-tcp-jpeg-v1` / `ATL1`. V036 binary TCP remains accepted during migration because it uses the same stream format. V035 HTTP/MJPEG production firmware is not compatible with the current binary receiver.
 
-Legacy `POST /api/camera/frame` remains available in PC Studio for other device senders, but this ESP firmware no longer uses per-frame HTTP uploads.
+Legacy `POST /api/camera/frame` remains available in PC Studio for other device senders, but this ESP firmware does not use per-frame HTTP uploads.
 
 ## Prototype boundary
 
 This camera node only supplies images to the local AiTL prototype. It performs no heavy inference and has no public-road traffic-signal authority.
-
-### V037 R6 quality-preserving transport
-
-Physical isolation tests showed that the camera can capture stably with one `CAMERA_GRAB_WHEN_EMPTY` buffer at 20 MHz, and that TCP can carry 8/16/32 KiB framed payloads without treating the lwIP send buffer as a maximum frame size. R6 therefore removes the ~5 KB payload target, partial-send target learning, q=50 escalation, local oversize rejection and effective-resolution downshift. New profiles remain QVGA / JPEG 24 / 15 FPS; existing saved profiles are preserved.
