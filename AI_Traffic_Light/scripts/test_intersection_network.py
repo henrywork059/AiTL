@@ -32,6 +32,8 @@ def main() -> None:
         defaults = service.get()
         assert defaults["schema_version"] == 1
         assert defaults["active_intersection_id"] == "intersection_main"
+        assert defaults["intersections"][0]["primary_source_id"] == "simulation_camera"
+        assert defaults["intersections"][0]["position"] == {"x": 50.0, "y": 50.0}
         resolved = service.resolve_source("unknown_camera")
         assert resolved["intersection_id"] == "intersection_main"
         assert resolved["source_mapping_matched"] is False
@@ -45,24 +47,30 @@ def main() -> None:
                     "label": "Intersection A",
                     "enabled": True,
                     "source_ids": ["camera_a"],
+                    "primary_source_id": "camera_a",
                     "zone_ids": ["a_queue"],
                     "signal_profile": "Normal",
+                    "position": {"x": 20, "y": 45},
                 },
                 {
                     "id": "intersection_b",
                     "label": "Intersection B",
                     "enabled": True,
                     "source_ids": ["camera_b", "1camera_b"],
+                    "primary_source_id": "camera_b",
                     "zone_ids": ["b_queue"],
                     "signal_profile": "Vehicle Priority",
+                    "position": {"x": 55, "y": 45},
                 },
                 {
                     "id": "intersection_c",
                     "label": "Intersection C",
                     "enabled": False,
                     "source_ids": [],
+                    "primary_source_id": None,
                     "zone_ids": [],
                     "signal_profile": "Normal",
+                    "position": {"x": 82, "y": 62},
                 },
             ],
             "links": [
@@ -89,6 +97,9 @@ def main() -> None:
         saved = service.save(config)
         assert path.is_file()
         assert saved == service.get()
+        assert saved["intersections"][1]["source_ids"] == ["camera_b", "1camera_b"]
+        assert saved["intersections"][1]["primary_source_id"] == "camera_b"
+        assert saved["intersections"][1]["position"] == {"x": 55.0, "y": 45.0}
         assert service.resolve_source("camera_b")["intersection_id"] == "intersection_b"
         assert service.resolve_source("1camera_b")["intersection_id"] == "intersection_b"
         context_b = service.context("intersection_b")
@@ -102,9 +113,31 @@ def main() -> None:
         reloaded = IntersectionNetworkService(config_path=path)
         assert reloaded.get() == saved
 
+        # Schema 1 remains backward compatible: V0311 fills deterministic layout
+        # and primary-source metadata for older intersection records.
+        legacy = deepcopy(config)
+        for item in legacy["intersections"]:
+            item.pop("position", None)
+            item.pop("primary_source_id", None)
+        migrated = service.save(legacy)
+        assert migrated["intersections"][0]["primary_source_id"] == "camera_a"
+        assert migrated["intersections"][1]["primary_source_id"] == "camera_b"
+        assert migrated["intersections"][2]["primary_source_id"] is None
+        assert len({(item["position"]["x"], item["position"]["y"]) for item in migrated["intersections"]}) > 1
+        service.save(saved)
+
         duplicate_source = deepcopy(config)
         duplicate_source["intersections"][2]["source_ids"] = ["camera_a"]
+        duplicate_source["intersections"][2]["primary_source_id"] = "camera_a"
         expect_invalid(service, duplicate_source)
+
+        bad_primary = deepcopy(config)
+        bad_primary["intersections"][1]["primary_source_id"] = "camera_a"
+        expect_invalid(service, bad_primary)
+
+        bad_position = deepcopy(config)
+        bad_position["intersections"][0]["position"] = {"x": -1, "y": 50}
+        expect_invalid(service, bad_position)
 
         missing_target = deepcopy(config)
         missing_target["links"][0]["destination_intersection_id"] = "missing"
