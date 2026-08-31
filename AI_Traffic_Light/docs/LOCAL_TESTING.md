@@ -1,46 +1,47 @@
-# Local Testing — V038
+# Local Testing — V039
 
 Expected release state:
 
 ```text
-version: 0_3_8
-previous_version: 0_3_7
+version: 0_3_9
+previous_version: 0_3_8
 passed_baseline: 0_2_4
 ```
 
-After the extracted V038 files are on GitHub `main`, use the normal updater:
+## Normal update / test / run
+
+Use the same command for routine validation and launch from any PowerShell working directory:
 
 ```powershell
-Set-Location "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light"
-.\scripts\update_test_run.ps1
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-If the patch was deliberately overlaid directly onto the local working tree instead, use `-SkipUpdate`.
+The helper should:
 
-## Focused V038 checks
+1. require local `main` and refuse tracked local edits;
+2. fast-forward from `origin/main`;
+3. reload the newly pulled helper;
+4. refresh backend/training/frontend dependencies as required;
+5. run Python compile, structure validation, backend regressions, frontend typecheck/build, Git whitespace/cleanliness checks and live backend smoke;
+6. before startup, inspect listeners on ports 8000 and 5173;
+7. stop a listener only when Win32 process evidence identifies it as this repository's AiTL PC Studio backend/frontend process tree;
+8. refuse to terminate an unrelated listener;
+9. start the backend on 8000 and frontend on 5173, wait for readiness and open PC Studio.
 
-- Existing V037/R6 ESP firmware and `aitl-tcp-jpeg-v1` remain compatible; no ESP reflash is required for the diagnostics page.
-- **Operate → Camera Test** appears as a separate page; `App.tsx` remains composition-only.
-- With no saved/selected ESP, Diagnose is disabled and the page tells the user to configure Camera Sources first.
-- With a selected ESP, one Diagnose action calls `POST /api/camera/diagnostics/run` and waits for the staged report.
-- The service serializes diagnostic runs so two one-click tests cannot compete for the same camera.
-- A run temporarily quiesces the selected stream and simulation when necessary, then restores saved settings/FPS and the previous connection/stream/simulation state.
-- Control probes, protocol/camera readiness, Wi-Fi, direct stream, direct stream + status polling, and normal PC Studio managed-stream checks are all returned in the standard success envelope.
-- A direct stream failure with increased ESP `stream_send_failures` / `stream_deadline_drops` classifies as `esp_camera_tcp_send_stall`.
-- Direct streaming passing while the managed worker fails classifies as `pc_studio_stream_integration`.
-- Direct streaming passing until status polling is added classifies as `control_stream_contention`.
-- Weak RSSI with otherwise working transport is a warning rather than falsely blaming the camera sensor.
-- The diagnostic report never claims public-road authority or production camera validation.
+If a patch was deliberately overlaid directly onto the local working tree, `-SkipUpdate` remains available. `-SkipTests` is for a deliberate fast relaunch after the same code has already been validated; it is not the normal acceptance path.
 
-## Physical acceptance check
+## Focused V039 checks
 
-1. Keep the current V037/R6 firmware on the ESP and confirm its IP in Serial Monitor.
-2. Save/select that IP in Camera Sources.
-3. Open **Camera Test** and press **Diagnose camera** once.
-4. Confirm the page completes without a command-line helper and displays a diagnosis, layer checks, transport metrics, and recommended action.
-5. Confirm the previous camera stream/simulation state is restored after the run.
-6. For the currently observed failure, verify the report distinguishes whether the direct camera/TCP path itself fails or whether failure appears only in the normal PC Studio worker.
+- Start PC Studio normally, then run the canonical command again without manually killing the existing backend/frontend.
+- Confirm the old AiTL-owned processes are identified and stopped automatically.
+- Confirm the replacement backend becomes healthy on `http://127.0.0.1:8000/health` and the frontend becomes available on port 5173.
+- Confirm the live backend smoke test runs after backend readiness during a normal full test run.
+- Confirm runtime/user data such as `datasets/`, `outputs/`, saved camera/signal configuration, model weights, `.venv`, `node_modules`, `dist` and caches are not deleted.
+- Confirm an unrelated process deliberately placed on port 8000 or 5173 is not terminated automatically; the helper must stop with a clear ownership/safety error instead.
+- Confirm `scripts/test_update_test_run_script.py` passes the ownership/restart guardrails.
 
-## V038 R2 detailed Camera Test
+## Retained V038/R10 camera checks
 
-Open **Operate → Camera Test** and press **Diagnose camera** once. Allow roughly 40–60 seconds. Confirm the report shows Functionality, Stability score, Bottleneck analysis, Layer checks, and Measured transport. A healthy run should have no unexpected ESP send failures/deadline drops, no invalid JPEGs, successful reconnect, successful managed-worker phase, and reasonable FPS headroom/frame-interval p95 for the selected image settings. Diagnostic transition resets are intentional receiver-replacement evidence and are not counted as unexpected transport failures.
+V039 does not change Camera Diagnostics. With the matching diagnostic firmware flashed, **Operate → Camera Test → Diagnose camera** still runs the adaptive R5/R8/R9/R10 diagnostic path. R10 retains the framebuffer/grab-mode/FPS matrix, newest-frame cache comparison, JPEG-quality sweep, TCP write-size/transfer-size/repeatability tests and exact diagnostic state restoration.
+
+Existing Camera Sources, Live AI, simulation, Dataset Capture, multi-ESP selection, training/inference, network-simulation experiments and the prototype-only safety boundary must remain intact.
