@@ -24,6 +24,15 @@ def main() -> int:
     assert not re.search(r"(?m)^\s*elif\s*\(", text), "PowerShell runner must use elseif, not elif"
     assert re.search(r"(?m)^\s*elseif\s*\(", text), "PowerShell runner should retain the SkipTests dependency branch"
 
+    # New zero-argument offline regressions should join the normal workflow by
+    # naming convention rather than requiring a manually maintained test list.
+    assert 'Get-ChildItem ".\\scripts\\test_*.py"' in text
+    assert '$_ .Name' not in text  # reject an easy-to-miss malformed PowerShell property access
+    assert 'test_backend_smoke.py' in text
+    assert '$manualHardwareTests' in text
+    assert 'Sort-Object Name' in text
+    assert 'Run-Step "Backend regression: $($test.Name)"' in text
+
     # The runner must never mutate tracked release metadata. V036's historical
     # finalizer caused CHANGELOG/projectVersion edits that blocked the next pull.
     assert "Invoke-CandidateMetadataFinalizer" not in text
@@ -56,6 +65,8 @@ def main() -> int:
     assert "Stop the existing frontend/process before running this helper" not in text
 
     print("[PASS] update/test/run helper protects tracked work and only fast-forwards main")
+    print("[PASS] runner auto-discovers zero-argument test_*.py regressions in deterministic name order")
+    print("[PASS] hardware-only camera CLIs remain explicitly excluded from the automatic regression sweep")
     print("[PASS] runner no longer invokes any candidate metadata finalizer")
     print("[PASS] runner remains read-only for tracked release/source files")
     print("[PASS] post-test tracked-cleanliness guard prevents self-dirtying regressions")
