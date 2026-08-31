@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,6 +24,8 @@ MAX_INTERSECTIONS = 16
 MAX_LINKS = 64
 MAX_SOURCE_IDS = 16
 MAX_ZONE_IDS = 64
+POSITION_MIN = 0.0
+POSITION_MAX = 100.0
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
@@ -33,8 +36,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "label": "Main prototype junction",
             "enabled": True,
             "source_ids": ["simulation_camera"],
+            "primary_source_id": "simulation_camera",
             "zone_ids": [],
             "signal_profile": "Normal",
+            "position": {"x": 50.0, "y": 50.0},
         }
     ],
     "links": [],
@@ -42,13 +47,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 
 class IntersectionNetworkService:
-    """Persist generic prototype intersection/topology metadata.
+    """Persist prototype junction identity, topology, layout and source mapping.
 
-    This service is intentionally configuration-only in V025. It does not
-    coordinate phases, move vehicles between intersections, or issue physical
-    signal commands. The existing single-junction controller remains the only
-    active controller runtime until a later candidate explicitly adds isolated
-    per-intersection controller instances.
+    The configuration may describe several installed/model junctions and map
+    several camera/source ids to one junction. Source ids remain exclusive to
+    one junction so a live frame has one unambiguous junction identity. Layout
+    coordinates are presentation metadata only; configured links remain
+    topology metadata and do not themselves activate cooperative signal control.
     """
 
     def __init__(self, *, config_path: Path | None = None) -> None:
@@ -87,7 +92,9 @@ class IntersectionNetworkService:
         """Resolve one camera/source id to a configured intersection.
 
         Unmapped or unavailable sources fall back to the configured active
-        intersection so existing single-source V025 behavior remains stable.
+        intersection so the established single-source controller behavior stays
+        stable. The returned matched flag lets overview/UI surfaces disclose
+        whether that fallback was used.
         """
 
         with self._lock:
@@ -148,7 +155,8 @@ class IntersectionNetworkService:
         intersections: list[dict[str, Any]] = []
         intersection_ids: set[str] = set()
         claimed_sources: dict[str, str] = {}
-        for raw in raw_intersections:
+        total_intersections = len(raw_intersections)
+        for index, raw in enumerate(raw_intersections):
             if not isinstance(raw, dict):
                 cls._invalid("Each intersection must be an object.")
             intersection_id = cls._validate_id(raw.get("id"), "intersection id")
@@ -170,6 +178,14 @@ class IntersectionNetworkService:
                     )
                 claimed_sources[source_id] = intersection_id
 
+            primary_raw = str(raw.get("primary_source_id") or "").strip()
+            primary_source_id = primary_raw or (source_ids[0] if source_ids else None)
+            if primary_source_id is not None and primary_source_id not in source_ids:
+                cls._invalid(
+                    "primary_source_id must be one of the intersection source_ids.",
+                    {"intersection_id": intersection_id, "primary_source_id": primary_source_id},
+                )
+
             zone_ids = cls._string_id_list(raw.get("zone_ids", []), "zone_ids", MAX_ZONE_IDS)
             signal_profile = str(raw.get("signal_profile") or "Normal").strip()
             if not 1 <= len(signal_profile) <= 64:
@@ -181,8 +197,10 @@ class IntersectionNetworkService:
                     "label": label,
                     "enabled": bool(raw.get("enabled", True)),
                     "source_ids": source_ids,
+                    "primary_source_id": primary_source_id,
                     "zone_ids": zone_ids,
                     "signal_profile": signal_profile,
+                    "position": cls._position(raw.get("position"), index=index, total=total_intersections),
                 }
             )
 
@@ -245,6 +263,40 @@ class IntersectionNetworkService:
             "intersections": intersections,
             "links": links,
         }
+
+    @classmethod
+    def _position(cls, value: Any, *, index: int, total: int) -> dict[str, float]:
+        if value is None:
+            return cls._default_position(index, total)
+        if not isinstance(value, dict):
+            cls._invalid("position must be an object with numeric x/y percentages.")
+        try:
+            x = float(value.get("x"))
+            y = float(value.get("y"))
+        except (TypeError, ValueError) as exc:
+            raise AppError(
+                ErrorCode.TRAFFIC_NETWORK_INVALID,
+                "position x and y must be numeric percentages.",
+                status_code=422,
+            ) from exc
+        if not math.isfinite(x) or not math.isfinite(y) or not POSITION_MIN <= x <= POSITION_MAX or not POSITION_MIN <= y <= POSITION_MAX:
+            cls._invalid(
+                "position x and y must be finite percentages between 0 and 100.",
+                {"position": {"x": x, "y": y}},
+            )
+        return {"x": round(x, 2), "y": round(y, 2)}
+
+    @staticmethod
+    def _default_position(index: int, total: int) -> dict[str, float]:
+        if total <= 1:
+            return {"x": 50.0, "y": 50.0}
+        columns = min(4, max(2, int(math.ceil(math.sqrt(total)))))
+        rows = int(math.ceil(total / columns))
+        column = index % columns
+        row = index // columns
+        x = 15.0 + (70.0 * column / max(1, columns - 1))
+        y = 25.0 + (50.0 * row / max(1, rows - 1)) if rows > 1 else 50.0
+        return {"x": round(x, 2), "y": round(y, 2)}
 
     @staticmethod
     def _validate_id(value: Any, label: str) -> str:
@@ -338,7 +390,7 @@ class IntersectionNetworkService:
             "cooperative_control_active": False,
             "emergency_priority_active": False,
             "prototype_only": True,
-            "scope_note": "Topology metadata only; V025 does not coordinate signal timing between intersections.",
+            "scope_note": "Configured topology and camera/source mapping only; links do not by themselves coordinate signal timing.",
         }
 
     def relative_config_path(self) -> str:
