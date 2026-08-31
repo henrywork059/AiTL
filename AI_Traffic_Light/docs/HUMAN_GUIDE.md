@@ -27,6 +27,7 @@ For current project state:
 3. Read `PROJECT_SCOPE.md` to distinguish implemented, foundation, simulation-only and planned capabilities.
 4. Use `LOCAL_TESTING.md` / `TEST_READY_CHECKLIST.md` when testing the current candidate.
 5. Use `DOCUMENTATION_MAP.md` if documents appear to disagree.
+6. Use `PATCH_PLAYBOOK.md` for the shortest future-development workflow.
 
 ## 3. Main project parts
 
@@ -86,12 +87,21 @@ This is the default workflow. You normally do **not** need to manually:
 - run `git pull` separately;
 - maintain a list of regression scripts;
 - kill an old AiTL backend/frontend on ports 8000/5173;
+- reinstall Python/Node dependencies on every run;
 - run frontend typecheck/build separately;
 - start backend/frontend separately.
 
-The helper protects tracked local edits before updating, preserves untracked runtime data, reloads itself after the pull, auto-runs the offline regression set, runs frontend checks, safely replaces only AiTL-owned listeners, performs live backend smoke, and opens PC Studio.
+The helper protects tracked local edits before updating, preserves untracked runtime data, reloads itself after the pull, runs cheap compile/structure/release checks first, and then performs the full regression/typecheck/build/smoke/startup workflow.
+
+For speed, a normal Git update now refreshes backend dependencies only when the backend requirement manifests changed, and refreshes frontend dependencies only when `package.json`/`package-lock.json` changed or `node_modules` is missing. Tests/build/smoke are **not** skipped when dependency installation is skipped.
 
 If an unrelated program owns port 8000/5173, the runner refuses to terminate it automatically.
+
+If the local Python/Node environment was manually damaged or you suspect a dependency problem, force refresh with:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -RefreshDependencies
+```
 
 Use individual commands from `LOCAL_TESTING.md` only when diagnosing the stage that failed.
 
@@ -106,6 +116,8 @@ Before sharing source changes, confirm no datasets, outputs, trained models, sec
 ## 9. Testing a candidate
 
 The normal runner covers the automated suite. The current candidate's `TEST_READY_CHECKLIST.md` contains the manual behavior checks automation cannot prove, such as physical ESP performance or visual interaction.
+
+Cheap repository/release checks intentionally run before dependency refresh, so version/document/structure errors should appear near the top rather than after lengthy install output.
 
 Automated tests make a candidate test-ready; they do **not** make it the passed baseline.
 
