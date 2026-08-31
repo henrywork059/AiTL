@@ -12,6 +12,8 @@ For routine update, validation and launch, use the same command from any PowerSh
 
 The idempotent restart behavior remains: the helper may stop listeners on 8000/5173 only when Win32 process evidence identifies them as this repository's AiTL PC Studio process tree. Unrelated listeners are protected. Runtime/user data is preserved.
 
+For future development, coding agents should use `docs/PATCH_PLAYBOOK.md` after reading root `VERSION` and `AGENTS.md`. It contains the short module-selection, test, documentation and release-bundle workflow; the longer agent guides are reference material rather than a mandatory full reread for every small change.
+
 ## V0311 Junction Network
 
 Open **Traffic → Junction Network** to configure and visualize the prototype junction installation model.
@@ -76,5 +78,6 @@ After the normal one-command workflow passes:
 6. Stream one selected ESP and verify only its resolved junction receives live traffic/pedestrian data.
 7. Verify another unselected junction remains explicitly unavailable rather than mirroring the selected junction's counts.
 8. Exercise an offline camera warning and an existing simulation/test event.
+9. Confirm Dashboard/function status now includes Junction Network capabilities.
 
 AiTL remains a local/student-scale prototype; physical/public-road traffic-signal authority is out of scope.
