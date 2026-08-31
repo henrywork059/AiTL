@@ -1,6 +1,99 @@
-# API Contracts — V037 camera transport highlights
+# API Contracts — current camera and junction-network highlights
 
-Existing non-camera contracts remain unchanged.
+Existing non-described contracts remain unchanged. All JSON success/error responses retain the standard envelope and request ID conventions.
+
+## V0311 Junction Network configuration
+
+`GET /api/traffic/network`
+
+Returns the persisted logical intersection network plus `config_path`, `cooperative_control_active: false`, and `prototype_only: true`.
+
+The existing schema remains `schema_version: 1`. V0311 extends each `intersections[]` object with:
+
+```json
+{
+  "id": "junction_a",
+  "label": "Junction A",
+  "enabled": true,
+  "source_ids": ["esp32_cam_01", "esp32_cam_02"],
+  "primary_source_id": "esp32_cam_01",
+  "zone_ids": [],
+  "signal_profile": "Normal",
+  "position": {"x": 28.0, "y": 42.0}
+}
+```
+
+Rules:
+
+- one junction may contain zero or more `source_ids` up to the existing configured maximum;
+- one source id may appear in only one junction;
+- `primary_source_id` is nullable and, when present, must be one of that junction's `source_ids`;
+- `position.x` and `position.y` are finite logical canvas percentages from 0 through 100;
+- older schema-1 records without `primary_source_id` or `position` remain accepted and receive deterministic defaults when normalized/saved;
+- `links[]` retain the existing directed source/destination/approach/travel-time contract.
+
+`PUT /api/traffic/network`
+
+Body remains:
+
+```json
+{"config": {"schema_version": 1, "active_intersection_id": "...", "intersections": [], "links": []}}
+```
+
+Validation failures continue to use the existing traffic-network error contract. V0311 introduces no new stable error code.
+
+`POST /api/traffic/network/reset`
+
+Resets to the single default prototype junction using the same schema, including its default logical position and primary simulation source.
+
+`GET /api/traffic/network/context?intersection_id=<id>`
+
+Retains the existing per-junction topology context behavior. Configured neighbours remain metadata and do not activate live cooperative control.
+
+## V0311 Junction Network overview
+
+`GET /api/traffic/network/overview`
+
+Returns one observational projection for the Junction Network page. The route is read-only; it does not start/stop cameras, mutate network configuration, run signal arbitration, or create additional inference pipelines.
+
+Top-level data includes:
+
+```json
+{
+  "schema_version": 1,
+  "generated_at_ms": 0,
+  "network": {},
+  "available_cameras": [],
+  "active_source_id": "esp32_cam_01",
+  "current_frame_source_id": "esp32_cam_01",
+  "observation_intersection_id": "junction_a",
+  "observation_provenance": "ai_detection",
+  "source_mapping_matched": true,
+  "simulation_enabled": false,
+  "junctions": [],
+  "links": [],
+  "warnings": [],
+  "summary": {},
+  "multi_camera_assignment": true,
+  "simultaneous_multi_junction_inference": false,
+  "prototype_only": true,
+  "scope_note": "..."
+}
+```
+
+`available_cameras[]` projects saved ESP camera status including source id, host, selected/connected/reachable/streaming state, measured FPS, last success/error and a compact state label.
+
+Each `junctions[]` entry includes persisted identity/layout/source metadata plus:
+
+- assigned camera summaries;
+- `camera_count`, `reachable_camera_count`, and `streaming_camera_count`;
+- `live.vehicle` total/waiting/load;
+- `live.pedestrian` total/waiting/crossing/load;
+- current phase/decision/decision reason where available;
+- structured event records for current ranked scenario, protected service request, manual/test input or observed crossing activity where supported by the existing live decision context;
+- warnings for missing/unassigned source profiles, unavailable assigned ESPs, camera errors, offline primary camera, unmapped current source, or unavailable live traffic observation.
+
+The live-data rule is strict: PC Studio still has one shared selected camera/simulation inference pipeline. Only the junction resolved from the current frame/source receives current live traffic metrics and decision context. Other configured junctions return `observation_provenance: "unavailable"` and unavailable load instead of copying the selected junction's occupancy. Camera assignment does not imply multi-camera fusion, cross-camera identity matching, observed network transfer, emergency recognition, or active cooperative signal control.
 
 ## Connect
 
@@ -50,6 +143,8 @@ All integer fields are unsigned network byte order. Payload length must be 1..`M
 
 The backend uses exact header/payload reads. On transport failure it probes `/status`; if `session_active=false`, it reapplies retained configuration and `/start` before reconnecting.
 
+V0310 keeps this wire format but tunes the production ESP capture/send implementation; V0311 does not change that transport.
+
 ## Browser preview
 
 `GET /api/camera/live.mjpeg`
@@ -74,7 +169,6 @@ Existing fields remain, with these V037 semantics/additions:
 
 Private RFC1918 IPv4 restriction remains. No redirects or public-road signal-control API are introduced.
 
-
 ## Saved multi-camera registry
 
 The saved multi-camera registry retained from V036 provides:
@@ -88,7 +182,6 @@ The saved multi-camera registry retained from V036 provides:
 Profiles are stored locally in `config/remote_cameras.json` using the existing atomic JSON-store helper. Socket state is never persisted: after PC Studio restarts, the list/settings are restored but devices must be connected again.
 
 Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; therefore Live AI, Dataset Capture, zones and analytics continue to consume one unambiguous active source. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.
-
 
 ## V037 R6 quality-preserving transport telemetry
 
@@ -107,7 +200,6 @@ A V037 R6 device `/status` additionally reports:
 For same-candidate compatibility, the previous `adaptive_quality_adjustments`, `adaptive_payload_target_bytes`, `adaptive_local_frame_drops`, `adaptive_window_learns`, `adaptive_resolution_downshifts`, and `adaptive_resolution_recoveries` keys remain present but stay zero in R6. They must not be interpreted as active adaptation.
 
 These fields are diagnostic device telemetry. They do not change the `ATL1` image packet format or PC-side API envelopes.
-
 
 ## V038 one-click camera diagnostics
 
