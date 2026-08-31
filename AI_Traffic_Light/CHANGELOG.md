@@ -1,4 +1,15 @@
 # Changelog
+## 0_3_11 — Junction Network visualization
+
+- Created V0311 / `0_3_11` at the owner's explicit request after V0310; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Added a persistent Junction Network workspace that represents installed/model junctions as draggable nodes and existing directed topology links as lines.
+- Extended schema-1 intersection metadata with deterministic/persisted canvas positions and an optional primary source while preserving backward loading of older schema-1 files.
+- One junction may own multiple camera/source ids, while each source remains exclusive to one junction so live source-to-junction identity stays unambiguous.
+- Added `GET /api/traffic/network/overview` to project topology, saved ESP camera health, selected/current source identity, current shared-pipeline vehicle/pedestrian load, phase/decision, ranked-scenario/service/test events and warnings.
+- Added camera assignment/reassignment, primary-camera selection, junction add/remove/edit, link add/remove/enable/travel-time editing, load badges, event badges and warning indicators to the new frontend page.
+- Preserved the existing single selected camera/simulation inference pipeline: only the resolved observation junction receives current AI/simulation traffic metrics; other junctions explicitly show unavailable occupancy rather than copied/fabricated data.
+- Preserved V0310 camera transport, simulation/network-experiment semantics, API envelopes/request IDs, and the prototype-only no-public-road-control boundary.
+
 ## 0_3_10 — R10-tuned production camera pipeline
 
 - Created V0310 / `0_3_10` at the owner's explicit request after V039; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -217,7 +228,6 @@
 ## 0_2_4 — Maintenance hardening and polling optimization
 
 - Refined the signal-aware simulator presentation by shrinking the top-left metadata banner and the right-side pedestrian signal display so more of the synthetic roadway remains visible in Live AI and Camera views.
-
 - Same-candidate Windows runner repair: replace an invalid Python-style `elif` with PowerShell `elseif` after the frontend/build checks, and extend the runner regression to reject that syntax error before handoff.
 
 - Same-candidate Windows atomic-write repair: serialize the final `os.replace` step and retry bounded transient `PermissionError` sharing violations; keep 32-writer concurrency coverage and add a deterministic retry-path regression.
