@@ -19,6 +19,7 @@ import { CameraSourcesPage } from "./pages/CameraSourcesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DatasetCapturePage } from "./pages/DatasetCapturePage";
 import { DatasetReviewPage } from "./pages/DatasetReviewPage";
+import { JunctionNetworkPage } from "./pages/JunctionNetworkPage";
 import { LiveAiPage } from "./pages/LiveAiPage";
 import { LogsPage } from "./pages/LogsPage";
 import { ModelRegistryPage } from "./pages/ModelRegistryPage";
@@ -194,6 +195,8 @@ export default function App() {
         );
       case "camera_diagnostics":
         return <CameraDiagnosticsPage />;
+      case "junction_network":
+        return <JunctionNetworkPage />;
       case "zone_editor":
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":
