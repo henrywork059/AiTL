@@ -26,6 +26,8 @@ REQUIRED_PATHS = (
     "apps/pc-studio/backend/app/services/traffic_recorder.py",
     "apps/pc-studio/backend/app/services/traffic_logic.py",
     "apps/pc-studio/backend/app/services/signal_rules.py",
+    "apps/pc-studio/backend/app/services/intersection_network.py",
+    "apps/pc-studio/backend/app/services/junction_network_overview.py",
     "apps/pc-studio/frontend/src/App.tsx",
     "apps/pc-studio/frontend/src/styles.css",
     "apps/pc-studio/frontend/src/styles/tokens.css",
@@ -34,9 +36,11 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/styles/components.css",
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/lib/useSerialPolling.ts",
+    "apps/pc-studio/frontend/src/lib/junctionNetworkApi.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficLogicPage.tsx",
+    "apps/pc-studio/frontend/src/pages/JunctionNetworkPage.tsx",
     "apps/pc-studio/frontend/src/pages/signalRules.css",
     "apps/pc-studio/frontend/src/components/TrafficHistoryChart.tsx",
     "apps/pc-studio/frontend/src/components/TrafficFlowChart.tsx",
@@ -46,6 +50,10 @@ REQUIRED_PATHS = (
     "packages/schema/detection-frame.schema.json",
     "packages/schema/zones.schema.json",
     "docs/START_HERE.md",
+    "docs/DOCUMENTATION_MAP.md",
+    "docs/PROJECT_SCOPE.md",
+    "docs/ARCHITECTURE.md",
+    "docs/PATCH_PLAYBOOK.md",
     "docs/AI_AGENT_GUIDE.md",
     "docs/AI_AGENT_CHECKLIST.md",
     "docs/CODE_STRUCTURE.md",
@@ -57,6 +65,9 @@ REQUIRED_PATHS = (
     "scripts/validate_patch_zip.py",
     "scripts/test_atomic_json_store.py",
     "scripts/test_frontend_polling_structure.py",
+    "scripts/test_release_documentation_consistency.py",
+    "scripts/test_junction_network_frontend_structure.py",
+    "scripts/test_junction_network_overview.py",
     "scripts/update_test_run.ps1",
     "scripts/test_update_test_run_script.py",
     "scripts/test_object_tracking_flow.py",
@@ -71,6 +82,12 @@ BACKEND_VERSION_SURFACES = (
 )
 
 FRONTEND_VERSION_SOURCE = "apps/pc-studio/frontend/src/constants/projectVersion.ts"
+
+CURRENT_CANDIDATE_DOCS = (
+    "docs/START_HERE.md",
+    "docs/LOCAL_TESTING.md",
+    "docs/TEST_READY_CHECKLIST.md",
+)
 
 FRONTEND_STYLE_ENTRYPOINT = "apps/pc-studio/frontend/src/styles.css"
 REQUIRED_STYLE_IMPORTS = (
@@ -89,10 +106,12 @@ ATOMIC_JSON_SERVICES = (
     "apps/pc-studio/backend/app/services/runtime_settings.py",
     "apps/pc-studio/backend/app/services/zones.py",
     "apps/pc-studio/backend/app/services/model_registry.py",
+    "apps/pc-studio/backend/app/services/intersection_network.py",
 )
 
 SERIAL_POLLING_SURFACES = (
     "apps/pc-studio/frontend/src/App.tsx",
+    "apps/pc-studio/frontend/src/pages/JunctionNetworkPage.tsx",
 )
 
 
@@ -155,6 +174,60 @@ def validate_version(root: Path, errors: list[str]) -> dict[str, str]:
     if changelog.exists() and f"## {fields['version']}" not in changelog.read_text(encoding="utf-8"):
         add_error(errors, f"CHANGELOG.md has no section for {fields['version']}")
     return fields
+
+
+def validate_current_candidate_docs(root: Path, fields: dict[str, str], errors: list[str]) -> None:
+    current = fields.get("version", "")
+    previous = fields.get("previous_version", "")
+    baseline = fields.get("passed_baseline", "")
+    if not current or not previous or not baseline:
+        return
+
+    for relative_path in CURRENT_CANDIDATE_DOCS:
+        path = root / relative_path
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if current not in text:
+            add_error(errors, f"Current-candidate document does not identify {current}: {relative_path}")
+        if baseline not in text:
+            add_error(errors, f"Current-candidate document does not disclose passed baseline {baseline}: {relative_path}")
+
+    for relative_path in ("docs/START_HERE.md", "docs/LOCAL_TESTING.md"):
+        path = root / relative_path
+        if path.exists() and previous not in path.read_text(encoding="utf-8"):
+            add_error(errors, f"Current-candidate document does not identify previous version {previous}: {relative_path}")
+
+    patch_path = root / "docs" / f"PATCH_{current}.md"
+    if patch_path.exists():
+        patch_text = patch_path.read_text(encoding="utf-8")
+        if current not in patch_text:
+            add_error(errors, f"Current patch document does not identify {current}: docs/{patch_path.name}")
+        if baseline not in patch_text:
+            add_error(errors, f"Current patch document does not disclose passed baseline {baseline}: docs/{patch_path.name}")
+
+
+def validate_durable_workflow_guards(root: Path, errors: list[str]) -> None:
+    playbook = root / "docs/PATCH_PLAYBOOK.md"
+    if playbook.exists():
+        text = playbook.read_text(encoding="utf-8")
+        for marker, message in (
+            ("update root `VERSION` last", "Patch playbook must preserve the VERSION-last release safeguard."),
+            ("scripts/test_*.py", "Patch playbook must document automatic regression naming."),
+            ("update_test_run.ps1", "Patch playbook must identify the normal owner validation command."),
+        ):
+            if marker not in text:
+                add_error(errors, message)
+
+    architecture = root / "docs/ARCHITECTURE.md"
+    if architecture.exists():
+        text = architecture.read_text(encoding="utf-8")
+        if "FB1 + CAMERA_GRAB_LATEST" not in text:
+            add_error(errors, "Durable architecture must describe the tuned FB1 + CAMERA_GRAB_LATEST production camera path.")
+        if "2 PSRAM framebuffers" in text:
+            add_error(errors, "Durable architecture reintroduced the obsolete two-framebuffer production claim.")
+        if "JunctionNetworkOverviewService" not in text:
+            add_error(errors, "Durable architecture must document JunctionNetworkOverviewService ownership.")
 
 
 def validate_backend_version_source(root: Path, errors: list[str]) -> None:
@@ -238,8 +311,6 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
             add_error(errors, "Traffic Logic page CSS must consume shared color tokens instead of page-local hex colors.")
 
 
-
-
 def validate_frontend_presentation_copy(root: Path, errors: list[str]) -> None:
     stale_text = {
         "apps/pc-studio/frontend/src/layout/AppShell.tsx": ("Confirm layout first",),
@@ -261,6 +332,7 @@ def validate_frontend_presentation_copy(root: Path, errors: list[str]) -> None:
         neutral_marker = ".status-pill,"
         if neutral_marker not in content or "background: var(--color-surface-muted);" not in content:
             add_error(errors, "Generic status pills must remain neutral; semantic status colors require explicit status classes.")
+
 
 def validate_atomic_json_persistence(root: Path, errors: list[str]) -> None:
     helper = root / "apps/pc-studio/backend/app/core/json_store.py"
@@ -302,12 +374,15 @@ def validate_frontend_polling(root: Path, errors: list[str]) -> None:
         if "window.setInterval" in text:
             add_error(errors, f"High-frequency frontend surface must not use overlapping setInterval polling: {relative_path}")
 
+
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
     errors: list[str] = []
     validate_required_paths(root, errors)
     fields = validate_version(root, errors)
+    validate_current_candidate_docs(root, fields, errors)
+    validate_durable_workflow_guards(root, errors)
     validate_backend_version_source(root, errors)
     validate_frontend_version_surfaces(root, fields.get("version", ""), errors)
     validate_frontend_style_system(root, errors)
