@@ -12,6 +12,7 @@ def main() -> int:
     app = read("App.tsx")
     app_types = read("types/app.ts")
     navigation = read("constants/appNavigation.ts")
+    functions = read("constants/functionRegistry.ts")
     page = read("pages/JunctionNetworkPage.tsx")
     api = read("lib/junctionNetworkApi.ts")
     types = read("types/junctionNetwork.ts")
@@ -24,13 +25,19 @@ def main() -> int:
     assert "junction_network:" in navigation
     assert "PAGE_DETAILS.junction_network" in navigation
 
+    for function_id in (
+        "traffic.junction_network",
+        "traffic.junction_camera_assignment",
+        "traffic.junction_observability",
+    ):
+        assert f'id: "{function_id}"' in functions, f"function registry missing {function_id}"
+
     assert "useSerialPolling" in page
     assert "window.setInterval" not in page
     assert "fetchJunctionNetworkOverview" in page
     assert "saveJunctionNetwork" in page
     assert "resetJunctionNetwork" in page
     assert "source_ids" in page and "primary_source_id" in page
-    assert "simultaneous_multi_junction_inference" not in page or "single selected AI source" in page
     assert "single selected AI source" in page
     assert "junction-map-canvas" in page
     assert "junction-link-layer" in page
@@ -55,7 +62,7 @@ def main() -> int:
     ):
         assert marker in css, f"missing Junction Network style marker: {marker}"
 
-    print("[PASS] Junction Network is registered in navigation and App routing")
+    print("[PASS] Junction Network is registered in navigation, App routing and function registry")
     print("[PASS] Junction Network uses serial polling and typed network APIs")
     print("[PASS] multi-camera assignment and single-selected-source boundary are visible in the page structure")
     print("[PASS] node/link/load/warning visualization styles are present")
