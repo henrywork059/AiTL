@@ -1,47 +1,51 @@
-# Local Testing — V039
+# Local Testing — V0310
 
 Expected release state:
 
 ```text
-version: 0_3_9
-previous_version: 0_3_8
+version: 0_3_10
+previous_version: 0_3_9
 passed_baseline: 0_2_4
 ```
 
 ## Normal update / test / run
 
-Use the same command for routine validation and launch from any PowerShell working directory:
+Use the same command from any PowerShell working directory:
 
 ```powershell
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-The helper should:
+The helper should fast-forward `main`, reload itself, refresh dependencies, run Python compile/structure/regressions, frontend typecheck/build, Git cleanliness and live backend smoke, safely replace an existing AiTL-owned PC Studio instance on ports 8000/5173, and relaunch the app. Unrelated port owners remain protected.
 
-1. require local `main` and refuse tracked local edits;
-2. fast-forward from `origin/main`;
-3. reload the newly pulled helper;
-4. refresh backend/training/frontend dependencies as required;
-5. run Python compile, structure validation, backend regressions, frontend typecheck/build, Git whitespace/cleanliness checks and live backend smoke;
-6. before startup, inspect listeners on ports 8000 and 5173;
-7. stop a listener only when Win32 process evidence identifies it as this repository's AiTL PC Studio backend/frontend process tree;
-8. refuse to terminate an unrelated listener;
-9. start the backend on 8000 and frontend on 5173, wait for readiness and open PC Studio.
+## Focused V0310 offline checks
 
-If a patch was deliberately overlaid directly onto the local working tree, `-SkipUpdate` remains available. `-SkipTests` is for a deliberate fast relaunch after the same code has already been validated; it is not the normal acceptance path.
+- `scripts/test_v0310_camera_pipeline.py` passes.
+- PlatformIO selects `src/main_v0310.cpp` rather than compiling legacy `src/main.cpp` separately.
+- V0310 keeps the existing `ATL1` / `aitl-tcp-jpeg-v1` PC wire contract.
+- The PSRAM path uses one framebuffer + `CAMERA_GRAB_LATEST`.
+- The production sender uses plain non-blocking `send()` underneath the inherited progress/deadline loop with an 11,680-byte maximum application write.
+- Saved frame size/JPEG quality/FPS remain PC-controlled; no diagnostic q18 override or automatic image-quality degradation is introduced.
+- The R10 architecture diagnostic sketch remains separate and available.
+- Existing remote-camera/session/multi-camera, simulation, inference, dataset, analytics and signal/network regressions remain passing.
 
-## Focused V039 checks
+## Arduino IDE physical test
 
-- Start PC Studio normally, then run the canonical command again without manually killing the existing backend/frontend.
-- Confirm the old AiTL-owned processes are identified and stopped automatically.
-- Confirm the replacement backend becomes healthy on `http://127.0.0.1:8000/health` and the frontend becomes available on port 5173.
-- Confirm the live backend smoke test runs after backend readiness during a normal full test run.
-- Confirm runtime/user data such as `datasets/`, `outputs/`, saved camera/signal configuration, model weights, `.venv`, `node_modules`, `dist` and caches are not deleted.
-- Confirm an unrelated process deliberately placed on port 8000 or 5173 is not terminated automatically; the helper must stop with a clear ownership/safety error instead.
-- Confirm `scripts/test_update_test_run_script.py` passes the ownership/restart guardrails.
+1. Pull V0310 with the normal command and allow the full regression/build/smoke run to pass.
+2. In `apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V0310/`, copy `secrets.example.h` to `secrets.h` if needed and enter the same 2.4 GHz Wi-Fi credentials used for the working diagnostic.
+3. Open `AiTL_ESP32_CAM_V0310.ino` in Arduino IDE and upload with the same board/port settings used previously.
+4. Open Serial Monitor at 115200 and confirm `AiTL V0310 R10-tuned production pipeline active` plus the ESP IP.
+5. Keep the ESP in the previously tested good Wi-Fi position.
+6. In PC Studio Camera Sources, save/select the current ESP IP, Connect, and Start Stream.
+7. Use the existing saved image settings. Request 15 FPS for the main comparison; do not change JPEG quality solely to manufacture a higher FPS result.
+8. Observe production measured FPS, `send_ewma_ms`, send failures/deadlines, RSSI/BSSID/channel and reconnect behavior for a sustained run.
+9. Verify Camera Sources preview, Live AI, Dataset Capture, zones and analytics receive complete current frames.
+10. Stop/Start once and Disconnect/Connect once to verify the inherited lifecycle and recovery behavior.
 
-## Retained V038/R10 camera checks
+## Acceptance interpretation
 
-V039 does not change Camera Diagnostics. With the matching diagnostic firmware flashed, **Operate → Camera Test → Diagnose camera** still runs the adaptive R5/R8/R9/R10 diagnostic path. R10 retains the framebuffer/grab-mode/FPS matrix, newest-frame cache comparison, JPEG-quality sweep, TCP write-size/transfer-size/repeatability tests and exact diagnostic state restoration.
+A useful target at the good Wi-Fi position is approximately 10–12 FPS sustained on the **production ATL1 path**, with complete JPEGs, no sustained deadline-failure loop, no unexpected reconnect churn and unchanged configured image quality/resolution.
 
-Existing Camera Sources, Live AI, simulation, Dataset Capture, multi-ESP selection, training/inference, network-simulation experiments and the prototype-only safety boundary must remain intact.
+The R10 diagnostic's 12.43 FPS at a 15 FPS target is comparative evidence for V0310 tuning, not an automatic production result. If V0310 production ATL1 remains materially below the R10 camera ladder, compare the ATL1 framing/PC receiver path directly against R10 HTTPD before adding cache/framebuffer complexity.
+
+V024 / `0_2_4` remains the passed baseline until explicit owner acceptance. Physical/public-road traffic-control authority remains out of scope.
