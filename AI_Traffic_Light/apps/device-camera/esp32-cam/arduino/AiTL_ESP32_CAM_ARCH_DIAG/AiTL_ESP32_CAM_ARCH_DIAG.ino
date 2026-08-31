@@ -1,7 +1,7 @@
 // AiTL 0_3_8 R9 camera architecture benchmark firmware.
-// DIAGNOSTIC ONLY. This compares the current manual WiFiClient style,
-// the older esp_http_server MJPEG path, a Pi-style latest-frame cache,
-// and camera-free bulk TCP controls on the same ESP/network.
+// DIAGNOSTIC ONLY. Compares the current manual WiFiClient writer, the older
+// esp_http_server MJPEG path, a Pi-style latest-frame producer/consumer path,
+// and camera-free TCP controls on the same ESP/network.
 
 #include <Arduino.h>
 #include <WebServer.h>
@@ -30,7 +30,6 @@
 #endif
 
 namespace {
-
 constexpr uint16_t CONTROL_PORT = 80;
 constexpr uint16_t MANUAL_MJPEG_PORT = 84;
 constexpr uint16_t HTTPD_PORT = 85;
@@ -67,10 +66,11 @@ WiFiClient manualClient;
 httpd_handle_t httpdServer = nullptr;
 
 bool cameraReady = false;
+bool httpdReady = false;
+bool cameraUsesPsram = false;
 framesize_t configuredFrameSize = FRAMESIZE_QVGA;
 int configuredJpegQuality = 24;
 
-// Manual WiFiClient MJPEG state (R5-style server implementation).
 uint16_t manualFramesRequested = 8;
 uint8_t manualTargetFps = 10;
 uint16_t manualFramesSent = 0;
@@ -80,14 +80,12 @@ uint32_t manualLastCaptureMs = 0;
 uint32_t manualLastBytes = 0;
 uint32_t manualNextDueUs = 0;
 
-// Old-style esp_http_server direct MJPEG telemetry.
 volatile uint32_t httpdDirectFrames = 0;
 volatile uint32_t httpdDirectFailures = 0;
 volatile uint32_t httpdDirectLastSendMs = 0;
 volatile uint32_t httpdDirectLastCaptureMs = 0;
 volatile uint32_t httpdDirectLastBytes = 0;
 
-// Pi-style producer/consumer latest-frame cache.
 SemaphoreHandle_t cacheMutex = nullptr;
 TaskHandle_t cacheTaskHandle = nullptr;
 volatile bool cacheActive = false;
@@ -105,7 +103,6 @@ volatile uint32_t cachedStreamFailures = 0;
 volatile uint32_t cachedLastSendMs = 0;
 volatile bool cachedLastCopyInternal = false;
 
-// Camera-free bulk controls.
 size_t rawBulkBytes = 512U * 1024U;
 bool rawBulkNoDelay = true;
 volatile uint32_t rawBulkLastMs = 0;
@@ -126,7 +123,9 @@ const char* resetReasonName() {
     case ESP_RST_WDT: return "watchdog";
     case ESP_RST_DEEPSLEEP: return "deep_sleep";
     case ESP_RST_BROWNOUT: return "brownout";
+#ifdef ESP_RST_SDIO
     case ESP_RST_SDIO: return "sdio";
+#endif
     default: return "unknown";
   }
 }
@@ -184,14 +183,16 @@ void closeManualClient() {
 
 String statusJson() {
   String json;
-  json.reserve(2200);
+  json.reserve(2300);
   json = "{";
   json += "\"firmware\":\"aitl-0_3_8-r9-architecture-benchmark\"";
   json += ",\"camera_ready\":" + String(cameraReady ? "true" : "false");
+  json += ",\"httpd_ready\":" + String(httpdReady ? "true" : "false");
   json += ",\"frame_size\":\"" + String(frameSizeName(configuredFrameSize)) + "\"";
   json += ",\"jpeg_quality\":" + String(configuredJpegQuality);
-  json += ",\"camera_fb_count\":2";
-  json += ",\"camera_grab_mode\":\"latest\"";
+  json += ",\"camera_fb_count\":" + String(cameraUsesPsram ? 2 : 1);
+  json += ",\"camera_grab_mode\":\"" + String(cameraUsesPsram ? "latest" : "when_empty") + "\"";
+  json += ",\"camera_fb_location\":\"" + String(cameraUsesPsram ? "psram" : "dram") + "\"";
   json += ",\"reset_reason\":\"" + String(resetReasonName()) + "\"";
   json += ",\"manual_frames_sent\":" + String(manualFramesSent);
   json += ",\"manual_failures\":" + String(manualFailures);
@@ -260,10 +261,8 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-
-  if (psramFound()) {
-    // Match the older V035/Espressif-style allocation strategy: allocate maximum
-    // JPEG capacity first, then lower the runtime sensor resolution.
+  cameraUsesPsram = psramFound();
+  if (cameraUsesPsram) {
     config.frame_size = FRAMESIZE_UXGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
@@ -281,8 +280,7 @@ bool initCamera() {
   if (!sensor) return false;
   configuredFrameSize = FRAMESIZE_QVGA;
   configuredJpegQuality = 24;
-  return sensor->set_framesize(sensor, configuredFrameSize) == 0 &&
-         sensor->set_quality(sensor, configuredJpegQuality) == 0;
+  return sensor->set_framesize(sensor, configuredFrameSize) == 0 && sensor->set_quality(sensor, configuredJpegQuality) == 0;
 }
 
 void connectWifi() {
@@ -298,9 +296,8 @@ void connectWifi() {
 bool ensureCacheCapacity(size_t wanted) {
   if (wanted == 0 || wanted > MAX_CACHE_BYTES) return false;
   if (cacheBuffer && cacheCapacity >= wanted) return true;
-  uint8_t* next = static_cast<uint8_t*>(heap_caps_malloc(
-      wanted,
-      psramFound() ? (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
+  const uint32_t caps = cameraUsesPsram ? (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  uint8_t* next = static_cast<uint8_t*>(heap_caps_malloc(wanted, caps));
   if (!next) return false;
   if (cacheBuffer) heap_caps_free(cacheBuffer);
   cacheBuffer = next;
@@ -310,7 +307,7 @@ bool ensureCacheCapacity(size_t wanted) {
 
 void cacheCaptureTask(void*) {
   while (true) {
-    if (!cacheActive || !cameraReady) {
+    if (!cacheActive || !cameraReady || !cacheMutex) {
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
@@ -339,7 +336,8 @@ void cacheCaptureTask(void*) {
     }
     cacheLastCopyMs = millis() - copyStarted;
     esp_camera_fb_return(fb);
-    const uint32_t periodMs = max<uint32_t>(1, 1000U / max<uint8_t>(1, cacheTargetFps));
+    const uint32_t fps = cacheTargetFps > 0 ? static_cast<uint32_t>(cacheTargetFps) : 1U;
+    const uint32_t periodMs = 1000U / fps;
     const uint32_t elapsed = millis() - cycleStarted;
     if (elapsed < periodMs) vTaskDelay(pdMS_TO_TICKS(periodMs - elapsed));
     else taskYIELD();
@@ -383,17 +381,15 @@ esp_err_t httpdDirectHandler(httpd_req_t* req) {
     httpd_resp_set_status(req, "409 Conflict");
     return httpd_resp_sendstr(req, "cache producer active");
   }
-  int frames = 8;
-  int fps = 10;
+  int frames = 8, fps = 10;
   if (!readHttpdInt(req, "frames", 8, 1, 50, frames) || !readHttpdInt(req, "fps", 10, 1, 30, fps)) {
     httpd_resp_set_status(req, "422 Unprocessable Entity");
     return httpd_resp_sendstr(req, "invalid query");
   }
-  httpdDirectFrames = 0;
-  httpdDirectFailures = 0;
+  httpdDirectFrames = httpdDirectFailures = 0;
   httpd_resp_set_type(req, MJPEG_TYPE);
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-  const uint32_t periodMs = max(1, 1000 / fps);
+  const uint32_t periodMs = 1000U / static_cast<uint32_t>(fps);
   uint32_t nextDue = millis();
   for (int index = 0; index < frames; ++index) {
     while (static_cast<int32_t>(millis() - nextDue) < 0) vTaskDelay(pdMS_TO_TICKS(1));
@@ -415,40 +411,36 @@ esp_err_t httpdDirectHandler(httpd_req_t* req) {
 }
 
 esp_err_t httpdCachedHandler(httpd_req_t* req) {
-  if (!cacheActive) {
+  if (!cacheActive || !cacheMutex) {
     httpd_resp_set_status(req, "409 Conflict");
-    return httpd_resp_sendstr(req, "cache producer is not active");
+    return httpd_resp_sendstr(req, "cache producer unavailable");
   }
-  int frames = 8;
-  int fps = 10;
+  int frames = 8, fps = 10;
   if (!readHttpdInt(req, "frames", 8, 1, 50, frames) || !readHttpdInt(req, "fps", 10, 1, 30, fps)) {
     httpd_resp_set_status(req, "422 Unprocessable Entity");
     return httpd_resp_sendstr(req, "invalid query");
   }
-  cachedStreamFrames = 0;
-  cachedStreamFailures = 0;
+  cachedStreamFrames = cachedStreamFailures = 0;
   httpd_resp_set_type(req, MJPEG_TYPE);
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-  uint32_t lastSequence = 0;
-  const uint32_t periodMs = max(1, 1000 / fps);
+  const uint32_t periodMs = 1000U / static_cast<uint32_t>(fps);
   uint32_t nextDue = millis();
-
+  uint32_t lastSequence = 0;
   for (int index = 0; index < frames; ++index) {
     while (static_cast<int32_t>(millis() - nextDue) < 0) vTaskDelay(pdMS_TO_TICKS(1));
     nextDue = millis() + periodMs;
-
     uint8_t* copy = nullptr;
     size_t length = 0;
     uint32_t sequence = 0;
     const uint32_t waitStarted = millis();
-    while (millis() - waitStarted < 2000) {
+    while (millis() - waitStarted < 2000U) {
       if (xSemaphoreTake(cacheMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
         sequence = cacheSequence;
         length = cacheLength;
         if (sequence != lastSequence && length > 0) {
           copy = static_cast<uint8_t*>(heap_caps_malloc(length, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
           cachedLastCopyInternal = copy != nullptr;
-          if (!copy) copy = static_cast<uint8_t*>(heap_caps_malloc(length, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+          if (!copy && cameraUsesPsram) copy = static_cast<uint8_t*>(heap_caps_malloc(length, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
           if (copy) memcpy(copy, cacheBuffer, length);
         }
         xSemaphoreGive(cacheMutex);
@@ -489,10 +481,10 @@ esp_err_t httpdBulkHandler(httpd_req_t* req) {
   esp_err_t result = ESP_OK;
   while (httpdBulkLastAccepted < static_cast<uint32_t>(bytes)) {
     const size_t remain = static_cast<size_t>(bytes) - httpdBulkLastAccepted;
-    const size_t n = min(BULK_CHUNK_BYTES, remain);
-    result = httpd_resp_send_chunk(req, reinterpret_cast<const char*>(buffer), n);
+    const size_t count = remain < BULK_CHUNK_BYTES ? remain : BULK_CHUNK_BYTES;
+    result = httpd_resp_send_chunk(req, reinterpret_cast<const char*>(buffer), count);
     if (result != ESP_OK) break;
-    httpdBulkLastAccepted += n;
+    httpdBulkLastAccepted += count;
   }
   httpdBulkLastMs = millis() - started;
   if (result != ESP_OK) ++httpdBulkFailures;
@@ -516,32 +508,20 @@ bool startHttpd() {
   config.keep_alive_enable = true;
   config.open_fn = httpdOpen;
   if (httpd_start(&httpdServer, &config) != ESP_OK) return false;
-
   httpd_uri_t direct{};
-  direct.uri = "/direct.mjpeg";
-  direct.method = HTTP_GET;
-  direct.handler = httpdDirectHandler;
+  direct.uri = "/direct.mjpeg"; direct.method = HTTP_GET; direct.handler = httpdDirectHandler;
   httpd_register_uri_handler(httpdServer, &direct);
-
   httpd_uri_t cached{};
-  cached.uri = "/cached.mjpeg";
-  cached.method = HTTP_GET;
-  cached.handler = httpdCachedHandler;
+  cached.uri = "/cached.mjpeg"; cached.method = HTTP_GET; cached.handler = httpdCachedHandler;
   httpd_register_uri_handler(httpdServer, &cached);
-
   httpd_uri_t bulk{};
-  bulk.uri = "/bulk.bin";
-  bulk.method = HTTP_GET;
-  bulk.handler = httpdBulkHandler;
+  bulk.uri = "/bulk.bin"; bulk.method = HTTP_GET; bulk.handler = httpdBulkHandler;
   httpd_register_uri_handler(httpdServer, &bulk);
   return true;
 }
 
 void handleConfig() {
-  if (cacheActive || (manualClient && manualClient.connected())) {
-    sendJson(409, "{\"error\":\"busy\"}");
-    return;
-  }
+  if (cacheActive || (manualClient && manualClient.connected())) { sendJson(409, "{\"error\":\"busy\"}"); return; }
   sensor_t* sensor = esp_camera_sensor_get();
   if (!sensor) { sendJson(503, "{\"error\":\"camera_not_ready\"}"); return; }
   if (controlServer.hasArg("frame_size")) {
@@ -552,11 +532,11 @@ void handleConfig() {
     configuredFrameSize = next;
   }
   if (controlServer.hasArg("jpeg_quality")) {
-    const int q = controlServer.arg("jpeg_quality").toInt();
-    if (q < 4 || q > 63 || sensor->set_quality(sensor, q) != 0) {
+    const int quality = controlServer.arg("jpeg_quality").toInt();
+    if (quality < 4 || quality > 63 || sensor->set_quality(sensor, quality) != 0) {
       sendJson(422, "{\"error\":\"invalid_jpeg_quality\"}"); return;
     }
-    configuredJpegQuality = q;
+    configuredJpegQuality = quality;
   }
   sendJson(200, statusJson());
 }
@@ -583,27 +563,21 @@ void handleManualConfig() {
   const int frames = controlServer.hasArg("frames") ? controlServer.arg("frames").toInt() : 8;
   const int fps = controlServer.hasArg("fps") ? controlServer.arg("fps").toInt() : 10;
   if (frames < 1 || frames > 50 || fps < 1 || fps > 30) { sendJson(422, "{\"error\":\"invalid_manual_config\"}"); return; }
-  manualFramesRequested = frames;
-  manualTargetFps = fps;
-  manualFramesSent = 0;
-  manualFailures = 0;
-  manualLastSendMs = 0;
+  manualFramesRequested = static_cast<uint16_t>(frames);
+  manualTargetFps = static_cast<uint8_t>(fps);
+  manualFramesSent = 0; manualFailures = 0; manualLastSendMs = 0;
   sendJson(200, statusJson());
 }
 
 void handleCacheStart() {
+  if (!cacheMutex) { sendJson(503, "{\"error\":\"cache_mutex_unavailable\"}"); return; }
   if (manualClient && manualClient.connected()) { sendJson(409, "{\"error\":\"manual_active\"}"); return; }
   const int fps = controlServer.hasArg("fps") ? controlServer.arg("fps").toInt() : 15;
   if (fps < 1 || fps > 30) { sendJson(422, "{\"error\":\"invalid_cache_fps\"}"); return; }
-  cacheTargetFps = fps;
-  cacheCapturedFrames = 0;
-  cacheCaptureFailures = 0;
-  cachedStreamFrames = 0;
-  cachedStreamFailures = 0;
+  cacheTargetFps = static_cast<uint8_t>(fps);
+  cacheCapturedFrames = cacheCaptureFailures = cachedStreamFrames = cachedStreamFailures = 0;
   if (xSemaphoreTake(cacheMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-    cacheLength = 0;
-    cacheSequence = 0;
-    xSemaphoreGive(cacheMutex);
+    cacheLength = 0; cacheSequence = 0; xSemaphoreGive(cacheMutex);
   }
   cacheActive = true;
   sendJson(200, statusJson());
@@ -620,9 +594,7 @@ void handleBulkConfig() {
   if (bytes < 4096 || bytes > static_cast<int>(MAX_BULK_BYTES)) { sendJson(422, "{\"error\":\"invalid_bulk_bytes\"}"); return; }
   rawBulkBytes = static_cast<size_t>(bytes);
   rawBulkNoDelay = !controlServer.hasArg("nodelay") || controlServer.arg("nodelay") != "0";
-  rawBulkLastMs = 0;
-  rawBulkLastAccepted = 0;
-  rawBulkFailures = 0;
+  rawBulkLastMs = rawBulkLastAccepted = rawBulkFailures = 0;
   sendJson(200, statusJson());
 }
 
@@ -632,19 +604,15 @@ void acceptManualClient() {
   if (!candidate) return;
   configureClient(candidate, true);
   candidate.setTimeout(500);
-  const uint32_t deadline = millis() + 800;
+  const uint32_t deadline = millis() + 800U;
   while (candidate.connected() && millis() < deadline) {
     if (!candidate.available()) { delay(1); continue; }
-    String line = candidate.readStringUntil('\n');
+    const String line = candidate.readStringUntil('\n');
     if (line == "\r" || line.length() == 0) break;
   }
-  candidate.print("HTTP/1.1 200 OK\r\n");
-  candidate.print("Content-Type: multipart/x-mixed-replace; boundary=aitlframe\r\n");
-  candidate.print("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
+  candidate.print("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=aitlframe\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
   manualClient = candidate;
-  manualFramesSent = 0;
-  manualFailures = 0;
-  manualNextDueUs = micros();
+  manualFramesSent = 0; manualFailures = 0; manualNextDueUs = micros();
 }
 
 void sendManualFrameIfDue() {
@@ -656,7 +624,8 @@ void sendManualFrameIfDue() {
   }
   const uint32_t nowUs = micros();
   if (static_cast<int32_t>(nowUs - manualNextDueUs) < 0) return;
-  manualNextDueUs = nowUs + 1000000UL / max<uint8_t>(1, manualTargetFps);
+  const uint32_t fps = manualTargetFps > 0 ? static_cast<uint32_t>(manualTargetFps) : 1U;
+  manualNextDueUs = nowUs + 1000000UL / fps;
   const uint32_t captureStarted = millis();
   camera_fb_t* fb = esp_camera_fb_get();
   manualLastCaptureMs = millis() - captureStarted;
@@ -664,7 +633,7 @@ void sendManualFrameIfDue() {
   manualLastBytes = fb->len;
   const uint32_t sendStarted = millis();
   manualClient.printf("--aitlframe\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", static_cast<unsigned int>(fb->len));
-  size_t written = manualClient.write(fb->buf, fb->len);
+  const size_t written = manualClient.write(fb->buf, fb->len);
   manualClient.print("\r\n");
   manualLastSendMs = millis() - sendStarted;
   esp_camera_fb_return(fb);
@@ -684,8 +653,8 @@ void handleRawBulkClient() {
   bool ok = true;
   while (rawBulkLastAccepted < rawBulkBytes && client.connected()) {
     const size_t remain = rawBulkBytes - rawBulkLastAccepted;
-    const size_t n = min(BULK_CHUNK_BYTES, remain);
-    const size_t written = client.write(buffer, n);
+    const size_t count = remain < BULK_CHUNK_BYTES ? remain : BULK_CHUNK_BYTES;
+    const size_t written = client.write(buffer, count);
     if (written == 0) { ok = false; break; }
     rawBulkLastAccepted += written;
   }
@@ -694,7 +663,6 @@ void handleRawBulkClient() {
   heap_caps_free(buffer);
   client.stop();
 }
-
 }  // namespace
 
 void setup() {
@@ -703,14 +671,10 @@ void setup() {
   Serial.println();
   Serial.println("AiTL 0_3_8 R9 camera architecture benchmark");
   Serial.printf("Reset reason: %s\n", resetReasonName());
-
   cameraReady = initCamera();
   cacheMutex = xSemaphoreCreateMutex();
-  if (cacheMutex) {
-    xTaskCreatePinnedToCore(cacheCaptureTask, "aitl-cache", 4096, nullptr, 1, &cacheTaskHandle, 1);
-  }
+  if (cacheMutex) xTaskCreatePinnedToCore(cacheCaptureTask, "aitl-cache", 4096, nullptr, 1, &cacheTaskHandle, 1);
   connectWifi();
-
   controlServer.on("/status", HTTP_GET, [](){ sendJson(200, statusJson()); });
   controlServer.on("/config", HTTP_POST, handleConfig);
   controlServer.on("/capture", HTTP_GET, handleCapture);
@@ -720,13 +684,11 @@ void setup() {
   controlServer.on("/bulk/config", HTTP_POST, handleBulkConfig);
   controlServer.onNotFound([](){ sendJson(404, "{\"error\":\"not_found\"}"); });
   controlServer.begin();
-
   manualServer.begin();
   manualServer.setNoDelay(true);
   rawBulkServer.begin();
-  startHttpd();
-
-  Serial.printf("Camera ready: %s\n", cameraReady ? "yes" : "no");
+  httpdReady = startHttpd();
+  Serial.printf("Camera ready: %s | HTTPD ready: %s\n", cameraReady ? "yes" : "no", httpdReady ? "yes" : "no");
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("ESP IP: %s\n", WiFi.localIP().toString().c_str());
     Serial.printf("Control: http://%s:%u/status\n", WiFi.localIP().toString().c_str(), CONTROL_PORT);
