@@ -1,4 +1,13 @@
 # Changelog
+## 0_3_9 — Idempotent update / test / run workflow
+
+- Created V039 / `0_3_9` as the next small candidate patch after V038; V024 / `0_2_4` remains the owner-confirmed passed baseline.
+- Made `scripts/update_test_run.ps1` idempotent for normal Windows use: the same command now fast-forwards `main`, reloads the pulled helper, runs the established dependency/test/build/cleanliness sequence, safely replaces an already-running AiTL PC Studio instance, runs live smoke, and relaunches the frontend/backend.
+- Existing listeners on ports 8000/5173 are terminated automatically only when Win32 executable/command-line evidence identifies them as this repository's AiTL PC Studio process tree; unrelated listeners are never killed automatically and still block startup with a clear safety error.
+- Added regression coverage for AiTL-owned process-tree replacement, unrelated-port protection, retained fast-forward/tracked-work safeguards, and the prohibition on destructive `git clean` behavior.
+- Preserved V038/R10 Camera Diagnostics, ESP production/diagnostic firmware, API envelopes, signal behavior, data/training/inference workflows, runtime data, and the prototype-only public-road safety boundary unchanged.
+- Added V039 patch/current-candidate documentation and synchronized the shared frontend project-version source; `passed_baseline` remains `0_2_4` until explicit owner acceptance.
+
 ## 0_3_8 — One-click camera diagnostics
 
 - Created V038 / `0_3_8` at the owner's explicit request after V037; V024 / `0_2_4` remains the owner-confirmed passed baseline.
