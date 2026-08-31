@@ -14,7 +14,9 @@ def run_camera_diagnostics(request: Request) -> dict:
 
     Normal AiTL firmware uses the established production diagnostic pipeline.
     R5 transport-benchmark firmware runs the full transport matrix, timing
-    attribution and the focused R8 payload/receiver alternative follow-up.
+    attribution and the focused R8 payload/receiver follow-up. R9 architecture
+    firmware compares manual WiFiClient, old-style esp_http_server, Pi-style
+    latest-frame caching and camera-free TCP controls.
     """
     data = camera_diagnostic_enhanced_service.run()
     logger.info(
