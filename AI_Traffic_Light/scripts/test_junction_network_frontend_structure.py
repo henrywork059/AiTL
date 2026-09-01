@@ -14,6 +14,8 @@ def main() -> int:
     navigation = read("constants/appNavigation.ts")
     functions = read("constants/functionRegistry.ts")
     page = read("pages/JunctionNetworkPage.tsx")
+    node_card = read("components/junctions/JunctionNodeCard.tsx")
+    view_helpers = read("lib/junctionNetworkView.ts")
     api = read("lib/junctionNetworkApi.ts")
     types = read("types/junctionNetwork.ts")
     css = read("pages/junctionNetworkPage.css")
@@ -41,7 +43,20 @@ def main() -> int:
     assert "single selected AI source" in page
     assert "junction-map-canvas" in page
     assert "junction-link-layer" in page
-    assert "junction-node" in page
+
+    # V0313 keeps page state/mutations in the page but moves card presentation
+    # and pure view helpers out of the already-large page module.
+    assert 'import { JunctionNodeCard } from "../components/junctions/JunctionNodeCard";' in page
+    assert "<JunctionNodeCard" in page
+    assert "configById = useMemo" in page
+    assert "cameraOwnerBySource = useMemo" in page
+    assert "draft.intersections.find((item) => item.id === link.source_intersection_id)" not in page
+    assert "function JunctionNodeCard" in node_card
+    assert "junction-node-body" in node_card
+    assert "JUNCTION_LOAD_LABELS" in node_card
+    assert "fallbackJunctionNode" in view_helpers
+    assert "cloneJunctionNetworkConfig" in view_helpers
+    assert "nextJunctionNetworkId" in view_helpers
 
     assert "/api/traffic/network/overview" in api
     assert "/api/traffic/network" in api
@@ -62,18 +77,21 @@ def main() -> int:
     ):
         assert marker in css, f"missing Junction Network style marker: {marker}"
 
-    assert "width: 260px;" in css, "desktop junction cards must preserve enough width for live status content"
-    assert "max-width: calc(100% - 24px);" in css, "junction cards must remain bounded by the map width"
+    # V0312/V0313 card content must remain visible rather than clipped by fixed
+    # single-line metadata rows.
+    assert "width: 260px;" in css
+    assert "max-width: calc(100% - 24px);" in css
     assert ".junction-node-meta span:last-child" in css
-    assert "white-space: normal;" in css, "junction status content must be allowed to wrap instead of clipping"
-    assert "overflow-wrap: anywhere;" in css, "long junction status labels must remain visible inside the card"
-    assert "flex-wrap: wrap;" in css, "junction metadata/alerts must be able to wrap inside the card"
+    assert "white-space: normal;" in css
+    assert "overflow-wrap: anywhere;" in css
+    assert "flex-wrap: wrap;" in css
+    assert "width: 220px;" in css
 
     print("[PASS] Junction Network is registered in navigation, App routing and function registry")
-    print("[PASS] Junction Network uses serial polling and typed network APIs")
-    print("[PASS] multi-camera assignment and single-selected-source boundary are visible in the page structure")
-    print("[PASS] node/link/load/warning visualization styles are present")
-    print("[PASS] junction cards keep title, phase, load and warning content visible without fixed-row clipping")
+    print("[PASS] page behavior, node presentation and pure view helpers have separate owners")
+    print("[PASS] Junction Network uses serial polling, typed APIs and memoized lookup maps")
+    print("[PASS] multi-camera assignment and single-selected-source boundary remain visible")
+    print("[PASS] node content remains responsive and non-clipping")
     return 0
 
 
