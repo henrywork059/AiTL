@@ -62,10 +62,18 @@ def main() -> int:
     ):
         assert marker in css, f"missing Junction Network style marker: {marker}"
 
+    assert "width: 260px;" in css, "desktop junction cards must preserve enough width for live status content"
+    assert "max-width: calc(100% - 24px);" in css, "junction cards must remain bounded by the map width"
+    assert ".junction-node-meta span:last-child" in css
+    assert "white-space: normal;" in css, "junction status content must be allowed to wrap instead of clipping"
+    assert "overflow-wrap: anywhere;" in css, "long junction status labels must remain visible inside the card"
+    assert "flex-wrap: wrap;" in css, "junction metadata/alerts must be able to wrap inside the card"
+
     print("[PASS] Junction Network is registered in navigation, App routing and function registry")
     print("[PASS] Junction Network uses serial polling and typed network APIs")
     print("[PASS] multi-camera assignment and single-selected-source boundary are visible in the page structure")
     print("[PASS] node/link/load/warning visualization styles are present")
+    print("[PASS] junction cards keep title, phase, load and warning content visible without fixed-row clipping")
     return 0
 
 
