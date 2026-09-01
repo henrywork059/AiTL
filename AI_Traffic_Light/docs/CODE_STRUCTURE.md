@@ -34,6 +34,8 @@ Do not move camera connection state into `intersection_network.py`. Do not move 
 
 One junction may own several source IDs. A source ID remains exclusive to one junction. The shared `CameraFrameService` still exposes one selected active source, so camera assignment does not imply simultaneous multi-junction inference.
 
+The overview path is polled frequently, so reusable camera projections should be built once per overview and then reused for assigned-junction views rather than repeatedly normalizing the same saved camera.
+
 Other established ownership remains unchanged: `signal_rules.py` owns protected simulated timing; experiment services own isolated benchmarks; `network_policy_arbiter.py` owns pure experiment overlay selection; decision evidence remains a non-controlling stored projection.
 
 ## Frontend
@@ -46,6 +48,7 @@ src/api.ts
 src/lib/apiClient.ts
 src/lib/remoteCameraApi.ts
 src/lib/junctionNetworkApi.ts
+src/lib/junctionNetworkView.ts
 src/lib/useSerialPolling.ts
 src/types.ts / types/
 src/constants/
@@ -54,21 +57,29 @@ src/styles/
 
 - Camera Sources owns saved-ESP selection/editing state.
 - `remoteCameraApi.ts` owns typed saved-profile, select/connect/start/stop/disconnect calls.
-- `JunctionNetworkPage.tsx` owns the editable node/link workspace and camera-assignment interactions.
+- `JunctionNetworkPage.tsx` owns Junction Network page state, mutations, drag interaction, selection and save/reset orchestration.
+- `components/junctions/JunctionNodeCard.tsx` owns junction-node card presentation only.
+- `junctionNetworkView.ts` owns small pure Junction Network view helpers such as display labels, safe config cloning, fallback-node projection and ID/number helpers.
 - `junctionNetworkApi.ts` owns the typed network overview/save/reset HTTP calls.
 - `types/junctionNetwork.ts` owns the frontend Junction Network contract shapes.
 - `App.tsx` only wires the page into navigation/composition; it must not absorb junction business logic.
 - Async polling uses the shared serial scheduler so periodic requests cannot overlap.
 
-## Regression ownership
+When a page grows, extract presentation or pure helpers only when the ownership boundary is obvious. Do not split state across components merely to reduce line count.
+
+For frequently rendered graph/list surfaces, prefer memoized ID/source maps over repeated `.find(...)` scans inside render loops when the same lookup is reused.
+
+## Regression / structural ownership
 
 Every new automatic regression should be runnable with **no command-line arguments** and use the `scripts/test_*.py` naming convention so `scripts/update_test_run.ps1` discovers it automatically. Hardware/interactive utilities that require `--host`, manual input or special firmware must not be introduced as an ordinary zero-argument `test_*.py` regression unless the runner explicitly excludes/documents them.
+
+`scripts/check_structure.py` is the single repository structural/release-consistency authority. Extend it when a durable required path, version surface, workflow guard, persistence invariant or polling invariant changes. Do not create another script that independently re-parses `VERSION` and duplicates the same release/document checks.
 
 Focused Junction Network coverage lives in:
 
 - `scripts/test_intersection_network.py` — persistence/validation/source resolution/topology compatibility;
-- `scripts/test_junction_network_overview.py` — multi-camera assignment, camera health, observation honesty and route wiring;
-- `scripts/test_junction_network_frontend_structure.py` — frontend navigation/API/page wiring guard.
+- `scripts/test_junction_network_overview.py` — multi-camera assignment, camera health, observation honesty, per-overview camera projection reuse and route wiring;
+- `scripts/test_junction_network_frontend_structure.py` — frontend navigation/API/page/component/helper wiring guard.
 
 ## Data / safety rules
 
