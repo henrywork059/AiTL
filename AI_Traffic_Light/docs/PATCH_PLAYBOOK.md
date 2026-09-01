@@ -54,6 +54,8 @@ For a new candidate, **prepare release metadata first but update root `VERSION` 
 
 Do not begin with version/document churn before the implementation shape is known.
 
+When a page/module has become large, extract only clear pure helpers or presentation units. Keep page/domain state with its existing owner; do not split state across abstractions merely to reduce line count.
+
 ## 4. Regression rule that saves time
 
 `scripts/update_test_run.ps1` automatically runs every zero-argument `scripts/test_*.py` file except its documented preflight/hardware-only exclusions.
@@ -67,6 +69,8 @@ Therefore:
 - do **not** create a normal `test_*.py` file that unexpectedly requires `--host`, special hardware, credentials or user input.
 
 A focused regression should verify the important semantic claim, not just that a string/file exists.
+
+`scripts/check_structure.py` is the single structural/release-consistency authority. Extend it when durable paths, release surfaces, workflow guards, persistence rules or polling rules change. Do not add another script that independently re-parses `VERSION` and duplicates the same release/document validation.
 
 Cheap repository guards run before dependency refresh. A broken release bundle, stale durable architecture, runner syntax/structure issue, or Python compile error should therefore fail before time is spent on pip/npm work.
 
@@ -133,6 +137,8 @@ Review changed code for:
 - nullable/optional fields that are accidentally normalized into a value;
 - source/provenance ambiguity;
 - routes containing service logic;
+- repeated linear lookups inside hot render/polling loops when an ID/source map would be clearer;
+- duplicate validators/tests that enforce the same invariant in separate places;
 - release/docs claiming behavior that code does not perform.
 
 For frontend visual editors also check:
@@ -157,7 +163,7 @@ Routine owner validation should use the repository runner rather than an ad-hoc 
 The normal command:
 
 1. fast-forwards `main` and reloads the newly pulled runner;
-2. runs cheap compile/structure/release/runner guards first;
+2. runs cheap compile/structure-release/runner guards first;
 3. refreshes Python dependencies only when backend requirement manifests changed in that Git update;
 4. refreshes frontend dependencies only when `package.json`/`package-lock.json` changed or `node_modules` is missing;
 5. auto-runs the offline regression suite;
