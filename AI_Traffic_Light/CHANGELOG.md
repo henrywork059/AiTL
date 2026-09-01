@@ -1,4 +1,12 @@
 # Changelog
+## 0_3_12 — Repository cleanup and runner hardening
+
+- Created V0312 / `0_3_12` at the owner's explicit request after the owner-confirmed V0311 baseline; `passed_baseline` remains `0_3_11` until explicit acceptance.
+- Removed obsolete root patch manifests/apply instructions, V010 test-ready instructions, duplicate legacy Windows launch/smoke wrappers, the historical V036 metadata finalizer and preservation-only regression, and the unused standalone V036 Arduino path while retaining current production/diagnostic paths.
+- Replaced the stale release-specific root README with a durable project overview that points current release state to `VERSION`.
+- Fixed a Windows runner regression observed during V0312 testing where the self-reloaded script could fail to bind array-splatted `-SkipUpdate` and recursively pull/reload. The reload now uses explicit switch binding and an `AITL_RUNNER_RELOADED` guard prevents unbounded recursion.
+- Preserved V0311 Junction Network semantics, the single-selected-source live inference boundary, dataset/training/inference APIs, simulation/signal behavior, V0310 production `ATL1` transport, camera diagnostics, runtime/user data and the prototype-only public-road safety boundary.
+
 ## 0_3_11 — Junction Network visualization
 
 - Created V0311 / `0_3_11` at the owner's explicit request after V0310; V024 / `0_2_4` remains the owner-confirmed passed baseline.
@@ -401,7 +409,7 @@
 - Added frontend/backend status display, refresh flow, and mock API integration checks.
 - Updated visible version labels from 0_0_4 to 0_1_0.
 - Added human testing instructions and a test-ready checklist.
-- Still intentionally excludes real YOLO inference, real camera capture, training, model export, and physical traffic-light control.
+- Still intentionally excludes real YOLO inference, real camera capture, training, model export, and physical public-road control.
 ## 0_0_4 — PC Studio app template and function map
 
 - Added the first structured PC Studio frontend template.

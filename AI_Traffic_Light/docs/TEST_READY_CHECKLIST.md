@@ -1,38 +1,49 @@
-# V0311 Passed Record
-
-Owner acceptance date: 2026-09-01
+# V0312 Test-Ready Checklist
 
 Release state:
 
 ```text
-version: 0_3_11
-previous_version: 0_3_10
+version: 0_3_12
+previous_version: 0_3_11
 passed_baseline: 0_3_11
-status: owner-confirmed passed baseline
+status: repository cleanup candidate
 ```
 
-The owner explicitly confirmed that V0311 is running correctly and passes. The following acceptance items are recorded as satisfied for the passed baseline:
+V0312 remains unaccepted until the owner explicitly confirms PASS.
 
-- [x] Normal reusable Windows command updates, validates and launches PC Studio.
-- [x] Python compile / structure / release-document / runner self-check path is in place.
-- [x] Dependency-aware repeated runs may skip redundant `pip install` / `npm ci` while retaining regressions/typecheck/build/smoke.
-- [x] `-RefreshDependencies` remains available for an intentional forced dependency refresh.
-- [x] Automatic zero-argument `scripts/test_*.py` discovery is preserved; hardware-only utilities remain separated.
-- [x] `docs/PATCH_PLAYBOOK.md` defines the short preflight, implementation order, release-bundle-before-VERSION rule, regression convention and handoff flow.
-- [x] Durable camera architecture documents FB1 + `CAMERA_GRAB_LATEST` rather than the obsolete two-framebuffer production claim.
-- [x] Junction Network is wired into Traffic navigation, App routing and the central function registry.
-- [x] Junction node positions and directed topology lines persist.
-- [x] One junction can own multiple saved ESP cameras.
-- [x] One camera/source ID cannot remain assigned to two junctions simultaneously.
-- [x] `primary_source_id` is nullable or one of the junction's assigned sources.
-- [x] Explicit **Primary camera → None** persists as null; legacy omitted primary-source metadata still gets the migration default.
-- [x] Camera health/FPS and warning state are available to Junction Network.
-- [x] Current vehicle/pedestrian load, phase and decision are shown only on the junction resolved from the selected shared source.
-- [x] Non-selected/unobserved junctions show unavailable live load instead of copied/fabricated counts.
-- [x] Ranked-scenario/pedestrian-service/manual-test events retain existing provenance semantics.
-- [x] Existing Camera Sources multi-camera management remains compatible.
-- [x] V0310 production camera transport/Arduino sketch remains the active ESP production path.
-- [x] No simultaneous multi-junction inference is claimed.
-- [x] No physical/public-road signal-control authority is introduced.
+## Automated validation
 
-Future development should treat `0_3_11` as the known-good baseline. A future patch increments `Z` only when the owner explicitly requests the next patch/version.
+- [ ] Normal Windows command performs one update/reload cycle only.
+- [ ] Recursive reload guard regression passes.
+- [ ] Python compile passes.
+- [ ] Repository structure/current-release consistency passes.
+- [ ] Automatic zero-argument backend regressions pass.
+- [ ] Frontend typecheck passes.
+- [ ] Frontend production build passes.
+- [ ] Git tracked-cleanliness check passes.
+- [ ] Live backend smoke passes.
+
+## Cleanup validation
+
+- [ ] No root `PATCH_MANIFEST_*` files remain.
+- [ ] No root `PATCH_APPLY_INSTRUCTIONS_*` files remain.
+- [ ] Historical `docs/PATCH_*` and cumulative changelog history remain available.
+- [ ] V036 metadata finalizer and its preservation-only regression are removed.
+- [ ] Duplicate generic Windows backend/frontend launch wrappers are removed.
+- [ ] Obsolete V010 test-ready instructions and old smoke `.bat` wrapper are removed.
+- [ ] V0310 production firmware remains available.
+- [ ] V037 source remains available because V0310 still inherits it.
+- [ ] Camera diagnostic firmware/tools remain available.
+- [ ] First-time/recovery `setup_backend_windows.ps1` remains available.
+
+## Functional regression
+
+- [ ] Junction Network still loads/persists nodes, links and camera assignments.
+- [ ] Only the selected source feeds the shared live inference/traffic pipeline.
+- [ ] Dataset/training/inference/model workflows remain unchanged.
+- [ ] Simulation/adaptive signal behavior remains unchanged.
+- [ ] V0310 `ATL1` production camera path remains unchanged.
+- [ ] Runtime/user data is not deleted by the runner.
+- [ ] No physical/public-road signal-control authority is introduced.
+
+After these checks, explicit owner confirmation is required before changing `passed_baseline` from `0_3_11`.

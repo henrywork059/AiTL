@@ -1,62 +1,33 @@
-# Start Here — V0311
+# Start Here — V0312
 
-V0311 / `0_3_11` is the current owner-confirmed passed baseline as of 2026-09-01. V0310 / `0_3_10` is the previous candidate.
+V0312 / `0_3_12` is the current cleanup candidate. V0311 / `0_3_11` is the previous version and remains the owner-confirmed passed baseline until explicit V0312 acceptance.
 
 ## Normal Windows workflow
 
-For routine update, validation and launch, use the same command from any PowerShell working directory:
+Use the same command from any PowerShell working directory:
 
 ```powershell
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-The helper safely fast-forwards `main`, reloads itself, runs the automatic validation suite, replaces only AiTL-owned PC Studio listeners on ports 8000/5173, runs live smoke and opens PC Studio. Runtime/user data is preserved and unrelated port owners are protected.
+The helper fast-forwards `origin/main`, reloads the pulled script exactly once, runs compile/structure/regression/frontend checks, safely replaces only AiTL-owned PC Studio listeners on ports 8000/5173, runs live smoke, and opens PC Studio. Untracked runtime/user data is preserved.
 
-Repeated runs are dependency-aware: unchanged backend/frontend dependency manifests skip redundant `pip install` / `npm ci`, while regressions, frontend typecheck/build, Git cleanliness and live smoke still run. Use `-RefreshDependencies` only when you intentionally need to force dependency refresh.
+If the backend `.venv` does not exist, run `scripts/setup_backend_windows.ps1` once and retry.
 
-For future development, read root `VERSION` and `AGENTS.md`, then use `docs/PATCH_PLAYBOOK.md` as the short execution path.
+## V0312 scope
 
-## V0311 Junction Network
+V0312 is maintenance-only:
 
-Open **Traffic → Junction Network** to configure and visualize the prototype junction installation model.
+- removes obsolete patch manifests/apply instructions and duplicate Windows wrappers;
+- removes the historical V036 metadata finalizer and archived V036 standalone firmware path that are no longer active;
+- keeps V0310 production firmware, inherited V037 source, diagnostics, current APIs and runtime data;
+- replaces the stale release-specific README with a durable project overview;
+- hardens the Windows runner against recursive self-reload.
 
-```text
-junction node
-├─ label / enabled state / signal profile
-├─ persisted canvas position
-├─ 0..N assigned source_ids
-├─ optional primary_source_id
-└─ directed topology links to other junctions
-```
+## Active functional baseline
 
-One junction may contain multiple saved ESP cameras. One camera/source id may belong to only one junction so a received frame resolves to one unambiguous junction.
+V0311 Junction Network behavior remains unchanged: multiple saved cameras may be assigned to a junction, one source remains exclusive to one junction, and exactly one selected physical/simulation source feeds the shared live inference/traffic pipeline. Unobserved junctions do not receive fabricated live counts.
 
-The page shows draggable junction nodes and directed links, camera health/FPS, vehicle and pedestrian load for the currently observed junction, prototype phase/decision context, event indicators and warnings.
-
-## Live-data boundary
-
-V0311 does not create one AI pipeline for every junction. Several ESP stream workers may exist, but exactly one selected physical/simulation source still feeds the shared inference/traffic pipeline. Other junctions intentionally show live occupancy/load as unavailable rather than copying the selected junction's data.
-
-Camera assignment or configured links do not imply live cross-camera fusion, observed transfer, cooperative signal control or emergency recognition.
-
-## Production camera firmware
-
-V0311 keeps the V0310 R10-tuned production camera transport:
-
-```text
-ESP camera -> FB1 / CAMERA_GRAB_LATEST on PSRAM
-ATL1 header + configured JPEG -> bounded plain send() writes, max 11680 B/write
-selected ESP -> CameraFrameService -> preview / Live AI / capture / zones / analytics
-```
-
-Continue to flash:
-
-```text
-apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V0310/AiTL_ESP32_CAM_V0310.ino
-```
-
-## Passed-state note
-
-The owner confirmed V0311 is running correctly and passes on 2026-09-01. Future normal patch development therefore starts from `0_3_11` as the passed baseline. Increment only when the owner explicitly requests the next patch/version.
+V0310 remains the production ESP32-CAM path using FB1 + `CAMERA_GRAB_LATEST`, bounded plain `send()` writes and the unchanged `ATL1` / `aitl-tcp-jpeg-v1` contract.
 
 AiTL remains a local/student-scale prototype; physical/public-road traffic-signal authority is out of scope.
