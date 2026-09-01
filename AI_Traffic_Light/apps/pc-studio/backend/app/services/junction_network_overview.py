@@ -18,8 +18,7 @@ SimulationProvider = Callable[[], bool]
 class JunctionNetworkOverviewService:
     """Project junction topology plus honest live observability for the UI.
 
-    V0311 does not create one inference/controller pipeline per junction. The
-    shared CameraFrameService still has one selected physical/simulation source,
+    The shared CameraFrameService has one selected physical/simulation source,
     so only that resolved junction receives live occupancy/decision data. Every
     configured junction can still expose assigned-camera health, topology,
     warnings and layout metadata without misrepresenting unavailable AI data.
@@ -235,10 +234,11 @@ class JunctionNetworkOverviewService:
             for item in camera_status.get("cameras", [])
             if isinstance(item, dict) and str(item.get("source_id") or "")
         }
-        available_cameras = [
-            self._remote_camera_view(item)
-            for item in sorted(remote_cameras.values(), key=lambda camera: str(camera.get("source_id") or ""))
-        ]
+        remote_camera_views = {
+            source_id: self._remote_camera_view(camera)
+            for source_id, camera in remote_cameras.items()
+        }
+        available_cameras = [remote_camera_views[source_id] for source_id in sorted(remote_camera_views)]
 
         observation_intersection_id = str(resolution["intersection_id"])
         observation_available = provenance != "unavailable"
@@ -246,17 +246,14 @@ class JunctionNetworkOverviewService:
 
         for intersection in network["intersections"]:
             intersection_id = str(intersection["id"])
-            assigned_sources: list[dict[str, Any]] = []
-            for source_id in intersection.get("source_ids", []):
-                remote = remote_cameras.get(source_id)
-                assigned_sources.append(
-                    self._remote_camera_view(remote)
-                    if remote is not None
-                    else self._virtual_source_view(source_id, simulation_enabled=simulation_enabled)
-                )
+            assigned_sources = [
+                remote_camera_views.get(source_id)
+                or self._virtual_source_view(source_id, simulation_enabled=simulation_enabled)
+                for source_id in intersection.get("source_ids", [])
+            ]
+            assigned_source_by_id = {str(source["source_id"]): source for source in assigned_sources}
 
-            is_observation_junction = intersection_id == observation_intersection_id
-            live_for_junction = is_observation_junction
+            live_for_junction = intersection_id == observation_intersection_id
             junction_provenance = provenance if live_for_junction else "unavailable"
             available = live_for_junction and observation_available
             vehicle_total = int(live_state.get("vehicles_total", 0) or 0) if live_for_junction else 0
@@ -270,19 +267,15 @@ class JunctionNetworkOverviewService:
             if not intersection.get("source_ids"):
                 warnings.append(self._warning("no_source_assigned", "No camera/source is assigned to this junction.", severity="info"))
 
-            missing_sources = [
-                source
-                for source in assigned_sources
-                if source["kind"] == "other_source" and not source["saved"]
-            ]
-            for source in missing_sources:
-                warnings.append(
-                    self._warning(
-                        "source_profile_missing",
-                        f"Assigned source {source['source_id']} is not a saved ESP camera profile.",
-                        source_id=str(source["source_id"]),
+            for source in assigned_sources:
+                if source["kind"] == "other_source" and not source["saved"]:
+                    warnings.append(
+                        self._warning(
+                            "source_profile_missing",
+                            f"Assigned source {source['source_id']} is not a saved ESP camera profile.",
+                            source_id=str(source["source_id"]),
+                        )
                     )
-                )
 
             remote_assigned = [source for source in assigned_sources if source["kind"] == "esp32_cam"]
             if remote_assigned and not any(bool(source["device_reachable"]) for source in remote_assigned):
@@ -299,7 +292,7 @@ class JunctionNetworkOverviewService:
 
             primary_source_id = intersection.get("primary_source_id")
             if primary_source_id:
-                primary = next((source for source in assigned_sources if source["source_id"] == primary_source_id), None)
+                primary = assigned_source_by_id.get(str(primary_source_id))
                 if primary is None:
                     warnings.append(self._warning("primary_source_missing", "The configured primary camera/source is not assigned to this junction."))
                 elif primary["kind"] == "esp32_cam" and not primary["device_reachable"]:
