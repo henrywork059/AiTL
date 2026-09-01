@@ -1,7 +1,0 @@
-AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_8_R4.txt
-AI_Traffic_Light/PATCH_MANIFEST_0_3_8_R4.txt
-AI_Traffic_Light/docs/CAMERA_TRANSPORT_BENCHMARK_R4.md
-AI_Traffic_Light/scripts/test_camera_transport_benchmark.py
-AI_Traffic_Light/scripts/compare_camera_transport_reports.py
-AI_Traffic_Light/apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_TRANSPORT_DIAG/AiTL_ESP32_CAM_TRANSPORT_DIAG.ino
-AI_Traffic_Light/apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_TRANSPORT_DIAG/secrets.example.h
