@@ -1,114 +1,59 @@
 # Patch 0_3_11 — Junction Network visualization
 
-V0311 / `0_3_11` is the current unaccepted candidate after V0310. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V0311 / `0_3_11` is the current owner-confirmed passed baseline as of 2026-09-01. V0310 / `0_3_10` is the previous candidate.
 
 ## Purpose
 
-V0311 adds one PC Studio workspace for representing installed/model AiTL junctions as nodes and directed topology lines, assigning saved ESP cameras to those junctions, and exposing the current prototype traffic/pedestrian/event/warning context without overstating the existing inference architecture.
+V0311 adds a PC Studio Junction Network workspace for representing installed/model AiTL junctions as nodes and directed topology lines, assigning saved ESP cameras to those junctions, and exposing current prototype traffic/pedestrian/event/warning context without overstating the existing inference architecture.
 
-The same candidate also includes a documentation/workflow hardening pass so future development can be performed with a shorter preflight, automatic focused-regression discovery, a safer release-metadata order, faster repeated validation and fewer stale architecture/version claims.
+The same version also includes workflow/code hardening so future development uses a shorter preflight, automatic focused-regression discovery, safer release-metadata ordering, faster repeated validation and fewer stale architecture/version claims.
 
 ## Implemented
 
-- Reuses the established `config/intersections.json` network configuration rather than creating a parallel junction database.
-- Extends each intersection with a persisted canvas `position` and optional `primary_source_id` while retaining schema version 1 compatibility.
-- One junction may own several `source_ids` / ESP cameras.
-- One source id may belong to only one junction, preserving unambiguous live source-to-junction identity.
-- Older schema-1 intersection files without V0311 layout/primary-source fields receive deterministic defaults when loaded/saved.
-- An explicitly saved `primary_source_id: null` now remains null across save/reload; only an older record that omits the field receives the backward-compatible first-source default.
-- Adds `GET /api/traffic/network/overview` using the standard API envelope/request ID path.
-- The overview projects configured junctions/links, saved ESP camera state, selected/current source identity, vehicle and pedestrian load, current phase/decision, ranked-scenario/service/manual-test events, and camera/source warnings.
-- Adds the PC Studio **Junction Network** page under the Traffic section.
-- Junction nodes can be added, removed, renamed, enabled/disabled, dragged and persisted.
-- Existing network links are visualized as directed lines; outgoing links can be added, removed, enabled/disabled and given a travel-time value.
-- Saved ESP cameras can be assigned/reassigned from the page. Multiple cameras can be assigned to one junction and one assigned source can be marked primary or the user may intentionally choose no primary source.
-- Node badges show vehicle load, pedestrian load, camera count, phase, event count and warning count.
-- The detail panel exposes current live state, camera health/FPS, topology links, events and warnings.
-- Registers Junction Network topology, camera assignment and honest live observability in the frontend `FUNCTION_REGISTRY` so capability/status surfaces stay synchronized with navigation.
-
-## Same-candidate review / workflow hardening
-
-Code/document review found and corrected a stale durable architecture claim: `ARCHITECTURE.md` still described the older two-PSRAM-framebuffer production camera path even though V0310 production actually uses one framebuffer + `CAMERA_GRAB_LATEST`. The durable architecture/code-ownership/function docs now match the production source.
-
-Future patch workflow is simplified with:
-
-- `docs/PATCH_PLAYBOOK.md` containing the short preflight, owner-module shortcuts, implementation order, release bundle, regression naming, code-review gate and one-command owner validation;
-- revised `AGENTS.md`, `AI_AGENT_GUIDE.md`, `AI_AGENT_CHECKLIST.md`, `DEVELOPMENT_WORKFLOW.md`, `DOCUMENTATION_MAP.md` and `HUMAN_GUIDE.md` so routine work reads fewer documents and follows one consistent sequence;
-- explicit **release bundle first, root `VERSION` last** guidance for an explicitly requested new candidate, preventing the earlier class of structure failures where `VERSION` advanced before patch/changelog/frontend/current-testing metadata existed;
-- explicit zero-argument `scripts/test_*.py` convention because `update_test_run.ps1` auto-discovers those regressions;
-- stronger `check_structure.py` coverage for current-candidate document alignment, required Junction Network/playbook files, atomic persistence of intersection configuration, serial Junction Network polling and durable production architecture markers;
-- `scripts/test_release_documentation_consistency.py`, automatically included by the normal runner, checking current/previous/baseline release-document alignment, frontend version alignment, playbook safeguards, and durable production architecture markers;
-- stronger runner regression assertions preserving automatic test discovery, preflight ordering, dependency-change detection and hardware-test separation;
-- strengthened Junction Network frontend regression requiring navigation, App routing **and** central function-registry wiring.
-
-### Faster normal validation
-
-The normal command remains unchanged, but the runner is now dependency-aware:
-
-- cheap Python compile / structure / release-consistency / runner-self checks run **before** dependency refresh;
-- after `git pull`, the runner compares the old/new Git commits;
-- backend `pip install` is skipped when backend requirement manifests did not change in that update;
-- frontend `npm ci` is skipped when `package.json` / `package-lock.json` did not change and `node_modules` exists;
-- the full offline regression suite, frontend typecheck/build, Git cleanliness and live smoke still run normally;
-- `-RefreshDependencies` forces dependency refresh when the local environment was manually damaged or is suspected to be inconsistent;
-- direct `-SkipUpdate` use refreshes dependencies conservatively because it has no Git-update diff evidence.
-
-No production ESP transport or traffic-control behavior is changed by this hardening pass.
+- Reuses `config/intersections.json` instead of creating a parallel junction database.
+- Persists junction canvas `position` and optional `primary_source_id` with schema-1 backward compatibility.
+- One junction may own multiple camera/source IDs; one source remains exclusive to one junction.
+- Explicit `primary_source_id: null` persists as null; legacy records that omit the field receive the first assigned source as a migration default.
+- Adds `GET /api/traffic/network/overview` through the standard API envelope/request-ID path.
+- Projects configured nodes/links, saved ESP camera health, selected/current source identity, vehicle/pedestrian load, phase/decision, events and warnings.
+- Adds **Traffic → Junction Network** with draggable nodes, directed links, add/remove/edit, camera assignment/reassignment, primary-camera selection, load badges, events and warnings.
+- Registers Junction Network topology, camera assignment and observability in the frontend function registry.
 
 ## Live-data boundary
 
-V0311 does **not** create a separate detector/controller pipeline for every junction. PC Studio still has several independent ESP stream workers but exactly one selected physical/simulation source feeds the shared inference/traffic pipeline.
+V0311 does **not** create a detector/controller pipeline for every junction. Several ESP stream workers may exist, but exactly one selected physical/simulation source feeds the shared inference/traffic pipeline.
 
 Therefore:
 
-- the junction resolved from the current selected frame/source may show current AI/simulation traffic metrics;
-- other junctions show topology and camera-health information but their occupancy/load is explicitly unavailable;
-- a configured link does not imply observed vehicle transfer or active cooperative signal control;
+- only the junction resolved from the selected frame/source may show current AI/simulation traffic metrics;
+- other junctions show topology/camera health but live occupancy/load is explicitly unavailable;
+- configured links do not imply observed vehicle transfer or active cooperative signal control;
 - camera assignment does not imply cross-camera identity/fusion;
 - all traffic phases remain prototype simulation/recommendation/display outputs only.
 
-## Deliberate non-changes
+## Workflow hardening included in V0311
 
-- V0310 ESP production camera transport remains unchanged.
-- No GIS/geographic map is added; this is an editable logical topology canvas.
-- No simultaneous multi-camera inference fusion is added.
-- No automatic cross-camera tracking/identity matching is added.
-- No public-road/cabinet signal control is added.
-- Existing network simulation/cooperation/emergency/class/pedestrian experiment semantics remain unchanged.
-- `passed_baseline` remains `0_2_4` until explicit owner acceptance.
+- Added `docs/PATCH_PLAYBOOK.md` as the short future patch path.
+- Durable architecture now matches the V0310 production camera path: FB1 + `CAMERA_GRAB_LATEST`.
+- New-candidate guidance uses **release bundle first, root `VERSION` last**.
+- Ordinary zero-argument `scripts/test_*.py` regressions are auto-discovered by the normal runner.
+- `check_structure.py` and `test_release_documentation_consistency.py` catch release/document/architecture drift earlier.
+- `test_update_test_run_script.py` protects runner behavior, automatic test discovery and hardware-test separation.
+- The normal Windows runner is dependency-aware: unchanged dependency manifests skip redundant `pip install` / `npm ci`, while full regressions/typecheck/build/smoke still run.
+- `-RefreshDependencies` remains the explicit recovery path when dependency refresh is intentionally required.
 
-## Validation focus
+## Production camera path
 
-The automatic local workflow should verify:
+V0311 does not change ESP firmware. Continue using the V0310 production sketch:
 
-1. Python compile plus project structure/version/current-document consistency **before** dependency refresh;
-2. `scripts/test_release_documentation_consistency.py` release/playbook/architecture safeguards;
-3. update/test/run helper regression including automatic `test_*.py` discovery, dependency-diff optimization and hardware-test separation;
-4. existing intersection-network regression plus V0311 primary-source/layout validation, including explicit-null persistence versus omitted-field migration;
-5. V0311 overview-service regression for multi-camera assignment, camera health, live source mapping, event/warning projection and unavailable non-selected junctions;
-6. V0311 frontend structure regression including navigation/App/function-registry/API/type/style wiring;
-7. backend/API regressions;
-8. frontend TypeScript typecheck and production build;
-9. live backend smoke sequence and normal PC Studio startup.
+```text
+apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V0310/AiTL_ESP32_CAM_V0310.ino
+```
 
-## Owner acceptance checks
+## Owner acceptance
 
-After the normal one-command update/test/run workflow passes:
+On 2026-09-01 the owner explicitly confirmed that V0311 is running correctly and passes. Root `VERSION` therefore records `passed_baseline: 0_3_11`.
 
-1. Open **Traffic → Junction Network**.
-2. Confirm the page loads the existing default/configured junction network.
-3. Add at least two junctions and drag them to different positions.
-4. Add at least one directed line between junctions and save.
-5. Assign two saved ESP cameras to one junction and, if another junction owns one of them, confirm the explicit reassignment prompt.
-6. Select one assigned camera as the primary source and save; then choose **None**, save again, restart PC Studio and verify the explicit no-primary choice persists.
-7. Reload/restart PC Studio and verify junction positions, links and camera assignments persist.
-8. With one ESP selected/streaming, verify that its resolved junction can display live traffic/pedestrian information while another unselected junction remains clearly unavailable rather than showing copied/fabricated counts.
-9. Disconnect or make an assigned ESP unavailable and verify a camera warning is visible.
-10. Trigger an existing simulation/test ranked scenario or pedestrian service and verify the selected observation junction displays the corresponding event badge/detail.
-11. Verify Dashboard/function-status presentation includes the Junction Network capabilities rather than omitting the implemented feature.
-12. Verify Camera Sources, Live AI, Camera Diagnostics, zones, analytics, dataset and simulation pages still operate normally.
-13. Run the same normal command a second time with no dependency-manifest changes and verify it reports dependency installation as skipped while still completing tests/build/smoke/startup.
-14. Use `-RefreshDependencies` only as a recovery check if you intentionally want to force reinstall/check; it is not required for normal acceptance.
-15. Do not change `passed_baseline` until the owner explicitly accepts V0311.
+The acceptance covers the V0311 Junction Network behavior and same-candidate hardening present on `main` at acceptance time. Future normal patch development starts from `0_3_11`; increment `Z` only when the owner explicitly requests the next patch/version.
 
 AiTL remains a local/student-scale prototype with no physical/public-road traffic-signal authority.
