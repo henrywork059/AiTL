@@ -37,6 +37,7 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/lib/useSerialPolling.ts",
     "apps/pc-studio/frontend/src/lib/junctionNetworkApi.ts",
+    "apps/pc-studio/frontend/src/lib/junctionNetworkView.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
     "apps/pc-studio/frontend/src/pages/TrafficLogicPage.tsx",
@@ -44,6 +45,7 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/pages/signalRules.css",
     "apps/pc-studio/frontend/src/components/TrafficHistoryChart.tsx",
     "apps/pc-studio/frontend/src/components/TrafficFlowChart.tsx",
+    "apps/pc-studio/frontend/src/components/junctions/JunctionNodeCard.tsx",
     "apps/pc-studio/frontend/src/constants/appNavigation.ts",
     "apps/pc-studio/frontend/src/constants/projectVersion.ts",
     "apps/device-camera/esp32-cam/src/main.cpp",
@@ -65,7 +67,6 @@ REQUIRED_PATHS = (
     "scripts/validate_patch_zip.py",
     "scripts/test_atomic_json_store.py",
     "scripts/test_frontend_polling_structure.py",
-    "scripts/test_release_documentation_consistency.py",
     "scripts/test_junction_network_frontend_structure.py",
     "scripts/test_junction_network_overview.py",
     "scripts/update_test_run.ps1",
@@ -218,6 +219,14 @@ def validate_durable_workflow_guards(root: Path, errors: list[str]) -> None:
         ):
             if marker not in text:
                 add_error(errors, message)
+
+    workflow = root / "docs/DEVELOPMENT_WORKFLOW.md"
+    if workflow.exists():
+        text = workflow.read_text(encoding="utf-8")
+        if "VERSION` last" not in text:
+            add_error(errors, "Development workflow must preserve VERSION-last release ordering.")
+        if "auto-discovers zero-argument `scripts/test_*.py`" not in text:
+            add_error(errors, "Development workflow must preserve automatic regression discovery guidance.")
 
     architecture = root / "docs/ARCHITECTURE.md"
     if architecture.exists():
