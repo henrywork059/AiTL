@@ -280,25 +280,20 @@ Remove-Item Env:AITL_BACKEND_DEPS_CHANGED -ErrorAction SilentlyContinue
 Remove-Item Env:AITL_FRONTEND_DEPS_CHANGED -ErrorAction SilentlyContinue
 
 $backendDependenciesNeedRefresh = $RefreshDependencies -or $backendDependencyHint -ne "0"
-$frontendDependenciesNeedRefresh = $RefreshDependencies -or $frontendDependencyHint -ne "0" -or -not (Test-Path (Join-Path $frontendDir "node_modules")
-)
+$frontendDependenciesNeedRefresh = $RefreshDependencies -or $frontendDependencyHint -ne "0" -or -not (Test-Path (Join-Path $frontendDir "node_modules"))
 
 if (Test-Path $versionFile) {
     Write-Host "`n=== Current project version ===" -ForegroundColor Cyan
     Get-Content $versionFile
 }
 
-$preflightTests = @(
-    "test_release_documentation_consistency.py",
-    "test_update_test_run_script.py"
-)
+$preflightTests = @("test_update_test_run_script.py")
 
 if (-not $SkipTests) {
     Push-Location $projectRoot
     try {
         Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
-        Run-Step "Project structure" { & $python ".\scripts\check_structure.py" }
-        Run-Step "Release documentation consistency" { & $python ".\scripts\test_release_documentation_consistency.py" }
+        Run-Step "Project structure and release consistency" { & $python ".\scripts\check_structure.py" }
         Run-Step "Update/test/run runner regression" { & $python ".\scripts\test_update_test_run_script.py" }
     }
     finally {
