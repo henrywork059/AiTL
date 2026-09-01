@@ -1,22 +1,57 @@
 # AI Traffic Light (AiTL)
 
-Local/student-scale computer-vision and adaptive traffic-light simulation prototype.
+AiTL is a local/student-scale computer-vision and adaptive traffic-light simulation prototype. It combines a Windows PC Studio application with ESP32-CAM camera nodes, simulation, dataset/training tools, traffic analytics, configurable signal logic, and multi-junction visualization.
 
-V037 / `0_3_7` is the current unaccepted candidate. V036 / `0_3_6` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+The authoritative release state is always in [`VERSION`](VERSION). Current-candidate details belong in `docs/PATCH_<version>.md`; durable architecture and workflow rules belong in the `docs/` guides.
 
-## V037 physical camera
+## PC Studio
 
-V037 R6 keeps V036-compatible HTTP control plus persistent `ATL1` TCP JPEG transport, but removes the R2/R4 assumption that a JPEG must fit one ESP lwIP send buffer. Controlled physical testing carried 8 KiB, 16 KiB and 32 KiB framed payloads without TCP failures on a healthy AP, so transport pressure no longer changes image quality or resolution.
+- FastAPI backend
+- React/Vite frontend
+- camera receiver and simulation source
+- ESP32-CAM profile/session management
+- live AI inference with trained YOLO models
+- dataset capture, review, labeling and managed training
+- occupancy, tracking and traffic-flow analytics
+- configurable protected signal timing and adaptive scenario logic
+- deterministic simulation experiments
+- Junction Network configuration and visualization
+- decision/explainability evidence for simulation/network experiments
 
-Each frame remains JPEG with a fixed 16-byte `ATL1` header carrying payload length, sequence and ESP uptime. PC Studio can save up to 12 ESP profiles, keep several streams active independently, cache the newest frame from each, and select one source for `CameraFrameService`. Browser-compatible MJPEG still comes from the PC backend.
+Exactly one selected physical or simulation source currently feeds the shared live inference/traffic pipeline. Junction Network may represent and configure multiple junctions/cameras, but it does not claim simultaneous live inference at every junction.
 
-R6 low-latency protections are:
-- one PSRAM framebuffer with `CAMERA_GRAB_WHEN_EMPTY` and 20 MHz XCLK;
-- `TCP_NODELAY`, keepalive and the existing non-blocking vectored `sendmsg()` path;
-- freshness-first target-FPS scheduling with no catch-up backlog;
-- 700 ms no-progress / 1500 ms total steady-state send guardrails, with longer per-connection warmup;
-- configured JPEG quality and resolution stay fixed if a send slows or fails;
-- a partial ATL1 frame closes only that TCP client so PC Studio can reconnect cleanly;
-- RSSI, BSSID, channel and ESP Wi-Fi recovery counters are visible in status/Camera Sources.
+## ESP32-CAM
 
-Connect still transfers zero image bytes. Camera settings remain PC-owned and are applied before Start Stream. Simulation and selected-source isolation remain unchanged. Physical/public-road traffic-signal control remains outside scope.
+The active production camera path is the V0310-tuned ESP32-CAM implementation. It preserves the `aitl-tcp-jpeg-v1` / `ATL1` framing contract, uses one framebuffer with `CAMERA_GRAB_LATEST`, and retains PC-owned image quality/resolution/FPS settings. Diagnostic firmware remains separate from the production entrypoint.
+
+## Windows workflow
+
+After first-time backend setup, normal update/test/run is one command from any PowerShell directory:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
+```
+
+The runner fast-forwards `origin/main`, protects tracked local work, preserves untracked runtime data, reloads the pulled runner once, runs structure/regression/frontend checks and live smoke, safely replaces only AiTL-owned PC Studio processes on ports 8000/5173, and opens PC Studio.
+
+First-time backend environment setup/recovery:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\setup_backend_windows.ps1"
+```
+
+## Documentation
+
+Start with:
+
+- `docs/START_HERE.md`
+- `docs/DOCUMENTATION_MAP.md`
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE.md`
+- `docs/PATCH_PLAYBOOK.md`
+- `docs/LOCAL_TESTING.md`
+- `docs/TEST_READY_CHECKLIST.md`
+
+## Safety boundary
+
+AiTL is a prototype for simulation, model-junction demonstrations and controlled hardware experiments. It does not provide certified or authorized physical/public-road traffic-signal control.
