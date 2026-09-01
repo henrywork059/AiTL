@@ -49,6 +49,20 @@ The existing safeguards remain:
 - only AiTL-owned PC Studio process trees on ports 8000/5173 may be terminated automatically;
 - unrelated port owners remain protected.
 
+## Same-candidate Junction Network UI repair
+
+Owner testing found that Junction Network node cards could clip their right/bottom status content. The node layout used a narrow fixed width plus single-line ellipsis in title/phase rows.
+
+V0312 now:
+
+- uses a wider responsive junction card (`260px` desktop, `220px` on small screens, bounded by the map width);
+- allows long junction titles and phase/status text to wrap inside the card;
+- allows metadata and event/warning rows to wrap rather than overflow;
+- adds extra bottom padding so alert badges remain clear of the rounded border;
+- extends `test_junction_network_frontend_structure.py` to guard the content-visibility layout rules.
+
+This changes presentation only; junction topology, camera assignment and live-data semantics are unchanged.
+
 ## Behavior intentionally unchanged
 
 V0312 does not change:
@@ -69,5 +83,7 @@ Run the normal command from any PowerShell directory:
 ```
 
 The command must perform at most one update/reload cycle, then continue through compile/structure/regressions/frontend checks/live smoke and start PC Studio. Re-running it while PC Studio is already running must safely replace only AiTL-owned listeners.
+
+On **Traffic → Junction Network**, confirm each node displays its full title/ACTIVE marker, vehicle and pedestrian load, signal phase and event/warning badges inside the card without right/bottom clipping.
 
 `0_3_11` remains the passed baseline until the owner explicitly confirms V0312 passes.
