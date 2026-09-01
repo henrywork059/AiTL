@@ -18,6 +18,7 @@ V0312 remains unaccepted until the owner explicitly confirms PASS.
 - [ ] Python compile passes.
 - [ ] Repository structure/current-release consistency passes.
 - [ ] Automatic zero-argument backend regressions pass.
+- [ ] Junction Network frontend structure/content-visibility regression passes.
 - [ ] Frontend typecheck passes.
 - [ ] Frontend production build passes.
 - [ ] Git tracked-cleanliness check passes.
@@ -39,6 +40,8 @@ V0312 remains unaccepted until the owner explicitly confirms PASS.
 ## Functional regression
 
 - [ ] Junction Network still loads/persists nodes, links and camera assignments.
+- [ ] Junction cards show the full title/ACTIVE state, vehicle/pedestrian load, phase and event/warning badges without clipping inside the node.
+- [ ] Long junction labels/status values wrap inside the node rather than disappearing past its border.
 - [ ] Only the selected source feeds the shared live inference/traffic pipeline.
 - [ ] Dataset/training/inference/model workflows remain unchanged.
 - [ ] Simulation/adaptive signal behavior remains unchanged.
