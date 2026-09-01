@@ -1,4 +1,0 @@
-AI_Traffic_Light/scripts/update_test_run.ps1
-AI_Traffic_Light/scripts/test_camera_transport_benchmark_logic.py
-AI_Traffic_Light/PATCH_APPLY_INSTRUCTIONS_0_3_8_R5_RUNNER_FIX.txt
-AI_Traffic_Light/PATCH_MANIFEST_0_3_8_R5_RUNNER_FIX.txt
