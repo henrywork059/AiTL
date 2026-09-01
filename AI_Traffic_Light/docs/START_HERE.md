@@ -1,6 +1,6 @@
 # Start Here — V0311
 
-V0311 / `0_3_11` is the current unaccepted candidate. V0310 / `0_3_10` is the previous candidate. V024 / `0_2_4` remains the owner-confirmed passed baseline.
+V0311 / `0_3_11` is the current owner-confirmed passed baseline as of 2026-09-01. V0310 / `0_3_10` is the previous candidate.
 
 ## Normal Windows workflow
 
@@ -10,15 +10,15 @@ For routine update, validation and launch, use the same command from any PowerSh
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-The idempotent restart behavior remains: the helper may stop listeners on 8000/5173 only when Win32 process evidence identifies them as this repository's AiTL PC Studio process tree. Unrelated listeners are protected. Runtime/user data is preserved.
+The helper safely fast-forwards `main`, reloads itself, runs the automatic validation suite, replaces only AiTL-owned PC Studio listeners on ports 8000/5173, runs live smoke and opens PC Studio. Runtime/user data is preserved and unrelated port owners are protected.
 
-For future development, coding agents should use `docs/PATCH_PLAYBOOK.md` after reading root `VERSION` and `AGENTS.md`. It contains the short module-selection, test, documentation and release-bundle workflow; the longer agent guides are reference material rather than a mandatory full reread for every small change.
+Repeated runs are dependency-aware: unchanged backend/frontend dependency manifests skip redundant `pip install` / `npm ci`, while regressions, frontend typecheck/build, Git cleanliness and live smoke still run. Use `-RefreshDependencies` only when you intentionally need to force dependency refresh.
+
+For future development, read root `VERSION` and `AGENTS.md`, then use `docs/PATCH_PLAYBOOK.md` as the short execution path.
 
 ## V0311 Junction Network
 
 Open **Traffic → Junction Network** to configure and visualize the prototype junction installation model.
-
-The page uses the established `config/intersections.json` network configuration:
 
 ```text
 junction node
@@ -29,55 +29,34 @@ junction node
 └─ directed topology links to other junctions
 ```
 
-One junction may contain multiple saved ESP cameras. One camera/source id may belong to only one junction so a received frame still resolves to one unambiguous junction.
+One junction may contain multiple saved ESP cameras. One camera/source id may belong to only one junction so a received frame resolves to one unambiguous junction.
 
-The page shows:
-
-- draggable junction nodes and directed topology lines;
-- assigned-camera health and measured FPS;
-- vehicle and pedestrian load for the currently observed junction;
-- current prototype phase/decision context;
-- ranked-scenario, pedestrian-service and manual/test event indicators when available;
-- camera/source and observation warnings.
+The page shows draggable junction nodes and directed links, camera health/FPS, vehicle and pedestrian load for the currently observed junction, prototype phase/decision context, event indicators and warnings.
 
 ## Live-data boundary
 
-V0311 does not yet create one AI pipeline for every junction. Several ESP stream workers may exist, but exactly one selected physical/simulation source still feeds the shared inference/traffic pipeline.
+V0311 does not create one AI pipeline for every junction. Several ESP stream workers may exist, but exactly one selected physical/simulation source still feeds the shared inference/traffic pipeline. Other junctions intentionally show live occupancy/load as unavailable rather than copying the selected junction's data.
 
-Therefore only the junction resolved from the current selected source may show current AI/simulation traffic metrics. Other junctions deliberately show occupancy/load as unavailable while still showing their topology and camera-health state. Do not interpret camera assignment or configured links as live cross-camera fusion, observed vehicle transfer, cooperative signal control, or emergency recognition.
+Camera assignment or configured links do not imply live cross-camera fusion, observed transfer, cooperative signal control or emergency recognition.
 
-## V0310 camera transport remains active
+## Production camera firmware
 
-The production ESP camera path remains the V0310 R10-tuned transport:
+V0311 keeps the V0310 R10-tuned production camera transport:
 
 ```text
-PC Connect -> ESP /status only
-PC Start -> /config -> /start -> persistent TCP :81
 ESP camera -> FB1 / CAMERA_GRAB_LATEST on PSRAM
 ATL1 header + configured JPEG -> bounded plain send() writes, max 11680 B/write
 selected ESP -> CameraFrameService -> preview / Live AI / capture / zones / analytics
 ```
 
-For production-camera testing, continue to flash:
+Continue to flash:
 
 ```text
 apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V0310/AiTL_ESP32_CAM_V0310.ino
 ```
 
-V0311 does not require a new ESP firmware sketch because this patch changes PC-side junction configuration/visualization only.
+## Passed-state note
 
-## V0311 acceptance focus
-
-After the normal one-command workflow passes:
-
-1. Open Junction Network.
-2. Add/arrange several junctions.
-3. Assign multiple saved ESP cameras to one junction.
-4. Add at least one directed link and save.
-5. Restart PC Studio and verify layout/link/camera assignment persistence.
-6. Stream one selected ESP and verify only its resolved junction receives live traffic/pedestrian data.
-7. Verify another unselected junction remains explicitly unavailable rather than mirroring the selected junction's counts.
-8. Exercise an offline camera warning and an existing simulation/test event.
-9. Confirm Dashboard/function status now includes Junction Network capabilities.
+The owner confirmed V0311 is running correctly and passes on 2026-09-01. Future normal patch development therefore starts from `0_3_11` as the passed baseline. Increment only when the owner explicitly requests the next patch/version.
 
 AiTL remains a local/student-scale prototype; physical/public-road traffic-signal authority is out of scope.
