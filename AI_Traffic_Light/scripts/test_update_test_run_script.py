@@ -36,22 +36,25 @@ def main() -> int:
     assert 'Run-Step "Frontend dependencies" { npm ci }' in text
     assert "Use -RefreshDependencies" in text
 
-    # Cheap guards run before dependency installation.
+    # Cheap guards run before dependency installation. check_structure.py is the
+    # single release/structure authority; the old duplicate release script must
+    # not be executed or listed as a preflight test.
     for marker in (
         'Run-Step "Python compile"',
-        'Run-Step "Project structure"',
-        'Run-Step "Release documentation consistency"',
+        'Run-Step "Project structure and release consistency"',
         'Run-Step "Update/test/run runner regression"',
     ):
         assert marker in text
+    assert "test_release_documentation_consistency.py" not in text
     dependency_step = text.index('Run-Step "Backend dependencies"')
-    assert text.index('Run-Step "Project structure"') < dependency_step
+    assert text.index('Run-Step "Project structure and release consistency"') < dependency_step
     assert text.index('Run-Step "Update/test/run runner regression"') < dependency_step
 
     # Automatic regressions and hardware-only exclusions remain deterministic.
     assert 'Get-ChildItem ".\\scripts\\test_*.py"' in text
     assert '$manualHardwareTests' in text
     assert '$preflightTests' in text
+    assert '$preflightTests = @("test_update_test_run_script.py")' in text
     assert 'Sort-Object Name' in text
     assert 'Run-Step "Backend regression: $($test.Name)"' in text
     assert '$_.Name -notin $preflightTests' in text
@@ -83,7 +86,8 @@ def main() -> int:
     print("[PASS] updater fast-forwards main without deleting runtime data")
     print("[PASS] pulled runner reloads exactly once and recursive update is guarded")
     print("[PASS] dependency refresh remains change-aware with force-refresh recovery")
-    print("[PASS] preflight, automatic regressions, typecheck/build and live smoke remain wired")
+    print("[PASS] structure/release validation has one preflight authority before dependency work")
+    print("[PASS] automatic regressions, typecheck/build and live smoke remain wired")
     print("[PASS] existing AiTL processes are replaced while unrelated port owners stay protected")
     print("[PASS] runner remains read-only for tracked release/source files")
     return 0
