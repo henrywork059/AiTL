@@ -57,6 +57,16 @@ class FakeCameraManager:
         }
 
 
+class CountingOverviewService(JunctionNetworkOverviewService):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.remote_camera_projection_count = 0
+
+    def _remote_camera_view(self, camera: dict) -> dict:  # type: ignore[override]
+        self.remote_camera_projection_count += 1
+        return JunctionNetworkOverviewService._remote_camera_view(camera)
+
+
 def fake_traffic_state() -> dict:
     return {
         "phase": "pedestrian_green",
@@ -179,7 +189,7 @@ def main() -> int:
         except AppError:
             pass
 
-        overview_service = JunctionNetworkOverviewService(
+        overview_service = CountingOverviewService(
             network_service=network,
             camera_manager=FakeCameraManager(),  # type: ignore[arg-type]
             traffic_state_provider=fake_traffic_state,
@@ -188,6 +198,9 @@ def main() -> int:
         )
         overview = overview_service.overview()
 
+        assert overview_service.remote_camera_projection_count == 2, (
+            "each saved ESP camera should be projected once per overview, then reused for assignment"
+        )
         assert overview["multi_camera_assignment"] is True
         assert overview["simultaneous_multi_junction_inference"] is False
         assert overview["observation_intersection_id"] == "junction_a"
@@ -217,11 +230,11 @@ def main() -> int:
     assert '@router.get("/network/overview")' in route_source
     assert "junction_network_overview_service.overview()" in route_source
 
-    print("[PASS] V0311 persists node positions and multi-camera junction assignments")
-    print("[PASS] source identities remain exclusive across junctions and primary camera stays inside the assignment")
+    print("[PASS] junction positions and multi-camera assignments remain persistent")
+    print("[PASS] each ESP camera view is projected once per overview and reused")
     print("[PASS] overview exposes camera health plus live load/events only for the shared selected pipeline junction")
-    print("[PASS] unavailable junctions are explicit and simultaneous multi-junction inference is not claimed")
-    print("[PASS] /api/traffic/network/overview route is wired through the dedicated service")
+    print("[PASS] unavailable junctions remain explicit and simultaneous multi-junction inference is not claimed")
+    print("[PASS] /api/traffic/network/overview route remains wired through the dedicated service")
     return 0
 
 
