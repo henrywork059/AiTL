@@ -1,52 +1,50 @@
-# V0312 Test-Ready Checklist
+# V0313 Test-Ready Checklist
 
 Release state:
 
 ```text
-version: 0_3_12
-previous_version: 0_3_11
+version: 0_3_13
+previous_version: 0_3_12
 passed_baseline: 0_3_11
-status: repository cleanup candidate
+status: code management and optimization candidate
 ```
 
-V0312 remains unaccepted until the owner explicitly confirms PASS.
+V0313 remains unaccepted until the owner explicitly confirms PASS.
 
 ## Automated validation
 
-- [ ] Normal Windows command performs one update/reload cycle only.
-- [ ] Recursive reload guard regression passes.
 - [ ] Python compile passes.
-- [ ] Repository structure/current-release consistency passes.
-- [ ] Automatic zero-argument backend regressions pass.
-- [ ] Junction Network frontend structure/content-visibility regression passes.
+- [ ] `check_structure.py` passes as the single structure/release-consistency authority.
+- [ ] Runner self-regression passes and confirms the duplicate release-consistency step is absent.
+- [ ] Junction Network overview optimization regression passes.
+- [ ] Junction Network frontend modularity/content-visibility regression passes.
+- [ ] All remaining automatic zero-argument backend regressions pass.
 - [ ] Frontend typecheck passes.
 - [ ] Frontend production build passes.
 - [ ] Git tracked-cleanliness check passes.
 - [ ] Live backend smoke passes.
 
-## Cleanup validation
+## Code management validation
 
-- [ ] No root `PATCH_MANIFEST_*` files remain.
-- [ ] No root `PATCH_APPLY_INSTRUCTIONS_*` files remain.
-- [ ] Historical `docs/PATCH_*` and cumulative changelog history remain available.
-- [ ] V036 metadata finalizer and its preservation-only regression are removed.
-- [ ] Duplicate generic Windows backend/frontend launch wrappers are removed.
-- [ ] Obsolete V010 test-ready instructions and old smoke `.bat` wrapper are removed.
-- [ ] V0310 production firmware remains available.
-- [ ] V037 source remains available because V0310 still inherits it.
-- [ ] Camera diagnostic firmware/tools remain available.
-- [ ] First-time/recovery `setup_backend_windows.ps1` remains available.
+- [ ] `JunctionNetworkPage.tsx` owns page state/mutations rather than node-card presentation.
+- [ ] `components/junctions/JunctionNodeCard.tsx` owns node-card presentation only.
+- [ ] `lib/junctionNetworkView.ts` owns pure view/config helpers.
+- [ ] Repeated link/source lookups use memoized maps in the Junction Network page.
+- [ ] Saved ESP camera UI projections are created once per overview and reused.
+- [ ] `scripts/test_release_documentation_consistency.py` is absent.
+- [ ] `scripts/check_structure.py` contains the consolidated durable release/workflow checks.
+- [ ] Normal runner has one `Project structure and release consistency` preflight plus its self-regression.
 
 ## Functional regression
 
-- [ ] Junction Network still loads/persists nodes, links and camera assignments.
-- [ ] Junction cards show the full title/ACTIVE state, vehicle/pedestrian load, phase and event/warning badges without clipping inside the node.
-- [ ] Long junction labels/status values wrap inside the node rather than disappearing past its border.
+- [ ] Junction Network loads/persists nodes, links and camera assignments unchanged.
+- [ ] Junction cards retain the V0312 non-clipping layout for long titles/status values.
+- [ ] Camera reassignment and Primary camera/None persistence remain correct.
 - [ ] Only the selected source feeds the shared live inference/traffic pipeline.
 - [ ] Dataset/training/inference/model workflows remain unchanged.
 - [ ] Simulation/adaptive signal behavior remains unchanged.
 - [ ] V0310 `ATL1` production camera path remains unchanged.
-- [ ] Runtime/user data is not deleted by the runner.
+- [ ] Runtime/user data is preserved by the runner.
 - [ ] No physical/public-road signal-control authority is introduced.
 
 After these checks, explicit owner confirmation is required before changing `passed_baseline` from `0_3_11`.

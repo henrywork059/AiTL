@@ -1,12 +1,12 @@
-# Local Testing — V0312
+# Local Testing — V0313
 
 Expected release state:
 
 ```text
-version: 0_3_12
-previous_version: 0_3_11
+version: 0_3_13
+previous_version: 0_3_12
 passed_baseline: 0_3_11
-status: repository cleanup candidate
+status: code management and optimization candidate
 ```
 
 ## Normal update / test / run
@@ -23,7 +23,8 @@ Expected sequence:
 fast-forward main
 → reload pulled runner exactly once
 → Python compile
-→ structure/current-release/runner preflight checks
+→ Project structure and release consistency
+→ Update/test/run runner regression
 → dependency refresh only when manifests changed
 → automatic zero-argument offline regressions
 → frontend typecheck/build
@@ -33,7 +34,7 @@ fast-forward main
 → launch frontend/backend
 ```
 
-A normal run must show only one `=== Update from origin/main ===` section. If parameter binding ever regresses, `AITL_RUNNER_RELOADED` must stop execution with `Recursive update prevented` instead of looping.
+There should be no separate `Release documentation consistency` preflight because `check_structure.py` now owns those checks.
 
 Force dependency refresh only when needed:
 
@@ -41,21 +42,30 @@ Force dependency refresh only when needed:
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -RefreshDependencies
 ```
 
-## V0312 checks
+## V0313 focused coverage
 
-Confirm:
+Important checks include:
 
-- `scripts/test_update_test_run_script.py` passes the explicit reload/recursion guard checks;
-- structure and release-document consistency pass for `0_3_12` / previous `0_3_11` / baseline `0_3_11`;
-- all remaining ordinary `scripts/test_*.py` regressions pass;
-- frontend typecheck and production build pass;
-- live backend smoke passes;
-- the frontend opens normally;
-- running the same command again safely replaces only AiTL-owned ports 8000/5173;
-- runtime data under config/datasets/outputs and generated caches is not deleted.
+- `scripts/check_structure.py` — the single structural/release-consistency authority plus durable ownership/persistence/polling guards;
+- `scripts/test_update_test_run_script.py` — reload safety, dependency optimization, one structural preflight authority, automatic regressions and safe process replacement;
+- `scripts/test_junction_network_overview.py` — one ESP camera projection per saved camera per overview while preserving honest selected-source observation behavior;
+- `scripts/test_junction_network_frontend_structure.py` — page/component/helper ownership, memoized lookup maps, navigation/API wiring and non-clipping node layout;
+- inherited Junction Network persistence, traffic, camera, dataset/training/inference, simulation and signal regressions.
 
-## Functional regression boundary
+## Manual V0313 checks
 
-V0312 should not change V0311 Junction Network behavior, the single-selected-source live inference boundary, simulation/signal logic, dataset/training/inference APIs, or V0310 production camera transport.
+Open **Traffic → Junction Network** and confirm:
 
-`0_3_11` remains the passed baseline until the owner explicitly confirms V0312 passes.
+- existing saved node positions and links load;
+- nodes still drag and save normally;
+- multiple cameras can still be assigned to one junction;
+- reassigning a camera between junctions still asks for confirmation;
+- Primary camera and explicit None still save/reload correctly;
+- link add/remove/travel-time editing still works;
+- full node title/ACTIVE/load/phase/event/warning content remains visible;
+- only the junction resolved from the shared selected source receives current live traffic values;
+- other junctions continue to show unavailable live load rather than copied data.
+
+No ESP firmware reflash is required for V0313.
+
+`0_3_11` remains the passed baseline until the owner explicitly confirms V0313 passes.

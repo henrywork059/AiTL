@@ -1,4 +1,14 @@
 # Changelog
+## 0_3_13 — Code management and optimization
+
+- Created V0313 / `0_3_13` at the owner's explicit request after unaccepted V0312; `passed_baseline` remains `0_3_11` until explicit acceptance.
+- Modularized Junction Network frontend ownership: page state/mutations remain in `JunctionNetworkPage.tsx`, node-card presentation moved to `components/junctions/JunctionNodeCard.tsx`, and pure view/config helpers moved to `lib/junctionNetworkView.ts`.
+- Replaced repeated junction/source scans in the frequently refreshed topology UI with memoized ID/source maps while preserving behavior and the V0312 non-clipping card layout.
+- Optimized `JunctionNetworkOverviewService` so each saved ESP camera view is normalized once per overview and reused for junction assignment/summary work; focused regression verifies one projection per saved camera.
+- Consolidated current-release/document/workflow structural validation into `scripts/check_structure.py`, removed the duplicate release-consistency regression, and simplified the Windows runner to one structure/release preflight plus runner self-regression.
+- Updated durable code/playbook guidance to prevent duplicate validators and encourage clear page/presentation/helper ownership without state fragmentation.
+- Preserved APIs, request IDs, persisted network schema, Junction Network semantics, single-selected-source live inference boundary, dataset/training/inference, signal simulation, V0310 `ATL1` production transport, runtime/user data, and prototype-only public-road safety boundary.
+
 ## 0_3_12 — Repository cleanup and runner hardening
 
 - Created V0312 / `0_3_12` at the owner's explicit request after the owner-confirmed V0311 baseline; `passed_baseline` remains `0_3_11` until explicit acceptance.
@@ -319,7 +329,7 @@
 - Added a patch-ZIP validator for `AI_Traffic_Light/` path enforcement, forbidden runtime/generated content, path traversal, and ZIP integrity.
 - Reworked AI-agent/developer instructions around the current architecture, candidate acceptance gate, runtime-data preservation, evidence reporting, and changed-files-only packaging; added a concise AI-agent checklist.
 - Preserved V017 convergence monitoring, patience-based early stopping, persistent settings/logs, traffic logic, labeling, training, model management, and prototype-only safety boundaries.
-- Physical public-road traffic control remains disabled.
+- Physical/public-road traffic control remains disabled.
 ## 0_1_7 — Training convergence, early stopping, and real prototype tools
 
 - Added per-epoch YOLO training metric history for validation fitness, mAP50-95, mAP50, and available train/validation loss totals.
