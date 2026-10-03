@@ -5,6 +5,7 @@ type SerialPollingOptions = {
   enabled?: boolean;
   immediate?: boolean;
   onError?: (error: unknown) => void;
+  restartKey?: string | number | boolean | null;
 };
 
 const MIN_POLL_INTERVAL_MS = 50;
@@ -28,6 +29,7 @@ export function useSerialPolling(
 
   const enabled = options.enabled ?? true;
   const immediate = options.immediate ?? true;
+  const restartKey = options.restartKey ?? null;
   const safeIntervalMs = Math.max(MIN_POLL_INTERVAL_MS, intervalMs);
 
   useEffect(() => {
@@ -60,5 +62,5 @@ export function useSerialPolling(
       cancelled = true;
       if (timerId !== undefined) window.clearTimeout(timerId);
     };
-  }, [enabled, immediate, safeIntervalMs]);
+  }, [enabled, immediate, restartKey, safeIntervalMs]);
 }

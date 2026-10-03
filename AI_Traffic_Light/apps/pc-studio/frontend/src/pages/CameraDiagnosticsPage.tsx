@@ -9,6 +9,7 @@ import {
   type CameraLoadPhase,
 } from "../lib/cameraDiagnosticsApi";
 import { fetchRemoteCameraStatus, type RemoteCameraStatus } from "../lib/remoteCameraApi";
+import { useSerialPolling } from "../lib/useSerialPolling";
 
 function checkPillClass(status: CameraDiagnosticCheckStatus): string {
   if (status === "pass") return "status-pill status-implemented";
@@ -67,27 +68,19 @@ export function CameraDiagnosticsPage() {
       .catch((nextError) => setError(nextError instanceof Error ? nextError.message : "Camera status could not be loaded."));
   }, []);
 
-  useEffect(() => {
-    if (!running) return;
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const next = await fetchCameraDiagnosticProgress();
-        if (!cancelled) setProgress(next);
-      } catch {
+  useSerialPolling(
+    async () => {
+      setProgress(await fetchCameraDiagnosticProgress());
+    },
+    500,
+    {
+      enabled: running,
+      onError: () => {
         // The main /run request remains authoritative. A transient progress-poll
         // failure must not abort an otherwise healthy diagnostic run.
-      }
-    }
-
-    void poll();
-    const timer = window.setInterval(() => void poll(), 500);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [running]);
+      },
+    },
+  );
 
   const activeProfile = useMemo(
     () => remote?.cameras.find((camera) => camera.source_id === remote.active_source_id) ?? null,

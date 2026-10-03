@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatus } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
+import { useSerialPolling } from "../lib/useSerialPolling";
 import type { CameraStatus, CaptureQualityTag, CaptureRecord, DatasetStatus } from "../types";
 
 type Props = {
@@ -23,11 +24,9 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     setLastCapture(nextStatus.last_capture);
   }
 
-  useEffect(() => {
-    void refreshStatus();
-    const timerId = window.setInterval(() => void refreshStatus(), 3000);
-    return () => window.clearInterval(timerId);
-  }, []);
+  useSerialPolling(refreshStatus, 3000, {
+    onError: (error) => setMessage(error instanceof Error ? error.message : "Dataset status could not be refreshed."),
+  });
 
   async function saveCurrentFrame() {
     setSaving(true);

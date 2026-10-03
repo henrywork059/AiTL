@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { fetchRecentLogs } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
+import { useSerialPolling } from "../lib/useSerialPolling";
 import type { ApiConnectionState, RecentLog } from "../types";
 
 type Props = {
@@ -21,11 +22,7 @@ export function LogsPage({ logs, apiState, onLogsChange }: Props) {
     }
   }
 
-  useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(timer);
-  }, []);
+  useSerialPolling(refresh, 3000);
 
   return (
     <div className="page-stack">

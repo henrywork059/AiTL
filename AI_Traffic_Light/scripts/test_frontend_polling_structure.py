@@ -1,20 +1,16 @@
-"""Static regression checks for V024 non-overlapping App-level polling."""
+"""Static regression checks for non-overlapping periodic frontend polling."""
 from __future__ import annotations
 
 from pathlib import Path
 
+from check_structure import SERIAL_POLLING_SURFACES
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-APP_PATH = PROJECT_ROOT / "apps" / "pc-studio" / "frontend" / "src" / "App.tsx"
 HOOK_PATH = PROJECT_ROOT / "apps" / "pc-studio" / "frontend" / "src" / "lib" / "useSerialPolling.ts"
 
 
 def main() -> int:
-    app = APP_PATH.read_text(encoding="utf-8")
     hook = HOOK_PATH.read_text(encoding="utf-8")
-
-    assert 'from "./lib/useSerialPolling"' in app
-    assert app.count("useSerialPolling(") >= 2
-    assert "window.setInterval" not in app
 
     assert "await taskRef.current()" in hook
     assert "finally" in hook
@@ -22,8 +18,16 @@ def main() -> int:
     assert "window.setInterval" not in hook
     assert hook.index("await taskRef.current()") < hook.index("finally")
 
-    print("[PASS] App-level camera/live-context polling is routed through the shared serial hook")
-    print("[PASS] serial polling schedules with setTimeout after async settlement and contains no setInterval")
+    checked: list[str] = []
+    for relative_path in SERIAL_POLLING_SURFACES:
+        path = PROJECT_ROOT / relative_path
+        content = path.read_text(encoding="utf-8")
+        assert "useSerialPolling" in content, f"{relative_path} must use the shared serial polling hook"
+        assert "window.setInterval" not in content, f"{relative_path} must not use overlapping setInterval polling"
+        checked.append(relative_path)
+
+    print(f"[PASS] shared serial polling hook validated across {len(checked)} periodic frontend surfaces")
+    print("[PASS] periodic async polling schedules only after the previous task settles")
     return 0
 
 

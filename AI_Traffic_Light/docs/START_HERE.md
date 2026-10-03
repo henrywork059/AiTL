@@ -1,6 +1,6 @@
-# Start Here — V0313
+# Start Here — V0314
 
-V0313 / `0_3_13` is the current code-management and optimization candidate. V0312 / `0_3_12` is the previous unaccepted candidate. V0311 / `0_3_11` remains the owner-confirmed passed baseline until explicit V0313 acceptance.
+V0314 / `0_3_14` is the current frontend-polling reliability and code-optimization candidate. V0313 / `0_3_13` is the previous unaccepted candidate. V0311 / `0_3_11` remains the owner-confirmed passed baseline until explicit V0314 acceptance.
 
 ## Normal Windows workflow
 
@@ -14,23 +14,16 @@ The helper fast-forwards `origin/main`, reloads the pulled runner once, runs com
 
 If the backend `.venv` does not exist, run `scripts/setup_backend_windows.ps1` once and retry.
 
-## V0313 scope
+## V0314 scope
 
-V0313 manages and optimizes existing code rather than adding a new functional capability:
+V0314 follows a current-main whole-project audit. The concrete reliability defect found was overlapping async frontend polling: six pages still used `window.setInterval` around API work even though `useSerialPolling` already provides settled-task scheduling.
 
-- Junction Network page state remains in `JunctionNetworkPage.tsx` while node presentation and pure view helpers now have narrow modules;
-- repeated frontend link/source lookups use memoized maps;
-- saved ESP camera view projection is performed once per Junction Network overview poll and reused;
-- `scripts/check_structure.py` is the single structural/release-consistency authority;
-- the duplicate release-consistency regression and duplicate runner step are removed;
-- durable coding/playbook guidance now guards these ownership and validation rules.
+Those pages now use the shared serial hook, Traffic Analytics preserves immediate refresh when its query changes, and startup/status polling errors are handled rather than leaking rejected promises. The structural validator now rejects future `window.setInterval` usage anywhere in frontend TypeScript/TSX source.
+
+No backend API, signal/safety policy, stored schema, ESP transport, dataset, training or inference behavior was reconstructed because no verified defect required it.
 
 ## Functional boundary
 
-Junction Network behavior remains the same: a junction may own multiple saved cameras, a source remains exclusive to one junction, and exactly one selected physical/simulation source feeds the shared live inference/traffic pipeline. Unobserved junctions do not receive fabricated live counts.
+The existing single-selected-source live observation model remains unchanged: only the resolved physical/simulation source feeds current live inference/traffic state. Signal-control capability remains simulation/prototype only and does not provide public-road controller authority.
 
-The V0312 non-clipping junction-card layout is preserved.
-
-V0310 remains the production ESP32-CAM path using FB1 + `CAMERA_GRAB_LATEST`, bounded plain `send()` writes and the unchanged `ATL1` / `aitl-tcp-jpeg-v1` contract.
-
-AiTL remains a local/student-scale prototype; physical/public-road traffic-signal authority is out of scope.
+V0310 remains the production ESP32-CAM path using FB1 + `CAMERA_GRAB_LATEST`, bounded plain `send()` writes and the existing `ATL1` / `aitl-tcp-jpeg-v1` contract.

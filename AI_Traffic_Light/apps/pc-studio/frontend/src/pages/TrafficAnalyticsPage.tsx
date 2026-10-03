@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   clearTrafficFlow,
   clearTrafficHistory,
@@ -10,6 +10,7 @@ import {
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { TrafficFlowChart } from "../components/TrafficFlowChart";
 import { TrafficHistoryChart } from "../components/TrafficHistoryChart";
+import { useSerialPolling } from "../lib/useSerialPolling";
 import type { TrafficFlow, TrafficHistory } from "../types";
 import "./trafficAnalytics.css";
 
@@ -71,11 +72,9 @@ export function TrafficAnalyticsPage() {
     }
   }, [mode, minutes, regionId, flowLineId, flowRegionId, className]);
 
-  useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 2000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
+  useSerialPolling(refresh, 2000, {
+    restartKey: [mode, minutes, regionId ?? "", flowLineId ?? "", flowRegionId ?? "", className].join("|"),
+  });
 
   const latest = history && history.points.length > 0 ? history.points[history.points.length - 1] : null;
   const regionOptions = history?.regions ?? [];

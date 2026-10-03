@@ -112,7 +112,14 @@ ATOMIC_JSON_SERVICES = (
 
 SERIAL_POLLING_SURFACES = (
     "apps/pc-studio/frontend/src/App.tsx",
+    "apps/pc-studio/frontend/src/pages/CameraDiagnosticsPage.tsx",
+    "apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx",
+    "apps/pc-studio/frontend/src/pages/DatasetCapturePage.tsx",
     "apps/pc-studio/frontend/src/pages/JunctionNetworkPage.tsx",
+    "apps/pc-studio/frontend/src/pages/LiveAiPage.tsx",
+    "apps/pc-studio/frontend/src/pages/LogsPage.tsx",
+    "apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx",
+    "apps/pc-studio/frontend/src/pages/TrainExportPage.tsx",
 )
 
 
@@ -380,8 +387,18 @@ def validate_frontend_polling(root: Path, errors: list[str]) -> None:
         text = path.read_text(encoding="utf-8")
         if "useSerialPolling" not in text:
             add_error(errors, f"High-frequency frontend surface must use serial polling helper: {relative_path}")
-        if "window.setInterval" in text:
-            add_error(errors, f"High-frequency frontend surface must not use overlapping setInterval polling: {relative_path}")
+
+    frontend_root = root / "apps/pc-studio/frontend/src"
+    if frontend_root.exists():
+        for pattern in ("*.ts", "*.tsx"):
+            for path in frontend_root.rglob(pattern):
+                text = path.read_text(encoding="utf-8")
+                if "window.setInterval" in text:
+                    relative_path = path.relative_to(root).as_posix()
+                    add_error(
+                        errors,
+                        f"Frontend periodic async work must not use window.setInterval; use serial polling or an explicit settled-task scheduler: {relative_path}",
+                    )
 
 
 def main() -> int:

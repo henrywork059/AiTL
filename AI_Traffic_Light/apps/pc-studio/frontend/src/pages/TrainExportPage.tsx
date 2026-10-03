@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import { fetchRuntimeSettings, fetchTrainingDatasetStatus, fetchTrainingStatus, startTraining } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { TrainingConvergenceChart } from "../components/TrainingConvergenceChart";
+import { useSerialPolling } from "../lib/useSerialPolling";
 import type { TrainingConfig, TrainingDatasetStatus, TrainingStatus } from "../types";
 
 const DEFAULT_CONFIG: TrainingConfig = {
@@ -33,16 +34,21 @@ export function TrainExportPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchRuntimeSettings().then((settings) => {
-      if (!cancelled) setConfig((current) => ({ ...current, patience: settings.training_patience }));
-    });
-    void refreshStatus();
-    const timerId = window.setInterval(() => void refreshStatus(), 1200);
+    void fetchRuntimeSettings()
+      .then((settings) => {
+        if (!cancelled) setConfig((current) => ({ ...current, patience: settings.training_patience }));
+      })
+      .catch((nextError) => {
+        if (!cancelled) setError(nextError instanceof Error ? nextError.message : "Runtime settings could not be loaded.");
+      });
     return () => {
       cancelled = true;
-      window.clearInterval(timerId);
     };
   }, []);
+
+  useSerialPolling(refreshStatus, 1200, {
+    onError: (nextError) => setError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed."),
+  });
 
   async function launchTraining() {
     setStarting(true);

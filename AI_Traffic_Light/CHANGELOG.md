@@ -1,4 +1,14 @@
 # Changelog
+## 0_3_14 — Frontend polling reliability and code optimization
+
+- Created V0314 / `0_3_14` for the owner-requested whole-project code audit and optimization after unaccepted V0313; `passed_baseline` remains `0_3_11`.
+- Audited release workflow, backend route ownership, major service hotspots, frontend periodic work and regression guards; avoided speculative reconstruction of tested backend signal/camera/data services where no concrete defect was found.
+- Replaced the six remaining asynchronous `window.setInterval` polling loops in Camera Diagnostics, Dataset Capture, Live AI status, Logs, Traffic Analytics and Train / Export with the existing settled-task `useSerialPolling` helper.
+- Added an explicit serial-polling restart key so Traffic Analytics still refreshes immediately when its query/filter scope changes without allowing overlapping requests.
+- Fixed previously unhandled Live AI initialization and training/dataset status/settings promise failures by routing them into existing UI error state.
+- Expanded structural/regression coverage so all known periodic surfaces share the serial helper and any future `window.setInterval` in frontend TypeScript/TSX fails validation.
+- Preserved APIs, persistence schemas, request IDs, signal/safety behavior, network/simulation semantics, dataset/training/inference contracts, V0310 production camera transport, runtime data and the prototype-only public-road safety boundary.
+
 ## 0_3_13 — Code management and optimization
 
 - Created V0313 / `0_3_13` at the owner's explicit request after unaccepted V0312; `passed_baseline` remains `0_3_11` until explicit acceptance.

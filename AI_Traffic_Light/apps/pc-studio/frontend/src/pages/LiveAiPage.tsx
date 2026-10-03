@@ -16,6 +16,7 @@ import { LiveTrafficSignalOverlay } from "../components/LiveTrafficSignalOverlay
 import { StatusPanel } from "../components/StatusPanel";
 import { TrafficLight } from "../components/TrafficLight";
 import { ZonePanel } from "../components/ZonePanel";
+import { useSerialPolling } from "../lib/useSerialPolling";
 import type {
   CameraStatus,
   Detection,
@@ -56,6 +57,7 @@ export function LiveAiPage({
   onDetectionCountChange,
 }: Props) {
   const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus | null>(null);
+  const [inferenceInitialized, setInferenceInitialized] = useState(false);
   const [liveFrame, setLiveFrame] = useState<DetectionFrame | null>(null);
   const [inferenceError, setInferenceError] = useState<string | null>(null);
   const [loadingModel, setLoadingModel] = useState(false);
@@ -181,16 +183,29 @@ export function LiveAiPage({
       }
     }
 
-    void initializeInference();
+    void initializeInference()
+      .catch((error) => {
+        if (!cancelled) setInferenceError(errorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setInferenceInitialized(true);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    const timerId = window.setInterval(() => void refreshInferenceStatus(), 2000);
-    return () => window.clearInterval(timerId);
-  }, [refreshInferenceStatus]);
+  useSerialPolling(
+    async () => {
+      await refreshInferenceStatus();
+    },
+    2000,
+    {
+      enabled: inferenceInitialized,
+      immediate: false,
+      onError: (error) => setInferenceError(errorMessage(error)),
+    },
+  );
 
   useEffect(() => {
     if (!inferenceStatus?.model_loaded || !cameraStatus?.frame_available) {
