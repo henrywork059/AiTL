@@ -126,10 +126,10 @@ export default function App() {
     setZones(nextZones.zones);
   }, []);
 
-  useSerialPolling(
+  const { waitForIdle: waitForCameraStatusIdle } = useSerialPolling(
     pollCameraStatus,
     activePage === "live_ai" ? runtimeSettings.live_poll_interval_ms : 1000,
-    { enabled: CAMERA_POLL_PAGES.includes(activePage), immediate: true },
+    { enabled: CAMERA_POLL_PAGES.includes(activePage) && !changingCameraMode, immediate: true },
   );
 
   useSerialPolling(
@@ -141,11 +141,12 @@ export default function App() {
   const changeCameraSimulation = useCallback(async (enabled: boolean) => {
     setChangingCameraMode(true);
     try {
+      await waitForCameraStatusIdle();
       setCameraStatus(await setCameraSimulation(enabled));
     } finally {
       setChangingCameraMode(false);
     }
-  }, []);
+  }, [waitForCameraStatusIdle]);
 
   const applyRuntimeSettings = useCallback((settings: RuntimeSettings) => {
     setRuntimeSettings(settings);

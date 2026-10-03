@@ -1,61 +1,52 @@
-# Local Testing — V0314
+# Local Testing — V0315
 
 Expected release state:
 
 ```text
-version: 0_3_14
-previous_version: 0_3_13
+version: 0_3_15
+previous_version: 0_3_14
 passed_baseline: 0_3_11
-status: frontend polling reliability and code optimization candidate
+status: concurrency hardening and conflict cleanup candidate
 ```
 
-## Normal update / test / run
-
-From any PowerShell directory:
+## Normal run
 
 ```powershell
-& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
+& "C:\Users\henry_sik0ar\Downloads\AiTL_app\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-Expected sequence:
+Expected sequence remains:
 
 ```text
 fast-forward main
-→ reload pulled runner exactly once
+→ reload runner once
 → Python compile
-→ Project structure and release consistency
-→ Update/test/run runner regression
-→ dependency refresh only when manifests changed
-→ automatic zero-argument offline regressions
+→ structure/release consistency
+→ runner regression
+→ automatic offline regressions
 → frontend typecheck/build
-→ Git tracked-cleanliness check
-→ safely replace only AiTL-owned PC Studio listeners
+→ Git cleanliness
+→ safe AiTL process replacement
 → live backend smoke
-→ launch frontend/backend
+→ launch PC Studio
 ```
 
-## V0314 focused coverage
+## V0315 focused checks
 
-Important checks include:
+- `test_frontend_polling_structure.py`: single-flight hook, controller usage and mutation serialization.
+- `check_structure.py`: shared polling ownership and no `window.setInterval` in frontend TypeScript.
+- Existing firmware regression: confirms PlatformIO compiles only V0310 wrapper while retaining the required V037 implementation.
+- Existing camera, signal, network, dataset, training, inference and persistence regressions remain unchanged.
 
-- `scripts/check_structure.py` — release consistency plus a frontend-wide prohibition on `window.setInterval`;
-- `scripts/test_frontend_polling_structure.py` — shared serial hook behavior and every registered periodic frontend surface;
-- inherited camera, traffic, signal, network, dataset, labeling, training, inference, persistence and runner regressions;
-- frontend TypeScript typecheck and production build.
+## Manual stress checks
 
-## Manual V0314 checks
+1. **Logs:** click Refresh repeatedly around automatic refresh; UI should not create parallel fetches.
+2. **Traffic Analytics:** change mode/window/scope/class rapidly, then clear history; old data must not reappear after clear.
+3. **Dataset Capture:** capture/delete near a scheduled status refresh; final counts and last-capture state must be correct.
+4. **Train / Export:** start training near a status poll; the returned running state must not be overwritten by an older idle response.
+5. **Live AI:** change confidence/model/camera availability; detections should continue without duplicate timer loops.
+6. **Camera Sources:** switch simulation/physical mode near a status refresh; final mode/status must match the requested transition.
 
-Exercise these pages for several polling cycles:
+No ESP reflash is required.
 
-- **Operate → Camera Diagnostics** while a diagnostic run is active;
-- **Data → Dataset Capture** while camera/simulation status changes;
-- **AI → Live AI** with no model, a loaded model, and an unavailable backend/model error if practical;
-- **System → Logs**;
-- **Traffic → Analytics**, changing mode, time window, region/flow scope and class;
-- **AI → Train / Export**, including idle/running status.
-
-Confirm each page updates normally, query/filter changes refresh promptly, no duplicated request bursts appear, and errors remain visible/recoverable.
-
-No ESP firmware reflash is required for V0314.
-
-`0_3_11` remains the passed baseline until the owner explicitly confirms V0314 PASS.
+`0_3_11` remains the passed baseline until explicit V0315 PASS.

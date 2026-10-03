@@ -375,8 +375,9 @@ def validate_frontend_polling(root: Path, errors: list[str]) -> None:
     hook = root / "apps/pc-studio/frontend/src/lib/useSerialPolling.ts"
     if hook.exists():
         hook_text = hook.read_text(encoding="utf-8")
-        if "window.setTimeout" not in hook_text or "finally" not in hook_text:
-            add_error(errors, "Serial polling hook must schedule the next poll after the previous async task settles.")
+        for required in ("window.setTimeout", "finally", "inFlightRef", "runNow", "waitForIdle"):
+            if required not in hook_text:
+                add_error(errors, f"Serial polling hook is missing required single-flight operation: {required}")
         if "window.setInterval" in hook_text:
             add_error(errors, "Serial polling hook must not use setInterval because async polls may overlap.")
 

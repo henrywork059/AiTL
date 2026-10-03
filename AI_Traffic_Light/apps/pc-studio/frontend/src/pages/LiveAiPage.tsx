@@ -210,32 +210,26 @@ export function LiveAiPage({
   useEffect(() => {
     if (!inferenceStatus?.model_loaded || !cameraStatus?.frame_available) {
       setLiveFrame(null);
-      return undefined;
     }
+  }, [inferenceStatus?.model_loaded, cameraStatus?.frame_available]);
 
-    let cancelled = false;
-    let timerId: number | undefined;
-
-    async function pollDetections() {
-      try {
-        const nextFrame = await fetchLiveDetections(confidenceThreshold);
-        if (!cancelled) {
-          setLiveFrame(nextFrame);
-          setInferenceError(null);
-        }
-      } catch (error) {
-        if (!cancelled) setInferenceError(errorMessage(error));
-      } finally {
-        if (!cancelled) timerId = window.setTimeout(() => void pollDetections(), 500);
-      }
-    }
-
-    void pollDetections();
-    return () => {
-      cancelled = true;
-      if (timerId !== undefined) window.clearTimeout(timerId);
-    };
-  }, [inferenceStatus?.model_loaded, inferenceStatus?.active_model_id, cameraStatus?.frame_available, confidenceThreshold]);
+  useSerialPolling(
+    async () => {
+      const nextFrame = await fetchLiveDetections(confidenceThreshold);
+      setLiveFrame(nextFrame);
+      setInferenceError(null);
+    },
+    500,
+    {
+      enabled: Boolean(inferenceStatus?.model_loaded && cameraStatus?.frame_available),
+      restartKey: [
+        inferenceStatus?.active_model_id ?? "",
+        cameraStatus?.frame_available ?? false,
+        confidenceThreshold,
+      ].join("|"),
+      onError: (error) => setInferenceError(errorMessage(error)),
+    },
+  );
 
   const rawLiveDetections = liveFrame?.detections ?? [];
   const liveClassOptions = useMemo(

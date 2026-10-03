@@ -22,7 +22,7 @@ export function LogsPage({ logs, apiState, onLogsChange }: Props) {
     }
   }
 
-  useSerialPolling(refresh, 3000);
+  const { runNow: refreshLogs } = useSerialPolling(refresh, 3000);
 
   return (
     <div className="page-stack">
@@ -32,7 +32,7 @@ export function LogsPage({ logs, apiState, onLogsChange }: Props) {
             <h2>Backend event log</h2>
             <p className="placeholder-copy">Latest bounded in-memory backend records. Connection: {apiState.message}</p>
           </div>
-          <button className="primary" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
+          <button className="primary" onClick={() => void refreshLogs()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
         </div>
         <div className="log-list">
           {logs.length === 0 ? <p className="placeholder-copy">No backend events are available yet.</p> : logs.map((log, index) => (

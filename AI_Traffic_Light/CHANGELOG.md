@@ -1,4 +1,15 @@
 # Changelog
+## 0_3_15 — Concurrency hardening and conflict cleanup
+
+- Created V0315 / `0_3_15` after a deeper conflict/instability audit of unaccepted V0314; `passed_baseline` remains `0_3_11`.
+- Upgraded `useSerialPolling` from timer-serial scheduling to one single-flight request owner shared by timer ticks, effect restarts, StrictMode replay and explicit refresh actions.
+- Added `runNow()` and `waitForIdle()` controllers so manual refresh and state mutations can coordinate with active periodic reads instead of racing them.
+- Removed the duplicate page-local Live AI detection timer and routed detection polling through the shared owner.
+- Serialized dataset capture/delete, analytics clear, training start and camera simulation/physical-mode switching against conflicting status reads.
+- Verified apparently redundant firmware compatibility files, fallback fixtures, Simulation Lab API and camera-diagnostic modules are active dependencies and retained them.
+- Expanded structural/static regressions for the new single-flight and mutation-drain invariants.
+- Preserved backend APIs, persistence schemas, signal safety/arbitration, network/simulation behavior, dataset/training/inference contracts, V0310 ATL1 production transport and the prototype-only public-road safety boundary.
+
 ## 0_3_14 — Frontend polling reliability and code optimization
 
 - Created V0314 / `0_3_14` for the owner-requested whole-project code audit and optimization after unaccepted V0313; `passed_baseline` remains `0_3_11`.

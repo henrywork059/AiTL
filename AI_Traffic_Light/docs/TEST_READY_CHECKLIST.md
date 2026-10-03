@@ -1,48 +1,41 @@
-# V0314 Test-Ready Checklist
+# V0315 Test-Ready Checklist
 
 Release state:
 
 ```text
-version: 0_3_14
-previous_version: 0_3_13
+version: 0_3_15
+previous_version: 0_3_14
 passed_baseline: 0_3_11
-status: frontend polling reliability and code optimization candidate
+status: concurrency hardening and conflict cleanup candidate
 ```
 
-V0314 remains unaccepted until the owner explicitly confirms PASS.
-
-## Automated validation
+## Automated
 
 - [ ] Python compile passes.
-- [ ] `check_structure.py` passes.
-- [ ] Frontend polling regression passes across every registered periodic surface.
-- [ ] All remaining automatic zero-argument backend regressions pass.
+- [ ] Structure/release validation passes.
+- [ ] Frontend polling single-flight regression passes.
+- [ ] All automatic backend regressions pass.
 - [ ] Frontend typecheck passes.
 - [ ] Frontend production build passes.
-- [ ] Git tracked-cleanliness check passes.
+- [ ] Git cleanliness check passes.
 - [ ] Live backend smoke passes.
 
-## Reliability validation
+## Conflict / stability
 
-- [ ] Frontend TypeScript/TSX source contains no `window.setInterval`.
-- [ ] Camera Diagnostics progress polling is serial/non-overlapping.
-- [ ] Dataset Capture status polling is serial and reports refresh errors.
-- [ ] Live AI status polling is serial and initialization failures are handled.
-- [ ] Logs polling is serial/non-overlapping.
-- [ ] Traffic Analytics polling is serial and filter/query changes refresh immediately.
-- [ ] Train / Export status polling is serial and runtime/status errors are handled.
-- [ ] Existing settled-task Live AI detection polling remains non-overlapping.
+- [ ] One in-flight request is shared across timer ticks, restarts and manual refresh.
+- [ ] Live AI has no separate page-local detection polling timer.
+- [ ] Logs manual refresh shares the periodic request owner.
+- [ ] Dataset capture/delete cannot race a stale dataset-status response.
+- [ ] Analytics clear cannot be overwritten by an older analytics response.
+- [ ] Training start cannot be overwritten by an older training-status response.
+- [ ] Camera mode switching cannot race camera-status polling.
+- [ ] Polling resumes after failures and after mutations complete.
 
-## Functional regression
+## Cleanup
 
-- [ ] Camera/source/simulation workflows remain unchanged.
-- [ ] Traffic history/flow and analytics filters remain correct.
-- [ ] Dataset capture/delete/review and labels remain correct.
-- [ ] Training/inference/model workflows remain correct.
-- [ ] Junction Network behavior remains unchanged.
-- [ ] Signal simulation and safety-transition behavior remain unchanged.
-- [ ] V0310 `ATL1` production camera transport remains unchanged.
-- [ ] Runtime/user data is preserved by the runner.
-- [ ] No physical/public-road signal-control authority is introduced.
+- [ ] No `window.setInterval` remains in frontend TS/TSX.
+- [ ] V0310/V037 firmware compatibility sources remain because they are active build dependencies.
+- [ ] Fallback fixture, Simulation Lab API and diagnostic helper modules remain because they are referenced.
+- [ ] No runtime/user data is removed.
 
-After these checks, explicit owner confirmation is required before changing `passed_baseline` from `0_3_11`.
+Explicit owner PASS is required before changing `passed_baseline` from `0_3_11`.

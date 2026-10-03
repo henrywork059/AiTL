@@ -24,7 +24,8 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     setLastCapture(nextStatus.last_capture);
   }
 
-  useSerialPolling(refreshStatus, 3000, {
+  const { runNow: refreshDatasetStatus, waitForIdle: waitForDatasetStatusIdle } = useSerialPolling(refreshStatus, 3000, {
+    enabled: !saving && !deleting,
     onError: (error) => setMessage(error instanceof Error ? error.message : "Dataset status could not be refreshed."),
   });
 
@@ -32,10 +33,11 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     setSaving(true);
     setMessage(null);
     try {
+      await waitForDatasetStatusIdle();
       const record = await captureLatestFrame({ session_id: sessionId, quality_tag: qualityTag, note });
       setLastCapture(record);
       setMessage(`Captured ${record.image_path}`);
-      await refreshStatus();
+      await refreshDatasetStatus();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Capture failed.");
     } finally {
@@ -49,10 +51,11 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     setDeleting(true);
     setMessage(null);
     try {
+      await waitForDatasetStatusIdle();
       const result = await deleteDatasetCapture(lastCapture.capture_id);
       setLastCapture(null);
       setMessage(`Deleted ${result.capture_id}.`);
-      await refreshStatus();
+      await refreshDatasetStatus();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Capture could not be deleted.");
     } finally {

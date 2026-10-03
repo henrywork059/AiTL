@@ -46,7 +46,8 @@ export function TrainExportPage() {
     };
   }, []);
 
-  useSerialPolling(refreshStatus, 1200, {
+  const { waitForIdle: waitForTrainingStatusIdle } = useSerialPolling(refreshStatus, 1200, {
+    enabled: !starting,
     onError: (nextError) => setError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed."),
   });
 
@@ -54,6 +55,7 @@ export function TrainExportPage() {
     setStarting(true);
     setError(null);
     try {
+      await waitForTrainingStatusIdle();
       setStatus(await startTraining(config));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Training could not start.");

@@ -72,7 +72,8 @@ export function TrafficAnalyticsPage() {
     }
   }, [mode, minutes, regionId, flowLineId, flowRegionId, className]);
 
-  useSerialPolling(refresh, 2000, {
+  const { runNow: refreshAnalytics, waitForIdle: waitForAnalyticsIdle } = useSerialPolling(refresh, 2000, {
+    enabled: !clearing,
     restartKey: [mode, minutes, regionId ?? "", flowLineId ?? "", flowRegionId ?? "", className].join("|"),
   });
 
@@ -97,9 +98,10 @@ export function TrafficAnalyticsPage() {
     if (!window.confirm(prompt)) return;
     setClearing(true);
     try {
+      await waitForAnalyticsIdle();
       if (occupancy) await clearTrafficHistory();
       else await clearTrafficFlow();
-      await refresh();
+      await refreshAnalytics();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Traffic analytics could not be cleared.");
     } finally {
@@ -153,7 +155,7 @@ export function TrafficAnalyticsPage() {
           )}
 
           <div className="button-row wrap-row traffic-analytics-actions">
-            <button className="primary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
+            <button className="primary" type="button" onClick={() => void refreshAnalytics()} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button>
             <button type="button" onClick={() => window.location.assign(mode === "occupancy" ? occupancyExportUrl : flowExportUrl)}>Export CSV</button>
             <button className="danger" type="button" onClick={() => void clearCurrent()} disabled={clearing}>{clearing ? "Clearing..." : mode === "occupancy" ? "Clear occupancy history" : "Clear flow history"}</button>
           </div>
