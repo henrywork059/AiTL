@@ -1,6 +1,7 @@
 param(
     [switch]$SkipUpdate,
     [switch]$SkipTests,
+    [switch]$ChangedTests,
     [switch]$RefreshDependencies
 )
 
@@ -237,7 +238,7 @@ if (-not $SkipUpdate) {
         }
 
         $changedPaths = if ($beforeHead -eq $afterHead) {
-            @()
+            @(& git show --pretty=format: --name-only HEAD | Where-Object { $_ })
         }
         else {
             @(& git diff --name-only "$beforeHead..$afterHead")
@@ -245,6 +246,8 @@ if (-not $SkipUpdate) {
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to determine files changed by the update."
         }
+
+        $env:AITL_CHANGED_PATHS = $changedPaths -join "|"
 
         $env:AITL_BACKEND_DEPS_CHANGED = if (@(
             $changedPaths | Where-Object {
@@ -265,7 +268,7 @@ if (-not $SkipUpdate) {
     Write-Host "`nReloading the updated runner from the pulled code..." -ForegroundColor Cyan
     $env:AITL_RUNNER_RELOADED = "1"
     try {
-        & $PSCommandPath -SkipUpdate -SkipTests:$SkipTests -RefreshDependencies:$RefreshDependencies
+        & $PSCommandPath -SkipUpdate -SkipTests:$SkipTests -ChangedTests:$ChangedTests -RefreshDependencies:$RefreshDependencies
     }
     finally {
         Remove-Item Env:AITL_RUNNER_RELOADED -ErrorAction SilentlyContinue
@@ -278,6 +281,41 @@ $backendDependencyHint = $env:AITL_BACKEND_DEPS_CHANGED
 $frontendDependencyHint = $env:AITL_FRONTEND_DEPS_CHANGED
 Remove-Item Env:AITL_BACKEND_DEPS_CHANGED -ErrorAction SilentlyContinue
 Remove-Item Env:AITL_FRONTEND_DEPS_CHANGED -ErrorAction SilentlyContinue
+$updatedPathsHint = $env:AITL_CHANGED_PATHS
+Remove-Item Env:AITL_CHANGED_PATHS -ErrorAction SilentlyContinue
+
+$runAllRegressions = $true
+$runFrontendChecks = $true
+$selectedTests = @()
+$pythonCompileTargets = @()
+if ($ChangedTests -and -not $SkipTests) {
+    if ($null -eq $updatedPathsHint) {
+        Push-Location $repoRoot
+        try {
+            $updatedPathsHint = @(& git show --pretty=format: --name-only HEAD | Where-Object { $_ }) -join "|"
+            if ($LASTEXITCODE -ne 0) {
+                throw "Cannot identify latest Git changes for focused tests."
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    $changedPaths = @($updatedPathsHint -split '\|' | Where-Object { $_ })
+    $selectionJson = & $python (Join-Path $PSScriptRoot "select_changed_tests.py") @changedPaths
+    if ($LASTEXITCODE -ne 0) {
+        throw "Focused test selection failed; refusing to start without validation."
+    }
+    $selection = $selectionJson | ConvertFrom-Json
+    $runAllRegressions = [bool]$selection.all
+    $runFrontendChecks = [bool]$selection.frontend -or $runAllRegressions
+    $selectedTests = @($selection.tests)
+    $pythonCompileTargets = @($selection.python_files | ForEach-Object { Join-Path $repoRoot $_ })
+    Write-Host "Changed-tests mode: $($changedPaths.Count) changed file(s); $($selectedTests.Count) focused regression(s)." -ForegroundColor Cyan
+    if ($runAllRegressions) {
+        Write-Host "Shared/unknown change detected: full regression fallback." -ForegroundColor Yellow
+    }
+}
 
 $backendDependenciesNeedRefresh = $RefreshDependencies -or $backendDependencyHint -ne "0"
 $frontendDependenciesNeedRefresh = $RefreshDependencies -or $frontendDependencyHint -ne "0" -or -not (Test-Path (Join-Path $frontendDir "node_modules"))
@@ -292,7 +330,14 @@ $preflightTests = @("test_update_test_run_script.py")
 if (-not $SkipTests) {
     Push-Location $projectRoot
     try {
-        Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
+        if ($ChangedTests -and -not $runAllRegressions) {
+            if ($pythonCompileTargets.Count -gt 0) {
+                Run-Step "Changed Python compile" { & $python -m compileall @pythonCompileTargets }
+            }
+        }
+        else {
+            Run-Step "Python compile" { & $python -m compileall ".\apps\pc-studio\backend\app" ".\scripts" }
+        }
         Run-Step "Project structure and release consistency" { & $python ".\scripts\check_structure.py" }
         Run-Step "Update/test/run runner regression" { & $python ".\scripts\test_update_test_run_script.py" }
     }
@@ -334,6 +379,13 @@ if (-not $SkipTests) {
             } |
             Sort-Object Name
 
+        if ($ChangedTests -and -not $runAllRegressions) {
+            $tests = @($tests | Where-Object { $_.Name -in $selectedTests })
+        }
+        if ($ChangedTests) {
+            Write-Host "Offline regressions selected: $($tests.Count)" -ForegroundColor DarkCyan
+        }
+
         foreach ($test in $tests) {
             Run-Step "Backend regression: $($test.Name)" { & $python $test.FullName }
         }
@@ -365,13 +417,18 @@ else {
 }
 
 if (-not $SkipTests) {
-    Push-Location $frontendDir
-    try {
-        Run-Step "Frontend typecheck" { npm run typecheck }
-        Run-Step "Frontend production build" { npm run build }
+    if ($runFrontendChecks) {
+        Push-Location $frontendDir
+        try {
+            Run-Step "Frontend typecheck" { npm run typecheck }
+            Run-Step "Frontend production build" { npm run build }
+        }
+        finally {
+            Pop-Location
+        }
     }
-    finally {
-        Pop-Location
+    else {
+        Write-Host "Frontend typecheck/build skipped: no frontend runtime files changed." -ForegroundColor DarkCyan
     }
 
     Push-Location $repoRoot
