@@ -1,4 +1,11 @@
 # Changelog
+## 0_3_17 — Agent reading and editing workflow efficiency
+
+- Added an explicit owner-first, narrow-read workflow to `AGENTS.md` and `PATCH_PLAYBOOK.md`: confirm HEAD/version once, locate symbols/files before opening them, inspect only owning code/tests/contracts, and stop discovery when evidence is sufficient.
+- Standardized minimum-scope edits, reuse of existing services, batched independent reads, related-test-first validation with risk-based escalation, and atomic GitHub commits with remote-head verification and no force pushes.
+- Aligned `AI_AGENT_GUIDE.md`, `AI_AGENT_CHECKLIST.md`, and `DEVELOPMENT_WORKFLOW.md` without changing application architecture, APIs, frontend behavior, tests, firmware, or startup scripts.
+- Preserved release-state, traffic safety, runtime-data, provenance and owner-acceptance gates. `0_3_11` remains the owner-confirmed passed baseline.
+
 ## 0_3_16 — Change-scoped startup checks
 
 - Added optional -ChangedTests to the Windows update/test/run script; default remains full validation.

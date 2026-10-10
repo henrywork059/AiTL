@@ -1,28 +1,27 @@
-# V0316 Test-Ready Checklist
+# V0317 Test-Ready Checklist
 
 ```text
-version: 0_3_16
-previous_version: 0_3_15
+version: 0_3_17
+previous_version: 0_3_16
 passed_baseline: 0_3_11
-status: focused startup validation candidate
+status: AI workflow efficiency candidate
 ```
 
-## Changed-tests startup
+## Agent workflow and documentation
 
-- [ ] `-ChangedTests` passes through the one-time Git pull/reload.
-- [ ] Known backend changes select related offline regressions.
-- [ ] Frontend changes retain typecheck/build.
-- [ ] Shared/unknown and dependency changes trigger full fallback.
-- [ ] No-update mode targets the latest commit.
-- [ ] Structure/version checks and runner regression remain mandatory.
-- [ ] Backend health and live smoke remain mandatory.
-- [ ] Other port owners and user runtime data are protected.
+- [ ] Short agent path locates owner, nearest test and contract without whole-repository reading.
+- [ ] Narrow file reads and reuse of unchanged content are specified.
+- [ ] Minimal diffs and avoidance of unrelated refactors/duplicate implementations remain required.
+- [ ] Focused checks precede broader checks; failures/shared safety contracts trigger escalation.
+- [ ] GitHub direct atomic commit, remote HEAD recheck and no-force push are documented.
+- [ ] Documentation-only path avoids speculative application/firmware changes.
+- [ ] Release-state, single-source inference, signal safety, API/data, runtime preservation and owner acceptance gates remain intact.
 
-## Full acceptance
+## Repository / owner validation
 
-- [ ] Default startup runs complete offline regression suite.
-- [ ] Frontend typecheck/build and Git cleanliness succeed.
-- [ ] PC Studio opens; camera/simulation and app functionality work.
-- [ ] Explicit owner PASS received before promoting the baseline.
+- [ ] `python scripts/check_structure.py` passes.
+- [ ] Full standard Windows `update_test_run.ps1` validation passes on the owner's PC.
+- [ ] Version/reporting surfaces identify `0_3_17`, previous `0_3_16`, and passed baseline `0_3_11`.
+- [ ] Owner explicitly confirms PASS before promotion.
 
-`0_3_11` remains the passed baseline.
+`0_3_11` remains owner-confirmed baseline until that confirmation.

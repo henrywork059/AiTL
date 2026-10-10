@@ -2,6 +2,17 @@
 
 Short execution checklist. Read `../AGENTS.md` first. For routine work, use `PATCH_PLAYBOOK.md`; open `AI_AGENT_GUIDE.md`, `PROJECT_SCOPE.md`, and task-specific contracts when needed.
 
+## Fast path (do not repeat resolved work)
+
+- [ ] Read current GitHub HEAD, `VERSION`, `AGENTS.md` and `PATCH_PLAYBOOK.md` once for this task.
+- [ ] Locate one owner and its nearest regression/contract using path or symbol search; fetch narrow ranges first.
+- [ ] Stop browsing once the ownership, required behavior and test scope are supported by evidence.
+- [ ] Edit only expected files; review the final manifest/diff for unrelated changes and user data.
+- [ ] Run focused checks first and broaden only for shared contracts, ambiguous coverage or failures.
+- [ ] Commit/push directly where authorized; verify remote HEAD and report what actually ran.
+
+The sections below are conditional checks, not instructions to read all documents or run every test for a small change.
+
 ## 1. Preflight — record facts before editing
 
 - [ ] Inspect current GitHub `main` when repository state matters.

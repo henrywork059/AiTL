@@ -80,6 +80,20 @@ runtime data at risk
 
 This avoids spending most of a patch rediscovering repository structure.
 
+## 3A. Retrieval and edit efficiency
+
+Follow the short operational sequence in `PATCH_PLAYBOOK.md` rather than rebuilding the architecture map on every patch.
+
+- **Locate:** use the repository tree, known owner map and path/symbol search to identify one authoritative owner. Do not enumerate every historical patch or fetch whole modules before a target is known.
+- **Inspect:** read the smallest relevant function/component range, neighboring callers, closest existing regression and affected contract. Only widen the search when the implementation crosses an ownership boundary or evidence is missing.
+- **Reuse:** keep the inspected file text and HEAD identity for the current task. Avoid repeated retrievals of unchanged code and repetitive explanations of settled architecture. Historical notes explain *why*, not current state.
+- **Edit:** prefer an in-place minimal patch. Inspect the resulting diff/manifest for unrelated churn, accidental deletions and runtime data. Do not use sweeping regex substitutions across source.
+- **Verify:** run the smallest meaningful semantic test first. Add integrations when the contract is shared; use the existing structure/release validator rather than writing a duplicate check.
+- **Publish:** prefer one atomic multi-file release commit, validate the remote HEAD before updating `main`, never force-push, and confirm the resulting commit. Keep failed tests or inaccessible environments explicit.
+
+A docs-only workflow change should not require reading application services or running device tests. Conversely, a signal-safety/API/persistence change must not be rushed by limiting reads or tests below the required evidence.
+
+
 ## 4. Version-state gate
 
 ### Unaccepted candidate

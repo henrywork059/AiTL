@@ -1,18 +1,17 @@
-# Start Here — V0316
+# Start Here — V0317
 
-V0316 / `0_3_16` adds an opt-in focused startup test option. Previous version: `0_3_15` (unaccepted). Passed baseline: `0_3_11`.
+V0317 / `0_3_17` is the AI workflow and coding-guideline efficiency candidate. Previous candidate: `0_3_16` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
 
-## Full startup (default)
+## What changed
+
+- `AGENTS.md` and the patch playbook now prioritize one-pass authority checks, narrow owner/test/contract reads, minimal edits, targeted validation, and direct atomic GitHub commits.
+- Detailed agent guide, checklist and development workflow use the same fast path and explicit escalation rules.
+- Documentation-only work can finish without inspecting or changing unrelated application/firmware code; safety and release acceptance rules remain unchanged.
+
+## Update and validate
 
 ```powershell
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-## Fast startup (changed code tests)
-
-```powershell
-& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
-```
-
-Both commands update from `origin/main`, reload the current runner once, validate structure/release and runner safety, safely restart only AiTL-owned PC Studio processes, run backend health/smoke and open the app.
-The faster option selects relevant offline regressions and only builds the frontend when frontend files change. Shared/unknown changes fall back to the full suite. No application or firmware behavior changed.
+This is a guidance-only patch. Backend/frontend features and the Windows runner are unchanged. An explicit owner PASS is still required to advance the passed baseline.

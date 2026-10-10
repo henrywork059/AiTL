@@ -1,30 +1,27 @@
-# Local Testing — V0316
+# Local Testing — V0317
+
+Expected release state:
 
 ```text
-version: 0_3_16
-previous_version: 0_3_15
+version: 0_3_17
+previous_version: 0_3_16
 passed_baseline: 0_3_11
-status: focused startup validation candidate
+status: AI workflow efficiency candidate
 ```
 
-## Fast changed-tests startup
+## Guideline checks
 
-```powershell
-& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
-```
+1. Confirm `AGENTS.md`, `PATCH_PLAYBOOK.md`, `AI_AGENT_GUIDE.md`, `AI_AGENT_CHECKLIST.md` and `DEVELOPMENT_WORKFLOW.md` retain the release-state, architecture, safety, runtime-data and testing rules.
+2. Verify the new fast path explicitly requires HEAD/version confirmation, owner-first narrow reads, minimal file edits, relevant tests, remote-HEAD recheck and direct non-force push.
+3. Confirm `VERSION`, frontend `projectVersion.ts`, changelog, patch document, `START_HERE.md`, this guide and `TEST_READY_CHECKLIST.md` consistently name `0_3_17`; previous `0_3_16`; baseline `0_3_11`.
+4. Run `python scripts/check_structure.py` from `AI_Traffic_Light` to validate release/structure consistency on a complete checkout.
 
-Verify Git updates and runner reload exactly once. Check the printed changed-file count and the selected offline regressions. Verify that startup always completes the structure/release guard, runner regression, safe restart, backend readiness, live smoke and browser launch.
-If there is no newly pulled commit, the latest commit determines test scope. Shared/unknown paths and manifest changes trigger full-suite fallback.
-
-## Full validation
+## Full owner validation
 
 ```powershell
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-Default mode still compiles backend scripts, validates structure/version, runs all automatic offline regressions (excluding manual hardware tests), typechecks/builds frontend, checks Git cleanliness, safely restarts services, executes live smoke and opens PC Studio.
+The default command still performs its full preflight, tests, frontend typecheck/build, Git cleanliness and live smoke before starting PC Studio. `-ChangedTests` is optional for routine fast startup, not full acceptance.
 
-## Focused selector regression
-
-Run `scripts/test_select_changed_tests.py` to verify backend, frontend, edited-test, combined, docs-only and fallback cases. The runner regression verifies the updated switch wiring. Check `-SkipUpdate -ChangedTests` and existing `-SkipTests` behavior.
-ESP firmware does not require reflashing. `0_3_11` remains the passed baseline until explicit owner PASS.
+No ESP reflash or new UI/API behavior is expected. Owner PASS is required; `0_3_11` remains the accepted baseline.

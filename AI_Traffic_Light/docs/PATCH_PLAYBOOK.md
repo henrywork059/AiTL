@@ -20,6 +20,20 @@ runtime/user data at risk:
 
 Read only what the task needs after the mandatory authority files. Do not sweep the entire repository before every small change.
 
+### Fast path: inspect → patch → verify → push
+
+1. **Confirm once:** read HEAD, `VERSION`, `AGENTS.md` and this playbook. Respect the explicit next-version gate.
+2. **Find the owner:** search filenames/symbols first, then open only the owning source or document, its closest focused test, and any directly affected contract. Prefer relevant line ranges and small excerpts over entire folders.
+3. **Define a small change set:** state the invariant and expected file list before editing. Reuse existing patterns and preserve untouched content. Do not create parallel implementations or reformat unrelated code.
+4. **Make one focused change:** batch independent reads; group related edits; avoid repeated reads of unchanged files and serial one-file commits when an atomic multi-file commit is available.
+5. **Validate in layers:** start with changed-file syntax/structure and the closest deterministic regression, then affected integrations. Escalate to broad tests for shared ownership, unclear dependencies or failures; the owner's normal runner remains the acceptance check.
+6. **Commit directly:** inspect the intended file manifest/diff, verify remote HEAD has not advanced, atomically commit the release bundle where supported, push without force, and verify new HEAD/version. Do not ask the owner to copy diffs or push when repository write access works.
+7. **Hand off concisely:** changed behavior, evidence actually run, required owner test, and unchanged passed baseline.
+
+**Stop rule:** if the owner, dependency boundary and regression are already clear, do not spend further time reading historical docs or unaffected modules. If direct GitHub write fails, report the actual failure without claiming a push.
+
+**Documentation-only path:** edit the responsible guidance and required release bundle; check links, authority rules and version-surface consistency. No app build, camera flash or hardware test is implied by text-only changes.
+
 Use this ownership shortcut:
 
 | Change | Start here |

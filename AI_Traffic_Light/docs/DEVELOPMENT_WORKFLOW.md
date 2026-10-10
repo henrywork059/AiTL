@@ -31,6 +31,19 @@ focused regression
 
 This small preflight prevents most version, ownership and test-selection mistakes.
 
+### Efficient agent execution
+
+For each new task, use one narrow pass: **current HEAD + `VERSION` → relevant owner → focused regression/contract → smallest patch → targeted test → guarded atomic push**.
+
+- Search **paths and symbols before content**. Prefer targeted definitions and adjacent call sites; do not load directories, historical patches or all guides by default.
+- Read only relevant files and ranges; expand on a concrete dependency, changed contract, failure or unresolved ownership. Cache inspected content during the task, but recheck the remote HEAD before publishing.
+- Use an explicit small changed-file manifest. Edit in place, reuse existing code and APIs, preserve unchanged formatting and review the diff before commit.
+- Batch independent reads and release metadata writes when atomic tooling is available. Serialize dependent edits and avoid repeated commits to the same file.
+- Run focused syntax/regression/structure checks first, widen when the change crosses shared boundaries, and distinguish agent-side evidence from the owner's normal full acceptance runner.
+- For **documentation-only** changes, skip unrelated application, model and firmware inspection; validate current release surfaces and document authority instead.
+
+These efficiencies never relax safety, data-preservation, version, API-contract or acceptance rules.
+
 ## 2. Apply the candidate gate
 
 - If `version != passed_baseline`, the current release is unaccepted unless the owner explicitly says otherwise.

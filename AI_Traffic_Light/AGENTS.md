@@ -22,6 +22,18 @@ Then open as needed:
 
 When repository state matters, inspect current GitHub `main`. Never substitute a conversation summary, old local snapshot, historical patch note, or remembered version for current repository evidence.
 
+### Fast retrieval and edit rules
+
+- **One authority pass per task:** resolve GitHub `main` HEAD and `VERSION` once. Recheck HEAD immediately before a push; reread a file only if it changed or a concrete question remains.
+- **Locate before opening:** use paths, filename search and narrow symbol/text search; initially inspect the owning module, its closest regression and the affected contract. Do not list or fetch every source file.
+- **Read only necessary ranges:** inspect relevant definitions/callers and their local context. Expand to full files, related modules or longer guides only when dependencies, interfaces or failing tests justify it.
+- **Stop discovery at an evidence threshold:** once owner, contract, expected behavior and test are identified, edit. Do not perform a repository-wide audit for a small, well-localized request.
+- **Patch narrowly:** preserve untouched code and formatting; avoid rewrite-by-replacement, unrelated refactors, new files and dependencies when a local edit works.
+- **Reuse work already inspected in this task:** avoid duplicate remote fetches and redundant tests. Batch independent reads; perform dependent writes in order.
+- **Verify by risk:** run the closest relevant tests/static checks first; expand if a shared contract changes, coverage is ambiguous, or the focused check fails. Never replace the owner's full acceptance test with a focused check.
+
+This is an **execution-efficiency policy**, not permission to skip safety, version, API or data-integrity gates. A documentation-only patch must not trigger speculative application-code or firmware edits.
+
 ## 2. Release-state gate
 
 `VERSION` is the only release-state authority and must contain:

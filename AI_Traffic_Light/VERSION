@@ -1,5 +1,5 @@
-version: 0_3_16
-status: focused startup validation candidate
-previous_version: 0_3_15
+version: 0_3_17
+status: AI workflow efficiency candidate
+previous_version: 0_3_16
 passed_baseline: 0_3_11
-notes: V0316 adds opt-in -ChangedTests to the existing Windows runner, selecting tests by last Git update or latest commit. Shared/unknown and dependency changes fall back to full validation. Structure/release guards, runner regression, safe process replacement, backend live health/smoke and data preservation remain. Default startup remains full; application and ESP behavior unchanged. V0311 / 0_3_11 remains the confirmed baseline until explicit owner acceptance.
+notes: V0317 optimizes AI coding instructions for one-pass repository-state checks, narrow owner/test/contract retrieval, minimal edits, targeted validation, and guarded atomic direct GitHub publishing. Detailed agent guide, checklist, playbook and development workflow are aligned. Documentation and release metadata only: no PC Studio, FastAPI, UI, ESP firmware, API, signal/simulation or dataset behavior changes. V0311 / 0_3_11 remains the owner-confirmed passed baseline until explicit acceptance.
