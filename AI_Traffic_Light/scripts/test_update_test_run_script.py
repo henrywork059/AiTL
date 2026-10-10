@@ -22,9 +22,20 @@ def main() -> int:
     assert '$env:AITL_RUNNER_RELOADED = "1"' in text
     assert 'if ($env:AITL_RUNNER_RELOADED -eq "1" -and -not $SkipUpdate)' in text
     assert "Recursive update prevented" in text
-    assert '& $PSCommandPath -SkipUpdate -SkipTests:$SkipTests -RefreshDependencies:$RefreshDependencies' in text
+    assert '& $PSCommandPath -SkipUpdate -SkipTests:$SkipTests -ChangedTests:$ChangedTests -RefreshDependencies:$RefreshDependencies' in text
     assert '$reloadArgs = @("-SkipUpdate")' not in text
     assert "Remove-Item Env:AITL_RUNNER_RELOADED" in text
+
+    # Focused startup selection, forwarding and safe fallback remain wired.
+    assert '[switch]$ChangedTests' in text
+    assert 'AITL_CHANGED_PATHS' in text
+    assert 'git show --pretty=format: --name-only HEAD' in text
+    assert 'select_changed_tests.py' in text
+    assert '$runAllRegressions' in text
+    assert '$runFrontendChecks' in text
+    assert '$_.Name -in $selectedTests' in text
+    assert 'Run-Step "Changed Python compile"' in text
+    assert 'Run-Step "Live backend smoke"' in text
 
     # Dependency refresh remains update-aware with an explicit recovery override.
     assert '[switch]$RefreshDependencies' in text
@@ -90,6 +101,7 @@ def main() -> int:
     print("[PASS] automatic regressions, typecheck/build and live smoke remain wired")
     print("[PASS] existing AiTL processes are replaced while unrelated port owners stay protected")
     print("[PASS] runner remains read-only for tracked release/source files")
+    print("[PASS] change-scoped startup mode retains safe fallback and live smoke")
     return 0
 
 

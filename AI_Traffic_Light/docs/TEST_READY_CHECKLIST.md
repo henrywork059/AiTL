@@ -1,41 +1,28 @@
-# V0315 Test-Ready Checklist
-
-Release state:
+# V0316 Test-Ready Checklist
 
 ```text
-version: 0_3_15
-previous_version: 0_3_14
+version: 0_3_16
+previous_version: 0_3_15
 passed_baseline: 0_3_11
-status: concurrency hardening and conflict cleanup candidate
+status: focused startup validation candidate
 ```
 
-## Automated
+## Changed-tests startup
 
-- [ ] Python compile passes.
-- [ ] Structure/release validation passes.
-- [ ] Frontend polling single-flight regression passes.
-- [ ] All automatic backend regressions pass.
-- [ ] Frontend typecheck passes.
-- [ ] Frontend production build passes.
-- [ ] Git cleanliness check passes.
-- [ ] Live backend smoke passes.
+- [ ] `-ChangedTests` passes through the one-time Git pull/reload.
+- [ ] Known backend changes select related offline regressions.
+- [ ] Frontend changes retain typecheck/build.
+- [ ] Shared/unknown and dependency changes trigger full fallback.
+- [ ] No-update mode targets the latest commit.
+- [ ] Structure/version checks and runner regression remain mandatory.
+- [ ] Backend health and live smoke remain mandatory.
+- [ ] Other port owners and user runtime data are protected.
 
-## Conflict / stability
+## Full acceptance
 
-- [ ] One in-flight request is shared across timer ticks, restarts and manual refresh.
-- [ ] Live AI has no separate page-local detection polling timer.
-- [ ] Logs manual refresh shares the periodic request owner.
-- [ ] Dataset capture/delete cannot race a stale dataset-status response.
-- [ ] Analytics clear cannot be overwritten by an older analytics response.
-- [ ] Training start cannot be overwritten by an older training-status response.
-- [ ] Camera mode switching cannot race camera-status polling.
-- [ ] Polling resumes after failures and after mutations complete.
+- [ ] Default startup runs complete offline regression suite.
+- [ ] Frontend typecheck/build and Git cleanliness succeed.
+- [ ] PC Studio opens; camera/simulation and app functionality work.
+- [ ] Explicit owner PASS received before promoting the baseline.
 
-## Cleanup
-
-- [ ] No `window.setInterval` remains in frontend TS/TSX.
-- [ ] V0310/V037 firmware compatibility sources remain because they are active build dependencies.
-- [ ] Fallback fixture, Simulation Lab API and diagnostic helper modules remain because they are referenced.
-- [ ] No runtime/user data is removed.
-
-Explicit owner PASS is required before changing `passed_baseline` from `0_3_11`.
+`0_3_11` remains the passed baseline.

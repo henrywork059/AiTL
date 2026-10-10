@@ -34,6 +34,14 @@ After first-time backend setup, normal update/test/run is one command from any P
 
 The runner fast-forwards `origin/main`, protects tracked local work, preserves untracked runtime data, reloads the pulled runner once, runs structure/regression/frontend checks and live smoke, safely replaces only AiTL-owned PC Studio processes on ports 8000/5173, and opens PC Studio.
 
+For faster routine startup with focused checks, add the optional `-ChangedTests` switch:
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
+```
+
+This selects tests for changed code instead of the entire offline suite; shared/unknown changes fall back to full validation. Structure and health checks remain active. Use the default command for comprehensive regression validation.
+
 First-time backend environment setup/recovery:
 
 ```powershell

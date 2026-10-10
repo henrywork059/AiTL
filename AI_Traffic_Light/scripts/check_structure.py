@@ -71,6 +71,8 @@ REQUIRED_PATHS = (
     "scripts/test_junction_network_overview.py",
     "scripts/update_test_run.ps1",
     "scripts/test_update_test_run_script.py",
+    "scripts/select_changed_tests.py",
+    "scripts/test_select_changed_tests.py",
     "scripts/test_object_tracking_flow.py",
     "scripts/test_signal_rules_service.py",
 )

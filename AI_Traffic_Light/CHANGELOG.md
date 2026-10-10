@@ -1,4 +1,13 @@
 # Changelog
+## 0_3_16 — Change-scoped startup checks
+
+- Added optional -ChangedTests to the Windows update/test/run script; default remains full validation.
+- Selected related offline regressions from changed Git files (latest commit when no update), and frontend typecheck/build for frontend changes.
+- Added conservative full-suite fallback for shared/unknown/dependency changes.
+- Kept runner/release checks, live health/smoke, dependency management, safe process replacement, and data preservation.
+- Added deterministic selector and runner wiring regressions.
+- Preserved all runtime APIs, traffic signal behavior, data formats and ESP transport; 0_3_11 remains passed baseline.
+
 ## 0_3_15 — Concurrency hardening and conflict cleanup
 
 - Created V0315 / `0_3_15` after a deeper conflict/instability audit of unaccepted V0314; `passed_baseline` remains `0_3_11`.

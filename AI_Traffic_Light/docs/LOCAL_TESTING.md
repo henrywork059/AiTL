@@ -1,52 +1,30 @@
-# Local Testing — V0315
-
-Expected release state:
+# Local Testing — V0316
 
 ```text
-version: 0_3_15
-previous_version: 0_3_14
+version: 0_3_16
+previous_version: 0_3_15
 passed_baseline: 0_3_11
-status: concurrency hardening and conflict cleanup candidate
+status: focused startup validation candidate
 ```
 
-## Normal run
+## Fast changed-tests startup
 
 ```powershell
-& "C:\Users\henry_sik0ar\Downloads\AiTL_app\AI_Traffic_Light\scripts\update_test_run.ps1"
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Expected sequence remains:
+Verify Git updates and runner reload exactly once. Check the printed changed-file count and the selected offline regressions. Verify that startup always completes the structure/release guard, runner regression, safe restart, backend readiness, live smoke and browser launch.
+If there is no newly pulled commit, the latest commit determines test scope. Shared/unknown paths and manifest changes trigger full-suite fallback.
 
-```text
-fast-forward main
-→ reload runner once
-→ Python compile
-→ structure/release consistency
-→ runner regression
-→ automatic offline regressions
-→ frontend typecheck/build
-→ Git cleanliness
-→ safe AiTL process replacement
-→ live backend smoke
-→ launch PC Studio
+## Full validation
+
+```powershell
+& "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-## V0315 focused checks
+Default mode still compiles backend scripts, validates structure/version, runs all automatic offline regressions (excluding manual hardware tests), typechecks/builds frontend, checks Git cleanliness, safely restarts services, executes live smoke and opens PC Studio.
 
-- `test_frontend_polling_structure.py`: single-flight hook, controller usage and mutation serialization.
-- `check_structure.py`: shared polling ownership and no `window.setInterval` in frontend TypeScript.
-- Existing firmware regression: confirms PlatformIO compiles only V0310 wrapper while retaining the required V037 implementation.
-- Existing camera, signal, network, dataset, training, inference and persistence regressions remain unchanged.
+## Focused selector regression
 
-## Manual stress checks
-
-1. **Logs:** click Refresh repeatedly around automatic refresh; UI should not create parallel fetches.
-2. **Traffic Analytics:** change mode/window/scope/class rapidly, then clear history; old data must not reappear after clear.
-3. **Dataset Capture:** capture/delete near a scheduled status refresh; final counts and last-capture state must be correct.
-4. **Train / Export:** start training near a status poll; the returned running state must not be overwritten by an older idle response.
-5. **Live AI:** change confidence/model/camera availability; detections should continue without duplicate timer loops.
-6. **Camera Sources:** switch simulation/physical mode near a status refresh; final mode/status must match the requested transition.
-
-No ESP reflash is required.
-
-`0_3_11` remains the passed baseline until explicit V0315 PASS.
+Run `scripts/test_select_changed_tests.py` to verify backend, frontend, edited-test, combined, docs-only and fallback cases. The runner regression verifies the updated switch wiring. Check `-SkipUpdate -ChangedTests` and existing `-SkipTests` behavior.
+ESP firmware does not require reflashing. `0_3_11` remains the passed baseline until explicit owner PASS.

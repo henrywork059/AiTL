@@ -174,6 +174,8 @@ The normal command:
 
 Full validation is still performed even when dependency installation is skipped. Only redundant dependency installation is avoided.
 
+For faster routine startup, append `-ChangedTests` to the command. It selects feature-related tests from updated Git files or the latest commit, performs frontend typecheck/build when relevant, and conservatively falls back to the full suite for shared/unknown or dependency changes. Release guards, runner regression and live smoke remain active. Default startup still runs all offline regressions before owner acceptance.
+
 If the local environment is damaged or a dependency was removed manually, force a dependency refresh with:
 
 ```powershell
