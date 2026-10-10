@@ -238,7 +238,7 @@ if (-not $SkipUpdate) {
         }
 
         $changedPaths = if ($beforeHead -eq $afterHead) {
-            @(& git show --pretty=format: --name-only HEAD | Where-Object { $_ })
+            @()
         }
         else {
             @(& git diff --name-only "$beforeHead..$afterHead")
@@ -247,7 +247,18 @@ if (-not $SkipUpdate) {
             throw "Unable to determine files changed by the update."
         }
 
-        $env:AITL_CHANGED_PATHS = $changedPaths -join "|"
+        # No new pull means no dependency refresh. The focused selector can
+        # still inspect HEAD without treating it as a newly installed update.
+        $focusPaths = if ($changedPaths.Count -eq 0 -and $ChangedTests) {
+            @(& git show --pretty=format: --name-only HEAD | Where-Object { $_ })
+        }
+        else {
+            $changedPaths
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to determine paths for focused test selection."
+        }
+        $env:AITL_CHANGED_PATHS = $focusPaths -join "|"
 
         $env:AITL_BACKEND_DEPS_CHANGED = if (@(
             $changedPaths | Where-Object {
