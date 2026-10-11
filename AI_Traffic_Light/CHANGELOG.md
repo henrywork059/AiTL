@@ -1,4 +1,11 @@
 # Changelog
+## 0_3_19 — Camera Settings status and compact layout
+
+- Removed verbose transport, version-specific and image-setting descriptions from Camera Settings.
+- Added a color-coded, live-updating bar covering every saved ESP camera, with selected-preview identification and honest Streaming, Reconnecting, Paused, Connected, Unreachable, Error or Saved-only states.
+- Kept selected-camera dropdown and stream Start/Stop visible; grouped IP/connection management, camera image/FPS controls and diagnostic telemetry into collapsible sections.
+- Reused the existing camera status polling, transport/API and saved profile registry. No new backend endpoints, firmware or dependencies. `0_3_11` remains passed baseline pending owner PASS.
+
 ## 0_3_18 — Dedicated Camera Settings page
 
 - Added Camera Settings to PC Studio navigation, distinct from Camera Sources simulation controls.

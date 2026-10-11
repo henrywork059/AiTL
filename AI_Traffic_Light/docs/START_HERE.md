@@ -1,12 +1,12 @@
-# Start Here — V0318
+# Start Here — V0319
 
-V0318 / `0_3_18` is the Camera Settings page candidate. Previous candidate: `0_3_17` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
+V0319 / `0_3_19` is the collapsible Camera Settings and saved-camera status candidate. Previous candidate: `0_3_18` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
 
 ## What changed
 
-- Open **Camera Settings** from the Operate sidebar to add ESP32-CAM devices by IP, select the active feed from a saved-camera dropdown, inspect live preview/connection/FPS and device diagnostics, and configure per-camera image settings and target streaming FPS.
-- **Camera Sources** now focuses on frame input and simulation controls. Existing camera persistence, transport and one-selected-source AI pipeline remain unchanged.
-- To apply settings to a running camera, stop its stream, edit/save settings, then reconnect/start it; camera controls remain locked during streaming.
+- Camera Settings now shows a color-coded status strip for **every saved camera**, including the selected preview and live connected/streaming/reconnecting/paused/unreachable states.
+- The selected camera dropdown and Start/Stop controls remain visible. Expand **Manage IP addresses and connections** to add, save, connect, disconnect or delete devices; expand **Camera settings** to configure OV2640 settings/target FPS; expand **Detailed camera & stream status** for telemetry.
+- Removed old version-specific streaming descriptions and the compatibility prose panel. The existing backend/firmware and one-selected-source AI pipeline are unchanged.
 
 ## Update and validate
 
@@ -14,4 +14,4 @@ V0318 / `0_3_18` is the Camera Settings page candidate. Previous candidate: `0_3
 & "W:\\Code Project\\AiTL Ptoject\\AiTL\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests
 ```
 
-Complete owner acceptance still requires full validation and a physical ESP camera check. No ESP reflash or backend API change is required. `0_3_11` remains the accepted baseline until explicit owner PASS.
+A full Windows runner and real ESP check remain required for owner acceptance. `0_3_11` stays the accepted baseline until explicit PASS.

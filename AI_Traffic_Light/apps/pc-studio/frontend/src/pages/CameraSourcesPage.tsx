@@ -14,6 +14,7 @@ import {
   selectRemoteCamera,
   startRemoteCamera,
   stopRemoteCamera,
+  type RemoteCameraProfile,
   type RemoteCameraSettings,
   type RemoteCameraStatus,
   type RemoteFrameSize,
@@ -51,6 +52,23 @@ function formatAge(ageMs: number | null): string {
 
 function numberValue(value: string): number {
   return Number.parseInt(value, 10);
+}
+
+function cameraIndicator(camera: RemoteCameraProfile): { label: string; tone: string } {
+  if (camera.streaming) {
+    if (camera.paused_for_simulation) return { label: "Paused", tone: "status-planned" };
+    return camera.stream_connected
+      ? { label: "Streaming", tone: "status-implemented" }
+      : { label: "Reconnecting", tone: "status-planned" };
+  }
+  if (camera.connected) {
+    return camera.device_reachable
+      ? { label: "Connected", tone: "status-info" }
+      : { label: "Unreachable", tone: "status-error" };
+  }
+  return camera.last_error
+    ? { label: "Error", tone: "status-error" }
+    : { label: "Saved", tone: "muted" };
 }
 
 export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, changingMode, view = "sources" }: Props) {
@@ -308,16 +326,43 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
 
   return (
     <div className="page-stack">
+      {cameraSettingsView && (
+        <section className="panel compact-panel camera-status-strip" aria-label="Saved camera connection status">
+          <div className="camera-status-strip-header">
+            <strong>Saved cameras</strong>
+            <span>{remote?.camera_count ?? "—"} saved · {remote?.cameras.filter((camera) => camera.stream_connected).length ?? 0} live</span>
+          </div>
+          <div className="camera-status-strip-items" role="list">
+            {remote?.cameras.map((camera) => {
+              const indicator = cameraIndicator(camera);
+              return (
+                <div
+                  role="listitem"
+                  key={camera.source_id}
+                  className={`camera-status-entry${camera.selected ? " is-selected" : ""}`}
+                >
+                  <div className="camera-status-entry-name">
+                    <strong title={camera.source_id}>{camera.source_id}</strong>
+                    {camera.selected && <small>Active preview</small>}
+                  </div>
+                  <small title={camera.host}>{camera.host}</small>
+                  <span className={`status-pill ${indicator.tone}`}>{indicator.label}</span>
+                </div>
+              );
+            })}
+            {!remote && <span className="small-note">Loading saved cameras…</span>}
+            {remote?.camera_count === 0 && <span className="small-note">No cameras saved. Add one using the manager below.</span>}
+          </div>
+        </section>
+      )}
       <div className={cameraSettingsView ? "camera-layout" : "page-stack"}>
         <section className="panel camera-preview-panel">
           <div className="panel-header">
             <div>
               <h2>{cameraSettingsView ? "Selected camera live preview" : "Camera input and simulation"}</h2>
-              <p className="placeholder-copy">
-                {cameraSettingsView
-                  ? "Select a saved ESP camera, or add one by IP. This live preview uses the same selected source as the PC Studio AI and capture pipeline."
-                  : "Preview the shared frame input or start the built-in traffic simulation. Configure ESP cameras under Camera Settings."}
-              </p>
+              {!cameraSettingsView && (
+                <p className="placeholder-copy">Preview the current frame input or run the built-in traffic simulation.</p>
+              )}
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
               {statusLabel}
@@ -382,7 +427,6 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <div className="panel-header">
               <div>
                 <h2>ESP camera manager</h2>
-                <p className="placeholder-copy">Saved IPs and per-camera settings are restored automatically. Switching cameras does not stop the other ESP streams.</p>
               </div>
               <span className="status-pill muted">{remote?.camera_count ?? 0} / {remote?.max_saved_cameras ?? 12} saved</span>
             </div>
@@ -399,6 +443,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
                   ))}
                 </select>
               </label>
+            </div>
+
+            <details className="camera-fold">
+              <summary>Manage IP addresses and connections</summary>
+              <div className="form-grid">
               <label>
                 ESP IPv4 address
                 <input value={host} onChange={(event) => setHost(event.target.value)} placeholder="192.168.1.87" disabled={busy || selectedStreaming} />
@@ -422,6 +471,20 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
                 Remove saved
               </button>
             </div>
+            </details>
+
+            <div className="button-row">
+              <button className="primary" type="button" onClick={() => void startEsp()} disabled={busy || !selectedSaved || !remote?.configured || !remote.device_reachable || remote.streaming}>
+                Start Stream
+              </button>
+              <button type="button" onClick={() => void stopEsp()} disabled={busy || !selectedSaved || !remote?.streaming}>
+                Stop Stream
+              </button>
+            </div>
+
+            {remoteMessage && <p className="success-message">{remoteMessage}</p>}
+            {remoteError && <p className="error-message">{remoteError}</p>}
+            {remote?.last_error && selectedSaved && <p className="small-note">Last selected-ESP error: {remote.last_error}</p>}
 
             {backgroundStreams > 0 && (
               <p className="small-note">{backgroundStreams} other ESP stream{backgroundStreams === 1 ? " is" : "s are"} still running in the background for faster switching.</p>
@@ -429,14 +492,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             {remote?.registry_warning && <p className="error-message">{remote.registry_warning}</p>}
           </section>
 
-          <section className="panel compact-panel training-form">
-            <div className="panel-header">
-              <div>
-                <h2>Camera settings</h2>
-                <p className="placeholder-copy">Each saved ESP keeps its own OV2640 settings and target FPS. V037 may temporarily increase JPEG compression above the saved quality value to preserve freshness, then recover quality when the link is fast.</p>
-              </div>
-              <span className="status-pill muted">{selectedStreaming ? "locked while streaming" : "saved per camera"}</span>
-            </div>
+          <details className="panel compact-panel training-form camera-fold">
+            <summary>
+              <span>Camera settings</span>
+              <span className="status-pill muted">{selectedStreaming ? "Locked while streaming" : "Image & FPS"}</span>
+            </summary>
 
             <div className="form-grid">
               <label>
@@ -500,22 +560,10 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               </div>
             </details>
 
-            <div className="button-row">
-              <button className="primary" type="button" onClick={() => void startEsp()} disabled={busy || !selectedSaved || !remote?.configured || !remote.device_reachable || remote.streaming}>
-                Start Stream
-              </button>
-              <button type="button" onClick={() => void stopEsp()} disabled={busy || !selectedSaved || !remote?.streaming}>
-                Stop Stream
-              </button>
-            </div>
+          </details>
 
-            {remoteMessage && <p className="success-message">{remoteMessage}</p>}
-            {remoteError && <p className="error-message">{remoteError}</p>}
-            {remote?.last_error && selectedSaved && <p className="small-note">Last selected-ESP error: {remote.last_error}</p>}
-          </section>
-
-          <section className="panel compact-panel">
-            <div className="panel-header"><h2>Selected input status</h2></div>
+          <details className="panel compact-panel camera-fold">
+            <summary>Detailed camera & stream status</summary>
             <div className="camera-status-list">
               <div><span>Saved cameras</span><strong>{remote?.camera_count ?? 0}</strong></div>
               <div><span>Selected ESP</span><strong>{remote?.active_source_id ?? "none"}</strong></div>
@@ -544,19 +592,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <div><span>Frame age</span><strong>{selectedFrameAvailable ? formatAge(status?.age_ms ?? null) : "No selected frame"}</strong></div>
               <div><span>Frames received</span><strong>{remote?.successful_fetches ?? 0}</strong></div>
             </div>
-          </section>
-
-          <section className="panel compact-panel">
-            <div className="panel-header"><h2>Compatibility</h2><span className="status-pill muted">local prototype</span></div>
-            <p className="placeholder-copy">
-              V037 R6 keeps the V036-compatible length-prefixed TCP JPEG wire format but no longer forces JPEGs into one lwIP send window. Saved JPEG quality and resolution stay fixed across transport pressure; the ESP exposes RSSI/BSSID/channel diagnostics and lets achieved FPS fall to sustainable throughput. Multiple ESP streams can run independently; only the selected source is forwarded into the existing PC Studio frame pipeline.
-            </p>
-            <code className="endpoint-code">POST {API_BASE}/api/camera/remote/select</code>
-          </section>
+          </details>
         </aside>
         )}
       </div>
-      <FunctionChecklist area="Camera" />
+      {!cameraSettingsView && <FunctionChecklist area="Camera" />}
     </div>
   );
 }

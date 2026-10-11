@@ -1,5 +1,5 @@
-version: 0_3_18
-status: Camera Settings page candidate
-previous_version: 0_3_17
+version: 0_3_19
+status: Collapsible camera settings and status candidate
+previous_version: 0_3_18
 passed_baseline: 0_3_11
-notes: V0318 adds a dedicated Camera Settings UI for saved ESP camera IPs, selected live preview, stream/device status and per-camera image/FPS configuration. Existing ESP transport, backend APIs, firmware, simulation and single-selected-source inference remain unchanged. V0311 / 0_3_11 remains the owner-confirmed passed baseline until explicit acceptance.
+notes: V0319 refines the Camera Settings UI with a live color-coded saved-camera status strip, collapsible IP, image and diagnostic sections, and removal of verbose legacy streaming descriptions. Existing per-camera registry, ESP firmware, transport, APIs and selected-source inference are unchanged. V0311 / 0_3_11 remains passed baseline until explicit owner PASS.

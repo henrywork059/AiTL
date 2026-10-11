@@ -28,7 +28,24 @@ def main() -> int:
     assert "key={cameraSettingsView ? remote?.active_source_id" in page
     assert "selectedSaved && selectedStreaming && !status?.simulation_enabled" in page
     assert "Measured stream FPS" in page and "Frame age" in page
-    print("[PASS] Camera Settings navigation, saved ESP selection, preview and controls are wired")
+    assert "cameraIndicator(camera)" in page
+    for marker in ("camera.streaming", "camera.stream_connected", "camera.connected",
+                   "camera.device_reachable", "camera.paused_for_simulation"):
+        assert marker in page, marker
+    for state in ("Streaming", "Reconnecting", "Paused", "Connected", "Unreachable", "Saved"):
+        assert f'label: "{state}"' in page, state
+    assert "remote?.cameras.map((camera) => {" in page
+    assert "camera-status-entry" in page and "camera.selected" in page
+    assert 'role="list"' in page and 'role="listitem"' in page
+    assert 'className="camera-fold"' in page
+    assert 'className="panel compact-panel training-form camera-fold"' in page
+    assert 'className="panel compact-panel camera-fold"' in page
+    assert "Manage IP addresses and connections" in page
+    assert "Detailed camera & stream status" in page
+    assert "Each saved ESP keeps its own OV2640 settings" not in page
+    assert "V037 R6" not in page
+    assert '{!cameraSettingsView && <FunctionChecklist area="Camera" />}' in page
+    print("[PASS] Camera Settings status strip, collapsible controls, navigation and preview are wired")
     return 0
 
 

@@ -646,3 +646,81 @@ th {
   border-left-color: var(--color-danger);
   background: var(--color-danger-surface);
 }
+ 
+
+/* Compact, continuously refreshed saved-camera status strip. */
+.camera-status-strip {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.camera-status-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.camera-status-strip-header span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.camera-status-strip-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.camera-status-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-width: 0;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.camera-status-entry.is-selected {
+  border-color: var(--color-primary);
+}
+
+.camera-status-entry-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.camera-status-entry-name strong,
+.camera-status-entry small {
+  overflow-wrap: anywhere;
+}
+
+.camera-status-entry-name small {
+  color: var(--color-primary);
+}
+
+.camera-status-entry > small {
+  color: var(--color-text-muted);
+}
+
+.camera-fold > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.camera-fold[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+.camera-fold > summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.camera-fold > summary .status-pill {
+  float: right;
+}
