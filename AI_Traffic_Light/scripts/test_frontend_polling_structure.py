@@ -68,6 +68,7 @@ def main() -> int:
     assert "await waitForCameraStatusIdle()" in app
     assert "refreshInFlightRef" in app
     assert "cameraModeGenerationRef" in app
+    assert "generation === cameraModeGenerationRef.current" in app
     assert "const refreshAll = useCallback((): Promise<void>" in app
     assert "cameraModeGeneration === cameraModeGenerationRef.current" in app
 

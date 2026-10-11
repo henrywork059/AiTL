@@ -132,7 +132,9 @@ export default function App() {
   }, [refreshAll]);
 
   const pollCameraStatus = useCallback(async () => {
-    setCameraStatus(await fetchCameraStatus());
+    const generation = cameraModeGenerationRef.current;
+    const status = await fetchCameraStatus();
+    if (generation === cameraModeGenerationRef.current) setCameraStatus(status);
   }, []);
 
   const pollLiveContext = useCallback(async () => {
