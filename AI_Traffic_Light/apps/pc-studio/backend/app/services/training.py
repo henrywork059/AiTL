@@ -12,7 +12,7 @@ from uuid import uuid4
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
-from app.services.dataset_labeling import DatasetLabelingService
+from app.services.dataset_labeling import DatasetLabelingService, serialize_managed_dataset
 
 logger = get_logger(__name__)
 
@@ -111,6 +111,7 @@ class TrainingService:
         )
         return state
 
+    @serialize_managed_dataset
     def start(
         self,
         *,

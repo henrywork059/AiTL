@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = PROJECT_ROOT / "apps" / "pc-studio" / "backend"
@@ -13,6 +14,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 from app.core.error_codes import ErrorCode  # noqa: E402
 from app.core.exceptions import AppError  # noqa: E402
 from app.services.dataset_labeling import DatasetLabelingService  # noqa: E402
+from app.services.training import training_service  # noqa: E402
 
 
 CLASSES = {
@@ -110,6 +112,16 @@ def main() -> int:
         label_text = "\n".join(path.read_text(encoding="utf-8") for path in label_files)
         assert "0 0.350000 0.350000 0.500000 0.500000" in label_text
 
+        manifest_before = (dataset_root / "yolo" / "manifest.json").read_bytes()
+        with patch.object(training_service, "status", return_value={"status": "running"}):
+            try:
+                service.build_training_dataset(validation_fraction=0.2)
+            except AppError as exc:
+                assert exc.code == ErrorCode.DATASET_TRAINING_NOT_READY
+            else:
+                raise AssertionError("Dataset rebuild was allowed during training")
+        assert (dataset_root / "yolo" / "manifest.json").read_bytes() == manifest_before
+
         service.save_labels(
             "capture_positive",
             [{"class_id": 0, "box_xyxy": [12, 8, 60, 48]}],
@@ -124,6 +136,7 @@ def main() -> int:
     print("[PASS] bad-quality captures are excluded from YOLO builds")
     print("[PASS] managed train/validation split and normalized labels are generated")
     print("[PASS] label edits mark the managed dataset stale until rebuilt")
+    print("[PASS] managed dataset build is blocked during active training")
     return 0
 
 

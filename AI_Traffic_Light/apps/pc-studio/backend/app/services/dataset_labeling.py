@@ -3,14 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+from functools import wraps
 import os
 from pathlib import Path
 import re
 import shutil
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any
 from uuid import uuid4
 
+from app.core.json_store import write_json_atomic
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
@@ -24,6 +26,17 @@ CAPTURE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,160}$")
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".svg"}
 MAX_LABELS_PER_FRAME = 500
+
+_MANAGED_DATASET_LOCK = RLock()
+
+
+def serialize_managed_dataset(operation):
+    """Keep training startup and managed dataset replacement mutually exclusive."""
+    @wraps(operation)
+    def guarded(*args, **kwargs):
+        with _MANAGED_DATASET_LOCK:
+            return operation(*args, **kwargs)
+    return guarded
 
 
 class DatasetLabelingService:
@@ -225,7 +238,7 @@ class DatasetLabelingService:
         label_path = self._label_path(record)
         with self._lock:
             try:
-                self._atomic_write_json(label_path, document)
+                write_json_atomic(label_path, document)
             except OSError as exc:
                 logger.exception(
                     "Dataset label write failed",
@@ -281,7 +294,16 @@ class DatasetLabelingService:
             ),
         }
 
+    @serialize_managed_dataset
     def build_training_dataset(self, *, validation_fraction: float = 0.2) -> dict[str, Any]:
+        from app.services.training import training_service
+
+        if training_service.status()["status"] == "running":
+            raise AppError(
+                ErrorCode.DATASET_TRAINING_NOT_READY,
+                "Cannot rebuild the managed dataset while training is running.",
+                status_code=409,
+            )
         if not 0 < validation_fraction < 0.5:
             raise AppError(
                 ErrorCode.INVALID_REQUEST,
@@ -500,20 +522,6 @@ class DatasetLabelingService:
         if payload.get("reviewed") is not True or not isinstance(payload.get("labels"), list):
             raise ValueError("Invalid label document")
         return payload
-
-    @staticmethod
-    def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
-        try:
-            with temporary_path.open("x", encoding="utf-8", newline="\n") as handle:
-                json.dump(payload, handle, indent=2, sort_keys=True)
-                handle.write("\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, path)
-        finally:
-            temporary_path.unlink(missing_ok=True)
 
     @staticmethod
     def _source_signature(items: list[dict[str, Any]]) -> str:
