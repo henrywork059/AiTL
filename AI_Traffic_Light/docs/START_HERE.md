@@ -1,6 +1,6 @@
 # Start Here — V0317
 
-V0317 / `0_3_17` is the AI workflow and coding-guideline efficiency candidate. Previous candidate: `0_3_16` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
+V0317 / `0_3_17` is the AI workflow and integrity-hardening candidate. Previous candidate: `0_3_16` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
 
 ## What changed
 

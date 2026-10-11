@@ -6,7 +6,7 @@ Expected release state:
 version: 0_3_17
 previous_version: 0_3_16
 passed_baseline: 0_3_11
-status: AI workflow efficiency candidate
+status: AI workflow and integrity hardening candidate
 ```
 
 ## Guideline checks
@@ -24,7 +24,7 @@ status: AI workflow efficiency candidate
 
 The default command still performs its full preflight, tests, frontend typecheck/build, Git cleanliness and live smoke before starting PC Studio. `-ChangedTests` is optional for routine fast startup, not full acceptance.
 
-No ESP reflash or new UI/API behavior is expected. Owner PASS is required; `0_3_11` remains the accepted baseline.
+No ESP reflash, new feature or API change is expected. Existing UI refresh/error handling has been corrected. Owner PASS is required; `0_3_11` remains the accepted baseline.
 
 ## Same-candidate integrity validation
 

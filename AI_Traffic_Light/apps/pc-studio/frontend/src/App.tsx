@@ -90,8 +90,8 @@ export default function App() {
       setTraffic(nextTraffic);
       setRecentLogs(nextLogs);
       if (cameraModeGeneration === cameraModeGenerationRef.current) {
-      setCameraStatus(nextCameraStatus);
-    }
+        setCameraStatus(nextCameraStatus);
+      }
       setRuntimeSettings(nextSettings);
       if (!runtimeInitialized.current) {
         runtimeInitialized.current = true;

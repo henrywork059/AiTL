@@ -4,7 +4,7 @@
 version: 0_3_17
 previous_version: 0_3_16
 passed_baseline: 0_3_11
-status: AI workflow efficiency candidate
+status: AI workflow and integrity hardening candidate
 ```
 
 ## Agent workflow and documentation
