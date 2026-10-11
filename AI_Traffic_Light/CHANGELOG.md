@@ -1,6 +1,14 @@
 # Changelog
 ## 0_3_17 — Agent reading and editing workflow efficiency
 
+Same-candidate integrity hardening:
+- Reused shared atomic JSON persistence for dataset labels instead of a parallel writer.
+- Prevented managed YOLO dataset rebuilds during active training with serialized startup/rebuild operations.
+- Kept app-level bulk refreshes single-flight and prevented stale refreshes from overwriting changed camera mode.
+- Handled initial Dataset Review and manual capture-list refresh failures visibly.
+- Extended focused tests. No new features, security changes, firmware changes, or dependencies.
+
+
 - Added an explicit owner-first, narrow-read workflow to `AGENTS.md` and `PATCH_PLAYBOOK.md`: confirm HEAD/version once, locate symbols/files before opening them, inspect only owning code/tests/contracts, and stop discovery when evidence is sufficient.
 - Standardized minimum-scope edits, reuse of existing services, batched independent reads, related-test-first validation with risk-based escalation, and atomic GitHub commits with remote-head verification and no force pushes.
 - Aligned `AI_AGENT_GUIDE.md`, `AI_AGENT_CHECKLIST.md`, and `DEVELOPMENT_WORKFLOW.md` without changing application architecture, APIs, frontend behavior, tests, firmware, or startup scripts.

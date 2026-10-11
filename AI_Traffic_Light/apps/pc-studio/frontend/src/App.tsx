@@ -63,8 +63,11 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [changingCameraMode, setChangingCameraMode] = useState(false);
   const runtimeInitialized = useRef(false);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const cameraModeGenerationRef = useRef(0);
 
-  const refreshAll = useCallback(async () => {
+  const refreshAllOnce = useCallback(async () => {
+    const cameraModeGeneration = cameraModeGenerationRef.current;
     setRefreshing(true);
     setApiState({ status: "checking", message: "Refreshing API data..." });
 
@@ -86,7 +89,9 @@ export default function App() {
       setZones(nextZoneStatus.zones);
       setTraffic(nextTraffic);
       setRecentLogs(nextLogs);
+      if (cameraModeGeneration === cameraModeGenerationRef.current) {
       setCameraStatus(nextCameraStatus);
+    }
       setRuntimeSettings(nextSettings);
       if (!runtimeInitialized.current) {
         runtimeInitialized.current = true;
@@ -111,6 +116,16 @@ export default function App() {
       setRefreshing(false);
     }
   }, []);
+
+  // Keep one manual/startup refresh in flight across repeated clicks and StrictMode effects.
+  const refreshAll = useCallback((): Promise<void> => {
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    const pending = refreshAllOnce().finally(() => {
+      if (refreshInFlightRef.current === pending) refreshInFlightRef.current = null;
+    });
+    refreshInFlightRef.current = pending;
+    return pending;
+  }, [refreshAllOnce]);
 
   useEffect(() => {
     void refreshAll();
@@ -139,11 +154,14 @@ export default function App() {
   );
 
   const changeCameraSimulation = useCallback(async (enabled: boolean) => {
+    cameraModeGenerationRef.current += 1;
     setChangingCameraMode(true);
     try {
       await waitForCameraStatusIdle();
       setCameraStatus(await setCameraSimulation(enabled));
     } finally {
+      // Discard any bulk refresh that began before or during the transition.
+      cameraModeGenerationRef.current += 1;
       setChangingCameraMode(false);
     }
   }, [waitForCameraStatusIdle]);

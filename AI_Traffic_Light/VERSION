@@ -1,5 +1,5 @@
 version: 0_3_17
-status: AI workflow efficiency candidate
+status: AI workflow and integrity hardening candidate
 previous_version: 0_3_16
 passed_baseline: 0_3_11
-notes: V0317 optimizes AI coding instructions for one-pass repository-state checks, narrow owner/test/contract retrieval, minimal edits, targeted validation, and guarded atomic direct GitHub publishing. Detailed agent guide, checklist, playbook and development workflow are aligned. Documentation and release metadata only: no PC Studio, FastAPI, UI, ESP firmware, API, signal/simulation or dataset behavior changes. V0311 / 0_3_11 remains the owner-confirmed passed baseline until explicit acceptance.
+notes: V0317 includes streamlined AI agent workflow guidance and same-candidate integrity hardening: shared atomic dataset label writes, coordinated managed dataset rebuilding/training startup, single-flight application refreshes with camera-mode response sequencing, and Dataset Review error handling. No feature or security changes, new dependencies, or ESP firmware changes. V0311 / 0_3_11 remains passed baseline until explicit owner acceptance.

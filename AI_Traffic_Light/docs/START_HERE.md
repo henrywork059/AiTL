@@ -14,4 +14,4 @@ V0317 / `0_3_17` is the AI workflow and coding-guideline efficiency candidate. P
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
 ```
 
-This is a guidance-only patch. Backend/frontend features and the Windows runner are unchanged. An explicit owner PASS is still required to advance the passed baseline.
+The unaccepted candidate also contains focused code-integrity hardening for dataset/training coordination, atomic manual labels, and frontend refresh/error handling. No new features or security changes; the Windows runner and ESP firmware are unchanged. An explicit owner PASS is still required to advance the passed baseline.

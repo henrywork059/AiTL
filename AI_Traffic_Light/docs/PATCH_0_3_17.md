@@ -27,3 +27,13 @@ FastAPI/backend and React/frontend source behavior; scripts/startup/test selecti
 Validate release metadata and structure with `python scripts/check_structure.py` on a complete checkout. Owner uses the normal Windows `scripts/update_test_run.ps1` for full candidate acceptance; no hardware reflash is needed. A guidance-only patch does not prove faster runtime or AI execution until observed in subsequent development tasks.
 
 `0_3_11` remains the accepted baseline until explicit owner PASS.
+
+## Same-candidate integrity hardening
+
+Following a repository integrity review, this unaccepted candidate received focused fixes without a version increment:
+
+- Manual dataset labels now reuse the existing shared atomic JSON writer, removing the redundant custom writer.
+- Managed YOLO dataset rebuilds are coordinated with training startup and rejected with the existing dataset-not-ready error while a training run is active. Training files are not swapped underneath a running worker.
+- The application bulk refresh now shares one in-flight request, and older bulk camera-status responses cannot overwrite a completed simulation-mode transition.
+- Dataset Review initial loading and manual Refresh list report failed requests through the existing UI error state instead of leaving unhandled promise rejections.
+- Existing dataset and frontend regressions were extended. No new feature, security change, firmware edit or dependency was added.

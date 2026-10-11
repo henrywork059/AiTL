@@ -25,3 +25,11 @@ status: AI workflow efficiency candidate
 - [ ] Owner explicitly confirms PASS before promotion.
 
 `0_3_11` remains owner-confirmed baseline until that confirmation.
+
+## Same-candidate data/state integrity
+
+- [ ] Manual labels persist using the shared atomic JSON writer.
+- [ ] Active model training blocks managed YOLO dataset replacement.
+- [ ] Dataset Review initial load and manual Refresh list show errors when the API fails.
+- [ ] Repeated bulk refresh calls are single-flight; camera mode changes reject stale bulk responses.
+- [ ] Existing simulation, labeling, training and frontend interactions remain functional.

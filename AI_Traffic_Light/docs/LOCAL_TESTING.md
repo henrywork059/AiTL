@@ -25,3 +25,12 @@ status: AI workflow efficiency candidate
 The default command still performs its full preflight, tests, frontend typecheck/build, Git cleanliness and live smoke before starting PC Studio. `-ChangedTests` is optional for routine fast startup, not full acceptance.
 
 No ESP reflash or new UI/API behavior is expected. Owner PASS is required; `0_3_11` remains the accepted baseline.
+
+## Same-candidate integrity validation
+
+- Run `python scripts/test_dataset_labeling_service.py` to check label persistence, safe YOLO builds and the refusal to replace a dataset during active training.
+- Run `python scripts/test_training_service.py` to confirm existing training/early-stopping semantics.
+- Run `python scripts/test_frontend_polling_structure.py`, `npm run typecheck` and `npm run build`.
+- On Dataset Review, test with an unavailable backend: initial load and Refresh list should show an error.
+- Refresh the app while switching simulation on/off: late camera-status responses must not revert the selected mode.
+- Try rebuilding the managed dataset during a training job: the request must fail without replacing its files.

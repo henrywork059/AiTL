@@ -57,11 +57,22 @@ export function DatasetReviewPage() {
     setTrainingDataset(await fetchTrainingDatasetStatus());
   }
 
+  async function refreshCaptureList() {
+    try {
+      await refreshCaptures(selectedCaptureId);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Capture list could not be refreshed.");
+    }
+  }
+
   useEffect(() => {
     async function initialLoad() {
       setLoading(true);
       try {
         await Promise.all([refreshCaptures(null), refreshTrainingDataset()]);
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : "Dataset review could not be loaded.");
       } finally {
         setLoading(false);
       }
@@ -168,7 +179,7 @@ export function DatasetReviewPage() {
             </div>
             <span className="status-pill muted">{captures.length} saved</span>
           </div>
-          <button onClick={() => void refreshCaptures(selectedCaptureId)} disabled={loading || deleting}>Refresh list</button>
+          <button onClick={() => void refreshCaptureList()} disabled={loading || deleting}>Refresh list</button>
           <div className="capture-browser-list">
             {captures.map((capture) => (
               <button

@@ -66,11 +66,21 @@ def main() -> int:
     assert "waitForIdle: waitForCameraStatusIdle" in app
     assert "&& !changingCameraMode" in app
     assert "await waitForCameraStatusIdle()" in app
+    assert "refreshInFlightRef" in app
+    assert "cameraModeGenerationRef" in app
+    assert "const refreshAll = useCallback((): Promise<void>" in app
+    assert "cameraModeGeneration === cameraModeGenerationRef.current" in app
+
+    review = read("apps/pc-studio/frontend/src/pages/DatasetReviewPage.tsx")
+    assert "async function refreshCaptureList()" in review
+    assert "void refreshCaptureList()" in review
+    assert "Dataset review could not be loaded." in review
 
     print(f"[PASS] shared single-flight polling validated across {len(checked)} periodic frontend surfaces")
     print("[PASS] restarts/manual refreshes reuse one in-flight task")
     print("[PASS] mutations drain conflicting status polls before changing state")
     print("[PASS] Live AI duplicate page-local detection timer is removed")
+    print("[PASS] bulk context refresh and Dataset Review errors retain UI integrity")
     return 0
 
 
