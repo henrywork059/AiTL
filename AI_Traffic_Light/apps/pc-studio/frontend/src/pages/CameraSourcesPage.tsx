@@ -26,6 +26,7 @@ type Props = {
   onSimulationChange: (enabled: boolean) => void;
   onStatusChange: (status: CameraStatus) => void;
   changingMode: boolean;
+  view?: "sources" | "settings";
 };
 
 const FRAME_SIZES: RemoteFrameSize[] = ["QQVGA", "HQVGA", "QVGA", "CIF", "VGA", "SVGA", "XGA", "SXGA", "UXGA"];
@@ -52,7 +53,8 @@ function numberValue(value: string): number {
   return Number.parseInt(value, 10);
 }
 
-export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, changingMode }: Props) {
+export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, changingMode, view = "sources" }: Props) {
+  const cameraSettingsView = view === "settings";
   const [remote, setRemote] = useState<RemoteCameraStatus | null>(null);
   const [selectedId, setSelectedId] = useState(NEW_CAMERA);
   const [host, setHost] = useState("");
@@ -125,12 +127,16 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     status?.frame_available
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
   );
-  const useLivePreview = Boolean(status?.simulation_enabled || (selectedSaved && remote?.streaming));
-  const imageUrl = useLivePreview
-    ? liveCameraMjpegUrl()
-    : selectedFrameAvailable
-      ? `${API_BASE}/api/camera/frame?v=${status?.frame_number ?? 0}`
-      : null;
+  // The Settings preview must never display a simulation or stale frame as the selected ESP.
+  const imageUrl = cameraSettingsView
+    ? selectedSaved && selectedStreaming && !status?.simulation_enabled && !remote?.paused_for_simulation
+      ? liveCameraMjpegUrl()
+      : null
+    : status?.simulation_enabled
+      ? liveCameraMjpegUrl()
+      : selectedFrameAvailable
+        ? `${API_BASE}/api/camera/frame?v=${status?.frame_number ?? 0}`
+        : null;
 
   const statusLabel = !status
     ? "checking"
@@ -302,13 +308,15 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
 
   return (
     <div className="page-stack">
-      <div className="camera-layout">
+      <div className={cameraSettingsView ? "camera-layout" : "page-stack"}>
         <section className="panel camera-preview-panel">
           <div className="panel-header">
             <div>
-              <h2>Camera input</h2>
+              <h2>{cameraSettingsView ? "Selected camera live preview" : "Camera input and simulation"}</h2>
               <p className="placeholder-copy">
-                Saved ESP profiles keep the selected OV2640 image settings while the binary TCP stream carries complete JPEG frames. Select which ESP feeds the shared PC Studio AI, capture, zone and analytics pipeline; use Camera Test when a physical connection is unstable.
+                {cameraSettingsView
+                  ? "Select a saved ESP camera, or add one by IP. This live preview uses the same selected source as the PC Studio AI and capture pipeline."
+                  : "Preview the shared frame input or start the built-in traffic simulation. Configure ESP cameras under Camera Settings."}
               </p>
             </div>
             <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
@@ -319,18 +327,25 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           <div className="camera-frame-wrapper">
             {imageUrl ? (
               <img
+                key={cameraSettingsView ? remote?.active_source_id ?? "none" : status?.simulation_enabled ? "simulation" : status?.active_source_id ?? "input"}
                 className="camera-frame"
                 src={imageUrl}
-                alt={`Latest frame from ${status?.active_source_id ?? remote?.active_source_id ?? "camera"}`}
+                alt={`Live frame from ${cameraSettingsView ? selectedId : status?.active_source_id ?? "camera"}`}
               />
             ) : (
               <div className="camera-empty-state">
-                <strong>No selected-camera frame available</strong>
-                <p>Select a saved ESP, connect it and start its stream. Other ESP streams may continue in the background.</p>
+                <strong>{cameraSettingsView ? "No live ESP preview" : "No camera frame available"}</strong>
+                <p>{cameraSettingsView
+                  ? status?.simulation_enabled
+                    ? "Simulation is active. Stop it in Camera Sources to preview a physical ESP stream."
+                    : "Select a saved ESP, connect it and start its stream. Other ESP streams may continue in the background."
+                  : "Start simulation, select an ESP in Camera Settings, or upload a device frame."}</p>
               </div>
             )}
           </div>
 
+          {!cameraSettingsView && (
+            <>
           <div className="button-row">
             <button
               className="primary"
@@ -348,8 +363,20 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
           )}
 
           <SimulationControls status={status} onStatusChange={onStatusChange} />
+            </>
+          )}
+          {cameraSettingsView && (
+            <div className="camera-status-list">
+              <div><span>Preview camera</span><strong>{selectedSaved ? selectedId : "Select a saved camera"}</strong></div>
+              <div><span>IP address</span><strong>{selectedSaved ? selectedProfile?.host ?? "—" : "—"}</strong></div>
+              <div><span>Live connection</span><strong>{selectedSaved && remote?.stream_connected && !status?.simulation_enabled ? "Connected" : selectedStreaming ? "Waiting / paused" : "Offline"}</strong></div>
+              <div><span>Measured stream FPS</span><strong>{selectedSaved && remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>Frame age</span><strong>{selectedSaved && selectedFrameAvailable ? formatAge(status?.age_ms ?? null) : "No live frame"}</strong></div>
+            </div>
+          )}
         </section>
 
+        {cameraSettingsView && (
         <aside className="side-column">
           <section className="panel compact-panel training-form">
             <div className="panel-header">
@@ -527,8 +554,14 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             <code className="endpoint-code">POST {API_BASE}/api/camera/remote/select</code>
           </section>
         </aside>
+        )}
       </div>
       <FunctionChecklist area="Camera" />
     </div>
   );
+}
+
+// The dedicated Settings route reuses the existing camera session and form owner.
+export function CameraSettingsPage(props: Omit<Props, "view">) {
+  return <CameraSourcesPage {...props} view="settings" />;
 }

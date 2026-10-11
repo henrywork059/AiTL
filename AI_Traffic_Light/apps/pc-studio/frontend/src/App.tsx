@@ -15,7 +15,7 @@ import { AppStatusBar } from "./components/AppStatusBar";
 import { AppShell } from "./layout/AppShell";
 import { useSerialPolling } from "./lib/useSerialPolling";
 import { CameraDiagnosticsPage } from "./pages/CameraDiagnosticsPage";
-import { CameraSourcesPage } from "./pages/CameraSourcesPage";
+import { CameraSettingsPage, CameraSourcesPage } from "./pages/CameraSourcesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DatasetCapturePage } from "./pages/DatasetCapturePage";
 import { DatasetReviewPage } from "./pages/DatasetReviewPage";
@@ -42,7 +42,7 @@ import type {
   Zone,
 } from "./types";
 
-const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "dataset_capture", "zone_editor", "live_ai"];
+const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "camera_settings", "dataset_capture", "zone_editor", "live_ai"];
 
 export default function App() {
   const [frame, setFrame] = useState<DetectionFrame | null>(null);
@@ -208,6 +208,15 @@ export default function App() {
       case "camera_sources":
         return (
           <CameraSourcesPage
+            status={cameraStatus}
+            onSimulationChange={changeCameraSimulation}
+            onStatusChange={setCameraStatus}
+            changingMode={changingCameraMode}
+          />
+        );
+      case "camera_settings":
+        return (
+          <CameraSettingsPage
             status={cameraStatus}
             onSimulationChange={changeCameraSimulation}
             onStatusChange={setCameraStatus}

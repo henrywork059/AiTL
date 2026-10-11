@@ -16,6 +16,7 @@ This durable catalog describes implemented PC Studio capabilities without owning
 - serialized/retried low-rate ESP HTTP control requests;
 - reconnect/FPS/sequence-gap/send/RSSI/BSSID/channel telemetry;
 - up to the configured maximum persisted ESP camera profiles with IP/FPS/OV2640 settings;
+- separate Camera Settings page for adding IP cameras, selecting the live ESP preview, reading selected-source diagnostics, and configuring each camera's saved image/stream settings; Camera Sources retains local simulation controls;
 - independent background TCP workers and newest-frame cache per connected ESP;
 - one explicitly selected ESP feeds the shared Live AI / Dataset Capture / zones / analytics pipeline;
 - freshness-guarded switching so stale caches, retired sessions and old-IP frames cannot replace the selected source;

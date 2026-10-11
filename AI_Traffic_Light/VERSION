@@ -1,5 +1,5 @@
-version: 0_3_17
-status: AI workflow and integrity hardening candidate
-previous_version: 0_3_16
+version: 0_3_18
+status: Camera Settings page candidate
+previous_version: 0_3_17
 passed_baseline: 0_3_11
-notes: V0317 includes streamlined AI agent workflow guidance and same-candidate integrity hardening: shared atomic dataset label writes, coordinated managed dataset rebuilding/training startup, single-flight application refreshes with camera-mode response sequencing, and Dataset Review error handling. No feature or security changes, new dependencies, or ESP firmware changes. V0311 / 0_3_11 remains passed baseline until explicit owner acceptance.
+notes: V0318 adds a dedicated Camera Settings UI for saved ESP camera IPs, selected live preview, stream/device status and per-camera image/FPS configuration. Existing ESP transport, backend APIs, firmware, simulation and single-selected-source inference remain unchanged. V0311 / 0_3_11 remains the owner-confirmed passed baseline until explicit acceptance.

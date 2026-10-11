@@ -1,35 +1,26 @@
-# V0317 Test-Ready Checklist
+# V0318 Test-Ready Checklist
 
 ```text
-version: 0_3_17
-previous_version: 0_3_16
+version: 0_3_18
+previous_version: 0_3_17
 passed_baseline: 0_3_11
-status: AI workflow and integrity hardening candidate
+status: Camera Settings page candidate
 ```
 
-## Agent workflow and documentation
+## Camera Settings
 
-- [ ] Short agent path locates owner, nearest test and contract without whole-repository reading.
-- [ ] Narrow file reads and reuse of unchanged content are specified.
-- [ ] Minimal diffs and avoidance of unrelated refactors/duplicate implementations remain required.
-- [ ] Focused checks precede broader checks; failures/shared safety contracts trigger escalation.
-- [ ] GitHub direct atomic commit, remote HEAD recheck and no-force push are documented.
-- [ ] Documentation-only path avoids speculative application/firmware changes.
-- [ ] Release-state, single-source inference, signal safety, API/data, runtime preservation and owner acceptance gates remain intact.
+- [ ] Operate sidebar has a distinct Camera Settings page; Camera Sources still supports simulation.
+- [ ] Add multiple ESP camera IPs and source IDs, select each saved camera from the dropdown, and restore its settings.
+- [ ] Preview displays the selected live ESP feed only; switching, simulation, stopping and deleting do not show another camera's stale frame.
+- [ ] Live status displays selected source/IP, connection, measured FPS, frame age and detailed device/transport telemetry.
+- [ ] Resolution, JPEG quality, FPS, basic and advanced OV2640 settings persist and apply when the stream is started; editing a running stream remains locked.
+- [ ] Offline/reconnecting cameras show accurate state and errors; other ESP streams survive switching.
 
-## Repository / owner validation
+## Validation and acceptance
 
 - [ ] `python scripts/check_structure.py` passes.
-- [ ] Full standard Windows `update_test_run.ps1` validation passes on the owner's PC.
-- [ ] Version/reporting surfaces identify `0_3_17`, previous `0_3_16`, and passed baseline `0_3_11`.
-- [ ] Owner explicitly confirms PASS before promotion.
-
-`0_3_11` remains owner-confirmed baseline until that confirmation.
-
-## Same-candidate data/state integrity
-
-- [ ] Manual labels persist using the shared atomic JSON writer.
-- [ ] Active model training blocks managed YOLO dataset replacement.
-- [ ] Dataset Review initial load and manual Refresh list show errors when the API fails.
-- [ ] Repeated bulk refresh calls are single-flight; camera mode changes reject stale bulk responses.
-- [ ] Existing simulation, labeling, training and frontend interactions remain functional.
+- [ ] `python scripts/test_camera_settings_page_structure.py` passes.
+- [ ] `python scripts/test_frontend_polling_structure.py` passes.
+- [ ] Frontend `npm run typecheck` and `npm run build` pass.
+- [ ] Full Windows `update_test_run.ps1` and physical ESP connection test pass.
+- [ ] Owner confirms PASS. Until then `0_3_11` remains the passed baseline.

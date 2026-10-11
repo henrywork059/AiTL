@@ -2,6 +2,7 @@ export type AppPageId =
   | "dashboard"
   | "live_ai"
   | "camera_sources"
+  | "camera_settings"
   | "camera_diagnostics"
   | "junction_network"
   | "zone_editor"

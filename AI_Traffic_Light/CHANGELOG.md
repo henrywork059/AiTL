@@ -1,4 +1,11 @@
 # Changelog
+## 0_3_18 — Dedicated Camera Settings page
+
+- Added Camera Settings to PC Studio navigation, distinct from Camera Sources simulation controls.
+- Reused the existing saved ESP camera registry, per-camera IP/OV2640/FPS controls, MJPEG relay preview, and live device/stream diagnostics without new backend endpoints or firmware changes.
+- Preview now clearly identifies the selected source and avoids showing simulation/stale frames as an ESP live feed; switching sources remounts the preview.
+- Kept multiple ESP sessions but one selected camera input for shared inference/capture. Passed baseline remains 0_3_11 pending owner acceptance.
+
 ## 0_3_17 — Agent reading and editing workflow efficiency
 
 Same-candidate integrity hardening:
