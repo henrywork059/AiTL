@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { API_BASE } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { SimulationControls } from "../components/SimulationControls";
@@ -62,6 +62,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
   const [busy, setBusy] = useState(false);
   const [remoteMessage, setRemoteMessage] = useState<string | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
+  const initializedRef = useRef(false);
 
   function loadSelectedProfile(next: RemoteCameraStatus) {
     setRemote(next);
@@ -88,26 +89,15 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     setRemoteMessage("Enter a new ESP IP, adjust its settings, then Save or Connect.");
   }
 
-  useEffect(() => {
-    void fetchRemoteCameraStatus()
-      .then((next) => {
-        setRemote(next);
-        const profile = next.cameras.find((camera) => camera.source_id === next.active_source_id);
-        if (profile) {
-          setSelectedId(profile.source_id);
-          setHost(profile.host);
-          setSourceId(profile.source_id);
-          setTargetFps(profile.target_fps);
-          setSettings(profile.settings);
-        }
-      })
-      .catch(() => undefined);
-  }, []);
-
   useSerialPolling(
     async () => {
       const next = await fetchRemoteCameraStatus();
-      setRemote(next);
+      if (!initializedRef.current) {
+        loadSelectedProfile(next);
+        initializedRef.current = true;
+      } else {
+        setRemote(next);
+      }
     },
     1000,
     { onError: () => undefined },

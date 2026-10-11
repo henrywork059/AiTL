@@ -46,6 +46,11 @@ def main() -> int:
     assert "runNow: refreshLogs" in logs
     assert "void refreshLogs()" in logs
 
+    camera_sources = read("apps/pc-studio/frontend/src/pages/CameraSourcesPage.tsx")
+    assert camera_sources.count("fetchRemoteCameraStatus()") == 1
+    assert "initializedRef.current" in camera_sources
+    assert "loadSelectedProfile(next)" in camera_sources
+
     dataset = read("apps/pc-studio/frontend/src/pages/DatasetCapturePage.tsx")
     assert "waitForIdle: waitForDatasetStatusIdle" in dataset
     assert "enabled: !saving && !deleting" in dataset

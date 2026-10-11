@@ -37,3 +37,5 @@ Following a repository integrity review, this unaccepted candidate received focu
 - The application bulk refresh now shares one in-flight request, and older bulk camera-status responses cannot overwrite a completed simulation-mode transition.
 - Dataset Review initial loading and manual Refresh list report failed requests through the existing UI error state instead of leaving unhandled promise rejections.
 - Existing dataset and frontend regressions were extended. No new feature, security change, firmware edit or dependency was added.
+
+- Consolidated Camera Sources' duplicate initial remote-status request into its existing immediate serial poll; initialization still loads the selected saved profile once.
