@@ -1,5 +1,14 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0320 Crosswalk configuration
+
+`GET /api/crosswalks` returns `{"schema_version":1,"crosswalks":[]}` when empty. Crosswalk entries contain `id` (unique letter-first token, up to 64 chars), `label` (1–120 chars), `location` (0–160 chars), and nullable `camera_side_a_id` and `camera_side_b_id` source IDs.
+
+`PUT /api/crosswalks` accepts `{"config":{"schema_version":1,"crosswalks":[...]}}` to atomically save the whole set (up to 32). Assigned camera IDs must have valid existing camera-source syntax and differ within a crosswalk; references to deleted saved cameras remain visible until deliberately reassigned. Crosswalk source IDs refer to the existing remote-camera registry and do not initiate streams.
+
+Both routes use the standard request-ID success/error envelope. Invalid records return `ATL-CROSSWALK-001` (422); persisted read/write failures return `ATL-CROSSWALK-002/003` (500). This is configuration metadata only, not simultaneous multi-camera inference or traffic-signal control.
+
+
 Existing non-described contracts remain unchanged. All JSON success/error responses retain the standard envelope and request ID conventions.
 
 ## V0311 Junction Network configuration

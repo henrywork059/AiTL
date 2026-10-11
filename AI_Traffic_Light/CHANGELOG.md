@@ -1,4 +1,11 @@
 # Changelog
+## 0_3_20 — Crosswalk definitions and two-sided camera assignment
+
+- Added Traffic → Crosswalks page for create/edit/delete, schematic representation and two separate camera slots.
+- Reused saved camera profiles for the two pedestrian approaches and displayed their current connectivity.
+- Added isolated atomic crosswalk configuration storage, GET/PUT API, stable errors, and focused service/frontend regressions.
+- No change to firmware, existing camera streaming, signal control or one-selected-source inference; passed baseline remains `0_3_11`.
+
 ## 0_3_19 — Camera Settings status and compact layout
 
 - Removed verbose transport, version-specific and image-setting descriptions from Camera Settings.

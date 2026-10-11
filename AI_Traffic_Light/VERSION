@@ -1,5 +1,5 @@
-version: 0_3_19
-status: Collapsible camera settings and status candidate
-previous_version: 0_3_18
+version: 0_3_20
+status: Crosswalk configuration candidate
+previous_version: 0_3_19
 passed_baseline: 0_3_11
-notes: V0319 refines the Camera Settings UI with a live color-coded saved-camera status strip, collapsible IP, image and diagnostic sections, and removal of verbose legacy streaming descriptions. Existing per-camera registry, ESP firmware, transport, APIs and selected-source inference are unchanged. V0311 / 0_3_11 remains passed baseline until explicit owner PASS.
+notes: V0320 adds persistent Crosswalks configuration, an editable two-sided schematic and two distinct saved ESP camera assignments. API GET/PUT uses atomic metadata storage; no multi-camera inference, firmware or signal-control changes. V0311 / 0_3_11 remains the accepted baseline pending owner PASS.

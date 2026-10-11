@@ -2,6 +2,12 @@
 
 Stable project errors used by the current prototype APIs.
 
+## Crosswalk configuration
+
+- `ATL-CROSSWALK-001` — crosswalk validation failed (422)
+- `ATL-CROSSWALK-002` — crosswalk read failed (500)
+- `ATL-CROSSWALK-003` — crosswalk write failed (500)
+
 ## Dataset
 
 - `ATL-DATASET-001` — dataset write failed

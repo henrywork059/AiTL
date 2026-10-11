@@ -9,6 +9,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   camera_sources: { id: "camera_sources", label: "Camera Sources", shortLabel: "Sources", description: "Preview the current frame source and run the local traffic simulation or receive uploaded camera frames.", status: "test-ready" },
   camera_settings: { id: "camera_settings", label: "Camera Settings", shortLabel: "Camera Settings", description: "Add ESP cameras by IP, select a live preview, inspect camera/stream telemetry, and save per-camera OV2640 and FPS settings.", status: "test-ready" },
   camera_diagnostics: { id: "camera_diagnostics", label: "Camera Diagnostics", shortLabel: "Camera Test", description: "Run one-click staged diagnostics against the selected ESP camera and identify the most likely failing control, Wi-Fi, direct-stream, contention, or PC Studio layer.", status: "test-ready" },
+  crosswalks: { id: "crosswalks", label: "Crosswalks", shortLabel: "Crosswalks", description: "Define crosswalks and assign two saved cameras on opposite pedestrian approaches.", status: "test-ready" },
   junction_network: { id: "junction_network", label: "Junction Network", shortLabel: "Junctions", description: "Arrange prototype junction nodes and links, assign one or more saved ESP cameras to each junction, and inspect camera health plus live traffic, pedestrian, event, and warning context for the selected AI source.", status: "test-ready" },
   zone_editor: { id: "zone_editor", label: "Zone Editor", shortLabel: "Zones", description: "Define traffic decision zones, analytics regions, and counting lines directly against the current camera reference frame.", status: "test-ready" },
   traffic_logic: { id: "traffic_logic", label: "Traffic Logic", shortLabel: "Logic", description: "Define ranked traffic scenarios from metrics or class counts in zones, configure protected timing, inspect the winning signal response, and review decision history.", status: "test-ready" },
@@ -24,7 +25,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
 
 export const APP_SECTIONS: AppSection[] = [
   { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.live_ai, PAGE_DETAILS.camera_sources, PAGE_DETAILS.camera_settings, PAGE_DETAILS.camera_diagnostics] },
-  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.junction_network, PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
+  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.junction_network, PAGE_DETAILS.crosswalks, PAGE_DETAILS.zone_editor, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
   { id: "data", label: "Data & models", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export, PAGE_DETAILS.model_registry] },
   { id: "system", label: "System", pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs] },
 ];

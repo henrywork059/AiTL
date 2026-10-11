@@ -5,6 +5,7 @@ export type AppPageId =
   | "camera_settings"
   | "camera_diagnostics"
   | "junction_network"
+  | "crosswalks"
   | "zone_editor"
   | "traffic_logic"
   | "traffic_analytics"

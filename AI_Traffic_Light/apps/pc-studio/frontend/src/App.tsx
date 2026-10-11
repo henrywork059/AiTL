@@ -16,6 +16,7 @@ import { AppShell } from "./layout/AppShell";
 import { useSerialPolling } from "./lib/useSerialPolling";
 import { CameraDiagnosticsPage } from "./pages/CameraDiagnosticsPage";
 import { CameraSettingsPage, CameraSourcesPage } from "./pages/CameraSourcesPage";
+import { CrosswalksPage } from "./pages/CrosswalksPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DatasetCapturePage } from "./pages/DatasetCapturePage";
 import { DatasetReviewPage } from "./pages/DatasetReviewPage";
@@ -227,6 +228,8 @@ export default function App() {
         return <CameraDiagnosticsPage />;
       case "junction_network":
         return <JunctionNetworkPage />;
+      case "crosswalks":
+        return <CrosswalksPage />;
       case "zone_editor":
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":

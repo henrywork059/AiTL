@@ -27,6 +27,12 @@ This durable catalog describes implemented PC Studio capabilities without owning
 
 Several ESP streams may exist at once, but this is **multi-camera input/session support**, not simultaneous independent inference for every camera.
 
+## Crosswalks
+
+- persist up to 32 named and located crosswalks, with add/edit/delete and a crossing-road diagram;
+- optionally assign two distinct saved ESP camera source IDs to opposite pedestrian approaches and inspect camera status;
+- metadata only: no dual-camera inference or physical signal-control authority.
+
 ## Junction Network
 
 - editable PC Studio page representing installed/model junctions as logical draggable nodes;

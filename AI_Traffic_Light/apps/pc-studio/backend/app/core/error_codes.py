@@ -50,6 +50,10 @@ class ErrorCode(str, Enum):
     TRAFFIC_NETWORK_READ_FAILED = "ATL-TRAFFIC-014"
     TRAFFIC_NETWORK_WRITE_FAILED = "ATL-TRAFFIC-015"
 
+    CROSSWALK_INVALID = "ATL-CROSSWALK-001"
+    CROSSWALK_READ_FAILED = "ATL-CROSSWALK-002"
+    CROSSWALK_WRITE_FAILED = "ATL-CROSSWALK-003"
+
     DATASET_WRITE_FAILED = "ATL-DATASET-001"
     DATASET_READ_FAILED = "ATL-DATASET-002"
     DATASET_ITEM_NOT_FOUND = "ATL-DATASET-003"
@@ -107,6 +111,9 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.TRAFFIC_NETWORK_INVALID: "Intersection network configuration is invalid.",
     ErrorCode.TRAFFIC_NETWORK_READ_FAILED: "Failed to read intersection network configuration.",
     ErrorCode.TRAFFIC_NETWORK_WRITE_FAILED: "Failed to write intersection network configuration.",
+    ErrorCode.CROSSWALK_INVALID: "Crosswalk configuration is invalid.",
+    ErrorCode.CROSSWALK_READ_FAILED: "Failed to read crosswalk configuration.",
+    ErrorCode.CROSSWALK_WRITE_FAILED: "Failed to write crosswalk configuration.",
     ErrorCode.DATASET_WRITE_FAILED: "Failed to write dataset item.",
     ErrorCode.DATASET_READ_FAILED: "Failed to read dataset item.",
     ErrorCode.DATASET_ITEM_NOT_FOUND: "Dataset item was not found.",
