@@ -1,5 +1,5 @@
-version: 0_3_21
-status: Crosswalk schematic orientation correction candidate
-previous_version: 0_3_20
+version: 0_3_22
+status: Windows fresh-install dependency fix candidate
+previous_version: 0_3_21
 passed_baseline: 0_3_11
-notes: V0321 corrects the existing Crosswalks diagram to horizontal zebra stripes spanning a vertical pedestrian path between Side A and Side B, with both opposite-side camera positions preserved. No backend, data model, firmware or signal-control changes. V0311 / 0_3_11 remains the accepted baseline until owner PASS.
+notes: V0322 adds the missing pinned httpx dependency for FastAPI TestClient regressions during fresh Windows installation. Existing updater refreshes backend requirements automatically; no runtime, frontend, camera, signal, crosswalk or firmware changes. V0311 / 0_3_11 remains accepted until owner PASS.

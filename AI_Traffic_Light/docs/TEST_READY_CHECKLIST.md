@@ -1,15 +1,15 @@
-# V0321 Test-Ready Checklist
+# V0322 Test-Ready Checklist
 
 ```text
-version: 0_3_21
-previous_version: 0_3_20
+version: 0_3_22
+previous_version: 0_3_21
 passed_baseline: 0_3_11
-status: Crosswalk schematic orientation correction candidate
+status: Windows fresh-install dependency fix candidate
 ```
 
-- [ ] Seven zebra crossing bars run **horizontally** within the road.
-- [ ] Vertical pedestrian walkway joins Side A (top) to Side B (bottom); camera positions and arrows remain correctly aligned.
-- [ ] Crosswalk creation/editing, two distinct camera selectors, saved assignments and reload remain functional.
-- [ ] Focused frontend structure test passes.
-- [ ] `python scripts/check_structure.py`, frontend typecheck/build and complete Windows runner pass.
-- [ ] Owner confirms PASS; `0_3_11` remains the accepted baseline until then.
+- [ ] A new Windows backend virtual environment installs pinned `httpx==0.28.1` from `requirements.txt`.
+- [ ] `python scripts/test_camera_simulation_api.py` imports FastAPI TestClient and passes.
+- [ ] Unchanged camera, simulation, crosswalk and other tests pass.
+- [ ] `python scripts/check_structure.py` and frontend typecheck/build pass.
+- [ ] The complete Windows update/test/run workflow reaches backend health/smoke and opens PC Studio.
+- [ ] Owner confirms PASS; `0_3_11` remains baseline until then.

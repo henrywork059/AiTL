@@ -1,4 +1,10 @@
 # Changelog
+## 0_3_22 — Missing FastAPI TestClient dependency on fresh Windows installs
+
+- Added pinned `httpx==0.28.1` to backend requirements so `fastapi.testclient.TestClient` works in a newly created PC Studio virtual environment.
+- The existing updater automatically reinstalls backend requirements after pulling this change. No other behavior, API, firmware or UI changes.
+- Passed baseline stays `0_3_11` pending owner acceptance.
+
 ## 0_3_21 — Crosswalk schematic orientation correction
 
 - Rotated zebra stripe geometry to seven horizontal white bars across the vertically oriented path connecting pedestrian Side A and Side B.
