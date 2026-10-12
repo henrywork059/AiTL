@@ -1,17 +1,15 @@
-# V0320 Test-Ready Checklist
+# V0321 Test-Ready Checklist
 
 ```text
-version: 0_3_20
-previous_version: 0_3_19
+version: 0_3_21
+previous_version: 0_3_20
 passed_baseline: 0_3_11
-status: Crosswalk configuration candidate
+status: Crosswalk schematic orientation correction candidate
 ```
 
-- [ ] Crosswalks page and two-sided pedestrian crossing schematic render.
-- [ ] Multiple crosswalk definitions can be added, edited, removed and reloaded from saved JSON.
-- [ ] Opposing sides independently assign different saved ESP sources, or None.
-- [ ] A missing camera profile displays a warning without silently clearing it.
-- [ ] Save errors and unsaved changes are explicit; status polling does not reset edits.
-- [ ] Crosswalk service and frontend structure tests pass.
-- [ ] Structure checks, frontend typecheck/build and full Windows runner pass.
-- [ ] Owner confirms PASS; `0_3_11` remains accepted until then.
+- [ ] Seven zebra crossing bars run **horizontally** within the road.
+- [ ] Vertical pedestrian walkway joins Side A (top) to Side B (bottom); camera positions and arrows remain correctly aligned.
+- [ ] Crosswalk creation/editing, two distinct camera selectors, saved assignments and reload remain functional.
+- [ ] Focused frontend structure test passes.
+- [ ] `python scripts/check_structure.py`, frontend typecheck/build and complete Windows runner pass.
+- [ ] Owner confirms PASS; `0_3_11` remains the accepted baseline until then.

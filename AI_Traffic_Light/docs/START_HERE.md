@@ -1,10 +1,10 @@
-# Start Here — V0320
+# Start Here — V0321
 
-V0320 / `0_3_20` is the Crosswalk configuration candidate. Previous candidate: `0_3_19` (unaccepted). Passed baseline: `0_3_11`.
+V0321 / `0_3_21` corrects the Crosswalks diagram. Previous candidate: `0_3_20` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
 
-## New Crosswalks page
+## Change
 
-Open **Traffic → Crosswalks** to add, name, edit and remove crosswalks. Set camera Side A and Side B from your saved ESP camera profiles on opposite pedestrian approaches, as illustrated by the crosswalk diagram. Save definitions to `config/crosswalks.json`; the page displays saved camera connection status. No simultaneous two-camera inference or signal control is enabled.
+In Traffic → Crosswalks, the seven white zebra stripes now run **horizontally** across a **vertical** pedestrian crossing connecting Side A (top) and Side B (bottom). Camera A and camera B remain opposite each other, and all crosswalk editing, assignments and persistence behavior remain unchanged. This remains configuration-only, not dual-camera inference or live traffic control.
 
 ## Update and test
 
@@ -12,4 +12,4 @@ Open **Traffic → Crosswalks** to add, name, edit and remove crosswalks. Set ca
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Owner PASS and full Windows test are required. `0_3_11` remains baseline.
+Full validation and owner PASS remain necessary. `0_3_11` is still the accepted baseline.

@@ -201,13 +201,13 @@ export function CrosswalksPage() {
             <>
               {cameraPicker("camera_side_a_id", "Side A — first pedestrian approach")}
               <svg className="crosswalk-figure" viewBox="0 0 640 380" role="img"
-                aria-label="Crosswalk with Side A camera and Side B camera on opposite sides of the pedestrian road crossing">
+                aria-label="Vertical pedestrian crossing from Side A to Side B, with horizontal white zebra stripes across the road and one camera at each end">
                 <rect width="640" height="380" fill="#d1d8d0" rx="12" />
                 <rect y="125" width="640" height="130" fill="#39434a" />
                 <path d="M0 190 H640" stroke="#f0cd73" strokeWidth="3" strokeDasharray="24 20" />
-                <path d="M215 0 V125 M425 0 V125 M215 255 V380 M425 255 V380" stroke="#8a9a8a" strokeWidth="4" strokeDasharray="10 8" />
+                <path d="M240 75 V305 M400 75 V305" stroke="#315f9e" strokeWidth="3" strokeDasharray="10 8" opacity="0.6" fill="none" />
                 {Array.from({ length: 7 }, (_, index) => (
-                  <rect key={index} x={225 + index * 28} y="137" width="16" height="106" rx="2" fill="#f7f8f5" />
+                  <rect key={index} x="250" y={138 + index * 17} width="140" height="10" rx="2" fill="#f7f8f5" />
                 ))}
                 <path d="M320 89 V120 M307 109 L320 122 L333 109" fill="none" stroke="#315f9e" strokeWidth="5" strokeLinecap="round" />
                 <path d="M320 291 V260 M307 272 L320 259 L333 272" fill="none" stroke="#315f9e" strokeWidth="5" strokeLinecap="round" />

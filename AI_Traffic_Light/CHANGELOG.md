@@ -1,4 +1,10 @@
 # Changelog
+## 0_3_21 — Crosswalk schematic orientation correction
+
+- Rotated zebra stripe geometry to seven horizontal white bars across the vertically oriented path connecting pedestrian Side A and Side B.
+- Realigned the vertical path guides and corrected the accessible figure description; preserved two-camera assignments, controls and persistence.
+- Extended the focused frontend structure regression. No backend, firmware, API or signal-control changes; accepted baseline stays `0_3_11`.
+
 ## 0_3_20 — Crosswalk definitions and two-sided camera assignment
 
 - Added Traffic → Crosswalks page for create/edit/delete, schematic representation and two separate camera slots.
