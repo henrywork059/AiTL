@@ -1,18 +1,21 @@
-# Start Here — V0323
+# Start Here — V0324
 
-Current candidate: `0_3_23` (previous candidate `0_3_22`, accepted baseline `0_3_11`).
+Current candidate `0_3_24` (previous `0_3_23`); owner-confirmed passed baseline `0_3_11`.
 
-## What's new
+## Assign crosswalks to junction edges
 
-- Open Traffic → Crosswalks. Add/select a crosswalk, then **Edit regions** to enter a dedicated wide editor. Add/edit/delete a quadrilateral, dragging its four numbered corners over the chosen camera or simulated image. **Back to crosswalks → Save changes** persists the shared region definitions.
-- Side A and Side B use the *same* saved region coordinates; they are not geometrically calibrated to different viewpoints.
-- Start/stop shared simulation from either Crosswalks or Junction Network. There is only one simulated camera; the existing camera service handles physical-camera pause/resume.
+1. Define your crossings under **Traffic → Crosswalks**.
+2. Open **Traffic → Junction Network** and select a junction. Click any **N, E, S, W** label directly on the junction card.
+3. Under **Crosswalks by edge** in the inspector, choose a saved crosswalk for the selected side (or **No crosswalk** to clear it). Repeat for the other sides.
+4. Click **Save network**. Refreshing or restarting preserves edge assignments. Deleted crosswalks show a missing ID until explicitly corrected.
 
-## Pull, test, run
+The labels describe cardinal junction edges; connections are configuration-only and do not issue signal commands.
+
+## Update and test
 
 ```powershell
 cd D:\AiTL
 & ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Run the full Windows runner and verify physical camera preview before owner acceptance. The accepted baseline remains `0_3_11`.
+Validate UI and full runner before PASS; accepted baseline remains `0_3_11`.

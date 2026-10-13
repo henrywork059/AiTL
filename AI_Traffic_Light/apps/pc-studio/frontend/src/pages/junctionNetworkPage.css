@@ -174,7 +174,7 @@
   width: 260px;
   max-width: calc(100% - 24px);
   transform: translate(-50%, -50%);
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -188,6 +188,7 @@
 }
 
 .junction-node-selected {
+  z-index: 4;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-surface);
 }
@@ -666,3 +667,37 @@ button.compact {
     justify-self: start;
   }
 }
+
+/* N/E/S/W junction edge markers stay visible even without crosswalk assignments. */
+.junction-edge-tag {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  min-width: 29px;
+  height: 25px;
+  padding: 2px 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  font-size: 0.7rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.junction-edge-north { left: 50%; top: -14px; transform: translateX(-50%); }
+.junction-edge-south { left: 50%; bottom: -14px; transform: translateX(-50%); }
+.junction-edge-east { right: -15px; top: 50%; transform: translateY(-50%); }
+.junction-edge-west { left: -15px; top: 50%; transform: translateY(-50%); }
+.junction-edge-tag.is-linked { background: var(--color-success-surface); border-color: var(--color-success); color: var(--color-success); }
+.junction-edge-tag.is-selected,
+.junction-edge-tag:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.junction-crosswalk-edge-list { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.junction-crosswalk-edge-choice {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2); min-width: 0; text-align: left;
+}
+.junction-crosswalk-edge-choice strong { flex: 0 0 18px; }
+.junction-crosswalk-edge-choice span { overflow-wrap: anywhere; min-width: 0; }
+.junction-crosswalk-edge-choice.is-selected { border-color: var(--color-primary); background: var(--color-primary-surface); }
+.junction-crosswalk-missing { color: var(--color-danger); font-size: 0.7rem; }

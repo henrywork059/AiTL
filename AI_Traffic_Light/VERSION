@@ -1,5 +1,5 @@
-version: 0_3_23
-status: Crosswalk regions and shared simulation candidate
-previous_version: 0_3_22
+version: 0_3_24
+status: Junction edge crosswalk mapping candidate
+previous_version: 0_3_23
 passed_baseline: 0_3_11
-notes: V0323 adds persistent four-vertex quadrilateral regions per crosswalk with a dedicated drag editor, shared across its two saved cameras. Junction Network/Crosswalks reuse one global camera simulation with one simulated feed, not per-junction inference. API envelope, firmware, physical safety and baseline remain unchanged. V0311 / 0_3_11 stays owner-confirmed until PASS.
+notes: V0324 adds clickable N/E/S/W junction edge labels and persistent per-edge crosswalk mappings in the existing network JSON. Assignments use existing saved crosswalks; older network data loads with empty mappings, and deleted crosswalk references remain visible for correction. No new camera, inference or signal-control behavior. Baseline 0_3_11 stays accepted pending owner PASS.

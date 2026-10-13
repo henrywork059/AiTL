@@ -17,6 +17,23 @@ Both routes use the standard request-ID success/error envelope. Invalid records 
 
 Existing non-described contracts remain unchanged. All JSON success/error responses retain the standard envelope and request ID conventions.
 
+## V0324 Cardinal-edge crosswalk assignments
+
+The existing schema-1 `intersections[]` record optionally includes:
+
+```json
+"crosswalk_edges": {
+  "north": "crosswalk_1",
+  "east": null,
+  "south": "crosswalk_2",
+  "west": null
+}
+```
+
+Each of the four cardinal edge keys is optional on input; omitted keys and older records without `crosswalk_edges` normalize to `null`. Values are either `null` or a crosswalk ID matching the existing letter-first ID token syntax (1–64 chars). One crosswalk ID can belong to only one edge across the entire network. Unknown directions, invalid IDs and duplicates return `ATL-TRAFFIC-013` (422) without overwriting the previous JSON. Mappings are stored in the existing `config/intersections.json` file and returned by `GET /api/traffic/network` and the network overview; no new endpoint is introduced.
+
+Crosswalk definitions continue to live in `config/crosswalks.json`. The backend deliberately retains a mapping to a deleted crosswalk for operator review, and the inspector marks it missing. Junction-edge mapping is configuration metadata only and does not modify real or simulated signal decisions.
+
 ## V0311 Junction Network configuration
 
 `GET /api/traffic/network`

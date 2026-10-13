@@ -56,6 +56,15 @@ def main() -> int:
     assert "draft.intersections.find((item) => item.id === link.source_intersection_id)" not in page
     assert "function JunctionNodeCard" in node_card
     assert "junction-node-body" in node_card
+    assert "JUNCTION_EDGES" in node_card and "junction-edge-tag" in node_card
+    assert "onSelectEdge(config.id, edge)" in node_card
+    assert "selectedEdge={config.id === selectedId ? selectedEdge : null}" in page
+    assert "crosswalk_edges" in types and "JunctionCrosswalkEdges" in types
+    assert "fetchCrosswalks" in page and "crosswalkOwnerById" in page
+    assert "Missing:" in page and "Refresh crossings" in page
+    assert "junction-crosswalk-edge-choice" in css
+    assert ".junction-edge-north" in css and ".junction-edge-east" in css
+    assert ".junction-edge-south" in css and ".junction-edge-west" in css
     assert "JUNCTION_LOAD_LABELS" in node_card
     assert "fallbackJunctionNode" in view_helpers
     assert "cloneJunctionNetworkConfig" in view_helpers

@@ -1,26 +1,25 @@
-# Local Testing — V0323
+# Local Testing — V0324
 
 ```text
-version: 0_3_23
-previous_version: 0_3_22
+version: 0_3_24
+previous_version: 0_3_23
 passed_baseline: 0_3_11
-status: Crosswalk regions and shared simulation candidate
+status: Junction edge crosswalk mapping candidate
 ```
 
-## Tests
+## Focused checks
 
-- `python scripts/test_crosswalks_service.py`: older JSON compatibility, add/edit/delete, valid and invalid quadrilaterals, rejected invalid saves preserving previous persisted data.
-- `python scripts/test_crosswalks_frontend_structure.py`: region workspace and pointer handlers, camera switching/preview guard, app simulation prop wiring, existing crosswalk schematic.
-- `python scripts/test_junction_network_frontend_structure.py`: shared global simulator indicator/control.
+- `python scripts/test_intersection_network.py`: backwards-compatible N/E/S/W defaults, save/reload mappings, duplicate/invalid-reference rejection and untouched signal/controller mapping.
+- `python scripts/test_junction_network_frontend_structure.py`: four clickable map labels, edge inspector, typed keys, crosswalk retrieval and missing assignments.
 - `python scripts/check_structure.py`, frontend `npm run typecheck`, `npm run build`.
 
-## Hands-on validation
+## Owner test
 
-1. Add two crossings; save/reload and confirm each retains its own separate region collection.
-2. Open Edit regions; create a quad and drag each of four handles; rename, delete, create a second; Back → Save changes → reload.
-3. Select camera Side A, then Side B; confirm region polygons persist unchanged. For physical preview, ensure selected camera is streaming and choose Select camera for preview.
-4. Toggle simulation from Junction Network, then inspect Crosswalks/region editor and Camera Sources: one shared simulated feed, physical ESP stream pause. Switch it off, ensure physical source is restored without falsely claiming simultaneous input.
-5. Test self-intersecting, out-of-bounds and invalid region saves; verify validation error and no overwritten configuration.
-6. Run the full Windows `scripts/update_test_run.ps1` and confirm backend health/smoke and frontend startup, then physical ESP behavior.
+1. Create several named crosswalks in Traffic → Crosswalks.
+2. Open Traffic → Junction Network; every card should display N/E/S/W edge buttons, including on unassigned cards.
+3. Click each edge and select one crosswalk. Change or clear a mapping. Confirm one crosswalk cannot be assigned to multiple edges.
+4. Save network and restart PC Studio; mapping persists while existing cameras, junction dragging, topology links and simulation remain functional.
+5. Delete a referenced crosswalk in Crosswalks. Return to Junction Network and click **Refresh crossings**: its ID should be retained and marked Missing, with an option to clear/reassign.
+6. Run the full Windows `scripts/update_test_run.ps1` for complete regressions, typecheck/build, backend smoke and UI launch.
 
-Hardware and UI tests require owner PC. Candidate `0_3_23` is not accepted until PASS; baseline remains `0_3_11`.
+No physical hardware is needed for mapping itself. Full owner PASS is pending; baseline stays `0_3_11`.

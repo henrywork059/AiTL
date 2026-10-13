@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { JunctionNodeCard } from "../components/junctions/JunctionNodeCard";
+import { fetchCrosswalks } from "../lib/crosswalksApi";
+import type { Crosswalk } from "../types/crosswalks";
 import { fetchJunctionNetworkOverview, resetJunctionNetwork, saveJunctionNetwork } from "../lib/junctionNetworkApi";
 import {
   JUNCTION_LOAD_LABELS,
@@ -15,7 +17,9 @@ import {
 } from "../lib/junctionNetworkView";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import type { CameraStatus } from "../types";
+import { JUNCTION_EDGES } from "../types/junctionNetwork";
 import type {
+  JunctionEdge,
   JunctionCameraView,
   JunctionConfig,
   JunctionLink,
@@ -35,6 +39,9 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
   const [savedConfig, setSavedConfig] = useState<JunctionNetworkConfig | null>(null);
   const [draft, setDraft] = useState<JunctionNetworkConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<JunctionEdge>("north");
+  const [crosswalks, setCrosswalks] = useState<Crosswalk[]>([]);
+  const [crosswalkError, setCrosswalkError] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +67,19 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
       setError(nextError instanceof Error ? nextError.message : "Junction Network could not be loaded.");
     });
   }, [load]);
+
+  const refreshCrosswalks = useCallback(async () => {
+    try {
+      setCrosswalks((await fetchCrosswalks()).crosswalks);
+      setCrosswalkError(null);
+    } catch (nextError) {
+      setCrosswalkError(nextError instanceof Error ? nextError.message : "Crosswalks could not be loaded.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCrosswalks();
+  }, [refreshCrosswalks]);
 
   const pollOverview = useCallback(async () => {
     try {
@@ -101,6 +121,22 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
     () => new Set(availableCameras.map((camera) => camera.source_id)),
     [availableCameras],
   );
+
+  const crosswalkById = useMemo(
+    () => new Map(crosswalks.map((crosswalk) => [crosswalk.id, crosswalk])),
+    [crosswalks],
+  );
+
+  const crosswalkOwnerById = useMemo(() => {
+    const owners = new Map<string, string>();
+    for (const junction of draft?.intersections ?? []) {
+      for (const edge of JUNCTION_EDGES) {
+        const id = junction.crosswalk_edges[edge];
+        if (id) owners.set(id, junction.id + ":" + edge);
+      }
+    }
+    return owners;
+  }, [draft]);
 
   const cameraOwnerBySource = useMemo(() => {
     const owners = new Map<string, JunctionConfig>();
@@ -163,7 +199,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
       setSelectedId((current) => current && saved.intersections.some((item) => item.id === current)
         ? current
         : saved.active_intersection_id);
-      setNotice("Junction layout, links and camera assignments saved.");
+      setNotice("Junction layout, links, camera and crosswalk edge assignments saved.");
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Junction network could not be saved.");
     } finally {
@@ -201,6 +237,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
         source_ids: [],
         primary_source_id: null,
         zone_ids: [],
+        crosswalk_edges: { north: null, east: null, south: null, west: null },
         signal_profile: "Normal",
         position: {
           x: clampNumber(28 + (index % 4) * 18, 8, 92),
@@ -418,6 +455,8 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                 active={config.id === draft.active_intersection_id}
                 selected={config.id === selectedId}
                 onSelect={setSelectedId}
+                selectedEdge={config.id === selectedId ? selectedEdge : null}
+                onSelectEdge={(id, edge) => { setSelectedId(id); setSelectedEdge(edge); }}
                 onBeginDrag={beginDrag}
               />
             ))}
@@ -481,6 +520,57 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                   </label>
                 )}
                 {otherMappedSources.length > 0 && <div className="junction-other-sources"><span>Other mapped sources</span>{otherMappedSources.map((sourceId) => <code key={sourceId}>{sourceId}</code>)}</div>}
+              </section>
+
+              <section className="junction-inspector-section">
+                <div className="junction-section-title">
+                  <h4>Crosswalks by edge</h4>
+                  <button type="button" className="compact" onClick={() => void refreshCrosswalks()}>Refresh crossings</button>
+                </div>
+                <p className="small-note">Select N, E, S or W on the junction card, then connect an existing crossing from Traffic → Crosswalks.</p>
+                <div className="junction-crosswalk-edge-list">
+                  {JUNCTION_EDGES.map((edge) => {
+                    const id = selectedConfig.crosswalk_edges[edge];
+                    const missing = Boolean(id && !crosswalkById.has(id));
+                    return (
+                      <button type="button" key={edge}
+                        className={`junction-crosswalk-edge-choice${selectedEdge === edge ? " is-selected" : ""}`}
+                        aria-pressed={selectedEdge === edge}
+                        onClick={() => setSelectedEdge(edge)}>
+                        <strong>{edge[0].toUpperCase()}</strong>
+                        <span>{id ? crosswalkById.get(id)?.label ?? `Missing: ${id}` : "Unassigned"}</span>
+                        {missing && <span className="junction-crosswalk-missing">Missing</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="junction-primary-select">
+                  {selectedEdge[0].toUpperCase() + selectedEdge.slice(1)} edge crosswalk
+                  <select
+                    value={selectedConfig.crosswalk_edges[selectedEdge] ?? ""}
+                    onChange={(event) => mutateJunction(selectedConfig.id, (junction) => {
+                      junction.crosswalk_edges[selectedEdge] = event.target.value || null;
+                    })}
+                  >
+                    <option value="">No crosswalk</option>
+                    {selectedConfig.crosswalk_edges[selectedEdge] && !crosswalkById.has(selectedConfig.crosswalk_edges[selectedEdge]!) && (
+                      <option value={selectedConfig.crosswalk_edges[selectedEdge]!}>
+                        Missing: {selectedConfig.crosswalk_edges[selectedEdge]}
+                      </option>
+                    )}
+                    {crosswalks.filter((item) =>
+                      !crosswalkOwnerById.has(item.id)
+                      || crosswalkOwnerById.get(item.id) === selectedConfig.id + ":" + selectedEdge
+                    ).map((item) => <option key={item.id} value={item.id}>{item.label} ({item.id})</option>)}
+                  </select>
+                </label>
+                {crosswalkError && <p className="error-message">{crosswalkError}</p>}
+                {crosswalks.length === 0 && !crosswalkError && <p className="small-note">No defined crosswalks. Create one under Traffic → Crosswalks first.</p>}
+                {JUNCTION_EDGES.some((edge) => {
+                  const id = selectedConfig.crosswalk_edges[edge];
+                  return Boolean(id && !crosswalkById.has(id));
+                }) && <p className="error-message">An assigned crosswalk no longer exists. Update or clear its edge mapping.</p>}
+                <p className="small-note">Crosswalk edge links are configuration only and do not change signal control.</p>
               </section>
 
               <section className="junction-inspector-section">

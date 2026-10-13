@@ -34,6 +34,9 @@ def main() -> None:
         assert defaults["active_intersection_id"] == "intersection_main"
         assert defaults["intersections"][0]["primary_source_id"] == "simulation_camera"
         assert defaults["intersections"][0]["position"] == {"x": 50.0, "y": 50.0}
+        assert defaults["intersections"][0]["crosswalk_edges"] == {
+            "north": None, "east": None, "south": None, "west": None,
+        }
         resolved = service.resolve_source("unknown_camera")
         assert resolved["intersection_id"] == "intersection_main"
         assert resolved["source_mapping_matched"] is False
@@ -51,6 +54,7 @@ def main() -> None:
                     "zone_ids": ["a_queue"],
                     "signal_profile": "Normal",
                     "position": {"x": 20, "y": 45},
+                    "crosswalk_edges": {"north": "crosswalk_school", "east": None, "south": None, "west": None},
                 },
                 {
                     "id": "intersection_b",
@@ -100,6 +104,10 @@ def main() -> None:
         assert saved["intersections"][1]["source_ids"] == ["camera_b", "1camera_b"]
         assert saved["intersections"][1]["primary_source_id"] == "camera_b"
         assert saved["intersections"][1]["position"] == {"x": 55.0, "y": 45.0}
+        assert saved["intersections"][0]["crosswalk_edges"]["north"] == "crosswalk_school"
+        assert saved["intersections"][1]["crosswalk_edges"] == {
+            "north": None, "east": None, "south": None, "west": None,
+        }
         assert service.resolve_source("camera_b")["intersection_id"] == "intersection_b"
         assert service.resolve_source("1camera_b")["intersection_id"] == "intersection_b"
         context_b = service.context("intersection_b")
@@ -130,12 +138,38 @@ def main() -> None:
         for item in legacy["intersections"]:
             item.pop("position", None)
             item.pop("primary_source_id", None)
+            item.pop("crosswalk_edges", None)
         migrated = service.save(legacy)
         assert migrated["intersections"][0]["primary_source_id"] == "camera_a"
         assert migrated["intersections"][1]["primary_source_id"] == "camera_b"
         assert migrated["intersections"][2]["primary_source_id"] is None
+        assert all(all(value is None for value in item["crosswalk_edges"].values()) for item in migrated["intersections"])
         assert len({(item["position"]["x"], item["position"]["y"]) for item in migrated["intersections"]}) > 1
         service.save(saved)
+
+        # Side mappings are metadata, but each crosswalk has one unique edge owner.
+        # Unknown/deleted crosswalk IDs deliberately remain persisted for UI warnings.
+        mapped = deepcopy(config)
+        mapped["intersections"][1]["crosswalk_edges"] = {"west": "crosswalk_annex"}
+        assert service.save(mapped)["intersections"][1]["crosswalk_edges"]["west"] == "crosswalk_annex"
+        reloaded_mapping = IntersectionNetworkService(config_path=path).get()
+        assert reloaded_mapping["intersections"][0]["crosswalk_edges"]["north"] == "crosswalk_school"
+        assert reloaded_mapping["intersections"][1]["crosswalk_edges"]["west"] == "crosswalk_annex"
+        service.save(config)
+
+        duplicate_crosswalk = deepcopy(config)
+        duplicate_crosswalk["intersections"][1]["crosswalk_edges"] = {"south": "crosswalk_school"}
+        expect_invalid(service, duplicate_crosswalk)
+        duplicate_edge = deepcopy(config)
+        duplicate_edge["intersections"][0]["crosswalk_edges"]["east"] = "crosswalk_school"
+        expect_invalid(service, duplicate_edge)
+        bad_edge = deepcopy(config)
+        bad_edge["intersections"][0]["crosswalk_edges"]["northeast"] = "crosswalk_other"
+        expect_invalid(service, bad_edge)
+        bad_crosswalk = deepcopy(config)
+        bad_crosswalk["intersections"][0]["crosswalk_edges"]["south"] = "bad crosswalk"
+        expect_invalid(service, bad_crosswalk)
+        assert service.get()["intersections"][0]["crosswalk_edges"]["north"] == "crosswalk_school"
 
         duplicate_source = deepcopy(config)
         duplicate_source["intersections"][2]["source_ids"] = ["camera_a"]

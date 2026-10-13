@@ -1,3 +1,7 @@
+export const JUNCTION_EDGES = ["north", "east", "south", "west"] as const;
+export type JunctionEdge = (typeof JUNCTION_EDGES)[number];
+export type JunctionCrosswalkEdges = Record<JunctionEdge, string | null>;
+
 export type JunctionLoadLevel = "unavailable" | "clear" | "light" | "moderate" | "heavy";
 export type JunctionEventSeverity = "info" | "attention" | "critical";
 export type JunctionWarningSeverity = "info" | "warning" | "critical";
@@ -16,6 +20,7 @@ export type JunctionConfig = {
   zone_ids: string[];
   signal_profile: string;
   position: JunctionPosition;
+  crosswalk_edges: JunctionCrosswalkEdges;
 };
 
 export type JunctionLink = {

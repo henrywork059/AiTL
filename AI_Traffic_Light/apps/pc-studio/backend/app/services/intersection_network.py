@@ -24,6 +24,7 @@ MAX_INTERSECTIONS = 16
 MAX_LINKS = 64
 MAX_SOURCE_IDS = 16
 MAX_ZONE_IDS = 64
+CROSSWALK_EDGES = ("north", "east", "south", "west")
 POSITION_MIN = 0.0
 POSITION_MAX = 100.0
 
@@ -40,6 +41,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "zone_ids": [],
             "signal_profile": "Normal",
             "position": {"x": 50.0, "y": 50.0},
+            "crosswalk_edges": {edge: None for edge in CROSSWALK_EDGES},
         }
     ],
     "links": [],
@@ -155,6 +157,7 @@ class IntersectionNetworkService:
         intersections: list[dict[str, Any]] = []
         intersection_ids: set[str] = set()
         claimed_sources: dict[str, str] = {}
+        claimed_crosswalks: dict[str, str] = {}
         total_intersections = len(raw_intersections)
         for index, raw in enumerate(raw_intersections):
             if not isinstance(raw, dict):
@@ -194,6 +197,26 @@ class IntersectionNetworkService:
                 )
 
             zone_ids = cls._string_id_list(raw.get("zone_ids", []), "zone_ids", MAX_ZONE_IDS)
+            raw_edges = raw.get("crosswalk_edges", {})
+            if not isinstance(raw_edges, dict) or set(raw_edges).difference(CROSSWALK_EDGES):
+                cls._invalid("crosswalk_edges must contain only north, east, south and west keys.")
+            crosswalk_edges: dict[str, str | None] = {}
+            for edge in CROSSWALK_EDGES:
+                value = raw_edges.get(edge)
+                if value is None or value == "":
+                    crosswalk_edges[edge] = None
+                    continue
+                if not isinstance(value, str) or not ID_PATTERN.fullmatch(value):
+                    cls._invalid("Crosswalk edge assignment must be a valid crosswalk id or null.", {
+                        "intersection_id": intersection_id, "edge": edge,
+                    })
+                previous = claimed_crosswalks.get(value)
+                if previous is not None:
+                    cls._invalid("One crosswalk can be assigned to only one junction edge.", {
+                        "crosswalk_id": value, "previous_edge": previous, "intersection_id": intersection_id, "edge": edge,
+                    })
+                claimed_crosswalks[value] = f"{intersection_id}:{edge}"
+                crosswalk_edges[edge] = value
             signal_profile = str(raw.get("signal_profile") or "Normal").strip()
             if not 1 <= len(signal_profile) <= 64:
                 cls._invalid("signal_profile must contain 1-64 characters.", {"intersection_id": intersection_id})
@@ -208,6 +231,7 @@ class IntersectionNetworkService:
                     "zone_ids": zone_ids,
                     "signal_profile": signal_profile,
                     "position": cls._position(raw.get("position"), index=index, total=total_intersections),
+                    "crosswalk_edges": crosswalk_edges,
                 }
             )
 

@@ -1,4 +1,11 @@
 # Changelog
+## 0_3_24 — Junction edge labels and crosswalk links
+
+- Added N/E/S/W labels at all four sides of every junction map card and clickable edge selection.
+- Added assignment of a saved crosswalk to each selected edge in the existing Junction Network inspector, with clear/remove, missing-reference warnings and duplicate prevention.
+- Saved edge mapping with the existing junction network JSON (schema version 1), filling empty mappings when opening older saves.
+- No new signal logic, road control or inference; owner-confirmed baseline stays `0_3_11`.
+
 ## 0_3_23 — Crosswalk region workspace and one-camera junction simulation
 
 - Added an expanded in-page region workspace, separate from the compact Crosswalks layout, to create, rename, delete and drag four corner handles of quadrilateral regions against a selected camera/simulation frame.

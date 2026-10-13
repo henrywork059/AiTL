@@ -43,6 +43,8 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 - assign several saved ESP camera source IDs to one junction;
 - one source ID remains exclusive to one junction for unambiguous mapping;
 - choose an optional primary source for each junction;
+- show four N/E/S/W edge labels on each junction and assign a different saved crosswalk to each edge via the inspector;
+- persist/cardinal-edge assignments with existing junction data and warn when a crosswalk definition has been deleted;
 - persist logical node positions, source assignments and topology through the existing `config/intersections.json` service;
 - show saved ESP reachability/streaming/FPS/error state per junction;
 - show current vehicle/pedestrian load, phase/decision and supported event/warning context for the junction resolved from the shared selected source;
