@@ -31,7 +31,9 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 
 - persist up to 32 named and located crosswalks, with add/edit/delete and a crossing-road diagram;
 - optionally assign two distinct saved ESP camera source IDs to opposite pedestrian approaches and inspect camera status;
-- metadata only: no dual-camera inference or physical signal-control authority.
+- edit up to 24 shared four-vertex quadrilateral regions per crosswalk in a dedicated wide editor with draggable handles over the selected camera/simulation feed;
+- toggle the same one-camera simulation source from Crosswalks or Junction Network; physical camera input follows the shared simulation mode;
+- metadata only: no dual-camera inference, camera-view calibration or physical signal-control authority.
 
 ## Junction Network
 

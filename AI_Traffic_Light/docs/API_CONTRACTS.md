@@ -1,5 +1,11 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0323 Crosswalk shared quadrilateral regions
+
+Crosswalk schema version **remains 1**. Each crosswalk has an optional `regions` list (missing in older records means `[]`), up to 24 regions per crosswalk, with unique `id`, `label` (1–120 characters), and `vertices` holding exactly four integer `[x, y]` points. Coordinates use the editor's 1280 × 720 reference view (inclusive bounds) in clockwise or counterclockwise order; the outline must be a non-degenerate convex quadrilateral. Invalid data uses the existing `ATL-CROSSWALK-001` (422), and the prior data remains intact. Regions are shared crosswalk metadata, **not independently calibrated** for two physical camera perspectives and do not activate AI counting, inference or signal logic. No new endpoints.
+
+Junction Network, Camera Sources and Crosswalks use the existing global camera simulation endpoints (`POST /api/camera/simulation/start` and `/stop`) and one shared simulated camera. A simulated junction does not create a simulated camera per crosswalk or per intersection. Physical ESP stream workers are paused by the existing camera service while simulation runs.
+
 ## V0320 Crosswalk configuration
 
 `GET /api/crosswalks` returns `{"schema_version":1,"crosswalks":[]}` when empty. Crosswalk entries contain `id` (unique letter-first token, up to 64 chars), `label` (1–120 chars), `location` (0–160 chars), and nullable `camera_side_a_id` and `camera_side_b_id` source IDs.

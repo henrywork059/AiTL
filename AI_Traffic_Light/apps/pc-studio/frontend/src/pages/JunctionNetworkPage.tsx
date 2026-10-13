@@ -14,6 +14,7 @@ import {
   nextJunctionNetworkId,
 } from "../lib/junctionNetworkView";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { CameraStatus } from "../types";
 import type {
   JunctionCameraView,
   JunctionConfig,
@@ -23,7 +24,13 @@ import type {
 } from "../types/junctionNetwork";
 import "./junctionNetworkPage.css";
 
-export function JunctionNetworkPage() {
+type Props = {
+  cameraStatus: CameraStatus | null;
+  changingMode: boolean;
+  onSimulationChange: (enabled: boolean) => Promise<void>;
+};
+
+export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationChange }: Props) {
   const [overview, setOverview] = useState<JunctionNetworkOverview | null>(null);
   const [savedConfig, setSavedConfig] = useState<JunctionNetworkConfig | null>(null);
   const [draft, setDraft] = useState<JunctionNetworkConfig | null>(null);
@@ -346,6 +353,13 @@ export function JunctionNetworkPage() {
         <div className="junction-network-status-row">
           <span className="status-pill status-info">multi-camera assignment</span>
           <span className="status-pill muted">single selected AI source</span>
+          <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
+            {cameraStatus?.simulation_enabled ? "Simulation · 1 shared camera" : "Physical camera mode"}
+          </span>
+          <button type="button" disabled={changingMode || !cameraStatus}
+            onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>
+            {cameraStatus?.simulation_enabled ? "Stop simulation" : "Start simulation"}
+          </button>
           <p className="small-note">{overview.scope_note}</p>
         </div>
         {notice && <p className="success-message">{notice}</p>}

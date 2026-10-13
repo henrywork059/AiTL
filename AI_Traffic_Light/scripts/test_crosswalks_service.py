@@ -30,10 +30,11 @@ def main() -> None:
         item = {
             "id": "crosswalk_1", "label": "School entrance", "location": "Main gate",
             "camera_side_a_id": "esp32_cam_01", "camera_side_b_id": "esp32_cam_02",
+            "regions": [{"id": "waiting_a", "label": "Waiting A", "vertices": [[300, 150], [600, 150], [600, 330], [300, 330]]}],
         }
         config = {"schema_version": 1, "crosswalks": [item, {
             "id": "crosswalk_2", "label": "Rear road", "location": "",
-            "camera_side_a_id": None, "camera_side_b_id": None,
+            "camera_side_a_id": None, "camera_side_b_id": None, "regions": [],
         }]}
         assert service.save(config) == config
         assert path.exists()
@@ -45,9 +46,19 @@ def main() -> None:
             {"crosswalks": [{**item, "label": ""}]},
             {"crosswalks": [{**item, "camera_side_a_id": "bad id"}]},
             {"crosswalks": "invalid"},
+            {"crosswalks": [{**item, "regions": [{**item["regions"][0], "vertices": [[5, 5], [10, 10], [5, 10], [10, 5]]}]}]},
+            {"crosswalks": [{**item, "regions": [{**item["regions"][0], "vertices": [[1, 1], [2, 2], [3, 3]]}]}]},
+            {"crosswalks": [{**item, "regions": [{**item["regions"][0], "vertices": [[0, 0], [1281, 0], [1281, 721], [0, 721]]}]}]},
+            {"crosswalks": [{**item, "regions": [item["regions"][0], item["regions"][0]]}]},
         ):
             invalid(service, {**deepcopy(config), **bad})
             assert CrosswalkService(config_path=path).get() == config
+        legacy = {"schema_version": 1, "crosswalks": [{key: value for key, value in item.items() if key != "regions"}]}
+        assert service.save(legacy)["crosswalks"][0]["regions"] == []
+        edited = deepcopy(config)
+        edited["crosswalks"][0]["regions"][0]["vertices"][0] = [280, 140]
+        assert service.save(edited)["crosswalks"][0]["regions"][0]["vertices"][0] == [280, 140]
+        assert CrosswalkService(config_path=path).get() == edited
         assert service.save({"schema_version": 1, "crosswalks": []})["crosswalks"] == []
     print("[PASS] crosswalk create/edit/delete, persistence and distinct camera-side validation")
 

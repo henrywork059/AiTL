@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchCrosswalks, saveCrosswalks } from "../lib/crosswalksApi";
 import { fetchRemoteCameraStatus, type RemoteCameraProfile } from "../lib/remoteCameraApi";
+import { CrosswalkRegionEditor } from "./CrosswalkRegionEditor";
+import type { CameraStatus } from "../types";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import type { Crosswalk, CrosswalkConfig } from "../types/crosswalks";
+import type { Crosswalk, CrosswalkConfig, CrosswalkRegion } from "../types/crosswalks";
 import "./crosswalksPage.css";
 
 const LIMIT = 32;
@@ -23,7 +25,14 @@ function cameraState(camera: RemoteCameraProfile | undefined): string {
   return camera.last_error ? "Error" : "Not connected";
 }
 
-export function CrosswalksPage() {
+type Props = {
+  cameraStatus: CameraStatus | null;
+  changingMode: boolean;
+  onSimulationChange: (enabled: boolean) => Promise<void>;
+  onCameraStatusChange: (status: CameraStatus) => void;
+};
+
+export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange, onCameraStatusChange }: Props) {
   const [saved, setSaved] = useState<CrosswalkConfig | null>(null);
   const [draft, setDraft] = useState<CrosswalkConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -31,6 +40,7 @@ export function CrosswalksPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [regionEditorOpen, setRegionEditorOpen] = useState(false);
 
   const load = useCallback(async () => {
     const next = await fetchCrosswalks();
@@ -67,7 +77,7 @@ export function CrosswalksPage() {
   function add() {
     if (!draft || draft.crosswalks.length >= LIMIT) return;
     const id = nextId(draft.crosswalks);
-    const next: Crosswalk = { id, label: "New crosswalk", location: "", camera_side_a_id: null, camera_side_b_id: null };
+    const next: Crosswalk = { id, label: "New crosswalk", location: "", camera_side_a_id: null, camera_side_b_id: null, regions: [] };
     setDraft({ ...draft, crosswalks: [...draft.crosswalks, next] });
     setSelectedId(id);
     setError(null);
@@ -137,6 +147,21 @@ export function CrosswalksPage() {
     );
   }
 
+  if (regionEditorOpen && selected) {
+    return (
+      <CrosswalkRegionEditor
+        crosswalk={selected}
+        cameras={cameras}
+        cameraStatus={cameraStatus}
+        changingMode={changingMode}
+        onSimulationChange={onSimulationChange}
+        onCameraStatusChange={onCameraStatusChange}
+        onRegionsChange={(regions: CrosswalkRegion[]) => update({ regions })}
+        onClose={() => setRegionEditorOpen(false)}
+      />
+    );
+  }
+
   const sideA = selected?.camera_side_a_id ? cameraById.get(selected.camera_side_a_id) : undefined;
   const sideB = selected?.camera_side_b_id ? cameraById.get(selected.camera_side_b_id) : undefined;
 
@@ -182,6 +207,11 @@ export function CrosswalksPage() {
                 </label>
               </div>
               <p className="small-note">ID: {selected.id}</p>
+              <div className="button-row">
+                <button type="button" onClick={() => setRegionEditorOpen(true)}>
+                  Edit regions ({selected.regions.length})
+                </button>
+              </div>
             </div>
           )}
           <div className="button-row">
@@ -196,7 +226,19 @@ export function CrosswalksPage() {
         </section>
 
         <section className="panel">
-          <div className="panel-header"><h2>Crosswalk layout</h2><span className="status-pill muted">Schematic only</span></div>
+          <div className="panel-header">
+            <h2>Crosswalk layout</h2>
+            <span className="status-pill muted">Schematic only</span>
+          </div>
+          <div className="button-row">
+            <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
+              {cameraStatus?.simulation_enabled ? "Shared junction/camera simulation · 1 camera" : "Physical camera mode"}
+            </span>
+            <button type="button" disabled={changingMode || !cameraStatus}
+              onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>
+              {cameraStatus?.simulation_enabled ? "Stop simulation" : "Start simulation"}
+            </button>
+          </div>
           {selected ? (
             <>
               {cameraPicker("camera_side_a_id", "Side A — first pedestrian approach")}

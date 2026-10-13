@@ -1,15 +1,19 @@
-# V0322 Test-Ready Checklist
+# V0323 Test-Ready Checklist
 
 ```text
-version: 0_3_22
-previous_version: 0_3_21
+version: 0_3_23
+previous_version: 0_3_22
 passed_baseline: 0_3_11
-status: Windows fresh-install dependency fix candidate
+status: Crosswalk regions and shared simulation candidate
 ```
 
-- [ ] A new Windows backend virtual environment installs pinned `httpx==0.28.1` from `requirements.txt`.
-- [ ] `python scripts/test_camera_simulation_api.py` imports FastAPI TestClient and passes.
-- [ ] Unchanged camera, simulation, crosswalk and other tests pass.
-- [ ] `python scripts/check_structure.py` and frontend typecheck/build pass.
-- [ ] The complete Windows update/test/run workflow reaches backend health/smoke and opens PC Studio.
-- [ ] Owner confirms PASS; `0_3_11` remains baseline until then.
+- [ ] Multiple crosswalks and their independent region sets persist across restart.
+- [ ] Edit regions opens a wide independent workspace without crowding Crosswalks page.
+- [ ] Each Add region creates a quadrilateral; four drag handles work; label edits, deletion, selection work.
+- [ ] Side A and Side B show identical region geometry on the selected physical preview, with no false claim of camera calibration.
+- [ ] Old crosswalk JSON without regions is loaded and normalized.
+- [ ] Invalid/self-crossing/out-of-bounds regions rejected without damaging saved data.
+- [ ] Junction Network and Crosswalks share the same simulation on/off state as Camera Sources; exactly one simulated feed.
+- [ ] Physical preview cannot show a different active ESP as the chosen camera; simulation pauses/resumes physical input safely.
+- [ ] Focused service/structure regressions, project structure, frontend typecheck/build and Windows live smoke pass.
+- [ ] Owner confirms PASS; `0_3_11` remains passed baseline until then.

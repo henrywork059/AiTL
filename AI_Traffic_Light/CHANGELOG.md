@@ -1,4 +1,12 @@
 # Changelog
+## 0_3_23 — Crosswalk region workspace and one-camera junction simulation
+
+- Added an expanded in-page region workspace, separate from the compact Crosswalks layout, to create, rename, delete and drag four corner handles of quadrilateral regions against a selected camera/simulation frame.
+- Saved per-crosswalk regions in the existing atomic JSON document, with backward compatibility for older saved crosswalks and validation for bounded, simple convex geometry. Both assigned cameras share one region set; there is no two-camera perspective calibration.
+- Added shared camera simulation controls in Crosswalks and Junction Network using the existing global simulation API; exactly one simulated camera is previewed when enabled and physical streams follow existing pause/resume behavior.
+- Added focused backend geometry/persistence regression and frontend wiring checks. No new model inference, pedestrian detection or signal-control authority.
+- Passed baseline remains `0_3_11` pending owner acceptance.
+
 ## 0_3_22 — Missing FastAPI TestClient dependency on fresh Windows installs
 
 - Added pinned `httpx==0.28.1` to backend requirements so `fastapi.testclient.TestClient` works in a newly created PC Studio virtual environment.

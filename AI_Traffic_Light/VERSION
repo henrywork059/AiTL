@@ -1,5 +1,5 @@
-version: 0_3_22
-status: Windows fresh-install dependency fix candidate
-previous_version: 0_3_21
+version: 0_3_23
+status: Crosswalk regions and shared simulation candidate
+previous_version: 0_3_22
 passed_baseline: 0_3_11
-notes: V0322 adds the missing pinned httpx dependency for FastAPI TestClient regressions during fresh Windows installation. Existing updater refreshes backend requirements automatically; no runtime, frontend, camera, signal, crosswalk or firmware changes. V0311 / 0_3_11 remains accepted until owner PASS.
+notes: V0323 adds persistent four-vertex quadrilateral regions per crosswalk with a dedicated drag editor, shared across its two saved cameras. Junction Network/Crosswalks reuse one global camera simulation with one simulated feed, not per-junction inference. API envelope, firmware, physical safety and baseline remain unchanged. V0311 / 0_3_11 stays owner-confirmed until PASS.

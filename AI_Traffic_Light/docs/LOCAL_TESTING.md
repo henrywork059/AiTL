@@ -1,17 +1,26 @@
-# Local Testing — V0322
+# Local Testing — V0323
 
 ```text
-version: 0_3_22
-previous_version: 0_3_21
+version: 0_3_23
+previous_version: 0_3_22
 passed_baseline: 0_3_11
-status: Windows fresh-install dependency fix candidate
+status: Crosswalk regions and shared simulation candidate
 ```
 
-## Focused verification
+## Tests
 
-1. Confirm backend `requirements.txt` includes `httpx==0.28.1`.
-2. Verify the existing `scripts/update_test_run.ps1` refreshes backend dependencies when requirements change.
-3. Run `python scripts/test_camera_simulation_api.py` from `AI_Traffic_Light` using `apps/pc-studio/backend/.venv/Scripts/python.exe`, and ensure `fastapi.testclient.TestClient` imports without `ModuleNotFoundError: httpx`.
-4. Run `python scripts/check_structure.py`, then the full Windows `scripts/update_test_run.ps1` acceptance suite. Backend smoke, frontend build and actual app startup still need owner confirmation.
+- `python scripts/test_crosswalks_service.py`: older JSON compatibility, add/edit/delete, valid and invalid quadrilaterals, rejected invalid saves preserving previous persisted data.
+- `python scripts/test_crosswalks_frontend_structure.py`: region workspace and pointer handlers, camera switching/preview guard, app simulation prop wiring, existing crosswalk schematic.
+- `python scripts/test_junction_network_frontend_structure.py`: shared global simulator indicator/control.
+- `python scripts/check_structure.py`, frontend `npm run typecheck`, `npm run build`.
 
-No backend functional changes, security changes or new features. `0_3_11` remains the accepted baseline.
+## Hands-on validation
+
+1. Add two crossings; save/reload and confirm each retains its own separate region collection.
+2. Open Edit regions; create a quad and drag each of four handles; rename, delete, create a second; Back → Save changes → reload.
+3. Select camera Side A, then Side B; confirm region polygons persist unchanged. For physical preview, ensure selected camera is streaming and choose Select camera for preview.
+4. Toggle simulation from Junction Network, then inspect Crosswalks/region editor and Camera Sources: one shared simulated feed, physical ESP stream pause. Switch it off, ensure physical source is restored without falsely claiming simultaneous input.
+5. Test self-intersecting, out-of-bounds and invalid region saves; verify validation error and no overwritten configuration.
+6. Run the full Windows `scripts/update_test_run.ps1` and confirm backend health/smoke and frontend startup, then physical ESP behavior.
+
+Hardware and UI tests require owner PC. Candidate `0_3_23` is not accepted until PASS; baseline remains `0_3_11`.

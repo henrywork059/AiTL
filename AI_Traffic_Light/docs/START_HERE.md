@@ -1,15 +1,18 @@
-# Start Here — V0322
+# Start Here — V0323
 
-V0322 / `0_3_22` fixes the missing `httpx` dependency in fresh Windows PC Studio installations. Previous candidate: `0_3_21` (unaccepted). Owner-confirmed passed baseline: `0_3_11`.
+Current candidate: `0_3_23` (previous candidate `0_3_22`, accepted baseline `0_3_11`).
 
-## Fix
+## What's new
 
-Backend requirements now include `httpx==0.28.1`, needed by FastAPI's `TestClient` regressions. The update/test/run script installs it automatically when pulling this requirements change. All existing Crosswalks and Camera Settings behavior remains unchanged.
+- Open Traffic → Crosswalks. Add/select a crosswalk, then **Edit regions** to enter a dedicated wide editor. Add/edit/delete a quadrilateral, dragging its four numbered corners over the chosen camera or simulated image. **Back to crosswalks → Save changes** persists the shared region definitions.
+- Side A and Side B use the *same* saved region coordinates; they are not geometrically calibrated to different viewpoints.
+- Start/stop shared simulation from either Crosswalks or Junction Network. There is only one simulated camera; the existing camera service handles physical-camera pause/resume.
 
-## On the new Windows PC
+## Pull, test, run
 
 ```powershell
-& "D:\AiTL\AI_Traffic_Light\scripts\update_test_run.ps1"
+cd D:\AiTL
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Run with `-RefreshDependencies` if dependency installation was previously interrupted or the script does not detect a requirements change. Owner PASS requires full validation; `0_3_11` remains the accepted baseline.
+Run the full Windows runner and verify physical camera preview before owner acceptance. The accepted baseline remains `0_3_11`.

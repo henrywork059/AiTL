@@ -22,7 +22,10 @@ def main() -> int:
 
     assert 'import { JunctionNetworkPage } from "./pages/JunctionNetworkPage";' in app
     assert 'case "junction_network":' in app
-    assert "<JunctionNetworkPage />" in app
+    assert "<JunctionNetworkPage" in app
+    assert 'onSimulationChange={changeCameraSimulation}' in app
+    assert 'cameraStatus?.simulation_enabled' in page
+    assert 'Simulation · 1 shared camera' in page
     assert '| "junction_network"' in app_types
     assert "junction_network:" in navigation
     assert "PAGE_DETAILS.junction_network" in navigation

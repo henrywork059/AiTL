@@ -27,6 +27,18 @@ def main() -> None:
     assert 140 > 10  # Each white stripe is horizontal, not longitudinal.
     assert "useSerialPolling" in page and "fetchRemoteCameraStatus" in page
     assert "simultaneous two-camera pedestrian inference" in page
+    editor = read("pages/CrosswalkRegionEditor.tsx")
+    assert "CrosswalkRegionEditor" in page and "onRegionsChange" in page
+    assert "setRegionEditorOpen(true)" in page
+    assert "setPointerCapture" in editor and "onPointerMove" in editor
+    assert "onPointerCancel" in editor and "onVertexDown" in editor
+    assert "vertices: [[390, 220], [890, 220], [890, 500], [390, 500]]" in editor
+    assert "Select camera for preview" in editor and "cameraStatus?.active_source_id === sourceId" in editor
+    assert "One shared simulated camera" in editor
+    assert "onSimulationChange(!simulated)" in editor
+    assert '"crosswalks", "dataset_capture"' in read("App.tsx")
+    assert "onCameraStatusChange={setCameraStatus}" in read("App.tsx")
+    assert ".crosswalk-region-overlay" in read("pages/crosswalkRegionEditor.css")
     assert 'method: "PUT"' in read("lib/crosswalksApi.ts")
     assert '"/api/crosswalks"' in read("lib/crosswalksApi.ts")
     assert "camera_side_a_id" in read("types/crosswalks.ts")

@@ -43,7 +43,7 @@ import type {
   Zone,
 } from "./types";
 
-const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "camera_settings", "dataset_capture", "zone_editor", "live_ai"];
+const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "camera_settings", "crosswalks", "junction_network", "dataset_capture", "zone_editor", "live_ai"];
 
 export default function App() {
   const [frame, setFrame] = useState<DetectionFrame | null>(null);
@@ -227,9 +227,22 @@ export default function App() {
       case "camera_diagnostics":
         return <CameraDiagnosticsPage />;
       case "junction_network":
-        return <JunctionNetworkPage />;
+        return (
+          <JunctionNetworkPage
+            cameraStatus={cameraStatus}
+            changingMode={changingCameraMode}
+            onSimulationChange={changeCameraSimulation}
+          />
+        );
       case "crosswalks":
-        return <CrosswalksPage />;
+        return (
+          <CrosswalksPage
+            cameraStatus={cameraStatus}
+            changingMode={changingCameraMode}
+            onSimulationChange={changeCameraSimulation}
+            onCameraStatusChange={setCameraStatus}
+          />
+        );
       case "zone_editor":
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":

@@ -16,6 +16,29 @@ from app.services.intersection_network import ID_PATTERN, TOKEN_PATTERN
 DEFAULT_PATH = Path(__file__).resolve().parents[5] / "config" / "crosswalks.json"
 CAMERA_FIELDS = ("camera_side_a_id", "camera_side_b_id")
 MAX_CROSSWALKS = 32
+MAX_REGIONS = 24
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+
+
+def _quadrilateral(points: Any) -> bool:
+    """Four bounded integer vertices in a simple, non-degenerate convex outline."""
+    if not isinstance(points, list) or len(points) != 4:
+        return False
+    if any(
+        not isinstance(point, list) or len(point) != 2
+        or any(type(value) is not int for value in point)
+        or not 0 <= point[0] <= FRAME_WIDTH or not 0 <= point[1] <= FRAME_HEIGHT
+        for point in points
+    ):
+        return False
+    cross = [
+        (points[(i + 1) % 4][0] - points[i][0]) * (points[(i + 2) % 4][1] - points[(i + 1) % 4][1])
+        - (points[(i + 1) % 4][1] - points[i][1]) * (points[(i + 2) % 4][0] - points[(i + 1) % 4][0])
+        for i in range(4)
+    ]
+    return all(value > 0 for value in cross) or all(value < 0 for value in cross)
+
 
 
 class CrosswalkService:
@@ -87,7 +110,29 @@ class CrosswalkService:
                     invalid(f"{field} must be a source ID or null.")
             if cameras["camera_side_a_id"] is not None and cameras["camera_side_a_id"] == cameras["camera_side_b_id"]:
                 invalid("Use different cameras on Side A and Side B.")
-            items.append({"id": identity, "label": label.strip(), "location": location.strip(), **cameras})
+            raw_regions = raw.get("regions", [])
+            if not isinstance(raw_regions, list) or len(raw_regions) > MAX_REGIONS:
+                invalid(f"regions must be a list of at most {MAX_REGIONS} entries per crosswalk.")
+            regions: list[dict[str, Any]] = []
+            region_ids: set[str] = set()
+            for region in raw_regions:
+                if not isinstance(region, dict):
+                    invalid("Each region must be an object.")
+                region_id = region.get("id")
+                region_label = region.get("label")
+                if not isinstance(region_id, str) or not ID_PATTERN.fullmatch(region_id) or region_id in region_ids:
+                    invalid("Region ids must be valid and unique within the crosswalk.")
+                if not isinstance(region_label, str) or not 1 <= len(region_label.strip()) <= 120:
+                    invalid("Region name must contain 1–120 characters.")
+                if not _quadrilateral(region.get("vertices")):
+                    invalid("Region must have four bounded integer vertices forming a convex quadrilateral.")
+                region_ids.add(region_id)
+                regions.append({
+                    "id": region_id,
+                    "label": region_label.strip(),
+                    "vertices": deepcopy(region["vertices"]),
+                })
+            items.append({"id": identity, "label": label.strip(), "location": location.strip(), **cameras, "regions": regions})
         return {"schema_version": 1, "crosswalks": items}
 
 
