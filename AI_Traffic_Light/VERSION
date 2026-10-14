@@ -1,5 +1,5 @@
-version: 0_4_2
-status: Crosswalk test alignment candidate
-previous_version: 0_4_1
+version: 0_4_3
+status: Shared visual system and page palette consistency candidate
+previous_version: 0_4_2
 passed_baseline: 0_4_0
-notes: V0402 aligns the Crosswalk static regression with V0401 mirrored camera pair UI. No runtime, API, camera, junction or navigation changes. Owner acceptance pending; stable V0400 remains the passed baseline.
+notes: V0403 uses Fluent 2 / Material 3 semantic color and layout guidance to unify shared page shell, buttons, controls, tabs, panels, charts and active page styles in adaptive light/dark themes. Existing application logic remains unchanged. Owner validation pending; accepted baseline remains 0_4_0.

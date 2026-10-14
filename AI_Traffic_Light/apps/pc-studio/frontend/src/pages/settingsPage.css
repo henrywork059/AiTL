@@ -1,8 +1,10 @@
 .training-form select {
   width: 100%;
-  border: 1px solid #30363d;
-  border-radius: 9px;
-  background: #0d1117;
-  color: #e6edf3;
-  padding: 9px 10px;
+  min-width: 0;
+  min-height: var(--control-height);
+  border: 1px solid var(--color-control-stroke);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-text-primary);
+  padding: 8px 12px;
 }

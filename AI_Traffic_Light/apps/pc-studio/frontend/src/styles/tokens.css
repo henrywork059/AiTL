@@ -4,27 +4,34 @@
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
+  /* Shared Fluent-inspired role tokens. */
+  --control-height: 40px;
+  --sidebar-width: 252px;
+  --color-chart-vehicle: #a85120;
+  --color-chart-pedestrian: #6b4ea3;
+
   /* Neutral application layers. */
-  --color-canvas: #f5f6f8;
-  --color-shell: #eef0f3;
+  --color-canvas: #f3f6fa;
+  --color-shell: #edf2f8;
   --color-surface: #ffffff;
-  --color-surface-raised: #fafbfc;
-  --color-surface-muted: #f3f5f7;
-  --color-surface-overlay: #eceff2;
+  --color-surface-raised: #fbfcfe;
+  --color-surface-muted: #f6f8fb;
+  --color-surface-overlay: #eaf0f7;
   --color-field: #ffffff;
   --color-media: #0b0d10;
-  --color-control-hover: #eef2f6;
-  --color-control-pressed: #e2e7ed;
+  --color-control-hover: #eaf1f9;
+  --color-control-pressed: #dfe9f5;
 
-  --color-border-subtle: #e0e4e8;
-  --color-border-default: #c5cbd2;
-  --color-border-strong: #7b848e;
+  --color-border-subtle: #e2e8f0;
+  --color-border-default: #c9d4e2;
+  --color-control-stroke: #7b8fa7;
+  --color-border-strong: #7890a8;
 
   /* Material-style "on surface" hierarchy. */
-  --color-text-primary: #202124;
-  --color-text-secondary: #50565e;
-  --color-text-muted: #6d747d;
-  --color-text-disabled: #9aa0a6;
+  --color-text-primary: #172b45;
+  --color-text-secondary: #40566f;
+  --color-text-muted: #52677d;
+  --color-text-disabled: #8594a6;
   --color-text-inverse: #ffffff;
 
   /*
@@ -33,10 +40,10 @@
    * secondary = selective controls/progress;
    * neither is used as a generic status color.
    */
-  --color-primary: #315f9e;
-  --color-primary-hover: #274f85;
-  --color-primary-active: #1f426f;
-  --color-primary-surface: #e8eef7;
+  --color-primary: #225fa8;
+  --color-primary-hover: #184f90;
+  --color-primary-active: #133e74;
+  --color-primary-surface: #e9f1fc;
   --color-on-primary: #ffffff;
 
   --color-secondary: #00796b;
@@ -54,14 +61,14 @@
   --color-selection: #cbdaf0;
 
   /* Semantic state colors are reserved for meaning. */
-  --color-success: #2e7d32;
-  --color-success-surface: #e8f5e9;
-  --color-warning: #8a5d00;
-  --color-warning-surface: #fff4d6;
-  --color-danger: #b3261e;
-  --color-danger-surface: #fce8e6;
-  --color-info: #315f9e;
-  --color-info-surface: #e8eef7;
+  --color-success: #216a3c;
+  --color-success-surface: #e6f4eb;
+  --color-warning: #98620f;
+  --color-warning-surface: #fff4d8;
+  --color-danger: #a32929;
+  --color-danger-surface: #ffeceb;
+  --color-info: #225fa8;
+  --color-info-surface: #e9f1fc;
 
   /* Camera / SVG scene colors remain independent of the application theme. */
   --color-scene-sky: #1b1f1d;
@@ -91,54 +98,54 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
   --radius-pill: 999px;
   --border-width: 1px;
 
-  --shadow-panel: 0 1px 2px rgba(27, 31, 36, 0.07);
+  --shadow-panel: 0 2px 9px rgba(29, 50, 75, 0.035);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /*
-     * Material 2 dark-theme elevation ramp:
-     * base #121212 plus progressively lighter surfaces.
-     */
-    --color-dark-surface-0: #121212;
-    --color-dark-surface-1: #1e1e1e;
-    --color-dark-surface-2: #232323;
-    --color-dark-surface-4: #272727;
-    --color-dark-surface-8: #2e2e2e;
+    /* Layered neutral-blue surfaces. */
+    --color-dark-surface-0: #0e1725;
+    --color-dark-surface-1: #152236;
+    --color-dark-surface-2: #1b2b42;
+    --color-dark-surface-4: #233650;
+    --color-dark-surface-8: #293d59;
 
+    --color-chart-vehicle: #ffba83;
+    --color-chart-pedestrian: #c3a9ff;
     --color-canvas: var(--color-dark-surface-0);
     --color-shell: var(--color-dark-surface-0);
     --color-surface: var(--color-dark-surface-1);
     --color-surface-raised: var(--color-dark-surface-2);
-    --color-surface-muted: #181818;
+    --color-surface-muted: #111d2e;
     --color-surface-overlay: var(--color-dark-surface-8);
     --color-field: var(--color-dark-surface-1);
-    --color-media: #090909;
+    --color-media: #0b1019;
     --color-control-hover: var(--color-dark-surface-4);
     --color-control-pressed: var(--color-dark-surface-8);
 
-    --color-text-primary: #e8eaed;
-    --color-text-secondary: #bdc1c6;
-    --color-text-muted: #9aa0a6;
-    --color-text-disabled: #6f7378;
+    --color-text-primary: #eff5ff;
+    --color-text-secondary: #c1d0e2;
+    --color-text-muted: #a8bad0;
+    --color-text-disabled: #7d8fa6;
     --color-text-inverse: #121212;
 
     --color-border-subtle: rgba(255, 255, 255, 0.08);
     --color-border-default: rgba(255, 255, 255, 0.16);
+    --color-control-stroke: #657b95;
     --color-border-strong: rgba(255, 255, 255, 0.36);
 
     /* Lighter variants preserve legibility on dark surfaces. */
-    --color-primary: #90caf9;
-    --color-primary-hover: #bbdefb;
-    --color-primary-active: #64b5f6;
-    --color-primary-surface: rgba(144, 202, 249, 0.12);
-    --color-on-primary: #0d1b2a;
+    --color-primary: #95c3ff;
+    --color-primary-hover: #b8d8ff;
+    --color-primary-active: #79b1f5;
+    --color-primary-surface: rgba(149, 195, 255, 0.13);
+    --color-on-primary: #0c203a;
 
     --color-secondary: #80cbc4;
     --color-secondary-hover: #b2dfdb;

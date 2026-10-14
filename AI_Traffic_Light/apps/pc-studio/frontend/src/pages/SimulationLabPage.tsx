@@ -234,15 +234,27 @@ export function SimulationLabPage() {
 
         {error && <p className="error-message experiment-error">{error}</p>}
 
-        <div className="experiment-tabs" role="tablist" aria-label="Simulation experiment data groups">
+        <div className="experiment-tabs" role="tablist" aria-label="Simulation experiment data groups"
+          onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const ids: TabId[] = ["summary", "waiting", "throughput", "signal", "samples"];
+            const index = ids.indexOf(tab);
+            const next = event.key === "Home" ? ids[0] : event.key === "End" ? ids[ids.length - 1]
+              : ids[(index + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length];
+            setTab(next);
+            event.currentTarget.querySelector<HTMLButtonElement>(`#experiment-tab-${next}`)?.focus();
+          }}>
           {([
             ["summary", "Summary"], ["waiting", "Waiting & queues"], ["throughput", "Throughput"], ["signal", "Signal behavior"], ["samples", "Raw samples"],
           ] as [TabId, string][]).map(([id, text]) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{text}</button>
+            <button key={id} id={`experiment-tab-${id}`} type="button" role="tab" aria-selected={tab === id}
+              aria-controls="experiment-tab-panel" tabIndex={tab === id ? 0 : -1}
+              className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{text}</button>
           ))}
         </div>
 
-        <div className="experiment-tab-panel" role="tabpanel">
+        <div className="experiment-tab-panel" id="experiment-tab-panel" role="tabpanel" aria-labelledby={`experiment-tab-${tab}`} tabIndex={0}>
           {!result ? <div className="experiment-empty"><strong>No experiment selected.</strong><span>Choose a stored run or start a new comparison.</span></div> : (
             <>
               {tab === "summary" && <SummaryTab result={result} />}

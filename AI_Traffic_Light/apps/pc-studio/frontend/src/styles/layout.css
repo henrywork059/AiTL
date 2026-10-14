@@ -1,6 +1,6 @@
 .app-frame {
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: calc(100vh - 40px);
 }
 
@@ -11,23 +11,23 @@
   overflow: auto;
   border-right: var(--border-width) solid var(--color-border-subtle);
   background: var(--color-shell);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-6) var(--space-3);
 }
 
 .brand-block {
-  padding: 2px var(--space-2) var(--space-4);
-  margin-bottom: var(--space-4);
+  padding: 0 var(--space-3) var(--space-5);
+  margin-bottom: var(--space-5);
   border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
 .side-nav {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .content-frame {
   min-width: 0;
-  padding: var(--space-6);
+  padding: var(--space-6) var(--space-8);
 }
 
 .page-header {
@@ -35,21 +35,21 @@
   justify-content: space-between;
   gap: var(--space-6);
   align-items: flex-start;
-  margin-bottom: var(--space-5);
-  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-5);
   border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 
 .page-stack {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .two-column-grid,
 .live-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: var(--space-4);
+  gap: var(--space-5);
 }
 
 .live-layout {
@@ -111,4 +111,22 @@
   .settings-list div {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 1050px) {
+  .app-frame { grid-template-columns: 210px minmax(0, 1fr); }
+  .content-frame { padding: var(--space-5); }
+  .sidebar { padding: var(--space-4) var(--space-2); }
+}
+
+@media (max-width: 760px) {
+  .app-frame { display: block; }
+  .sidebar { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--color-border-subtle); padding: var(--space-3); }
+  .brand-block { margin-bottom: var(--space-3); padding-bottom: var(--space-3); }
+  .side-nav { display: flex; overflow-x: auto; gap: var(--space-4); padding-bottom: var(--space-1); }
+  .nav-section { flex: 0 0 auto; min-width: 150px; }
+  .nav-button { min-height: 36px; }
+  .content-frame { padding: var(--space-4); }
+  .page-header { margin-bottom: var(--space-4); }
+  .form-grid, .two-column-grid { grid-template-columns: 1fr; }
 }

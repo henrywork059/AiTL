@@ -118,8 +118,8 @@ export function TrafficAnalyticsPage() {
             <p className="placeholder-copy">Occupancy samples how many detected objects are present. Flow / Tracks records track-derived crossings and region events. Keep the two metrics separate when interpreting results.</p>
           </div>
           <div className="traffic-mode-tabs" role="group" aria-label="Traffic analytics mode">
-            <button type="button" className={mode === "occupancy" ? "active" : ""} onClick={() => setMode("occupancy")}>Occupancy</button>
-            <button type="button" className={mode === "flow" ? "active" : ""} onClick={() => setMode("flow")}>Flow / Tracks</button>
+            <button type="button" aria-pressed={mode === "occupancy"} className={mode === "occupancy" ? "active" : ""} onClick={() => setMode("occupancy")}>Occupancy</button>
+            <button type="button" aria-pressed={mode === "flow"} className={mode === "flow" ? "active" : ""} onClick={() => setMode("flow")}>Flow / Tracks</button>
           </div>
         </div>
 

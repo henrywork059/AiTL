@@ -1,7 +1,7 @@
 .dataset-review-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  gap: 18px;
+  gap: var(--space-5);
   align-items: start;
 }
 
@@ -25,13 +25,13 @@
 }
 
 .capture-browser-item span {
-  color: #8b949e;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .capture-browser-item.active {
-  border-color: #388bfd;
-  background: rgba(56, 139, 253, 0.14);
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
 }
 
 .labeling-workspace {
@@ -50,15 +50,15 @@
   display: grid;
   gap: 6px;
   min-width: 220px;
-  color: #c9d1d9;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
 .label-toolbar select {
-  border: 1px solid #30363d;
-  border-radius: 9px;
-  background: #0d1117;
-  color: #e6edf3;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  color: var(--color-text-primary);
   padding: 9px 10px;
 }
 
@@ -69,9 +69,9 @@
 
 .label-canvas-shell {
   overflow: hidden;
-  border: 1px solid #30363d;
-  border-radius: 14px;
-  background: #05070a;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-media);
 }
 
 .label-canvas {
@@ -84,8 +84,8 @@
 }
 
 .manual-label-box {
-  fill: rgba(88, 166, 255, 0.08);
-  stroke: #58a6ff;
+  fill: var(--color-zone-fill);
+  stroke: var(--color-primary);
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
@@ -95,11 +95,11 @@
 }
 
 .manual-label-text {
-  fill: #ffffff;
+  fill: var(--color-overlay-label);
   font-size: 14px;
   font-weight: 700;
   paint-order: stroke;
-  stroke: #000000;
+  stroke: var(--color-overlay-label-stroke);
   stroke-width: 3px;
   stroke-linejoin: round;
 }
@@ -115,10 +115,10 @@
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  border: 1px solid #30363d;
-  border-radius: 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   padding: 8px 10px;
-  background: #0d1117;
+  background: var(--color-field);
 }
 
 .saved-label-list span {
@@ -130,7 +130,7 @@
   display: grid;
   min-height: 360px;
   place-items: center;
-  color: #8b949e;
+  color: var(--color-text-muted);
 }
 
 .managed-dataset-metrics {
@@ -141,10 +141,10 @@
 }
 
 .managed-dataset-metrics > div {
-  border: 1px solid #30363d;
-  border-radius: 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   padding: 10px;
-  background: #0d1117;
+  background: var(--color-surface-raised);
 }
 
 .managed-dataset-metrics span,
@@ -153,7 +153,7 @@
 }
 
 .managed-dataset-metrics span {
-  color: #8b949e;
+  color: var(--color-text-muted);
   font-size: 12px;
   margin-bottom: 5px;
 }

@@ -1,4 +1,4 @@
-# PC Studio Design System — V024 candidate
+# AiTL PC Studio Design System — V0403
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,20 +6,34 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Reference basis
+## Current benchmark and decisions (V0403)
 
-The V024 refinement applies the role model in **Material Design 2 — The color system**:
+AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
-- primary color identifies the application and the most important actions;
-- secondary color is selective and supports secondary emphasis;
-- background and surface roles carry most application area;
-- error is a semantic role, not a brand color;
-- readable foreground roles are defined for colored surfaces (the Material “on” concept);
-- color hierarchy must preserve legibility and should not be the only state cue.
+- [Fluent 2 color](https://fluent2.microsoft.design/color/) — neutral/brand/semantic role separation; functional emphasis rather than broad accent fills.
+- [Fluent 2 layout](https://fluent2.microsoft.design/layout) — 4px spacing ramp and visual grouping.
+- [Fluent 2 button](https://fluent2.microsoft.design/components/web/react/core/button/usage/) — one dominant primary action; neutral secondary and destructive actions.
+- [Fluent 2 tablist](https://fluent2.microsoft.design/components/web/react/core/tablist/usage) — clear selected states and concise tab labels.
+- [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-The existing dark appearance also retains the Material dark-theme surface model: `#121212` at the base, with progressively lighter neutral elevated surfaces.
+### V0403 implementation parameters
 
-Supporting references used earlier in this design system remain Apple HIG, Figma color theory, and UX Pilot color-theory guidance. AiTL uses those references as design rationale; it does not copy their component libraries or product branding.
+| Element | Light | Dark | Decision |
+| --- | --- | --- | --- |
+| Main canvas | `#F3F6FA` | `#0E1725` | Quiet neutral desktop backdrop |
+| Main panel | `#FFFFFF` | `#152236` | Elevated neutral content surface |
+| Primary text | `#172B45` | `#EFF5FF` | High-contrast hierarchy |
+| Muted text | `#52677D` | `#A8BAD0` | Legible secondary data |
+| Primary control | `#225FA8` | `#95C3FF` | Actions/selection, not health or warning |
+| Input/interactive border | `#7B8FA7` | `#657B95` | 3:1+ contrast against typical field surface |
+| Controls | 40px minimum height | same | Consistent pointer/keyboard target |
+| Page/panel spacing | 4px increments; 20–32px sections | same | Deliberate proximity hierarchy |
+| Radius | 6/9/12px | same | Compact Windows-style geometry |
+| Tab selection | underline/segmented active surface | same | Distinguishes selected state from action |
+| Focus | 3px outline, 2px offset | same | Strong keyboard focus without changed tab order |
+
+Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
 
 ## Color-role model
 
@@ -33,21 +47,21 @@ Light appearance:
 
 | Role | Value |
 | --- | --- |
-| Primary | `#315F9E` |
-| Primary hover | `#274F85` |
-| Primary active | `#1F426F` |
-| Primary surface | `#E8EEF7` |
+| Primary | `#225FA8` |
+| Primary hover | `#184F90` |
+| Primary active | `#133E74` |
+| Primary surface | `#E9F1FC` |
 | On primary | `#FFFFFF` |
 
 Dark appearance:
 
 | Role | Value |
 | --- | --- |
-| Primary | `#90CAF9` |
-| Primary hover | `#BBDEFB` |
-| Primary active | `#64B5F6` |
+| Primary | `#95C3FF` |
+| Primary hover | `#B8D8FF` |
+| Primary active | `#79B1F5` |
 | Primary surface | `rgba(144, 202, 249, 0.12)` |
-| On primary | `#0D1B2A` |
+| On primary | `#0C203A` |
 
 Use primary for:
 
@@ -78,15 +92,15 @@ Do not use secondary as a second general brand color across large surfaces.
 
 Background, shell, panel, field, and raised-control colors are neutral. They carry almost all screen area.
 
-Light appearance uses a cool-neutral canvas (`#F5F6F8`) and white/elevated surfaces. Dark appearance retains:
+Light appearance uses a cool-neutral canvas (`#F3F6FA`) and white/elevated surfaces. Dark appearance retains:
 
 | Elevation role | Surface |
 | --- | --- |
-| 0dp canvas/shell | `#121212` |
-| 1dp normal panel | `#1E1E1E` |
-| 2dp raised control | `#232323` |
-| 4dp hover | `#272727` |
-| 8dp pressed/overlay | `#2E2E2E` |
+| 0dp canvas/shell | `#0E1725` |
+| 1dp normal panel | `#152236` |
+| 2dp raised control | `#1B2B42` |
+| 4dp hover | `#233650` |
+| 8dp pressed/overlay | `#293D59` |
 
 Dark depth comes primarily from controlled luminance differences rather than glow or large shadows.
 

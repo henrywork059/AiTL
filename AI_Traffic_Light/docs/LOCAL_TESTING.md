@@ -1,11 +1,19 @@
-# Local Testing — V0402
+# Local Testing — V0403
 
 ```text
-version: 0_4_2
-previous_version: 0_4_1
+version: 0_4_3
+previous_version: 0_4_2
 passed_baseline: 0_4_0
-status: Crosswalk test alignment candidate
+status: Shared visual system and page palette consistency candidate
 ```
+
+## V0403 visual acceptance
+
+- From the repository root, run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests`.
+- Inspect Dashboard, Camera Settings, Crosswalks, Junction Network, Live AI, Dataset Review, Traffic Analytics, Simulation Experiments and Settings in **both Windows light and dark appearance**.
+- Confirm legible text, neutral panels, visible input boundaries, clear primary actions and selected navigation, and correct selected tab / segmented view state.
+- Test keyboard Tab and simulation panel Left/Right/Home/End navigation. Confirm no clipped layout at typical 1280px and 1920px desktop widths.
+- Real/simulation camera and saved data behavior should be unchanged; full frontend build and live smoke must pass before owner PASS.
 
 ## V0402 acceptance
 

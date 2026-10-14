@@ -14,9 +14,11 @@ html {
 
 body {
   margin: 0;
-  min-width: 1180px;
+  min-width: 0;
   background: var(--color-canvas);
   color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -31,15 +33,15 @@ input,
 select,
 textarea {
   font: inherit;
-  border: var(--border-width) solid var(--color-border-default);
+  border: var(--border-width) solid var(--color-control-stroke);
   border-radius: var(--radius-md);
   background: var(--color-field);
   color: var(--color-text-primary);
 }
 
 button {
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: var(--control-height);
+  padding: 8px 14px;
   background: var(--color-surface-raised);
   cursor: pointer;
   font-weight: 600;
@@ -108,7 +110,8 @@ button:disabled {
 input,
 select,
 textarea {
-  padding: 8px 10px;
+  min-height: var(--control-height);
+  padding: 8px 12px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
@@ -126,6 +129,7 @@ textarea::placeholder {
 input[type="checkbox"],
 input[type="radio"],
 input[type="range"] {
+  min-height: auto;
   accent-color: var(--color-secondary);
 }
 
@@ -134,7 +138,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -154,20 +158,20 @@ p {
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 28px;
   line-height: 1.2;
   letter-spacing: -0.02em;
   font-weight: 650;
 }
 
 h2 {
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.35;
   font-weight: 650;
 }
 
 h3 {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
 }
 
@@ -198,3 +202,8 @@ code {
     forced-color-adjust: auto;
   }
 }
+
+/* Inputs use the same visual scale across page-specific forms. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea { max-width: 100%; }

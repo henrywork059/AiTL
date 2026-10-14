@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_4_3 — Shared UI design refinement
+
+- Rebalanced the semantic blue/slate light/dark tokens for Fluent-style neutral surfaces, readable foreground hierarchy and meaningful status colors.
+- Standardized 40px controls, clearer focus indicators and stronger field strokes, 4px-based spacing, page headings, navigation selection and restrained panel depth.
+- Removed active-page hardcoded dark form/chart/list palettes from Camera-related region editing, dataset review, analytics, AI detection and Settings while keeping dark media overlays separate.
+- Clarified analytics segmented selection and simulation tab appearance, keyboard navigation, labels and selected state.
+- Added focused static style, tab and WCAG contrast regression checks; no new dependencies or backend/runtime behavior.
+- Previous candidate `0_4_2`; stable accepted baseline `0_4_0`. Owner acceptance pending.
+
+
 ## 0_4_2 — Crosswalk regression alignment
 
 - Replaced the stale single-simulation-camera static assertion with checks for both mirrored source IDs, assigned paired cameras, and numbered Crosswalk edges.

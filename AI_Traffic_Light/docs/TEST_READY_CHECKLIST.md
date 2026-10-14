@@ -1,12 +1,16 @@
-# V0402 Test Checklist
+# V0403 Test Checklist
 
 ```text
-version: 0_4_2
-previous_version: 0_4_1
+version: 0_4_3
+previous_version: 0_4_2
 passed_baseline: 0_4_0
-status: Crosswalk test alignment candidate
+status: Shared visual system and page palette consistency candidate
 ```
 
+- [ ] Shared semantic palette passes contrast validation; light/dark page styles share tokens.
+- [ ] Buttons, input fields, panels, navigation selection and analytics/simulation tabs are usable.
+- [ ] Simulation tabs support keyboard navigation; chart labels remain readable.
+- [ ] Windows build and live smoke pass; prior functionality unchanged.
 - [ ] Crosswalk static regression passes with mirrored-pair assertions.
 - [ ] Both simulation profiles are saved and are vertically mirrored views of the same scene.
 - [ ] Crosswalk labels 1–4, pair assignment, preview, region editor and save/restart are valid.
