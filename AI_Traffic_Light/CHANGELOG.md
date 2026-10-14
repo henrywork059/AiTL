@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_3_27 — Camera Settings preview regression assertion repair
+
+- Updated the Camera Settings static regression to assert both the selected simulated preview and the explicit physical ESP-only guard; removed the obsolete exact ESP-only expression inherited from V0325.
+- No runtime, camera transport, topology, backend, hardware or firmware changes. Owner validation remains pending, and passed baseline stays `0_3_11`.
+
+
 ## 0_3_26 — Numbered junction edges and saved simulation camera
 
 - Junction edges use direction-neutral labels 1–4; new topology lines record source and destination edge identifiers in existing approach fields.

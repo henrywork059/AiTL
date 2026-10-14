@@ -1,11 +1,16 @@
-# Local Testing — V0326
+# Local Testing — V0327
 
 ```text
-version: 0_3_26
-previous_version: 0_3_25
+version: 0_3_27
+previous_version: 0_3_26
 passed_baseline: 0_3_11
-status: Numbered edge links and simulation camera candidate
+status: Camera Settings preview regression assertion repair candidate
 ```
+
+## V0327 startup regression check
+
+- Run `python scripts/test_camera_settings_page_structure.py`: assert simulated previews use the selected simulation branch and physical ESP previews explicitly exclude simulation.
+- Run `scripts/update_test_run.ps1 -ChangedTests` from Windows; verify previously blocked startup proceeds through frontend typecheck/build and live smoke.
 
 ## Camera and network focused regression
 

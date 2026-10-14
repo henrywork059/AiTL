@@ -1,12 +1,14 @@
-# V0326 Test-Ready Checklist
+# V0327 Test-Ready Checklist
 
 ```text
-version: 0_3_26
-previous_version: 0_3_25
+version: 0_3_27
+previous_version: 0_3_26
 passed_baseline: 0_3_11
-status: Numbered edge links and simulation camera candidate
+status: Camera Settings preview regression assertion repair candidate
 ```
 
+- [ ] Camera Settings regression asserts both selected simulation and physical ESP preview isolation and passes.
+- [ ] Windows changed-tests startup completes all selected regressions, frontend checks, backend health and live smoke.
 - [ ] New Camera supports selecting and saving one simulation camera without IP; its preview and Crosswalk assignment work after restart.
 - [ ] Junctions show 1–4 edge labels with no N/E/S/W visible; topology links persist selected endpoint numbers.
 - [ ] Existing crosswalk-to-edge mappings and physical ESP stream controls remain intact.

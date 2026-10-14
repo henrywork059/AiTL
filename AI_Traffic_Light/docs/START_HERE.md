@@ -1,8 +1,8 @@
-# Start Here — V0326
+# Start Here — V0327
 
-Current candidate `0_3_26` (previous `0_3_25`); owner-confirmed passed baseline `0_3_11`.
+Current candidate `0_3_27` (previous `0_3_26`); owner-confirmed passed baseline `0_3_11`.
 
-V0326 adds orientation-neutral edge numbers 1–4 for topology connections and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
+V0327 repairs a V0326 startup regression assertion for the new simulation/ESP preview branches. Runtime behavior remains the same: numbered 1–4 topology endpoints and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
 
 ## Assign crosswalks to junction edges
 

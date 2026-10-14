@@ -27,7 +27,8 @@ def main() -> int:
                  "startRemoteCamera(", "stopRemoteCamera(", "deleteRemoteCamera("):
         assert call in page, call
     assert "key={cameraSettingsView ? remote?.active_source_id" in page
-    assert "selectedSaved && selectedStreaming && !status?.simulation_enabled" in page
+    assert "selectedSimulation && status?.simulation_enabled" in page
+    assert "selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled" in page
     assert "Measured stream FPS" in page and "Frame age" in page
     assert "cameraIndicator(camera)" in page
     assert "saveSimulationCamera()" in page
