@@ -36,7 +36,8 @@ def main() -> None:
     assert "Select camera for preview" in editor and "cameraStatus?.active_source_id === sourceId" in editor
     assert "One shared simulated camera" in editor
     assert "onSimulationChange(!simulated)" in editor
-    assert '"crosswalks", "dataset_capture"' in read("App.tsx")
+    poll_pages = read("App.tsx").split("const CAMERA_POLL_PAGES:", 1)[1].split("];", 1)[0]
+    assert all(f'"{page}"' in poll_pages for page in ("crosswalks", "dataset_capture"))
     assert "onCameraStatusChange={setCameraStatus}" in read("App.tsx")
     assert ".crosswalk-region-overlay" in read("pages/crosswalkRegionEditor.css")
     assert 'method: "PUT"' in read("lib/crosswalksApi.ts")

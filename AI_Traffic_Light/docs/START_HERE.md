@@ -1,6 +1,8 @@
-# Start Here — V0324
+# Start Here — V0325
 
-Current candidate `0_3_24` (previous `0_3_23`); owner-confirmed passed baseline `0_3_11`.
+Current candidate `0_3_25` (previous `0_3_24`); owner-confirmed passed baseline `0_3_11`.
+
+V0325 corrects two stale startup regression assertions for Camera Settings and Crosswalks. No app behavior changes; the existing junction-edge mapping checks remain part of owner validation.
 
 ## Assign crosswalks to junction edges
 

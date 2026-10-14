@@ -1,11 +1,17 @@
-# Local Testing — V0324
+# Local Testing — V0325
 
 ```text
-version: 0_3_24
-previous_version: 0_3_23
+version: 0_3_25
+previous_version: 0_3_24
 passed_baseline: 0_3_11
-status: Junction edge crosswalk mapping candidate
+status: Startup regression assertion fix candidate
 ```
+
+## Startup regression fix
+
+- Run `python scripts/test_camera_settings_page_structure.py` and `python scripts/test_crosswalks_frontend_structure.py` to confirm both pages remain included in `CAMERA_POLL_PAGES` regardless of neighboring pages.
+- Run `scripts/update_test_run.ps1 -ChangedTests` from Windows to verify the full startup pipeline. The original V0324 junction-edge owner checks below remain pending.
+
 
 ## Focused checks
 

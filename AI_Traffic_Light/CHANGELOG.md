@@ -1,4 +1,9 @@
 # Changelog
+
+## 0_3_25 — Startup regression assertion repair
+
+- Replaced two brittle camera-settings/crosswalks static assertions that assumed adjacent entries in the shared camera polling page list. Each regression now checks that its required page identifiers are present, independent of ordering.
+- No application, transport, API, hardware, configuration or runtime behavior changed. Owner-confirmed baseline remains `0_3_11`; full Windows startup/owner acceptance is pending.
 ## 0_3_24 — Junction edge labels and crosswalk links
 
 - Added N/E/S/W labels at all four sides of every junction map card and clickable edge selection.

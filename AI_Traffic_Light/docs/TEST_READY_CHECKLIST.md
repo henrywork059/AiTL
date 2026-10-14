@@ -1,11 +1,16 @@
-# V0324 Test-Ready Checklist
+# V0325 Test-Ready Checklist
 
 ```text
-version: 0_3_24
-previous_version: 0_3_23
+version: 0_3_25
+previous_version: 0_3_24
 passed_baseline: 0_3_11
-status: Junction edge crosswalk mapping candidate
+status: Startup regression assertion fix candidate
 ```
+
+- [ ] Camera Settings and Crosswalks page regressions pass without relying on adjacent entries in `CAMERA_POLL_PAGES`.
+- [ ] Windows update/test/run completes, frontend opens and backend health/live smoke pass.
+- [ ] V0324 junction-edge acceptance checks below still pass.
+
 
 - [ ] All junction cards show clickable N/E/S/W edge labels, linked/selected styling and tooltips.
 - [ ] Selecting an edge opens its crossing assignment in Junction Network inspector.

@@ -15,7 +15,8 @@ def main() -> int:
     assert "PAGE_DETAILS.camera_settings" in nav
     assert 'case "camera_settings":' in app
     assert '<CameraSettingsPage' in app
-    assert '"camera_settings", "dataset_capture"' in app
+    poll_pages = app.split("const CAMERA_POLL_PAGES:", 1)[1].split("];", 1)[0]
+    assert all(f'"{page}"' in poll_pages for page in ("camera_settings", "dataset_capture"))
 
     # Both routes share one camera registry, rather than duplicating state or transport.
     assert 'view="settings"' in page

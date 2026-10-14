@@ -1,5 +1,5 @@
-version: 0_3_24
-status: Junction edge crosswalk mapping candidate
-previous_version: 0_3_23
+version: 0_3_25
+status: Startup regression assertion fix candidate
+previous_version: 0_3_24
 passed_baseline: 0_3_11
-notes: V0324 adds clickable N/E/S/W junction edge labels and persistent per-edge crosswalk mappings in the existing network JSON. Assignments use existing saved crosswalks; older network data loads with empty mappings, and deleted crosswalk references remain visible for correction. No new camera, inference or signal-control behavior. Baseline 0_3_11 stays accepted pending owner PASS.
+notes: V0325 corrects two brittle startup regressions that assumed Camera Settings/Crosswalks page IDs were adjacent to Dataset Capture in App.tsx. No runtime or firmware changes. V0324 junction-edge mapping remains pending owner verification; passed baseline stays 0_3_11.
