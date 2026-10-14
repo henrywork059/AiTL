@@ -1,5 +1,5 @@
-version: 0_3_25
-status: Startup regression assertion fix candidate
-previous_version: 0_3_24
+version: 0_3_26
+status: Numbered edge links and saved simulated camera candidate
+previous_version: 0_3_25
 passed_baseline: 0_3_11
-notes: V0325 corrects two brittle startup regressions that assumed Camera Settings/Crosswalks page IDs were adjacent to Dataset Capture in App.tsx. No runtime or firmware changes. V0324 junction-edge mapping remains pending owner verification; passed baseline stays 0_3_11.
+notes: V0326 adds direction-neutral numbered junction edge labels and endpoint selection for topology links, plus one simulation camera in Camera Settings New Camera. Cardinal internal edge keys remain for saved configuration compatibility. Owner acceptance pending.

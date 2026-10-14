@@ -1,5 +1,6 @@
 export const JUNCTION_EDGES = ["north", "east", "south", "west"] as const;
 export type JunctionEdge = (typeof JUNCTION_EDGES)[number];
+export const JUNCTION_EDGE_LABELS: Record<JunctionEdge, string> = { north: "1", east: "2", south: "3", west: "4" };
 export type JunctionCrosswalkEdges = Record<JunctionEdge, string | null>;
 
 export type JunctionLoadLevel = "unavailable" | "clear" | "light" | "moderate" | "heavy";

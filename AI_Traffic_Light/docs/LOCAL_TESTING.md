@@ -1,13 +1,19 @@
-# Local Testing — V0325
+# Local Testing — V0326
 
 ```text
-version: 0_3_25
-previous_version: 0_3_24
+version: 0_3_26
+previous_version: 0_3_25
 passed_baseline: 0_3_11
-status: Startup regression assertion fix candidate
+status: Numbered edge links and simulation camera candidate
 ```
 
-## Startup regression fix
+## Camera and network focused regression
+
+- Create a simulation camera under Camera Settings → New camera and confirm it is selected, previewed and can be removed/re-added without IP or ESP.
+- Connect junction 1 edge 2 to junction 2 edge 4; Save network, refresh, and verify the endpoint IDs persist.
+- Run `python scripts/test_remote_camera_multi.py`, `python scripts/test_camera_settings_page_structure.py`, `python scripts/test_junction_network_frontend_structure.py`, and `python scripts/test_intersection_network.py`.
+
+## Previous startup regression checks
 
 - Run `python scripts/test_camera_settings_page_structure.py` and `python scripts/test_crosswalks_frontend_structure.py` to confirm both pages remain included in `CAMERA_POLL_PAGES` regardless of neighboring pages.
 - Run `scripts/update_test_run.ps1 -ChangedTests` from Windows to verify the full startup pipeline. The original V0324 junction-edge owner checks below remain pending.

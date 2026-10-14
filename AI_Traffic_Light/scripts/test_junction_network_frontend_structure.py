@@ -57,6 +57,9 @@ def main() -> int:
     assert "function JunctionNodeCard" in node_card
     assert "junction-node-body" in node_card
     assert "JUNCTION_EDGES" in node_card and "junction-edge-tag" in node_card
+    assert "JUNCTION_EDGE_LABELS" in node_card and "JUNCTION_EDGE_LABELS" in page
+    assert "linkTargetEdge" in page and "Connect edges" in page
+    assert "source_approach: `edge_" in page and "destination_approach: `edge_" in page
     assert "onSelectEdge(config.id, edge)" in node_card
     assert "selectedEdge={config.id === selectedId ? selectedEdge : null}" in page
     assert "crosswalk_edges" in types and "JunctionCrosswalkEdges" in types

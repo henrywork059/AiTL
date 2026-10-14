@@ -17,7 +17,7 @@ import {
 } from "../lib/junctionNetworkView";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import type { CameraStatus } from "../types";
-import { JUNCTION_EDGES } from "../types/junctionNetwork";
+import { JUNCTION_EDGES, JUNCTION_EDGE_LABELS } from "../types/junctionNetwork";
 import type {
   JunctionEdge,
   JunctionCameraView,
@@ -43,6 +43,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
   const [crosswalks, setCrosswalks] = useState<Crosswalk[]>([]);
   const [crosswalkError, setCrosswalkError] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState("");
+  const [linkTargetEdge, setLinkTargetEdge] = useState<JunctionEdge>("north");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -302,8 +303,8 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
       enabled: true,
       source_intersection_id: selectedConfig.id,
       destination_intersection_id: linkTarget,
-      source_approach: "outbound",
-      destination_approach: "inbound",
+      source_approach: `edge_${JUNCTION_EDGE_LABELS[selectedEdge]}`,
+      destination_approach: `edge_${JUNCTION_EDGE_LABELS[linkTargetEdge]}`,
       travel_time_seconds: 10,
     }));
   }
@@ -527,7 +528,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                   <h4>Crosswalks by edge</h4>
                   <button type="button" className="compact" onClick={() => void refreshCrosswalks()}>Refresh crossings</button>
                 </div>
-                <p className="small-note">Select N, E, S or W on the junction card, then connect an existing crossing from Traffic → Crosswalks.</p>
+                <p className="small-note">Select numbered edges 1–4 on the junction card. Numbers identify connection points, not compass directions.</p>
                 <div className="junction-crosswalk-edge-list">
                   {JUNCTION_EDGES.map((edge) => {
                     const id = selectedConfig.crosswalk_edges[edge];
@@ -537,7 +538,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                         className={`junction-crosswalk-edge-choice${selectedEdge === edge ? " is-selected" : ""}`}
                         aria-pressed={selectedEdge === edge}
                         onClick={() => setSelectedEdge(edge)}>
-                        <strong>{edge[0].toUpperCase()}</strong>
+                        <strong>{JUNCTION_EDGE_LABELS[edge]}</strong>
                         <span>{id ? crosswalkById.get(id)?.label ?? `Missing: ${id}` : "Unassigned"}</span>
                         {missing && <span className="junction-crosswalk-missing">Missing</span>}
                       </button>
@@ -545,7 +546,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                   })}
                 </div>
                 <label className="junction-primary-select">
-                  {selectedEdge[0].toUpperCase() + selectedEdge.slice(1)} edge crosswalk
+                  Edge {JUNCTION_EDGE_LABELS[selectedEdge]} crosswalk
                   <select
                     value={selectedConfig.crosswalk_edges[selectedEdge] ?? ""}
                     onChange={(event) => mutateJunction(selectedConfig.id, (junction) => {
@@ -577,8 +578,10 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                 <div className="junction-section-title"><h4>Topology links</h4></div>
                 {linkTargets.length > 0 && (
                   <div className="junction-add-link-row">
+                    <span>From edge {JUNCTION_EDGE_LABELS[selectedEdge]}</span>
                     <select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)}>{linkTargets.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-                    <button type="button" onClick={addLink}>Add outgoing line</button>
+                    <label>To edge <select value={linkTargetEdge} onChange={(event) => setLinkTargetEdge(event.target.value as JunctionEdge)}>{JUNCTION_EDGES.map((edge) => <option key={edge} value={edge}>{JUNCTION_EDGE_LABELS[edge]}</option>)}</select></label>
+                    <button type="button" onClick={addLink}>Connect edges</button>
                   </div>
                 )}
                 <div className="junction-link-list">
@@ -587,7 +590,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
                     const peer = outgoing ? link.destination_intersection_id : link.source_intersection_id;
                     return (
                       <div key={link.id} className="junction-link-row">
-                        <div><strong>{outgoing ? "→" : "←"} {peer}</strong><small>{link.id}</small></div>
+                        <div><strong>{outgoing ? "→" : "←"} {peer}</strong><small>{link.source_approach} → {link.destination_approach} · {link.id}</small></div>
                         <label><input type="number" min={0.1} max={300} step={0.1} value={link.travel_time_seconds} onChange={(event) => mutateLink(link.id, (item) => { item.travel_time_seconds = Number(event.target.value); })} />s</label>
                         <label className="junction-link-enabled"><input type="checkbox" checked={link.enabled} onChange={(event) => mutateLink(link.id, (item) => { item.enabled = event.target.checked; })} />on</label>
                         <button className="compact" type="button" onClick={() => mutateConfig((next) => { next.links = next.links.filter((item) => item.id !== link.id); })}>Remove</button>

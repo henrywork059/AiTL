@@ -19,6 +19,7 @@ from app.services.remote_camera import _FramePacket  # noqa: E402
 from app.services.remote_camera_manager import (  # noqa: E402
     DEFAULT_CAMERA_SETTINGS,
     MAX_SWITCH_CACHE_AGE_MS,
+    SIMULATION_SOURCE_ID,
     RemoteCameraManager,
     _CachedPacket,
 )
@@ -275,6 +276,21 @@ def main() -> int:
         assert profiles["cam_b"]["target_fps"] == 20
         assert profiles["cam_b"]["settings"]["brightness"] == 1
 
+        sim_registry = Path(temporary) / "simulation_registry.json"
+        simulator = RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession)
+        simulator.save_profile(host="192.168.50.95", source_id="physical_camera")
+        created = simulator.save_simulation_profile()
+        assert created["camera_count"] == 2 and created["active_source_id"] == SIMULATION_SOURCE_ID
+        assert camera_frame_service.latest_frame().source_id == SIMULATION_SOURCE_ID
+        assert SIMULATION_SOURCE_ID not in simulator._sessions
+        assert simulator.save_simulation_profile()["camera_count"] == 2
+        assert any(item["kind"] == "simulation" for item in RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession).status()["cameras"])
+        simulator.select("physical_camera")
+        assert not camera_frame_service.simulation_enabled
+        simulator.select(SIMULATION_SOURCE_ID)
+        simulator.delete_profile(SIMULATION_SOURCE_ID)
+        assert not camera_frame_service.simulation_enabled
+
         # FastAPI shutdown hook equivalent must disconnect every session, not only selected.
         assert session_a.reachable
         assert replacement_session_b.reachable
@@ -282,6 +298,7 @@ def main() -> int:
         assert not session_a.reachable
         assert not replacement_session_b.reachable
 
+    print("[PASS] simulation camera saves, selects and deletes without ESP transport")
     print("[PASS] multiple ESP profiles persist IP/FPS/OV2640 settings")
     print("[PASS] independent ESP streams can run simultaneously")
     print("[PASS] inactive and in-flight old-source frames cannot overwrite the selected PC Studio source")

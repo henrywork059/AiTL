@@ -30,6 +30,7 @@ DEFAULT_REGISTRY_PATH = PROJECT_ROOT / "config" / "remote_cameras.json"
 MAX_SAVED_CAMERAS = 12
 MAX_SWITCH_CACHE_AGE_MS = 1500
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+SIMULATION_SOURCE_ID = "simulation_camera"
 
 DEFAULT_CAMERA_SETTINGS: dict[str, Any] = {
     "frame_size": "QVGA",
@@ -212,8 +213,12 @@ class RemoteCameraManager:
                     continue
                 try:
                     source_id = self._validate_source_id(str(raw.get("source_id") or ""))
-                    host = normalize_private_lan_ipv4(str(raw.get("host") or ""))
+                    kind = "simulation" if raw.get("kind") == "simulation" else "esp32"
+                    if (kind == "simulation") != (source_id == SIMULATION_SOURCE_ID):
+                        raise ValueError("Simulation camera source ID does not match its kind")
+                    host = "" if kind == "simulation" else normalize_private_lan_ipv4(str(raw.get("host") or ""))
                     profiles[source_id] = {
+                        "kind": kind,
                         "source_id": source_id,
                         "host": host,
                         "target_fps": self._normalize_target_fps(raw.get("target_fps")),
@@ -247,6 +252,7 @@ class RemoteCameraManager:
             "cameras": [
                 {
                     "source_id": profile["source_id"],
+                    "kind": profile["kind"],
                     "host": profile["host"],
                     "target_fps": profile["target_fps"],
                     "settings": profile["settings"],
@@ -436,6 +442,8 @@ class RemoteCameraManager:
     ) -> dict:
         normalized_host = normalize_private_lan_ipv4(host)
         normalized_source = self._validate_source_id(source_id)
+        if normalized_source == SIMULATION_SOURCE_ID:
+            raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "The simulation camera ID is reserved.", status_code=409)
         normalized_settings = self._normalize_settings(settings)
         normalized_fps = self._normalize_target_fps(target_fps)
 
@@ -468,6 +476,7 @@ class RemoteCameraManager:
                 now_ms = self._now_ms()
                 self._profiles[normalized_source] = {
                     "source_id": normalized_source,
+                    "kind": "esp32",
                     "host": normalized_host,
                     "target_fps": normalized_fps,
                     "settings": normalized_settings,
@@ -480,6 +489,8 @@ class RemoteCameraManager:
                 self._persist_locked()
 
             if selection_changed or active_host_changed:
+                if selection_changed and camera_frame_service.simulation_enabled:
+                    camera_frame_service.set_simulation(False)
                 self._publish_selected_cache_locked()
 
         # Disconnect outside the publication lock. The generation was already
@@ -489,6 +500,29 @@ class RemoteCameraManager:
             session_to_reset.disconnect()
 
         return self.status()
+
+    def save_simulation_profile(self) -> dict:
+        """Register the single built-in simulated source in the saved camera list."""
+        with self._publish_lock:
+            with self._frame_condition:
+                existing = self._profiles.get(SIMULATION_SOURCE_ID)
+                if existing is not None and existing.get("kind") != "simulation":
+                    raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Simulation source ID is already in use.", status_code=409)
+                if existing is None and len(self._profiles) >= MAX_SAVED_CAMERAS:
+                    raise AppError(ErrorCode.INVALID_REQUEST, "The saved camera list is full.", status_code=409)
+                self._profiles[SIMULATION_SOURCE_ID] = {
+                    "source_id": SIMULATION_SOURCE_ID,
+                    "kind": "simulation",
+                    "host": "",
+                    "target_fps": 2,
+                    "settings": dict(DEFAULT_CAMERA_SETTINGS),
+                    "last_used_ms": self._now_ms(),
+                }
+                self._active_source_id = SIMULATION_SOURCE_ID
+                self._persist_locked()
+            camera_frame_service.set_simulation(True)
+            self._publish_selected_cache_locked()
+        return self.status(refresh_device=False)
 
     def select(self, source_id: str) -> dict:
         normalized_source = self._validate_source_id(source_id)
@@ -506,9 +540,13 @@ class RemoteCameraManager:
                 self._profiles[normalized_source]["last_used_ms"] = self._now_ms()
                 self._persist_locked()
 
-            if selection_changed:
+            selected_simulation = normalized_source == SIMULATION_SOURCE_ID
+            mode_changed = camera_frame_service.simulation_enabled != selected_simulation
+            if mode_changed:
+                camera_frame_service.set_simulation(selected_simulation)
+            if selection_changed or mode_changed:
                 self._publish_selected_cache_locked()
-        logger.info("Active ESP camera selected", extra={"source_id": normalized_source})
+        logger.info("Active saved camera selected", extra={"source_id": normalized_source})
         return self.status(refresh_device=False)
 
     def delete_profile(self, source_id: str) -> dict:
@@ -537,6 +575,8 @@ class RemoteCameraManager:
                 self._frame_condition.notify_all()
 
             if was_active:
+                if normalized_source == SIMULATION_SOURCE_ID and camera_frame_service.simulation_enabled:
+                    camera_frame_service.set_simulation(False)
                 self._publish_selected_cache_locked()
 
         if session is not None:
@@ -665,9 +705,22 @@ class RemoteCameraManager:
 
     def _camera_summary_locked(self, profile: dict[str, Any], *, refresh_device: bool = False) -> dict[str, Any]:
         source_id = profile["source_id"]
+        if profile["kind"] == "simulation":
+            running = source_id == self._active_source_id and camera_frame_service.simulation_enabled
+            return {
+                "source_id": source_id, "kind": "simulation", "host": "",
+                "target_fps": 2, "settings": dict(profile["settings"]),
+                "last_used_ms": profile["last_used_ms"],
+                "selected": source_id == self._active_source_id,
+                "connected": running, "device_reachable": True,
+                "streaming": running, "stream_connected": running,
+                "paused_for_simulation": False, "measured_fps": 2.0 if running else 0.0,
+                "last_success_at_ms": None, "last_error": None,
+            }
         session = self._sessions.get(source_id)
         session_status = session.status(refresh_device=refresh_device) if session is not None else None
         return {
+            "kind": "esp32",
             "source_id": source_id,
             "host": profile["host"],
             "target_fps": profile["target_fps"],
@@ -704,9 +757,9 @@ class RemoteCameraManager:
                 "stream_protocol": None,
                 "host": profile["host"] if profile else None,
                 "source_id": profile["source_id"] if profile else None,
-                "status_url": f"http://{profile['host']}/status" if profile else None,
-                "capture_url": f"http://{profile['host']}/capture" if profile else None,
-                "stream_url": f"tcp://{profile['host']}:81" if profile else None,
+                "status_url": f"http://{profile['host']}/status" if profile and profile["kind"] == "esp32" else None,
+                "capture_url": f"http://{profile['host']}/capture" if profile and profile["kind"] == "esp32" else None,
+                "stream_url": f"tcp://{profile['host']}:81" if profile and profile["kind"] == "esp32" else None,
                 "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
                 "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
                 "measured_fps": 0.0,
@@ -749,6 +802,14 @@ class RemoteCameraManager:
                 active_status["target_fps"] = profile["target_fps"]
                 active_status["settings"] = dict(profile["settings"])
                 active_status["fetch_interval_ms"] = round(1000 / max(1, int(profile["target_fps"])))
+                if profile["kind"] == "simulation":
+                    running = camera_frame_service.simulation_enabled
+                    active_status.update({
+                        "configured": True, "device_reachable": True,
+                        "streaming": running, "stream_connected": running,
+                        "host": None, "measured_fps": 2.0 if running else 0.0,
+                        "control_sequence": ["select", "simulation_start", "simulation_stop"],
+                    })
             summaries = [
                 self._camera_summary_locked(item, refresh_device=False)
                 for item in sorted(

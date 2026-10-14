@@ -157,6 +157,11 @@ def save_remote_camera_profile(payload: RemoteCameraProfileRequest, request: Req
     return ok(data, request_id=request.state.request_id)
 
 
+@router.post("/remote/simulation")
+def save_simulation_camera(request: Request) -> dict:
+    return ok(remote_camera_service.save_simulation_profile(), request_id=request.state.request_id)
+
+
 @router.post("/remote/select")
 def select_remote_camera(payload: RemoteCameraSelectRequest, request: Request) -> dict:
     data = remote_camera_service.select(payload.source_id)

@@ -61,6 +61,7 @@ export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
 
 export type RemoteCameraProfile = {
   source_id: string;
+  kind: "esp32" | "simulation";
   host: string;
   target_fps: number;
   settings: RemoteCameraSettings;
@@ -147,6 +148,10 @@ export async function saveRemoteCamera(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function saveSimulationCamera(): Promise<RemoteCameraStatus> {
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/simulation`, { method: "POST" });
 }
 
 export async function selectRemoteCamera(source_id: string): Promise<RemoteCameraStatus> {

@@ -18,6 +18,7 @@ function nextId(items: Crosswalk[]): string {
 
 function cameraState(camera: RemoteCameraProfile | undefined): string {
   if (!camera) return "Missing saved camera";
+  if (camera.kind === "simulation") return camera.streaming ? "Simulation running" : "Simulation stopped";
   if (camera.paused_for_simulation) return "Paused";
   if (camera.stream_connected) return "Streaming";
   if (camera.streaming) return "Reconnecting";
@@ -140,7 +141,7 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
           <option value="">No camera assigned</option>
           {current && !cameraById.has(current) && <option value={current}>{current} (missing camera)</option>}
           {cameras.filter((camera) => camera.source_id !== other).map((camera) => (
-            <option key={camera.source_id} value={camera.source_id}>{camera.source_id} — {camera.host}</option>
+            <option key={camera.source_id} value={camera.source_id}>{camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}</option>
           ))}
         </select>
       </label>

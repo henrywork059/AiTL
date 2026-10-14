@@ -1,17 +1,17 @@
-# Start Here — V0325
+# Start Here — V0326
 
-Current candidate `0_3_25` (previous `0_3_24`); owner-confirmed passed baseline `0_3_11`.
+Current candidate `0_3_26` (previous `0_3_25`); owner-confirmed passed baseline `0_3_11`.
 
-V0325 corrects two stale startup regression assertions for Camera Settings and Crosswalks. No app behavior changes; the existing junction-edge mapping checks remain part of owner validation.
+V0326 adds orientation-neutral edge numbers 1–4 for topology connections and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
 
 ## Assign crosswalks to junction edges
 
 1. Define your crossings under **Traffic → Crosswalks**.
-2. Open **Traffic → Junction Network** and select a junction. Click any **N, E, S, W** label directly on the junction card.
+2. Open **Traffic → Junction Network** and select a junction. Click any **1, 2, 3, 4** label directly on the junction card.
 3. Under **Crosswalks by edge** in the inspector, choose a saved crosswalk for the selected side (or **No crosswalk** to clear it). Repeat for the other sides.
 4. Click **Save network**. Refreshing or restarting preserves edge assignments. Deleted crosswalks show a missing ID until explicitly corrected.
 
-The labels describe cardinal junction edges; connections are configuration-only and do not issue signal commands.
+The numbered labels identify junction connection points regardless of orientation; connections are configuration-only and do not issue signal commands.
 
 ## Update and test
 

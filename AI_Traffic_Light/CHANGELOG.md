@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_3_26 — Numbered junction edges and saved simulation camera
+
+- Junction edges use direction-neutral labels 1–4; new topology lines record source and destination edge identifiers in existing approach fields.
+- Preserved legacy cardinal edge keys in saved crosswalk assignments for backward compatibility.
+- Camera Settings New Camera can register one simulation camera with no IP or ESP socket; the shared simulated scene is reused and appears in Crosswalk camera assignments.
+- Physical ESP transport and signal-control behavior remain unchanged. Passed baseline `0_3_11`; owner PASS pending.
+
+
 ## 0_3_25 — Startup regression assertion repair
 
 - Replaced two brittle camera-settings/crosswalks static assertions that assumed adjacent entries in the shared camera polling page list. Each regression now checks that its required page identifiers are present, independent of ordering.

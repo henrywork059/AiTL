@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { JUNCTION_EDGES } from "../../types/junctionNetwork";
+import { JUNCTION_EDGES, JUNCTION_EDGE_LABELS } from "../../types/junctionNetwork";
 import type { JunctionConfig, JunctionEdge, JunctionOverviewNode } from "../../types/junctionNetwork";
 import {
   JUNCTION_LOAD_LABELS,
@@ -73,15 +73,15 @@ export function JunctionNodeCard({
           key={edge}
           type="button"
           className={`junction-edge-tag junction-edge-${edge}${config.crosswalk_edges[edge] ? " is-linked" : ""}${selectedEdge === edge ? " is-selected" : ""}`}
-          aria-label={`${edge} edge of ${config.label}: ${config.crosswalk_edges[edge] ?? "unassigned"}. Select edge to assign a crosswalk`}
+          aria-label={`Edge ${JUNCTION_EDGE_LABELS[edge]} of ${config.label}: ${config.crosswalk_edges[edge] ?? "unassigned"}. Select edge to assign a crosswalk`}
           aria-pressed={selected && selectedEdge === edge}
-          title={`${edge.toUpperCase()} · ${config.crosswalk_edges[edge] ?? "No crosswalk"}`}
+          title={`Edge ${JUNCTION_EDGE_LABELS[edge]} · ${config.crosswalk_edges[edge] ?? "No crosswalk"}`}
           onClick={(event) => {
             event.stopPropagation();
             onSelectEdge(config.id, edge);
           }}
         >
-          {edge[0].toUpperCase()}
+          {JUNCTION_EDGE_LABELS[edge]}
         </button>
       ))}
     </article>
