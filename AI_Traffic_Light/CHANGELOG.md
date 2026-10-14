@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_4_0 — Owner-accepted stable release
+
+- Owner confirmed candidate `0_3_27` PASS and explicitly approved promotion to stable `0_4_0`.
+- Functional code is unchanged; `0_4_0` is the new accepted baseline.
+
+
 ## 0_3_27 — Camera Settings preview regression assertion repair
 
 - Updated the Camera Settings static regression to assert both the selected simulated preview and the explicit physical ESP-only guard; removed the obsolete exact ESP-only expression inherited from V0325.

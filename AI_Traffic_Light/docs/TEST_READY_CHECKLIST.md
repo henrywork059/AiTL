@@ -1,9 +1,9 @@
-# V0327 Test-Ready Checklist
+# V0400 Test-Ready Checklist
 
 ```text
-version: 0_3_27
-previous_version: 0_3_26
-passed_baseline: 0_3_11
+version: 0_4_0
+previous_version: 0_3_27
+passed_baseline: 0_4_0
 status: Camera Settings preview regression assertion repair candidate
 ```
 
@@ -26,4 +26,4 @@ status: Camera Settings preview regression assertion repair candidate
 - [ ] `python scripts/test_intersection_network.py` passes.
 - [ ] `python scripts/test_junction_network_frontend_structure.py` passes.
 - [ ] `python scripts/check_structure.py`, frontend typecheck/build and full Windows runner pass.
-- [ ] Owner confirms PASS, otherwise `0_3_11` remains accepted baseline.
+- [ ] Owner confirms PASS, otherwise `0_4_0` remains accepted baseline.

@@ -1,13 +1,13 @@
-# Local Testing — V0327
+# Local Testing — V0400
 
 ```text
-version: 0_3_27
-previous_version: 0_3_26
-passed_baseline: 0_3_11
+version: 0_4_0
+previous_version: 0_3_27
+passed_baseline: 0_4_0
 status: Camera Settings preview regression assertion repair candidate
 ```
 
-## V0327 startup regression check
+## V0400 startup regression check
 
 - Run `python scripts/test_camera_settings_page_structure.py`: assert simulated previews use the selected simulation branch and physical ESP previews explicitly exclude simulation.
 - Run `scripts/update_test_run.ps1 -ChangedTests` from Windows; verify previously blocked startup proceeds through frontend typecheck/build and live smoke.
@@ -39,4 +39,4 @@ status: Camera Settings preview regression assertion repair candidate
 5. Delete a referenced crosswalk in Crosswalks. Return to Junction Network and click **Refresh crossings**: its ID should be retained and marked Missing, with an option to clear/reassign.
 6. Run the full Windows `scripts/update_test_run.ps1` for complete regressions, typecheck/build, backend smoke and UI launch.
 
-No physical hardware is needed for mapping itself. Full owner PASS is pending; baseline stays `0_3_11`.
+No physical hardware is needed for mapping itself. Full owner PASS is pending; baseline stays `0_4_0`.

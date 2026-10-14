@@ -1,8 +1,8 @@
-# Start Here — V0327
+# Start Here — V0400
 
-Current candidate `0_3_27` (previous `0_3_26`); owner-confirmed passed baseline `0_3_11`.
+Current accepted stable release `0_4_0` (promoted from accepted `0_3_27`).
 
-V0327 repairs a V0326 startup regression assertion for the new simulation/ESP preview branches. Runtime behavior remains the same: numbered 1–4 topology endpoints and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
+V0400 repairs a V0326 startup regression assertion for the new simulation/ESP preview branches. Runtime behavior remains the same: numbered 1–4 topology endpoints and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
 
 ## Assign crosswalks to junction edges
 
@@ -20,4 +20,4 @@ cd D:\AiTL
 & ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Validate UI and full runner before PASS; accepted baseline remains `0_3_11`.
+Validate UI and full runner before PASS; accepted baseline remains `0_4_0`.

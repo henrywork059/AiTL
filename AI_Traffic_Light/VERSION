@@ -1,5 +1,5 @@
-version: 0_3_27
-status: Camera Settings preview regression assertion repair candidate
-previous_version: 0_3_26
-passed_baseline: 0_3_11
-notes: V0327 corrects the Camera Settings static test to validate separate saved simulation and physical ESP preview conditions introduced by V0326. No runtime, API, registry, topology, firmware or hardware behavior changes. V0326 owner validation remains pending; accepted baseline stays 0_3_11.
+version: 0_4_0
+status: Stable release accepted by owner
+previous_version: 0_3_27
+passed_baseline: 0_4_0
+notes: Owner confirmed V0327 PASS and approved promotion to the next stable minor release. No functional changes; V0400 is the accepted stable baseline.
