@@ -1,11 +1,16 @@
-# Local Testing — V0401
+# Local Testing — V0402
 
 ```text
-version: 0_4_1
-previous_version: 0_4_0
+version: 0_4_2
+previous_version: 0_4_1
 passed_baseline: 0_4_0
-status: Crosswalk, camera pair, navigation and junction interaction candidate
+status: Crosswalk test alignment candidate
 ```
+
+## V0402 acceptance
+
+- The Crosswalk structure test must recognize the mirrored simulation pair and numbered edges.
+- All V0401 functional validation steps below remain required.
 
 ## V0401 acceptance
 

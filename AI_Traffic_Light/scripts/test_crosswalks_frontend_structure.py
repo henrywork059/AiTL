@@ -34,7 +34,11 @@ def main() -> None:
     assert "onPointerCancel" in editor and "onVertexDown" in editor
     assert "vertices: [[390, 220], [890, 220], [890, 500], [390, 500]]" in editor
     assert "Select camera for preview" in editor and "cameraStatus?.active_source_id === sourceId" in editor
-    assert "One shared simulated camera" in editor
+    assert "Simulation pair" in editor
+    assert "source_id=${encodeURIComponent(sourceId)}" in editor
+    assert "Assign simulation pair" in page and "saveSimulationCamera()" in page
+    assert "crosswalk-edge-marker" in page and '["1", 422, 18]' in page
+    assert "simulation_camera_b" in page and "crosswalk-simulation-previews" in page
     assert "onSimulationChange(!simulated)" in editor
     poll_pages = read("App.tsx").split("const CAMERA_POLL_PAGES:", 1)[1].split("];", 1)[0]
     assert all(f'"{page}"' in poll_pages for page in ("crosswalks", "dataset_capture"))

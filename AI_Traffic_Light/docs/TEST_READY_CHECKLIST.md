@@ -1,12 +1,13 @@
-# V0401 Test Checklist
+# V0402 Test Checklist
 
 ```text
-version: 0_4_1
-previous_version: 0_4_0
+version: 0_4_2
+previous_version: 0_4_1
 passed_baseline: 0_4_0
-status: Crosswalk, camera pair, navigation and junction interaction candidate
+status: Crosswalk test alignment candidate
 ```
 
+- [ ] Crosswalk static regression passes with mirrored-pair assertions.
 - [ ] Both simulation profiles are saved and are vertically mirrored views of the same scene.
 - [ ] Crosswalk labels 1–4, pair assignment, preview, region editor and save/restart are valid.
 - [ ] Junction drag has no initial jump; edge controls do not overlay text.

@@ -1,8 +1,8 @@
-# Start Here — V0401
+# Start Here — V0402
 
-Current candidate `0_4_1` (previous `0_4_0`); passed stable baseline `0_4_0`.
+Current candidate `0_4_2` (previous `0_4_1`); passed stable baseline `0_4_0`.
 
-Camera Settings saves two mirrored simulated cameras. Crosswalks displays numbered edges and can assign the pair to Side A and B. Junction edge labels no longer cover node content, and dragging retains its initial pointer offset. Camera Sources and the old Zone Editor are hidden legacy routes; Traffic → Zones is reserved and intentionally empty.
+V0402 fixes a stale Crosswalk regression assertion; functionality from V0401 is unchanged. Camera Settings saves two mirrored simulated cameras. Crosswalks displays numbered edges and can assign the pair to Side A and B. Junction edge labels no longer cover node content, and dragging retains its initial pointer offset. Camera Sources and the old Zone Editor are hidden legacy routes; Traffic → Zones is reserved and intentionally empty.
 
 ## Assign crosswalks to junction edges
 

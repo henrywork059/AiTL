@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_4_2 — Crosswalk regression alignment
+
+- Replaced the stale single-simulation-camera static assertion with checks for both mirrored source IDs, assigned paired cameras, and numbered Crosswalk edges.
+- No runtime behavior changes. Stable baseline `0_4_0`; owner PASS pending.
+
+
 ## 0_4_1 — Crosswalk edges, mirrored simulation pair, navigation and junction UX
 
 - Display direction-neutral 1–4 labels on the Crosswalk schematic; assign an existing mirrored simulated camera pair to sides A/B.

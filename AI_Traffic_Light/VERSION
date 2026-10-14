@@ -1,5 +1,5 @@
-version: 0_4_1
-status: Crosswalk, camera pair, navigation and junction interaction candidate
-previous_version: 0_4_0
+version: 0_4_2
+status: Crosswalk test alignment candidate
+previous_version: 0_4_1
 passed_baseline: 0_4_0
-notes: V0401 adds mirrored simulated camera pairs, numbered Crosswalk edges, drag-offset and unobstructed junction edge controls, simpler navigation, hidden legacy sources/zone editors, and a new empty Zones page. Owner acceptance pending; stable V0400 remains the passed baseline.
+notes: V0402 aligns the Crosswalk static regression with V0401 mirrored camera pair UI. No runtime, API, camera, junction or navigation changes. Owner acceptance pending; stable V0400 remains the passed baseline.
