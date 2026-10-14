@@ -31,7 +31,7 @@ export function AppShell({ activePage, onPageChange, children }: Props) {
                   onClick={() => onPageChange(navPage.id)}
                 >
                   <span>{navPage.shortLabel}</span>
-                  <small>{navPage.status}</small>
+                  {navPage.status === "planned" && <small>planned</small>}
                 </button>
               ))}
             </section>
@@ -42,11 +42,11 @@ export function AppShell({ activePage, onPageChange, children }: Props) {
       <div className="content-frame">
         <header className="page-header">
           <div className="section-intro">
-            <div className="eyebrow">{page.status}</div>
+            {page.status === "legacy" && <div className="eyebrow">Legacy</div>}
             <h1>{page.label}</h1>
             <p>{page.description}</p>
           </div>
-          <span className="status-pill muted">Local simulation only</span>
+
         </header>
         {children}
       </div>

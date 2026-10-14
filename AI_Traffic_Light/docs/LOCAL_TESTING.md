@@ -1,11 +1,21 @@
-# Local Testing — V0400
+# Local Testing — V0401
 
 ```text
-version: 0_4_0
-previous_version: 0_3_27
+version: 0_4_1
+previous_version: 0_4_0
 passed_baseline: 0_4_0
-status: Camera Settings preview regression assertion repair candidate
+status: Crosswalk, camera pair, navigation and junction interaction candidate
 ```
+
+## V0401 acceptance
+
+- From repository root run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests`.
+- Camera Settings → New Camera → Simulation pair adds exactly two virtual cameras. Select either; Side B must be vertically mirrored.
+- Crosswalks → Assign simulation pair sets sides A/B; Save changes and confirm both side previews. Four numbered edge labels appear on the schematic.
+- Junction Network edge labels do not obscure card text; dragging from the header does not jump the node centre to the pointer.
+- Dashboard, Camera Settings and Crosswalks show no test-ready badges; legacy Camera Sources/Zone Editor disappear from navigation; Zones opens blank.
+- Verify real ESP selection and existing crosswalk/junction saved settings are unchanged. Full backend/frontend live smoke and user PASS remain required.
+
 
 ## V0400 startup regression check
 

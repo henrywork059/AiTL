@@ -26,10 +26,10 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
     <div className="page-stack">
       <MetricStrip
         metrics={[
-          { label: "Release", value: version, note: "current candidate" },
+          { label: "Release", value: version, note: "installed version" },
           { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
           { label: "Validation", value: `${passCount} passed`, note: warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "no smoke warnings" },
-          { label: "Operating scope", value: "local prototype", note: "simulation, vision, datasets, analytics" },
+          { label: "Mode", value: health?.mode ?? "checking", note: "PC Studio" },
         ]}
       />
 
@@ -57,13 +57,13 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
 
       <div className="two-column-grid">
         <section className="panel">
-          <div className="panel-header"><h2>Available now</h2><span className="status-pill status-implemented">test-ready</span></div>
+          <div className="panel-header"><h2>Available now</h2></div>
           <ul className="check-list">
             {(smokeStatus?.ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>
         </section>
         <section className="panel">
-          <div className="panel-header"><h2>Not available / out of scope</h2><span className="status-pill muted">bounded scope</span></div>
+          <div className="panel-header"><h2>Out of scope</h2></div>
           <ul className="check-list">
             {(smokeStatus?.not_ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>

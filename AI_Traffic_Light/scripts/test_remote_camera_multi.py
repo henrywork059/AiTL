@@ -20,6 +20,7 @@ from app.services.remote_camera_manager import (  # noqa: E402
     DEFAULT_CAMERA_SETTINGS,
     MAX_SWITCH_CACHE_AGE_MS,
     SIMULATION_SOURCE_ID,
+    SIMULATION_MIRROR_SOURCE_ID,
     RemoteCameraManager,
     _CachedPacket,
 )
@@ -280,15 +281,18 @@ def main() -> int:
         simulator = RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession)
         simulator.save_profile(host="192.168.50.95", source_id="physical_camera")
         created = simulator.save_simulation_profile()
-        assert created["camera_count"] == 2 and created["active_source_id"] == SIMULATION_SOURCE_ID
+        assert created["camera_count"] == 3 and created["active_source_id"] == SIMULATION_SOURCE_ID
+        assert {item["source_id"] for item in created["cameras"] if item["kind"] == "simulation"} == {SIMULATION_SOURCE_ID, SIMULATION_MIRROR_SOURCE_ID}
         assert camera_frame_service.latest_frame().source_id == SIMULATION_SOURCE_ID
         assert SIMULATION_SOURCE_ID not in simulator._sessions
-        assert simulator.save_simulation_profile()["camera_count"] == 2
+        assert simulator.save_simulation_profile()["camera_count"] == 3
         assert any(item["kind"] == "simulation" for item in RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession).status()["cameras"])
         simulator.select("physical_camera")
         assert not camera_frame_service.simulation_enabled
-        simulator.select(SIMULATION_SOURCE_ID)
-        simulator.delete_profile(SIMULATION_SOURCE_ID)
+        simulator.select(SIMULATION_MIRROR_SOURCE_ID)
+        assert camera_frame_service.latest_frame().source_id == SIMULATION_MIRROR_SOURCE_ID
+        simulator.delete_profile(SIMULATION_MIRROR_SOURCE_ID)
+        assert all(item["kind"] != "simulation" for item in simulator.status()["cameras"])
         assert not camera_frame_service.simulation_enabled
 
         # FastAPI shutdown hook equivalent must disconnect every session, not only selected.
@@ -298,7 +302,7 @@ def main() -> int:
         assert not session_a.reachable
         assert not replacement_session_b.reachable
 
-    print("[PASS] simulation camera saves, selects and deletes without ESP transport")
+    print("[PASS] mirrored simulation camera pair saves, selects and deletes without ESP transport")
     print("[PASS] multiple ESP profiles persist IP/FPS/OV2640 settings")
     print("[PASS] independent ESP streams can run simultaneously")
     print("[PASS] inactive and in-flight old-source frames cannot overwrite the selected PC Studio source")

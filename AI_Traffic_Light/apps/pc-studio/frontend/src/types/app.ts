@@ -7,6 +7,7 @@ export type AppPageId =
   | "junction_network"
   | "crosswalks"
   | "zone_editor"
+  | "zones"
   | "traffic_logic"
   | "traffic_analytics"
   | "simulation_lab"
@@ -28,7 +29,7 @@ export type AppPageSummary = {
   label: string;
   shortLabel: string;
   description: string;
-  status: "template" | "mock" | "planned" | "test-ready";
+  status: "template" | "mock" | "planned" | "test-ready" | "stable" | "legacy";
 };
 
 export type FunctionStatus = "implemented" | "placeholder" | "planned" | "later";

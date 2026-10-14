@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_4_1 — Crosswalk edges, mirrored simulation pair, navigation and junction UX
+
+- Display direction-neutral 1–4 labels on the Crosswalk schematic; assign an existing mirrored simulated camera pair to sides A/B.
+- Create and persist two simulated camera profiles atomically; Side B is a vertical flip of the same deterministic scene, with individually selectable previews.
+- Move Junction edge controls outside the node card and preserve pointer-to-node offset during dragging.
+- Mark Dashboard, Camera Settings and Crosswalks stable; hide legacy Camera Sources/Zone Editor navigation, retain their routes, and add an intentionally blank Zones page.
+- Simplify page titles, subtitles and redundant status labels. No new signal-control behavior; dual-camera inference is not enabled.
+- Passed baseline: `0_4_0`. Owner acceptance pending.
+
+
 ## 0_4_0 — Owner-accepted stable release
 
 - Owner confirmed candidate `0_3_27` PASS and explicitly approved promotion to stable `0_4_0`.

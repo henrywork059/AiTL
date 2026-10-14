@@ -26,7 +26,7 @@ def main() -> None:
     assert 138 + 6 * 17 + 10 < 255  # All horizontal lines stay within the road.
     assert 140 > 10  # Each white stripe is horizontal, not longitudinal.
     assert "useSerialPolling" in page and "fetchRemoteCameraStatus" in page
-    assert "simultaneous two-camera pedestrian inference" in page
+    assert "Simultaneous two-camera inference" in page
     editor = read("pages/CrosswalkRegionEditor.tsx")
     assert "CrosswalkRegionEditor" in page and "onRegionsChange" in page
     assert "setRegionEditorOpen(true)" in page

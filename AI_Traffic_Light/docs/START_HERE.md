@@ -1,8 +1,8 @@
-# Start Here — V0400
+# Start Here — V0401
 
-Current accepted stable release `0_4_0` (promoted from accepted `0_3_27`).
+Current candidate `0_4_1` (previous `0_4_0`); passed stable baseline `0_4_0`.
 
-V0400 repairs a V0326 startup regression assertion for the new simulation/ESP preview branches. Runtime behavior remains the same: numbered 1–4 topology endpoints and simulation cameras via Camera Settings → New camera → Simulation camera → Save.
+Camera Settings saves two mirrored simulated cameras. Crosswalks displays numbered edges and can assign the pair to Side A and B. Junction edge labels no longer cover node content, and dragging retains its initial pointer offset. Camera Sources and the old Zone Editor are hidden legacy routes; Traffic → Zones is reserved and intentionally empty.
 
 ## Assign crosswalks to junction edges
 
@@ -16,7 +16,6 @@ The numbered labels identify junction connection points regardless of orientatio
 ## Update and test
 
 ```powershell
-cd D:\AiTL
 & ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 

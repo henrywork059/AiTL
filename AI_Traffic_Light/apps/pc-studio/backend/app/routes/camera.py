@@ -11,7 +11,7 @@ from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.models import CameraSimulationSettingsRequest
 from app.services.camera_frames import camera_frame_service
-from app.services.remote_camera_manager import remote_camera_manager as remote_camera_service
+from app.services.remote_camera_manager import SIMULATION_SOURCE_IDS, remote_camera_manager as remote_camera_service
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -70,13 +70,17 @@ class RemoteCameraStartRequest(BaseModel):
     settings: RemoteCameraSettingsRequest = Field(default_factory=RemoteCameraSettingsRequest)
 
 
-def _live_mjpeg() -> Iterator[bytes]:
+def _live_mjpeg(simulation_source_id: str | None = None) -> Iterator[bytes]:
     """Browser relay remains MJPEG; ESP-to-PC transport is the V036 TCP JPEG stream."""
     last_frame_number = -1
 
     while True:
+        if simulation_source_id and not camera_frame_service.simulation_enabled:
+            time.sleep(0.05)
+            continue
         if camera_frame_service.simulation_enabled:
-            frame = camera_frame_service.latest_frame()
+            frame = (camera_frame_service.simulation_frame_for(simulation_source_id)
+                     if simulation_source_id else camera_frame_service.latest_frame())
             if frame is None or frame.frame_number == last_frame_number:
                 time.sleep(0.02)
                 continue
@@ -122,10 +126,12 @@ def camera_status(request: Request) -> dict:
 
 
 @router.get("/live.mjpeg")
-def live_camera_mjpeg(request: Request) -> StreamingResponse:
-    """Low-latency browser preview from the same PC frame pipeline used by inference/capture."""
+def live_camera_mjpeg(request: Request, source_id: str | None = Query(default=None)) -> StreamingResponse:
+    """Low-latency preview with per-camera views for the simulated pair."""
+    if source_id is not None and source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Only simulation cameras support explicit preview IDs.", status_code=422)
     return StreamingResponse(
-        _live_mjpeg(),
+        _live_mjpeg(source_id),
         media_type="multipart/x-mixed-replace; boundary=frame",
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0, no-transform",

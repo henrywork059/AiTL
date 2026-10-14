@@ -47,9 +47,9 @@ export function CrosswalkRegionEditor({
   const selectedCamera = cameras.find((camera) => camera.source_id === sourceId);
   const simulated = Boolean(cameraStatus?.simulation_enabled);
   const previewReady = simulated
-    ? Boolean(cameraStatus?.frame_available)
+    ? Boolean(cameraStatus?.frame_available && selectedCamera?.kind === "simulation")
     : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale);
-  const previewName = simulated ? "One shared simulated camera" : sourceId ?? "No camera assigned";
+  const previewName = sourceId ?? "No camera assigned";
   const polygon = (region: CrosswalkRegion) => region.vertices.map(([x, y]) => x + "," + y).join(" ");
 
   function updateRegion(id: string, patch: Partial<CrosswalkRegion>) {
@@ -166,8 +166,8 @@ export function CrosswalkRegionEditor({
           )}
           <hr />
           <h3>Preview source</h3>
-          <span className="status-pill">{simulated ? "Simulation • one camera" : "Physical camera"}</span>
-          {!simulated && (
+          <span className="status-pill">{simulated ? "Simulation pair" : "Physical cameras"}</span>
+          {(
             <>
               <label>Camera side
                 <select value={side} onChange={(event) => setSide(event.target.value as Side)}>
@@ -175,16 +175,16 @@ export function CrosswalkRegionEditor({
                   <option value="camera_side_b_id">Side B</option>
                 </select>
               </label>
-              <button type="button" onClick={() => void previewPhysicalCamera()}
+              {!simulated && <button type="button" onClick={() => void previewPhysicalCamera()}
                 disabled={busy || changingMode || !selectedCamera}>
                 Select camera for preview
-              </button>
+              </button>}
             </>
           )}
           <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
             {simulated ? "Stop simulation" : "Use simulation camera"}
           </button>
-          <p className="small-note">Simulation uses the application's single shared camera and pauses physical input. No second simulated camera is created.</p>
+          <p className="small-note">Side A and B are mirrored views of the same simulation.</p>
           {error && <p role="alert" className="error-message">{error}</p>}
         </aside>
         <section className="panel crosswalk-region-canvas-panel">
@@ -196,7 +196,7 @@ export function CrosswalkRegionEditor({
           </div>
           <div className="crosswalk-region-frame">
             {previewReady
-              ? <img key={previewName} src={liveCameraMjpegUrl()} alt={previewName} className="crosswalk-region-camera" />
+              ? <img key={previewName} src={simulated && selectedCamera?.kind === "simulation" && sourceId ? `${liveCameraMjpegUrl()}?source_id=${encodeURIComponent(sourceId)}` : liveCameraMjpegUrl()} alt={previewName} className="crosswalk-region-camera" />
               : <p className="crosswalk-region-frame-empty">
                   {simulated
                     ? "Waiting for the shared simulation frame."

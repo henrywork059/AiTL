@@ -32,6 +32,8 @@ def main() -> int:
     assert "Measured stream FPS" in page and "Frame age" in page
     assert "cameraIndicator(camera)" in page
     assert "saveSimulationCamera()" in page
+    assert "Add simulation pair" in page
+    assert "simulation_camera_b" in page
     assert "New camera type" in page
     assert "selectedSimulation && <SimulationControls" in page
     for marker in ("camera.streaming", "camera.stream_connected", "camera.connected",

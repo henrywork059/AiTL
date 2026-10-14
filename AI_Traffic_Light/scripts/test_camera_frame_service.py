@@ -51,6 +51,12 @@ def main() -> int:
     assert simulated_frame.content.startswith(b"\x89PNG\r\n\x1a\n")
     assert (simulated_frame.width, simulated_frame.height) == (1280, 720)
     image = decode_png(simulated_frame.content)
+    mirrored_frame = service.simulation_frame_for("simulation_camera_b")
+    assert mirrored_frame is not None and mirrored_frame.source_id == "simulation_camera_b"
+    assert np.array_equal(decode_png(mirrored_frame.content), cv2.flip(image, 0))
+    service.set_simulation_source("simulation_camera_b")
+    assert service.latest_frame().source_id == "simulation_camera_b"
+    service.set_simulation_source("simulation_camera")
     stripe_region = image[297:320, 538:742]
     assert float(np.percentile(stripe_region.mean(axis=2), 75)) > 190
 
@@ -161,6 +167,7 @@ def main() -> int:
     else:
         raise AssertionError("Unsupported camera content type was accepted")
 
+    print("[PASS] camera B mirrors A vertically on the shared simulation clock")
     print("[PASS] camera receiver accepts PNG frames")
     print("[PASS] signal-aware simulation renders the road, crosswalk, stop lines, and signal state")
     print("[PASS] vehicles queue at the stop line and resume only on vehicle green")

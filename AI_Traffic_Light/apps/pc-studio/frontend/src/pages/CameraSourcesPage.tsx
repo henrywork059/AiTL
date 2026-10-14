@@ -111,7 +111,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     setTargetFps(15);
     setSettings({ ...DEFAULT_REMOTE_CAMERA_SETTINGS });
     setRemoteError(null);
-    setRemoteMessage("Enter a new ESP IP, adjust its settings, then Save or Connect.");
+    setRemoteMessage("Choose ESP32-CAM or a mirrored simulation pair.");
   }
 
   useSerialPolling(
@@ -228,7 +228,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
       });
       loadSelectedProfile(next);
       onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage(newCameraType === "simulation" && !selectedSaved ? "Simulation camera saved and started." : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
+      setRemoteMessage(newCameraType === "simulation" && !selectedSaved ? "Simulation camera pair saved and started." : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM profile could not be saved.");
     } finally {
@@ -391,7 +391,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               />
             ) : (
               <div className="camera-empty-state">
-                <strong>{cameraSettingsView ? selectedSimulation ? "Simulation stopped" : "No live ESP preview" : "No camera frame available"}</strong>
+                <strong>{cameraSettingsView ? selectedSimulation ? "Simulation stopped" : "No live camera preview" : "No camera frame available"}</strong>
                 <p>{cameraSettingsView
                   ? selectedSimulation
                     ? "Start simulation to preview the synthetic traffic scene."
@@ -449,7 +449,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               <label>
                 Saved camera
                 <select value={selectedId} onChange={(event) => void chooseSavedCamera(event.target.value)} disabled={busy}>
-                  <option value={NEW_CAMERA}>+ New ESP camera</option>
+                  <option value={NEW_CAMERA}>+ New camera</option>
                   {remote?.cameras.map((camera) => (
                     <option key={camera.source_id} value={camera.source_id}>
                       {camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}{camera.streaming ? " • streaming" : camera.connected ? " • connected" : ""}
@@ -462,10 +462,16 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             {!selectedSaved && <label>New camera type
               <select value={newCameraType} onChange={(event) => setNewCameraType(event.target.value as "esp32" | "simulation")} disabled={busy}>
                 <option value="esp32">ESP32-CAM (IP)</option>
-                <option value="simulation">Simulation camera</option>
+                <option value="simulation">Simulation pair (2 mirrored cameras)</option>
               </select>
             </label>}
-            {!selectedSimulation && <details className="camera-fold">
+            {!selectedSaved && newCameraType === "simulation" && <div className="button-row">
+              <button className="primary" type="button" onClick={() => void saveEspProfile()}
+                disabled={busy || (remote?.cameras.some((camera) => camera.source_id === "simulation_camera_b") ?? false)}>
+                Add simulation pair
+              </button>
+            </div>}
+            {!selectedSimulation && newCameraType === "esp32" && <details className="camera-fold">
               <summary>Manage IP addresses and connections</summary>
               <div className="form-grid">
               {newCameraType === "esp32" && <label>

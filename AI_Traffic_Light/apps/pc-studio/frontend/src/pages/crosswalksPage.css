@@ -18,3 +18,10 @@
 .crosswalk-camera-details span { color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .crosswalk-empty { text-align: center; color: var(--color-text-muted); padding: var(--space-8); }
 @media (max-width: 1300px) { .crosswalk-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.crosswalk-edge-marker rect { fill: #202932; stroke: #b6c6d9; stroke-width: 2; }
+.crosswalk-edge-marker text { fill: #fff; font-size: 19px; font-weight: 700; }
+.crosswalk-simulation-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
+.crosswalk-simulation-previews > div { display: grid; gap: var(--space-2); min-width: 0; }
+.crosswalk-simulation-previews img { width: 100%; border-radius: var(--radius-sm); }
+@media (max-width: 720px) { .crosswalk-simulation-previews { grid-template-columns: 1fr; } }

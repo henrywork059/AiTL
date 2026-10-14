@@ -1,11 +1,20 @@
-# V0400 Test-Ready Checklist
+# V0401 Test Checklist
 
 ```text
-version: 0_4_0
-previous_version: 0_3_27
+version: 0_4_1
+previous_version: 0_4_0
 passed_baseline: 0_4_0
-status: Camera Settings preview regression assertion repair candidate
+status: Crosswalk, camera pair, navigation and junction interaction candidate
 ```
+
+- [ ] Both simulation profiles are saved and are vertically mirrored views of the same scene.
+- [ ] Crosswalk labels 1–4, pair assignment, preview, region editor and save/restart are valid.
+- [ ] Junction drag has no initial jump; edge controls do not overlay text.
+- [ ] Legacy pages are hidden but remain reachable in code; new Zones page is blank.
+- [ ] Dashboard, Camera Settings and Crosswalks have no test-ready labels; page titles are concise.
+- [ ] Windows changed-tests startup, typecheck/build and live smoke pass; existing ESP and configuration remain intact.
+
+## Prior acceptance history
 
 - [ ] Camera Settings regression asserts both selected simulation and physical ESP preview isolation and passes.
 - [ ] Windows changed-tests startup completes all selected regressions, frontend checks, backend health and live smoke.

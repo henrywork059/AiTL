@@ -1,5 +1,5 @@
-version: 0_4_0
-status: Stable release accepted by owner
-previous_version: 0_3_27
+version: 0_4_1
+status: Crosswalk, camera pair, navigation and junction interaction candidate
+previous_version: 0_4_0
 passed_baseline: 0_4_0
-notes: Owner confirmed V0327 PASS and approved promotion to the next stable minor release. No functional changes; V0400 is the accepted stable baseline.
+notes: V0401 adds mirrored simulated camera pairs, numbered Crosswalk edges, drag-offset and unobstructed junction edge controls, simpler navigation, hidden legacy sources/zone editors, and a new empty Zones page. Owner acceptance pending; stable V0400 remains the passed baseline.

@@ -48,7 +48,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; pointerId: number } | null>(null);
+  const dragRef = useRef<{ id: string; pointerId: number; offsetX: number; offsetY: number } | null>(null);
 
   const load = useCallback(async (replaceDraft: boolean) => {
     const next = await fetchJunctionNetworkOverview();
@@ -321,8 +321,9 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const x = clampNumber(((event.clientX - rect.left) / rect.width) * 100, 5, 95);
-    const y = clampNumber(((event.clientY - rect.top) / rect.height) * 100, 7, 93);
+    const offset = dragRef.current;
+    const x = clampNumber(((event.clientX - rect.left - (offset?.offsetX ?? 0)) / rect.width) * 100, 5, 95);
+    const y = clampNumber(((event.clientY - rect.top - (offset?.offsetY ?? 0)) / rect.height) * 100, 7, 93);
     mutateJunction(id, (junction) => {
       junction.position = { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
     });
@@ -333,9 +334,15 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
     event.preventDefault();
     event.stopPropagation();
     setSelectedId(id);
-    dragRef.current = { id, pointerId: event.pointerId };
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const position = draft?.intersections.find((junction) => junction.id === id)?.position;
+    if (!rect || !position) return;
+    dragRef.current = {
+      id, pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left - rect.width * position.x / 100,
+      offsetY: event.clientY - rect.top - rect.height * position.y / 100,
+    };
     canvasRef.current?.setPointerCapture(event.pointerId);
-    positionFromPointer(id, event);
   }
 
   function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
@@ -372,7 +379,7 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
         <div className="junction-network-title-row">
           <div>
             <h2>Junction Network</h2>
-            <p className="placeholder-copy">Visualise installed/model junctions, topology, camera assignment and current prototype traffic observations.</p>
+            <p className="placeholder-copy">Arrange junctions, connect numbered edges and assign cameras or crosswalks.</p>
           </div>
           <div className="junction-network-actions">
             <button type="button" onClick={addJunction} disabled={draft.intersections.length >= 16}>Add junction</button>
@@ -389,10 +396,8 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
           <div><strong>{summary.warning_junction_count}</strong><span>Warnings</span></div>
         </div>
         <div className="junction-network-status-row">
-          <span className="status-pill status-info">multi-camera assignment</span>
-          <span className="status-pill muted">single selected AI source</span>
           <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
-            {cameraStatus?.simulation_enabled ? "Simulation · 1 shared camera" : "Physical camera mode"}
+            {cameraStatus?.simulation_enabled ? "Simulation active" : "Physical cameras"}
           </span>
           <button type="button" disabled={changingMode || !cameraStatus}
             onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>

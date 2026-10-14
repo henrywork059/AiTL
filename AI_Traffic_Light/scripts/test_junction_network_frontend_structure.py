@@ -61,6 +61,9 @@ def main() -> int:
     assert "linkTargetEdge" in page and "Connect edges" in page
     assert "source_approach: `edge_" in page and "destination_approach: `edge_" in page
     assert "onSelectEdge(config.id, edge)" in node_card
+    assert "offsetX" in page and "offsetY" in page
+    assert "positionFromPointer(id, event);" not in page.split("function beginDrag", 1)[1].split("function moveDrag", 1)[0]
+    assert "right: -38px;" in css and "left: -38px;" in css
     assert "selectedEdge={config.id === selectedId ? selectedEdge : null}" in page
     assert "crosswalk_edges" in types and "JunctionCrosswalkEdges" in types
     assert "fetchCrosswalks" in page and "crosswalkOwnerById" in page

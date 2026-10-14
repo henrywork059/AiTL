@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchCrosswalks, saveCrosswalks } from "../lib/crosswalksApi";
-import { fetchRemoteCameraStatus, type RemoteCameraProfile } from "../lib/remoteCameraApi";
+import { fetchRemoteCameraStatus, refreshCameraAfterRemoteChange, saveSimulationCamera, liveCameraMjpegUrl, type RemoteCameraProfile } from "../lib/remoteCameraApi";
 import { CrosswalkRegionEditor } from "./CrosswalkRegionEditor";
 import type { CameraStatus } from "../types";
 import { useSerialPolling } from "../lib/useSerialPolling";
@@ -105,6 +105,23 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
       setNotice("Crosswalks saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save crosswalks.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function assignSimulationPair() {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const cameraRegistry = await saveSimulationCamera();
+      setCameras(cameraRegistry.cameras);
+      onCameraStatusChange(await refreshCameraAfterRemoteChange());
+      update({ camera_side_a_id: "simulation_camera", camera_side_b_id: "simulation_camera_b" });
+      setNotice("Simulation pair assigned. Save changes to keep the assignment.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add simulation camera pair.");
     } finally {
       setBusy(false);
     }
@@ -233,12 +250,13 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
           </div>
           <div className="button-row">
             <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
-              {cameraStatus?.simulation_enabled ? "Shared junction/camera simulation · 1 camera" : "Physical camera mode"}
+              {cameraStatus?.simulation_enabled ? "Simulation active" : "Physical cameras"}
             </span>
             <button type="button" disabled={changingMode || !cameraStatus}
               onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>
               {cameraStatus?.simulation_enabled ? "Stop simulation" : "Start simulation"}
             </button>
+            <button type="button" disabled={busy || !selected} onClick={() => void assignSimulationPair()}>Assign simulation pair</button>
           </div>
           {selected ? (
             <>
@@ -263,6 +281,12 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
                 <text x="18" y="102" fontSize="16" fill="#26352c">Pedestrian side A</text>
                 <text x="18" y="285" fontSize="16" fill="#26352c">Pedestrian side B</text>
                 <text x="18" y="210" fontSize="16" fill="white">Road</text>
+                {([["1", 422, 18], ["2", 616, 182], ["3", 422, 362], ["4", 24, 182]] as const).map(([edge, x, y]) => (
+                  <g key={edge} className="crosswalk-edge-marker" aria-label={`Crosswalk edge ${edge}`}>
+                    <rect x={x - 17} y={y - 15} width="34" height="30" rx="5" />
+                    <text x={x} y={y + 5} textAnchor="middle">{edge}</text>
+                  </g>
+                ))}
               </svg>
               <div className="crosswalk-camera-details">
                 <div><strong>Side A</strong><span>{selected.camera_side_a_id || "Unassigned"} — {selected.camera_side_a_id ? cameraState(sideA) : "No camera"}</span></div>
@@ -272,10 +296,13 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
               {((selected.camera_side_a_id && !sideA) || (selected.camera_side_b_id && !sideB)) && (
                 <p className="error-message">An assigned camera is missing from Camera Settings. Reassign or clear it.</p>
               )}
-              <p className="small-note">
-                Two saved cameras can be configured on opposite sides. This is static configuration;
-                simultaneous two-camera pedestrian inference and traffic signal control are not enabled.
-              </p>
+              {cameraStatus?.simulation_enabled && sideA?.kind === "simulation" && sideB?.kind === "simulation" && (
+                <div className="crosswalk-simulation-previews">
+                  <div><strong>Side A</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera`} alt="Simulated camera A" /></div>
+                  <div><strong>Side B · vertically mirrored</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera_b`} alt="Mirrored camera B" /></div>
+                </div>
+              )}
+              <p className="small-note">Both cameras can be assigned. Simultaneous two-camera inference and physical signal control are not enabled.</p>
             </>
           ) : <p className="crosswalk-empty">Select or add a crosswalk to see its two camera positions.</p>}
         </section>
