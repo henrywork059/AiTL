@@ -1,5 +1,5 @@
-version: 0_5_0
-status: Owner-accepted stable release
-previous_version: 0_4_24
+version: 0_5_1
+status: Simulation tool visibility candidate
+previous_version: 0_5_0
 passed_baseline: 0_5_0
-notes: Owner confirmed PASS for 0_4_24 and explicitly requested the next stable version. V050 promotes that accepted implementation without application-code, API, firmware, data or signal-behavior changes. The accepted Crosswalk Side A/B layout, V0423 translucent Region Editor fills and existing simulation camera pairs are retained. Stable release based on owner acceptance; no additional runtime tests are claimed.
+notes: Default-hide simulator controls; reveal them by toggling AI Traffic Light panel. Existing simulation runtime, stored camera sources, APIs and traffic safety unaffected. Windows acceptance pending.

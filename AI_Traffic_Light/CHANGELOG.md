@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_5_1 — Hide simulation tools behind brand toggle
+
+- The top-left AI Traffic Light panel toggles simulation options throughout the PC app (click, Enter or Space). They are concealed by default.
+- Hide Experiments navigation, simulated-camera creation/previews and simulation controls; keep real ESP camera controls and truthful active-source state.
+- UI-only candidate. Existing camera source, signal controller, APIs and stored data are unchanged. Stable baseline `0_5_0`; Windows tests and owner PASS pending.
+
+
 ## 0_5_0 — Owner-accepted stable release
 
 - The owner confirmed PASS for candidate `0_4_24` and explicitly requested the next stable version; promote the accepted code as stable `0_5_0`.

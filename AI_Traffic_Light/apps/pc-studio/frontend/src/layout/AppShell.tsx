@@ -5,26 +5,30 @@ import type { AppPageId } from "../types/app";
 type Props = {
   activePage: AppPageId;
   onPageChange: (page: AppPageId) => void;
+  showSimulationTools: boolean;
+  onSimulationToolsToggle: () => void;
   children: ReactNode;
 };
 
-export function AppShell({ activePage, onPageChange, children }: Props) {
+export function AppShell({ activePage, onPageChange, showSimulationTools, onSimulationToolsToggle, children }: Props) {
   const page = PAGE_DETAILS[activePage];
 
   return (
     <div className="app-frame">
       <aside className="sidebar">
-        <div className="brand-block">
+        <div className="brand-block" role="button" tabIndex={0} aria-label="Toggle simulation tools" aria-pressed={showSimulationTools} onClick={onSimulationToolsToggle} onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSimulationToolsToggle(); }
+        }}>
           <div className="eyebrow">{APP_VERSION_LABEL}</div>
           <h1>AI Traffic Light</h1>
-          <p>Simulation & vision workbench</p>
+          <p>{showSimulationTools ? "Simulation & vision workbench" : "Vision workbench"}</p>
         </div>
 
         <nav className="side-nav" aria-label="PC Studio pages">
           {APP_SECTIONS.map((section) => (
             <section key={section.id} className="nav-section">
               <h2>{section.label}</h2>
-              {section.pages.map((navPage) => (
+              {section.pages.filter((navPage) => showSimulationTools || navPage.id !== "simulation_lab").map((navPage) => (
                 <button
                   key={navPage.id}
                   className={activePage === navPage.id ? "nav-button active" : "nav-button"}

@@ -20,7 +20,11 @@
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-brand-surface);
+  cursor: pointer;
 }
+.brand-block:hover { border-color: var(--color-border-strong); }
+.brand-block[aria-pressed="true"] { border-color: var(--color-primary); }
+.brand-block:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
 .side-nav {
   display: grid;

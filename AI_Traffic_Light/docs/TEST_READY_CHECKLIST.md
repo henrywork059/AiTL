@@ -1,4 +1,18 @@
-# V050 Stable Release Checklist
+# V0501 Candidate Checklist
+
+```text
+version: 0_5_1
+previous_version: 0_5_0
+passed_baseline: 0_5_0
+status: Simulation visibility candidate
+```
+
+- [ ] Simulator controls and Experiments initially hidden; physical ESP options remain usable.
+- [ ] Brand toggle by click/Enter/Space reveals/hides simulator tools across Camera Settings, Crosswalks, Region Editor and Junction Network.
+- [ ] Saved source state, assignments and signal behavior unchanged; run Windows frontend tests and app smoke.
+
+## Previous V050 stable checklist
+
 
 ```text
 version: 0_5_0

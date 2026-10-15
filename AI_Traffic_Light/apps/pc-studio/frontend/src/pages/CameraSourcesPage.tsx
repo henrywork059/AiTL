@@ -25,6 +25,7 @@ import type { CameraStatus } from "../types";
 
 type Props = {
   status: CameraStatus | null;
+  showSimulationTools: boolean;
   onSimulationChange: (enabled: boolean) => void;
   onStatusChange: (status: CameraStatus) => void;
   changingMode: boolean;
@@ -73,7 +74,7 @@ function cameraIndicator(camera: RemoteCameraProfile): { label: string; tone: st
     : { label: "Saved", tone: "muted" };
 }
 
-export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, changingMode, view = "sources" }: Props) {
+export function CameraSourcesPage({ status, showSimulationTools, onSimulationChange, onStatusChange, changingMode, view = "sources" }: Props) {
   const cameraSettingsView = view === "settings";
   const [remote, setRemote] = useState<RemoteCameraStatus | null>(null);
   const [selectedId, setSelectedId] = useState(NEW_CAMERA);
@@ -133,6 +134,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     ? remote?.cameras.find((camera) => camera.source_id === selectedId) ?? null
     : null;
   const selectedSimulation = selectedProfile?.kind === "simulation";
+  const visibleCameras = remote?.cameras.filter((camera) => showSimulationTools || camera.kind !== "simulation") ?? [];
+  const effectiveCameraType = showSimulationTools ? newCameraType : "esp32";
   const firstSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_b") ?? false;
   const secondSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_d") ?? false;
   const nextSimulationPair: 1 | 2 = firstSimulationPairSaved ? 2 : 1;
@@ -155,7 +158,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
       && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
   );
   // The Settings preview must never display a simulation or stale frame as the selected ESP.
-  const imageUrl = cameraSettingsView
+  const imageUrl = selectedSimulation && !showSimulationTools ? null : cameraSettingsView
     ? selectedSimulation && status?.simulation_enabled
       ? liveCameraMjpegUrl()
       : selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled && !remote?.paused_for_simulation
@@ -221,7 +224,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     setRemoteError(null);
     setRemoteMessage(null);
     try {
-      const next = newCameraType === "simulation" && !selectedSaved
+      const next = effectiveCameraType === "simulation" && !selectedSaved
         ? await saveSimulationCamera(nextSimulationPair)
         : await saveRemoteCamera({
         host: host.trim(),
@@ -231,7 +234,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
       });
       loadSelectedProfile(next);
       onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage(newCameraType === "simulation" && !selectedSaved ? `Simulation camera pair ${nextSimulationPair} saved and started.` : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
+      setRemoteMessage(effectiveCameraType === "simulation" && !selectedSaved ? `Simulation camera pair ${nextSimulationPair} saved and started.` : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM profile could not be saved.");
     } finally {
@@ -345,10 +348,10 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
         <section className="panel compact-panel camera-status-strip" aria-label="Saved camera connection status">
           <div className="camera-status-strip-header">
             <strong>Saved cameras</strong>
-            <span>{remote?.camera_count ?? "—"} saved · {remote?.cameras.filter((camera) => camera.stream_connected).length ?? 0} live</span>
+            <span>{remote ? visibleCameras.length : "—"} shown · {visibleCameras.filter((camera) => camera.stream_connected).length} live</span>
           </div>
           <div className="camera-status-strip-items" role="list">
-            {remote?.cameras.map((camera) => {
+            {visibleCameras.map((camera) => {
               const indicator = cameraIndicator(camera);
               return (
                 <div role="listitem" key={camera.source_id}>
@@ -370,7 +373,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               );
             })}
             {!remote && <span className="small-note">Loading saved cameras…</span>}
-            {remote?.camera_count === 0 && <span className="small-note">No cameras saved. Add one using the manager below.</span>}
+            {remote && visibleCameras.length === 0 && <span className="small-note">No cameras saved. Add one using the manager below.</span>}
           </div>
         </section>
       )}
@@ -378,7 +381,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
         <section className="panel camera-preview-panel">
           <div className="panel-header">
             <div>
-              <h2>{cameraSettingsView ? "Selected camera live preview" : "Camera input and simulation"}</h2>
+              <h2>{cameraSettingsView ? "Selected camera live preview" : showSimulationTools ? "Camera input and simulation" : "Camera input"}</h2>
               {!cameraSettingsView && (
                 <p className="placeholder-copy">Preview the current frame input or run the built-in traffic simulation.</p>
               )}
@@ -398,8 +401,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               />
             ) : (
               <div className="camera-empty-state">
-                <strong>{cameraSettingsView ? selectedSimulation ? "Simulation stopped" : "No live camera preview" : "No camera frame available"}</strong>
-                <p>{cameraSettingsView
+                <strong>{selectedSimulation && !showSimulationTools ? "Simulated preview hidden" : cameraSettingsView ? selectedSimulation ? "Simulation stopped" : "No live camera preview" : "No camera frame available"}</strong>
+                <p>{selectedSimulation && !showSimulationTools ? "Enable simulation tools to inspect the active simulated source." : cameraSettingsView
                   ? selectedSimulation
                     ? "Start simulation to preview the synthetic traffic scene."
                     : status?.simulation_enabled
@@ -410,7 +413,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             )}
           </div>
 
-          {!cameraSettingsView && (
+          {!cameraSettingsView && showSimulationTools && (
             <>
           <div className="button-row">
             <button
@@ -457,7 +460,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
                 Saved camera
                 <select value={selectedId} onChange={(event) => void chooseSavedCamera(event.target.value)} disabled={busy}>
                   <option value={NEW_CAMERA}>+ New camera</option>
-                  {remote?.cameras.map((camera) => (
+                  {selectedSimulation && !showSimulationTools && <option value={selectedId}>Active simulated source</option>}
+                  {visibleCameras.map((camera) => (
                     <option key={camera.source_id} value={camera.source_id}>
                       {camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}{camera.streaming ? " • streaming" : camera.connected ? " • connected" : ""}
                     </option>
@@ -466,26 +470,26 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
               </label>
             </div>
 
-            {!selectedSaved && <label>New camera type
+            {!selectedSaved && showSimulationTools && <label>New camera type
               <select value={newCameraType} onChange={(event) => setNewCameraType(event.target.value as "esp32" | "simulation")} disabled={busy}>
                 <option value="esp32">ESP32-CAM (IP)</option>
                 <option value="simulation">Simulation pair (2 mirrored cameras)</option>
               </select>
             </label>}
-            {!selectedSaved && newCameraType === "simulation" && <div className="button-row">
+            {!selectedSaved && showSimulationTools && effectiveCameraType === "simulation" && <div className="button-row">
               <button className="primary" type="button" onClick={() => void saveEspProfile()}
                 disabled={busy || (firstSimulationPairSaved && secondSimulationPairSaved) || (remote?.camera_count ?? 0) + 2 > (remote?.max_saved_cameras ?? 12)}>
                 {firstSimulationPairSaved ? "Add second simulation pair" : "Add simulation pair"}
               </button>
             </div>}
-            {!selectedSimulation && newCameraType === "esp32" && <details className="camera-fold">
+            {!selectedSimulation && effectiveCameraType === "esp32" && <details className="camera-fold">
               <summary>Manage IP addresses and connections</summary>
               <div className="form-grid">
-              {newCameraType === "esp32" && <label>
+              {effectiveCameraType === "esp32" && <label>
                 ESP IPv4 address
                 <input value={host} onChange={(event) => setHost(event.target.value)} placeholder="192.168.1.87" disabled={busy || selectedStreaming} />
               </label>}
-              {newCameraType === "esp32" && <label>
+              {effectiveCameraType === "esp32" && <label>
                 Source ID
                 <input value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="esp32_cam_01" disabled={busy || selectedSaved} />
               </label>}
@@ -514,11 +518,11 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
                 Stop Stream
               </button>
             </div>}
-            {selectedSimulation && <div className="button-row">
+            {showSimulationTools && selectedSimulation && <div className="button-row">
               <button className="primary" type="button" onClick={() => onSimulationChange(!status?.simulation_enabled)} disabled={busy || changingMode || !status}>{status?.simulation_enabled ? "Stop Simulation" : "Start Simulation"}</button>
               <button type="button" onClick={() => void deleteEspProfile()} disabled={busy}>Remove saved</button>
             </div>}
-            {selectedSimulation && <SimulationControls status={status} onStatusChange={onStatusChange} />}
+            {showSimulationTools && selectedSimulation && <SimulationControls status={status} onStatusChange={onStatusChange} />}
 
             {remoteMessage && <p className="success-message">{remoteMessage}</p>}
             {remoteError && <p className="error-message">{remoteError}</p>}

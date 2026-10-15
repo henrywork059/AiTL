@@ -1,4 +1,9 @@
-# Start Here — V050
+# Start Here — V0501
+
+Current candidate `0_5_1`, accepted baseline `0_5_0`. Toggle the top-left AI Traffic Light panel to show or hide simulation options; default is hidden. The toggle does not stop existing simulation or modify saved assignments.
+
+## Previous stable release
+
 
 Current stable release `0_5_0` (previous `0_4_24`); owner-accepted stable baseline `0_5_0`.
 
@@ -23,4 +28,4 @@ The numbered labels identify junction connection points regardless of orientatio
 & ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
 ```
 
-Validate UI and full runner before PASS; accepted baseline remains `0_4_14`.
+Validate UI and full runner before PASS; accepted baseline remains `0_5_0`.

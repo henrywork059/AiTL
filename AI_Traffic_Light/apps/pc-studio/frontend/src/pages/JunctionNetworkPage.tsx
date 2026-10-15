@@ -30,11 +30,12 @@ import "./junctionNetworkPage.css";
 
 type Props = {
   cameraStatus: CameraStatus | null;
+  showSimulationTools: boolean;
   changingMode: boolean;
   onSimulationChange: (enabled: boolean) => Promise<void>;
 };
 
-export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationChange }: Props) {
+export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changingMode, onSimulationChange }: Props) {
   const [overview, setOverview] = useState<JunctionNetworkOverview | null>(null);
   const [savedConfig, setSavedConfig] = useState<JunctionNetworkConfig | null>(null);
   const [draft, setDraft] = useState<JunctionNetworkConfig | null>(null);
@@ -399,10 +400,10 @@ export function JunctionNetworkPage({ cameraStatus, changingMode, onSimulationCh
           <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
             {cameraStatus?.simulation_enabled ? "Simulation active" : "Physical cameras"}
           </span>
-          <button type="button" disabled={changingMode || !cameraStatus}
+          {showSimulationTools && <button type="button" disabled={changingMode || !cameraStatus}
             onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>
             {cameraStatus?.simulation_enabled ? "Stop simulation" : "Start simulation"}
-          </button>
+          </button>}
           <p className="small-note">{overview.scope_note}</p>
         </div>
         {notice && <p className="success-message">{notice}</p>}

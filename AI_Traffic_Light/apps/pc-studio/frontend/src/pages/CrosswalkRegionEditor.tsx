@@ -25,6 +25,7 @@ type Props = {
   crosswalk: Crosswalk;
   cameras: RemoteCameraProfile[];
   cameraStatus: CameraStatus | null;
+  showSimulationTools: boolean;
   changingMode: boolean;
   onSimulationChange: (enabled: boolean) => Promise<void>;
   onCameraStatusChange: (status: CameraStatus) => void;
@@ -33,7 +34,7 @@ type Props = {
 };
 
 export function CrosswalkRegionEditor({
-  crosswalk, cameras, cameraStatus, changingMode,
+  crosswalk, cameras, cameraStatus, showSimulationTools, changingMode,
   onSimulationChange, onCameraStatusChange, onRegionsChange, onClose,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(crosswalk.regions[0]?.id ?? null);
@@ -46,9 +47,9 @@ export function CrosswalkRegionEditor({
   const sourceId = crosswalk[side];
   const selectedCamera = cameras.find((camera) => camera.source_id === sourceId);
   const simulated = Boolean(cameraStatus?.simulation_enabled);
-  const previewReady = simulated
+  const previewReady = (showSimulationTools || selectedCamera?.kind !== "simulation") && (simulated
     ? Boolean(cameraStatus?.frame_available && selectedCamera?.kind === "simulation")
-    : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale);
+    : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale));
   const previewName = sourceId ?? "No camera assigned";
   const polygon = (region: CrosswalkRegion) => region.vertices.map(([x, y]) => x + "," + y).join(" ");
 
@@ -181,10 +182,10 @@ export function CrosswalkRegionEditor({
               </button>}
             </>
           )}
-          <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
+          {showSimulationTools && <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
             {simulated ? "Stop simulation" : "Use simulation camera"}
-          </button>
-          <p className="small-note">Side A and B are mirrored views of the same simulation.</p>
+          </button>}
+          {showSimulationTools && <p className="small-note">Side A and B are mirrored views of the same simulation.</p>}
           {error && <p role="alert" className="error-message">{error}</p>}
         </aside>
         <section className="panel crosswalk-region-canvas-panel">

@@ -28,12 +28,13 @@ function cameraState(camera: RemoteCameraProfile | undefined): string {
 
 type Props = {
   cameraStatus: CameraStatus | null;
+  showSimulationTools: boolean;
   changingMode: boolean;
   onSimulationChange: (enabled: boolean) => Promise<void>;
   onCameraStatusChange: (status: CameraStatus) => void;
 };
 
-export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange, onCameraStatusChange }: Props) {
+export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode, onSimulationChange, onCameraStatusChange }: Props) {
   const [saved, setSaved] = useState<CrosswalkConfig | null>(null);
   const [draft, setDraft] = useState<CrosswalkConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -157,7 +158,7 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
         >
           <option value="">No camera assigned</option>
           {current && !cameraById.has(current) && <option value={current}>{current} (missing camera)</option>}
-          {cameras.filter((camera) => camera.source_id !== other).map((camera) => (
+          {cameras.filter((camera) => camera.source_id !== other && (showSimulationTools || camera.kind !== "simulation" || camera.source_id === current)).map((camera) => (
             <option key={camera.source_id} value={camera.source_id}>{camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}</option>
           ))}
         </select>
@@ -174,6 +175,7 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
         crosswalk={selected}
         cameras={cameras}
         cameraStatus={cameraStatus}
+        showSimulationTools={showSimulationTools}
         changingMode={changingMode}
         onSimulationChange={onSimulationChange}
         onCameraStatusChange={onCameraStatusChange}
@@ -256,11 +258,11 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
             <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
               {cameraStatus?.simulation_enabled ? "Simulation active" : "Physical cameras"}
             </span>
-            <button type="button" disabled={changingMode || !cameraStatus}
+            {showSimulationTools && <button type="button" disabled={changingMode || !cameraStatus}
               onClick={() => void onSimulationChange(!cameraStatus?.simulation_enabled)}>
               {cameraStatus?.simulation_enabled ? "Stop simulation" : "Start simulation"}
-            </button>
-            <button type="button" disabled={busy || !selected} onClick={() => void assignSimulationPair()}>Assign simulation pair</button>
+            </button>}
+            {showSimulationTools && <button type="button" disabled={busy || !selected} onClick={() => void assignSimulationPair()}>Assign simulation pair</button>}
           </div>
           {selected ? (
             <>
@@ -298,7 +300,7 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
               {((selected.camera_side_a_id && !sideA) || (selected.camera_side_b_id && !sideB)) && (
                 <p className="error-message">An assigned camera is missing from Camera Settings. Reassign or clear it.</p>
               )}
-              {cameraStatus?.simulation_enabled && sideA?.kind === "simulation" && sideB?.kind === "simulation" && (
+              {showSimulationTools && cameraStatus?.simulation_enabled && sideA?.kind === "simulation" && sideB?.kind === "simulation" && (
                 <div className="crosswalk-simulation-previews">
                   <div><strong>Side A</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera`} alt="Simulated camera A" /></div>
                   <div><strong>Side B · vertically mirrored</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera_b`} alt="Mirrored camera B" /></div>

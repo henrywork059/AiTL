@@ -57,6 +57,7 @@ export default function App() {
   const [confidenceThreshold, setConfidenceThreshold] = useState(fallbackRuntimeSettings.default_confidence);
   const [liveDetectionCount, setLiveDetectionCount] = useState(0);
   const [activePage, setActivePage] = useState<AppPageId>("dashboard");
+  const [showSimulationTools, setShowSimulationTools] = useState(false);
   const [apiState, setApiState] = useState<ApiConnectionState>({
     status: "checking",
     message: "Checking backend connection...",
@@ -209,6 +210,7 @@ export default function App() {
       case "camera_sources":
         return (
           <CameraSourcesPage
+            showSimulationTools={showSimulationTools}
             status={cameraStatus}
             onSimulationChange={changeCameraSimulation}
             onStatusChange={setCameraStatus}
@@ -218,6 +220,7 @@ export default function App() {
       case "camera_settings":
         return (
           <CameraSettingsPage
+            showSimulationTools={showSimulationTools}
             status={cameraStatus}
             onSimulationChange={changeCameraSimulation}
             onStatusChange={setCameraStatus}
@@ -229,6 +232,7 @@ export default function App() {
       case "junction_network":
         return (
           <JunctionNetworkPage
+            showSimulationTools={showSimulationTools}
             cameraStatus={cameraStatus}
             changingMode={changingCameraMode}
             onSimulationChange={changeCameraSimulation}
@@ -237,6 +241,7 @@ export default function App() {
       case "crosswalks":
         return (
           <CrosswalksPage
+            showSimulationTools={showSimulationTools}
             cameraStatus={cameraStatus}
             changingMode={changingCameraMode}
             onSimulationChange={changeCameraSimulation}
@@ -250,7 +255,7 @@ export default function App() {
       case "traffic_analytics":
         return <TrafficAnalyticsPage />;
       case "simulation_lab":
-        return <SimulationLabPage />;
+        return showSimulationTools ? <SimulationLabPage /> : null;
       case "dataset_capture":
         return <DatasetCapturePage cameraStatus={cameraStatus} />;
       case "dataset_review":
@@ -268,11 +273,16 @@ export default function App() {
     }
   }
 
+  const toggleSimulationTools = () => {
+    if (showSimulationTools && activePage === "simulation_lab") setActivePage("dashboard");
+    setShowSimulationTools((current) => !current);
+  };
+
   const statusBarDetectionCount = activePage === "live_ai" ? liveDetectionCount : filteredDetections.length;
 
   return (
     <>
-      <AppShell activePage={activePage} onPageChange={setActivePage}>{renderPage()}</AppShell>
+      <AppShell activePage={activePage} onPageChange={setActivePage} showSimulationTools={showSimulationTools} onSimulationToolsToggle={toggleSimulationTools}>{renderPage()}</AppShell>
       <AppStatusBar apiState={apiState} detectionCount={statusBarDetectionCount} />
     </>
   );

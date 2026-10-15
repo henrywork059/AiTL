@@ -1,4 +1,21 @@
-# Local Testing — V050
+# Local Testing — V0501
+
+```text
+version: 0_5_1
+previous_version: 0_5_0
+passed_baseline: 0_5_0
+status: Simulation visibility candidate
+```
+
+## V0501 acceptance
+
+- Run updater with `-ChangedTests`; verify frontend build, smoke and startup.
+- On startup simulation options and Experiments are hidden. Click or keyboard-activate AI Traffic Light brand to reveal them; toggle back to hide them. When hiding Experiments, return Dashboard.
+- Confirm ESP controls, camera states, saved Side A/B assignments, Regions and existing simulator state are unchanged. Active synthetic inputs remain correctly identified.
+- Windows owner PASS pending; stable baseline remains `0_5_0`.
+
+## V050 archive
+
 
 ```text
 version: 0_5_0
