@@ -74,6 +74,17 @@ def main() -> int:
     assert "Get-CimInstance Win32_Process" in text
     assert "Get-AiTLProcessTreeRoot" in text
     assert "taskkill /PID" in text and "/T /F" in text
+    # Windows uvicorn --reload listener is spawned as python -c spawn_main.
+    # Identify it only through this venv's verified uvicorn parent, and never
+    # kill its containing PowerShell host or an unrelated Python port owner.
+    assert '$combined.Contains("spawn_main")' in text
+    assert '$combined.Contains("--multiprocessing-fork")' in text
+    assert 'Get-ProcessRecord -ProcessId ([int]$ProcessRecord.ParentProcessId)' in text
+    assert '$parentCommand.Contains("app.main:app")' in text
+    assert '$parentCommand.Contains("--reload")' in text
+    assert '$parentCommand.Contains("--port 8000")' in text
+    assert '"$($ProcessRecord.ExecutablePath)".ToLowerInvariant() -ne $python.ToLowerInvariant()' in text
+    assert 'if ($Port -eq 8000 -and "$($parent.ExecutablePath)".ToLowerInvariant() -ne $python.ToLowerInvariant())' in text
     assert 'Stop-AiTLPortOwner -Port 5173 -Role "frontend"' in text
     assert 'Stop-AiTLPortOwner -Port 8000 -Role "backend"' in text
     assert "which is not identifiable as this AiTL" in text

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_7 — Safe Windows backend restart
+
+- Recognize Windows Uvicorn `--reload` worker processes by matching the project's virtualenv Python and verifying their Uvicorn parent, addressing unrecognized `python.exe` listeners on port 8000.
+- Stop the Uvicorn tree without terminating the containing PowerShell host; preserve refusal to terminate unrelated process owners.
+- Extend the existing updater safety regression to guard worker ancestry and process-tree boundaries.
+- No dependencies, frontend runtime, backend API, camera, intersection or signal-controller changes. Previous candidate `0_4_6`; passed stable baseline `0_4_0`; Windows validation pending.
+
+
 ## 0_4_6 — Junction Network regression assertion repair
 
 - Updated two stale Junction Network regression checks: verify the current simulation/physical-camera mode label and the actual primary-camera assignment control, instead of requiring removed instructional text.

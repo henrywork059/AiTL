@@ -1,5 +1,5 @@
-version: 0_4_6
-status: Junction Network regression assertion repair candidate
-previous_version: 0_4_5
+version: 0_4_7
+status: Safe Windows Uvicorn worker restart candidate
+previous_version: 0_4_6
 passed_baseline: 0_4_0
-notes: V0406 repairs two stale Junction Network static assertions introduced before paired simulation cameras and UI text cleanup. Existing runtime, cameras, styles, and traffic controller behavior are unchanged. Owner acceptance remains pending; accepted baseline stays 0_4_0.
+notes: V0407 identifies Windows uvicorn --reload spawned workers through this project's virtualenv Python executable and verified uvicorn parent, without treating other Python listeners as AiTL. Process-tree termination stops at the uvicorn parent rather than the PowerShell host. No API, frontend, traffic, camera or dependencies changed. Owner validation pending; stable baseline remains 0_4_0.

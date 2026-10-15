@@ -90,11 +90,34 @@ function Test-AiTLProcessRecord {
 
     $combined = "$($ProcessRecord.ExecutablePath) $($ProcessRecord.CommandLine)".ToLowerInvariant()
     if ($Port -eq 8000) {
-        return $combined.Contains($backendDir.ToLowerInvariant()) -and (
-            $combined.Contains("uvicorn") -or
-            $combined.Contains("app.main:app") -or
-            $combined.Contains("powershell") -or
-            $combined.Contains("pwsh")
+        # Only this project's virtualenv may own an automatically replaced backend.
+        if ("$($ProcessRecord.ExecutablePath)".ToLowerInvariant() -ne $python.ToLowerInvariant()) {
+            return $false
+        }
+        $backendLaunch = $combined.Contains("uvicorn") -and
+            $combined.Contains("app.main:app") -and
+            $combined.Contains("--port 8000")
+        if ($backendLaunch) {
+            return $true
+        }
+
+        # Windows uvicorn --reload serves requests from a multiprocessing child
+        # whose command line contains spawn_main rather than uvicorn. Verify its
+        # actual parent, never accept an arbitrary python.exe port owner.
+        if (-not ($combined.Contains("spawn_main") -and $combined.Contains("--multiprocessing-fork"))) {
+            return $false
+        }
+        $parent = Get-ProcessRecord -ProcessId ([int]$ProcessRecord.ParentProcessId)
+        if (-not $parent) {
+            return $false
+        }
+        $parentCommand = "$($parent.CommandLine)".ToLowerInvariant()
+        return (
+            "$($parent.ExecutablePath)".ToLowerInvariant() -eq $python.ToLowerInvariant() -and
+            $parentCommand.Contains("uvicorn") -and
+            $parentCommand.Contains("app.main:app") -and
+            $parentCommand.Contains("--reload") -and
+            $parentCommand.Contains("--port 8000")
         )
     }
     if ($Port -eq 5173) {
@@ -126,6 +149,11 @@ function Get-AiTLProcessTreeRoot {
         $visited[[string]$current.ProcessId] = $true
 
         $parent = Get-ProcessRecord -ProcessId ([int]$current.ParentProcessId)
+        # Stop at the Uvicorn launcher, not its PowerShell host, so unrelated
+        # processes in the host shell cannot be killed by taskkill /T.
+        if ($Port -eq 8000 -and "$($parent.ExecutablePath)".ToLowerInvariant() -ne $python.ToLowerInvariant()) {
+            break
+        }
         if (-not (Test-AiTLProcessRecord -ProcessRecord $parent -Port $Port)) {
             break
         }

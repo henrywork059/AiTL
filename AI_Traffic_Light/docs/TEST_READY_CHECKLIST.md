@@ -1,12 +1,15 @@
-# V0406 Test Checklist
+# V0407 Test Checklist
 
 ```text
-version: 0_4_6
-previous_version: 0_4_5
+version: 0_4_7
+previous_version: 0_4_6
 passed_baseline: 0_4_0
-status: Junction Network regression assertion repair candidate
+status: Safe Windows Uvicorn worker restart candidate
 ```
 
+- [ ] Windows runner safely restarts project Uvicorn reload parent/worker on port 8000, without closing unrelated processes.
+- [ ] Other Python services on port 8000 remain protected.
+- [ ] Backend health, frontend launch and smoke pass.
 - [ ] Junction Network regression asserts current mode text and primary-camera selector, not removed copy.
 - [ ] Windows update/test/run continues past the prior Junction Network failure.
 - [ ] Dark mode displays `#57FFED` accent; light mode uses accessible dark teal.

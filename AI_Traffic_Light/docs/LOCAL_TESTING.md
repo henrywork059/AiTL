@@ -1,11 +1,19 @@
-# Local Testing — V0406
+# Local Testing — V0407
 
 ```text
-version: 0_4_6
-previous_version: 0_4_5
+version: 0_4_7
+previous_version: 0_4_6
 passed_baseline: 0_4_0
-status: Junction Network regression assertion repair candidate
+status: Safe Windows Uvicorn worker restart candidate
 ```
+
+## V0407 backend port-owner validation
+
+- Run the existing one-line update/test/run command. It must keep other processes safe on ports 5173 and 8000.
+- If 8000 is held by this project's Uvicorn `--reload` worker, the runner should identify its verified virtualenv parent and restart its process tree without closing unrelated PowerShell windows.
+- If 8000 is owned by an unrelated Python program, the runner must refuse to terminate it.
+- Verify `/health`, live backend smoke, frontend launch and previously passing Junction Network regression.
+- No real hardware required. Owner Windows validation and PASS are pending.
 
 ## V0406 test alignment
 
