@@ -161,6 +161,9 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
             <option key={camera.source_id} value={camera.source_id}>{camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}</option>
           ))}
         </select>
+        <span className="crosswalk-camera-state">
+          {current ? cameraState(cameraById.get(current)) : "No camera assigned"}
+        </span>
       </label>
     );
   }
@@ -261,7 +264,10 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
           </div>
           {selected ? (
             <>
-              {cameraPicker("camera_side_a_id", "Side A — first pedestrian approach")}
+              <div className="crosswalk-camera-sides">
+                {cameraPicker("camera_side_a_id", "Side A")}
+                {cameraPicker("camera_side_b_id", "Side B")}
+              </div>
               <svg className="crosswalk-figure" viewBox="0 0 640 380" role="img"
                 aria-label="Vertical pedestrian crossing from Side A to Side B, with horizontal white zebra stripes across the road and one camera at each end">
                 <rect width="640" height="380" fill="#d1d8d0" rx="12" />
@@ -289,11 +295,6 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
                   </g>
                 ))}
               </svg>
-              <div className="crosswalk-camera-details">
-                <div><strong>Side A</strong><span>{selected.camera_side_a_id || "Unassigned"} — {selected.camera_side_a_id ? cameraState(sideA) : "No camera"}</span></div>
-                <div><strong>Side B</strong><span>{selected.camera_side_b_id || "Unassigned"} — {selected.camera_side_b_id ? cameraState(sideB) : "No camera"}</span></div>
-              </div>
-              {cameraPicker("camera_side_b_id", "Side B — opposite pedestrian approach")}
               {((selected.camera_side_a_id && !sideA) || (selected.camera_side_b_id && !sideB)) && (
                 <p className="error-message">An assigned camera is missing from Camera Settings. Reassign or clear it.</p>
               )}

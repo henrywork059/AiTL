@@ -1,5 +1,5 @@
-version: 0_4_23
-status: Translucent region overlay candidate
-previous_version: 0_4_22
+version: 0_4_24
+status: Crosswalk camera-side layout candidate
+previous_version: 0_4_23
 passed_baseline: 0_4_14
-notes: V0423 restores 10%-opacity mint fills for ordinary Crosswalk/legacy editor polygons and 22%-opacity pale cream fills for selected polygons while preserving visible camera frames, opaque bright dashed selection borders, draggable vertices and saved geometry. Live AI/simulation overlays remain unfilled; V0422 responsive text, V0421 two-pair simulation cameras and traffic safety are unchanged. Windows visual acceptance pending; baseline remains 0_4_14.
+notes: V0424 consolidates Crosswalk Side A/B camera selectors and source states into one row per side and displays the two sides in left/right columns above the schematic, stacking at narrow widths. Duplicate rows beneath the schematic are removed. Region editing, V0423 translucent polygons, camera pairing, persistence and signal safety remain unchanged. Windows acceptance pending; passed baseline remains 0_4_14.

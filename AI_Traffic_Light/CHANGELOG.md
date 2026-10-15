@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_24 — Consolidate Crosswalk camera-side rows
+
+- Crosswalk layout shows Side A and Side B as two equal-width columns above the schematic, each containing the existing camera selector and the corresponding live camera state.
+- Shorten the selector headings to `Side A` and `Side B`; remove duplicate status rows and the bottom Side B selector. Stack camera columns on narrow screens.
+- Keep camera assignment, missing-source warnings, simulation preview, region editing, saved data, translucent region styling and traffic behavior unchanged.
+- Extend the existing Crosswalk frontend regression to protect one selector per side, side-by-side placement and responsive stacking. Previous candidate `0_4_23`; accepted baseline `0_4_14`. Windows acceptance pending.
+
+
 ## 0_4_23 — Restore translucent Crosswalk region fills
 
 - Correct the Crosswalk Region Editor's opaque/empty appearance: normal polygons receive a 10%-opacity mint tint; selected polygons receive a 22%-opacity pale cream tint. Both show the camera feed through the polygon.

@@ -15,8 +15,18 @@ def main() -> None:
     assert 'crosswalks: { id: "crosswalks"' in read("constants/appNavigation.ts")
     assert '"crosswalks"' in read("types/app.ts")
     assert "saveCrosswalks" in page and "fetchCrosswalks" in page
-    assert "cameraPicker(\"camera_side_a_id\"" in page
-    assert "cameraPicker(\"camera_side_b_id\"" in page
+    # Each side gets one selector and its live status, placed side by side.
+    assert page.count('cameraPicker("camera_side_a_id", "Side A")') == 1
+    assert page.count('cameraPicker("camera_side_b_id", "Side B")') == 1
+    camera_rows = page.split('<div className="crosswalk-camera-sides">', 1)[1].split("</div>", 1)[0]
+    assert camera_rows.index('cameraPicker("camera_side_a_id"') < camera_rows.index('cameraPicker("camera_side_b_id"')
+    assert page.index('className="crosswalk-camera-sides"') < page.index('className="crosswalk-figure"')
+    assert 'className="crosswalk-camera-state"' in page
+    assert 'cameraState(cameraById.get(current))' in page
+    assert "crosswalk-camera-details" not in page
+    css = read("pages/crosswalksPage.css")
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css.split(".crosswalk-camera-sides {", 1)[1].split("}", 1)[0]
+    assert "@media (max-width: 720px) { .crosswalk-camera-sides, .crosswalk-simulation-previews { grid-template-columns: 1fr; } }" in css
     assert "<svg" in page and "Array.from({ length: 7 }" in page
     # Zebra lines run horizontally across a vertical route between camera A and B.
     assert 'x="250" y={138 + index * 17} width="140" height="10"' in page
@@ -50,7 +60,7 @@ def main() -> None:
     assert "camera_side_b_id" in read("types/crosswalks.ts")
     assert ".crosswalk-layout" in read("pages/crosswalksPage.css")
     assert "traffic.crosswalk_configuration" in read("constants/functionRegistry.ts")
-    print("[PASS] crosswalk page, opposite-side cameras, horizontal stripes, vertical path and API wiring")
+    print("[PASS] crosswalk page, paired side-by-side camera selectors/status, schematic and API wiring")
 
 
 if __name__ == "__main__":

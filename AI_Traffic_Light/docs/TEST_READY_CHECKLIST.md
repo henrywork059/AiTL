@@ -1,4 +1,20 @@
-# V0423 Test Checklist
+# V0424 Test Checklist
+
+```text
+version: 0_4_24
+previous_version: 0_4_23
+passed_baseline: 0_4_14
+status: Crosswalk camera-side layout candidate
+```
+
+- [ ] Side A appears left and Side B right, each with one camera selector and its status above the schematic.
+- [ ] The duplicate camera status section and the bottom Side B selector are removed.
+- [ ] At narrow widths the columns stack without clipping.
+- [ ] Camera assignments, status updates, save/reload, missing-source warnings and simulation remain functional.
+- [ ] Focused Crosswalk regression, frontend typecheck/build, backend smoke and actual Windows browser layout are verified.
+
+## Historical V0423 and earlier checks (archival)
+
 
 ```text
 version: 0_4_23

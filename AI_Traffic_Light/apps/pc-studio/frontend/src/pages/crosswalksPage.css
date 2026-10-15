@@ -10,12 +10,11 @@
 .crosswalk-list-item strong, .crosswalk-list-item small { overflow-wrap: anywhere; }
 .crosswalk-list-item small { color: var(--color-text-muted); }
 .crosswalk-editor { margin: var(--space-4) 0; padding-top: var(--space-3); border-top: 1px solid var(--color-border-subtle); }
-.crosswalk-camera-select { display: grid; gap: var(--space-2); font-weight: 600; margin: var(--space-3) 0; }
+.crosswalk-camera-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
+.crosswalk-camera-select { display: grid; gap: var(--space-2); min-width: 0; font-weight: 600; }
 .crosswalk-camera-select select { width: 100%; min-width: 0; }
+.crosswalk-camera-state { color: var(--color-text-secondary); font-weight: 400; overflow-wrap: anywhere; }
 .crosswalk-figure { display: block; width: 100%; height: auto; border: 1px solid var(--color-border-default); border-radius: var(--radius-lg); }
-.crosswalk-camera-details { display: grid; gap: var(--space-2); margin: var(--space-3) 0; }
-.crosswalk-camera-details > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); border-bottom: 1px solid var(--color-border-subtle); padding-bottom: var(--space-2); }
-.crosswalk-camera-details span { color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .crosswalk-empty { text-align: center; color: var(--color-text-muted); padding: var(--space-8); }
 @media (max-width: 1300px) { .crosswalk-layout { grid-template-columns: minmax(0, 1fr); } }
 
@@ -24,7 +23,7 @@
 .crosswalk-simulation-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
 .crosswalk-simulation-previews > div { display: grid; gap: var(--space-2); min-width: 0; }
 .crosswalk-simulation-previews img { width: 100%; border-radius: var(--radius-sm); }
-@media (max-width: 720px) { .crosswalk-simulation-previews { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .crosswalk-camera-sides, .crosswalk-simulation-previews { grid-template-columns: 1fr; } }
 
 .crosswalk-list-item.active { position: relative; padding-right: 34px; }
 .crosswalk-list-item.active::after {

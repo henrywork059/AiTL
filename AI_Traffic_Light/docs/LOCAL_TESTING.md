@@ -1,4 +1,22 @@
-# Local Testing — V0423
+# Local Testing — V0424
+
+```text
+version: 0_4_24
+previous_version: 0_4_23
+passed_baseline: 0_4_14
+status: Crosswalk camera-side layout candidate
+```
+
+## V0424 Crosswalk camera selector acceptance
+
+- Run `scripts/update_test_run.ps1 -ChangedTests`; verify focused Crosswalk regression, frontend typecheck/build, backend smoke and startup.
+- Select a crosswalk. Its Crosswalk layout must show a left Side A and right Side B selector, each directly followed by its current camera status, above the existing schematic.
+- No duplicate Side A/B status rows and no bottom Side B selector remain. Narrow widths should stack Side A then Side B without horizontal overflow.
+- Select cameras and save/reload; confirm both assignments and statuses persist/update normally, missing-camera warnings work, and the existing simulation preview/region controls are unchanged.
+- Candidate V0424 requires Windows visual acceptance; passed baseline remains V0414.
+
+## Historical V0423 and earlier checks (archival)
+
 
 ```text
 version: 0_4_23
