@@ -1,5 +1,5 @@
-version: 0_4_8
-status: Windows system-Python Uvicorn child recognition candidate
-previous_version: 0_4_7
+version: 0_4_9
+status: Slate and mint design alignment candidate
+previous_version: 0_4_8
 passed_baseline: 0_4_0
-notes: V0408 recognizes the Windows Uvicorn --reload child launched by system Python only when it is a direct descendant of this project's verified virtualenv Uvicorn launcher. The runner still refuses unrelated port owners and does not kill the parent PowerShell host. No application, camera or traffic logic changed. Windows acceptance pending; stable baseline stays 0_4_0.
+notes: V0409 applies the approved #4D4E61 slate dark canvas with opaque coordinated sidebar, panel, input, selected and semantic surfaces while retaining #57FFED mint interaction color. The sidebar brand and section titles use distinct panels, and numbered Junction Network edge controls fit inside reserved card space. No backend, camera or signal behavior changed. Candidate awaits owner PASS; accepted stable baseline remains 0_4_0.

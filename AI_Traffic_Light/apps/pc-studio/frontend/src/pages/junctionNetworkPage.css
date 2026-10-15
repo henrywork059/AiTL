@@ -171,8 +171,9 @@
 .junction-node {
   position: absolute;
   z-index: 2;
-  width: 260px;
+  width: 284px;
   max-width: calc(100% - 24px);
+  padding: 28px 32px;
   transform: translate(-50%, -50%);
   overflow: visible;
   border: 1px solid var(--color-border-default);
@@ -651,7 +652,7 @@ button.compact {
   }
 
   .junction-node {
-    width: 220px;
+    width: 260px;
   }
 
   .junction-live-grid {
@@ -668,7 +669,7 @@ button.compact {
   }
 }
 
-/* Numbered edge controls stay outside the junction card and do not obstruct text. */
+/* Edge controls occupy a reserved inset around the card content. */
 .junction-edge-tag {
   position: absolute;
   z-index: 3;
@@ -685,10 +686,10 @@ button.compact {
   font-weight: 750;
   cursor: pointer;
 }
-.junction-edge-north { left: 50%; top: -31px; transform: translateX(-50%); }
-.junction-edge-south { left: 50%; bottom: -31px; transform: translateX(-50%); }
-.junction-edge-east { right: -38px; top: 50%; transform: translateY(-50%); }
-.junction-edge-west { left: -38px; top: 50%; transform: translateY(-50%); }
+.junction-edge-north { left: 50%; top: 3px; transform: translateX(-50%); }
+.junction-edge-south { left: 50%; bottom: 3px; transform: translateX(-50%); }
+.junction-edge-east { right: 3px; top: 50%; transform: translateY(-50%); }
+.junction-edge-west { left: 3px; top: 50%; transform: translateY(-50%); }
 .junction-edge-tag.is-linked { background: var(--color-success-surface); border-color: var(--color-success); color: var(--color-success); }
 .junction-edge-tag.is-selected,
 .junction-edge-tag:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

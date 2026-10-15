@@ -8,6 +8,8 @@
   --control-height: 40px;
   --sidebar-width: 252px;
   --color-crosswalk-guide: #006f66;
+  --color-brand-surface: #ffffff;
+  --color-nav-heading-surface: #e3eaf2;
   --color-chart-vehicle: #a85120;
   --color-chart-pedestrian: #6b4ea3;
 
@@ -110,42 +112,43 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Layered neutral-blue surfaces. */
-    --color-dark-surface-0: #0e1725;
-    --color-dark-surface-1: #152236;
-    --color-dark-surface-2: #1b2b42;
-    --color-dark-surface-4: #233650;
-    --color-dark-surface-8: #293d59;
+    /* Owner-approved opaque slate surfaces with mint interactive states. */
+    --color-dark-surface-0: #4d4e61;
+    --color-dark-surface-1: #55576a;
+    --color-dark-surface-2: #5a5c70;
+    --color-dark-surface-4: #616375;
+    --color-dark-surface-8: #5b5d70;
 
-    --color-chart-vehicle: #ffba83;
-    --color-chart-pedestrian: #c3a9ff;
+    --color-chart-vehicle: #ffd3b7;
+    --color-chart-pedestrian: #e1d5ff;
     --color-canvas: var(--color-dark-surface-0);
-    --color-shell: var(--color-dark-surface-0);
+    --color-shell: #414354;
+    --color-brand-surface: #333648;
+    --color-nav-heading-surface: #333648;
     --color-surface: var(--color-dark-surface-1);
     --color-surface-raised: var(--color-dark-surface-2);
-    --color-surface-muted: #111d2e;
-    --color-surface-overlay: var(--color-dark-surface-8);
-    --color-field: var(--color-dark-surface-1);
+    --color-surface-muted: #505266;
+    --color-surface-overlay: var(--color-dark-surface-2);
+    --color-field: #47495b;
     --color-media: #0b1019;
     --color-control-hover: var(--color-dark-surface-4);
     --color-control-pressed: var(--color-dark-surface-8);
 
-    --color-text-primary: #eff5ff;
-    --color-text-secondary: #c1d0e2;
-    --color-text-muted: #a8bad0;
-    --color-text-disabled: #7d8fa6;
+    --color-text-primary: #f9faff;
+    --color-text-secondary: #e8eaf5;
+    --color-text-muted: #d6d9e8;
+    --color-text-disabled: #b9bed0;
     --color-text-inverse: #121212;
 
-    --color-border-subtle: rgba(255, 255, 255, 0.08);
-    --color-border-default: rgba(255, 255, 255, 0.16);
-    --color-control-stroke: #657b95;
-    --color-border-strong: rgba(255, 255, 255, 0.36);
+    --color-border-subtle: #797c90;
+    --color-border-default: #9093a7;
+    --color-control-stroke: #aeb2c6;
+    --color-border-strong: #aeb2c6;
 
-    /* Lighter variants preserve legibility on dark surfaces. */
     --color-primary: #57ffed;
-    --color-primary-hover: #8cfff1;
+    --color-primary-hover: #87fff2;
     --color-primary-active: #2be6d2;
-    --color-primary-surface: rgba(87, 255, 237, 0.13);
+    --color-primary-surface: #2f585a;
     --color-on-primary: #08312c;
 
     --color-secondary: var(--color-primary);
@@ -161,14 +164,15 @@
     --color-focus: var(--color-primary);
     --color-selection: rgba(87, 255, 237, 0.28);
 
-    --color-success: #a5d6a7;
-    --color-success-surface: rgba(165, 214, 167, 0.10);
-    --color-warning: #ffe082;
-    --color-warning-surface: rgba(255, 224, 130, 0.10);
-    --color-danger: #ef9a9a;
-    --color-danger-surface: rgba(239, 154, 154, 0.10);
-    --color-info: #90caf9;
-    --color-info-surface: rgba(144, 202, 249, 0.10);
+    /* Meaningful colors remain independent of selection/mint. */
+    --color-success: #d2f6da;
+    --color-success-surface: #385a55;
+    --color-warning: #ffe6a8;
+    --color-warning-surface: #5e5447;
+    --color-danger: #ffd0d5;
+    --color-danger-surface: #624d5b;
+    --color-info: #cee3ff;
+    --color-info-surface: #45566c;
 
     --shadow-panel: none;
   }

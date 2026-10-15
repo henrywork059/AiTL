@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0405
+# AiTL PC Studio Design System — V0409
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,7 +6,7 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Current benchmark and decisions (V0405)
+## Current benchmark and decisions (V0409)
 
 AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
@@ -17,23 +17,23 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 - [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
 - [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-### V0405 implementation parameters
+### V0409 implementation parameters
 
 | Element | Light | Dark | Decision |
 | --- | --- | --- | --- |
-| Main canvas | `#F3F6FA` | `#0E1725` | Quiet neutral desktop backdrop |
-| Main panel | `#FFFFFF` | `#152236` | Elevated neutral content surface |
-| Primary text | `#172B45` | `#EFF5FF` | High-contrast hierarchy |
-| Muted text | `#52677D` | `#A8BAD0` | Legible secondary data |
+| Main canvas | `#F3F6FA` | `#4D4E61` | User-selected slate backdrop |
+| Main panel | `#FFFFFF` | `#55576A` | Opaque content surface |
+| Primary text | `#172B45` | `#F9FAFF` | High-contrast hierarchy |
+| Muted text | `#52677D` | `#D6D9E8` | Legible secondary data |
 | Primary control | `#006F66` | `#57FFED` | Teal theme, readable on each background |
-| Input/interactive border | `#7B8FA7` | `#657B95` | 3:1+ contrast against typical field surface |
+| Input/interactive border | `#7B8FA7` | `#AEB2C6` | 3:1+ contrast against light/dark fields |
 | Controls | 40px minimum height | same | Consistent pointer/keyboard target |
 | Page/panel spacing | 4px increments; 20–32px sections | same | Deliberate proximity hierarchy |
 | Radius | 6/9/12px | same | Compact Windows-style geometry |
 | Tab selection | underline/segmented active surface | same | Distinguishes selected state from action |
 | Focus | 3px outline, 2px offset | same | Strong keyboard focus without changed tab order |
 
-Selection states use a teal tint plus a dot, underline or ring; color alone does not indicate selection. Mint filled buttons use a dark foreground, while light-mode dark-teal buttons use white. Hover must remain distinct from selected state. Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
+Selection states use a solid teal surface plus a dot, underline or ring; color alone does not indicate selection. Mint filled buttons use a dark foreground, while light-mode dark-teal buttons use white. Hover must remain distinct from selected state. Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
 
 ## Color-role model
 
@@ -58,9 +58,9 @@ Dark appearance:
 | Role | Value |
 | --- | --- |
 | Primary | `#57FFED` |
-| Primary hover | `#8CFFF1` |
+| Primary hover | `#87FFF2` |
 | Primary active | `#2BE6D2` |
-| Primary surface | `rgba(87, 255, 237, 0.13)` |
+| Primary surface | `#2F585A` |
 | On primary | `#08312C` |
 
 Use primary for:
@@ -90,19 +90,22 @@ Do not use secondary as a second general brand color across large surfaces.
 
 ### Neutral surfaces
 
-Background, shell, panel, field, and raised-control colors are neutral. They carry almost all screen area.
+The light appearance retains its established cool-neutral canvas (`#F3F6FA`) and white panels. The dark appearance uses user-selected slate roles instead of navy or glass.
 
-Light appearance uses a cool-neutral canvas (`#F3F6FA`) and white/elevated surfaces. Dark appearance retains:
-
-| Elevation role | Surface |
+| Role | Dark solid surface |
 | --- | --- |
-| 0dp canvas/shell | `#0E1725` |
-| 1dp normal panel | `#152236` |
-| 2dp raised control | `#1B2B42` |
-| 4dp hover | `#233650` |
-| 8dp pressed/overlay | `#293D59` |
+| Application canvas | `#4D4E61` |
+| Sidebar | `#414354` |
+| Sidebar brand and navigation section heading | `#333648` |
+| Panel | `#55576A` |
+| Raised panel/control | `#5A5C70` |
+| Inset input | `#47495B` |
+| Muted panel | `#505266` |
+| Hover | `#616375` |
+| Pressed | `#5B5D70` |
+| Selected item | `#2F585A` |
 
-Dark depth comes primarily from controlled luminance differences rather than glow or large shadows.
+A separate brand panel and bordered navigation headings distinguish sections from page buttons. Crosswalk/junction edge buttons remain inside each junction card's reserved border space. Use solid surfaces for panel hierarchy; retain translucent fills only for image overlays and text selection.
 
 ### Semantic colors
 

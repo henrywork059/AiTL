@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_9 — Slate/mint design alignment
+
+- Use the approved `#4D4E61` dark canvas with coordinated opaque sidebar (`#414354`), brand/header boxes (`#333648`), panel (`#55576A`), nested surface (`#5A5C70`), input (`#47495B`) and selected (`#2F585A`) color roles.
+- Retain `#57FFED` dark mint emphasis and accessible `#006F66` light mode. Rebalance text, borders, semantic states and vehicle/pedestrian chart colors against the new surfaces.
+- Place the sidebar title in a distinct solid panel; give each navigation group a bordered heading strip while preserving active page dots and mint selection.
+- Move Junction Network 1–4 edge controls from outside the card into a reserved interior perimeter without covering junction data; retain edge mapping, drag handling and selection.
+- Update palette, contrast and Junction Network layout regressions. No dependencies or backend/camera/signal logic changes. Previous candidate `0_4_8`; accepted baseline `0_4_0`.
+
+
 ## 0_4_8 — Safe recognition of system-Python Uvicorn reload child
 
 - The user's Windows process trace shows the port-8000 Uvicorn child (system Python) under the project's virtualenv Uvicorn launcher. Extend the runner's identity check to verify this direct relationship, the expected application and port, and the parent's reload command before stopping the backend tree.

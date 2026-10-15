@@ -1,11 +1,20 @@
-# Local Testing — V0408
+# Local Testing — V0409
 
 ```text
-version: 0_4_8
-previous_version: 0_4_7
+version: 0_4_9
+previous_version: 0_4_8
 passed_baseline: 0_4_0
-status: Windows system-Python Uvicorn child recognition candidate
+status: Slate and mint design alignment candidate
 ```
+
+## V0409 visual acceptance
+
+- Run the standard one-line updater/test/runner from the repository root.
+- In Windows dark appearance, confirm a `#4D4E61` canvas, separate dark sidebar, boxed brand/title area, navigation group header strips, raised opaque panels, legible text and `#57FFED` interactive emphasis.
+- Confirm light mode still uses the existing light surfaces and deep teal (`#006F66`).
+- In Junction Network, inspect junctions at desktop and narrow widths. Edge buttons 1–4 must be inside their respective cards, readable, selectable, and never cover the ID, title, camera count, status, or drag handle.
+- Check hover/selection, semantic state pills, forms and vehicle/pedestrian chart series in Camera Settings, Crosswalks, Live AI, Traffic Analytics and Simulation Experiments.
+- Validate backend `/health`, the live startup smoke and frontend build. Hardware-only tests remain separate.
 
 ## V0408 Windows port-8000 acceptance
 

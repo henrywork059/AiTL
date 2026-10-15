@@ -90,7 +90,7 @@ def main() -> None:
         validate_frontend_style_system(project, errors)
         assert not errors, errors
 
-        invalid = tokens.replace("--color-dark-surface-0: #0e1725;", "--color-dark-surface-0: invalid;")
+        invalid = tokens.replace("--color-dark-surface-0: #4d4e61;", "--color-dark-surface-0: invalid;")
         assert invalid != tokens
         token_file.write_text(invalid, encoding="utf-8")
         errors.clear()

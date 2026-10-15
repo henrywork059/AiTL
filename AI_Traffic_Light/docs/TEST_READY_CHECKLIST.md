@@ -1,12 +1,16 @@
-# V0408 Test Checklist
+# V0409 Test Checklist
 
 ```text
-version: 0_4_8
-previous_version: 0_4_7
+version: 0_4_9
+previous_version: 0_4_8
 passed_baseline: 0_4_0
-status: Windows system-Python Uvicorn child recognition candidate
+status: Slate and mint design alignment candidate
 ```
 
+- [ ] Dark canvas `#4D4E61` and opaque sidebar, input, panel, selected, and semantic layers are legible.
+- [ ] Sidebar brand and each navigation group title are visually separated from page links.
+- [ ] Junction edge labels 1–4 are inside the card and leave all card data and drag handle accessible.
+- [ ] Light mode and selected/toggled mint/teal styling remain usable; frontend build passes.
 - [ ] Mocked Windows PowerShell worker/parent identity regression passes.
 - [ ] System-Python Uvicorn child on port 8000 restarts through verified AiTL parent.
 - [ ] Application startup and backend health/live smoke pass; unrelated processes remain untouched.

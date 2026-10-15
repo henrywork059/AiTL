@@ -64,7 +64,14 @@ def main() -> int:
     assert "onSelectEdge(config.id, edge)" in node_card
     assert "offsetX" in page and "offsetY" in page
     assert "positionFromPointer(id, event);" not in page.split("function beginDrag", 1)[1].split("function moveDrag", 1)[0]
-    assert "right: -38px;" in css and "left: -38px;" in css
+    assert "padding: 28px 32px;" in css
+    for edge in ("north", "south", "east", "west"):
+        assert f".junction-edge-{edge}" in css
+    assert ".junction-edge-north { left: 50%; top: 3px;" in css
+    assert ".junction-edge-south { left: 50%; bottom: 3px;" in css
+    assert ".junction-edge-east { right: 3px;" in css
+    assert ".junction-edge-west { left: 3px;" in css
+    assert "top: -31px;" not in css and "right: -38px;" not in css
     assert "selectedEdge={config.id === selectedId ? selectedEdge : null}" in page
     assert "crosswalk_edges" in types and "JunctionCrosswalkEdges" in types
     assert "fetchCrosswalks" in page and "crosswalkOwnerById" in page
@@ -98,19 +105,19 @@ def main() -> int:
 
     # V0312/V0313 card content must remain visible rather than clipped by fixed
     # single-line metadata rows.
-    assert "width: 260px;" in css
+    assert "width: 284px;" in css
     assert "max-width: calc(100% - 24px);" in css
     assert ".junction-node-meta span:last-child" in css
     assert "white-space: normal;" in css
     assert "overflow-wrap: anywhere;" in css
     assert "flex-wrap: wrap;" in css
-    assert "width: 220px;" in css
+    assert "width: 260px;" in css
 
     print("[PASS] Junction Network is registered in navigation, App routing and function registry")
     print("[PASS] page behavior, node presentation and pure view helpers have separate owners")
     print("[PASS] Junction Network uses serial polling, typed APIs and memoized lookup maps")
     print("[PASS] multi-camera assignment and primary-camera selection remain available")
-    print("[PASS] node content remains responsive and non-clipping")
+    print("[PASS] numbered edges are inside reserved junction-card space; responsive node content remains visible")
     return 0
 
 
