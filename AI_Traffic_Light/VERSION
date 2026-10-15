@@ -1,5 +1,5 @@
-version: 0_4_12
-status: Junction Network layout regression selector repair candidate
-previous_version: 0_4_11
+version: 0_4_13
+status: Quiet slate navigation candidate
+previous_version: 0_4_12
 passed_baseline: 0_4_0
-notes: V0412 fixes the V0411 static test helper so it matches a standalone CSS rule rather than an earlier grouped selector referencing the same class. The actual Junction Network UI, CSS layout, palette, drag and edge behavior remain unchanged. Adds a grouped-selector regression example. Owner Windows validation pending; accepted baseline remains 0_4_0.
+notes: V0413 replaces sidebar neon/mint navigation decoration with muted section headings and thin dividers plus solid slate selected-page rows. Removes navigation-only mint bars and dots but preserves mint focus and functional control indicators. No routes, app behavior, camera, junction or backend changes. Owner Windows validation pending; stable baseline remains 0_4_0.

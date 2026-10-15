@@ -1,11 +1,19 @@
-# Local Testing — V0412
+# Local Testing — V0413
 
 ```text
-version: 0_4_12
-previous_version: 0_4_11
+version: 0_4_13
+previous_version: 0_4_12
 passed_baseline: 0_4_0
-status: Junction Network layout regression selector repair candidate
+status: Quiet slate navigation candidate
 ```
+
+## V0413 quiet navigation acceptance
+
+- Run the standard one-line update/test/run command; check frontend typecheck/build and live smoke.
+- Sidebar group headings (Operate, Traffic, Data & Models) should be small muted uppercase labels with a subtle horizontal divider, not dark boxes with mint borders.
+- Selected page should use a solid neutral slate row with bright text and no mint bar or dot; hover should be restrained. Keyboard focus still needs a visible mint outline.
+- Test light/dark appearance, navigation across pages, compact window width and preservation of other selection indicators (camera, tabs, toggles).
+- The sidebar brand/title remains boxed; Junction Network card, camera and simulation behavior are unchanged.
 
 ## V0412 CSS selector regression correction
 

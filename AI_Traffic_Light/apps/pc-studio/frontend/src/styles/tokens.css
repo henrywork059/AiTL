@@ -9,7 +9,10 @@
   --sidebar-width: 252px;
   --color-crosswalk-guide: #006f66;
   --color-brand-surface: #ffffff;
-  --color-nav-heading-surface: #e3eaf2;
+  --color-nav-heading-text: #52677d;
+  --color-nav-divider: #c9d4e2;
+  --color-nav-hover: #e3eaf2;
+  --color-nav-selected: #c9d4e2;
   --color-chart-vehicle: #a85120;
   --color-chart-pedestrian: #6b4ea3;
 
@@ -124,7 +127,10 @@
     --color-canvas: var(--color-dark-surface-0);
     --color-shell: #414354;
     --color-brand-surface: #333648;
-    --color-nav-heading-surface: #333648;
+    --color-nav-heading-text: #bec2d1;
+    --color-nav-divider: #696c80;
+    --color-nav-hover: #505266;
+    --color-nav-selected: #5a5c70;
     --color-surface: var(--color-dark-surface-1);
     --color-surface-raised: var(--color-dark-surface-2);
     --color-surface-muted: #505266;

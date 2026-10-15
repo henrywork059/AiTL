@@ -60,7 +60,7 @@ def main() -> None:
     assert "min-height: var(--control-height)" in base
     assert "border: var(--border-width) solid var(--color-control-stroke)" in base
     assert "outline: 3px solid var(--color-focus)" in base
-    assert ".nav-button.active" in components and "inset 3px 0 0" in components
+    assert ".nav-button.active" in components and "background: var(--color-nav-selected);" in components
     assert "padding: var(--space-5)" in components and "var(--shadow-panel)" in components
     assert "grid-template-columns: var(--sidebar-width)" in layout
     assert "@media (max-width: 760px)" in layout

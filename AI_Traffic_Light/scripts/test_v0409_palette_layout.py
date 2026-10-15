@@ -77,9 +77,10 @@ def main() -> None:
     assert "border-radius: var(--radius-lg);" in layout
     assert ".brand-block h1" in components
     assert ".nav-section h2" in components
-    assert "background: var(--color-nav-heading-surface);" in components
-    assert "border-left: 2px solid var(--color-primary);" in components
-    assert ".nav-button.active::after" in components
+    assert ".nav-section h2::after" in components
+    assert "background: var(--color-nav-divider);" in components
+    assert "background: var(--color-nav-selected);" in components
+    assert ".nav-button.active::after" not in components
 
     junction = source("pages/junctionNetworkPage.css")
     assert "width: clamp(268px, 27vw, 336px);" in junction
@@ -99,7 +100,7 @@ def main() -> None:
     assert 'className="junction-node-edge-layout"' in source("components/junctions/JunctionNodeCard.tsx")
     assert 'JUNCTION_EDGES.map((edge) =>' in source("components/junctions/JunctionNodeCard.tsx")
     print(f"[PASS] Slate/mint palette with {len(checks)} contrast checks and preserved light mode")
-    print("[PASS] Boxed sidebar header, distinct navigation sections and selected state")
+    print("[PASS] Boxed brand, quiet navigation headings and neutral page selection")
     print("[PASS] Edge labels 1-4 use the four sides of a central content grid")
 
 

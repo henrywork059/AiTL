@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0411
+# AiTL PC Studio Design System — V0413
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,7 +6,7 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Current benchmark and decisions (V0409)
+## Current benchmark and decisions (V0413)
 
 AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
@@ -17,7 +17,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 - [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
 - [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-### V0409 implementation parameters
+### V0413 implementation parameters
 
 | Element | Light | Dark | Decision |
 | --- | --- | --- | --- |
@@ -33,7 +33,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 | Tab selection | underline/segmented active surface | same | Distinguishes selected state from action |
 | Focus | 3px outline, 2px offset | same | Strong keyboard focus without changed tab order |
 
-Selection states use a solid teal surface plus a dot, underline or ring; color alone does not indicate selection. Mint filled buttons use a dark foreground, while light-mode dark-teal buttons use white. Hover must remain distinct from selected state. Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
+Interactive control selection (tabs, toggles, camera rows) uses teal emphasis plus a dot, underline or ring. Sidebar page navigation is intentionally quieter: solid neutral selected row with brighter text and no mint strip or dot. Mint filled buttons use a dark foreground, while light-mode dark-teal buttons use white. Hover must remain distinct from selected state. Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
 
 ## Color-role model
 
@@ -41,7 +41,7 @@ Most of the interface remains neutral. Color has a job.
 
 ### Primary
 
-Primary identifies navigation, links, focus, and the dominant action in a workflow.
+Primary identifies links, focus, and the dominant action in a workflow. Sidebar navigation deliberately uses neutral slate selection to avoid repeated accent decoration.
 
 Light appearance:
 
@@ -65,7 +65,7 @@ Dark appearance:
 
 Use primary for:
 
-- active navigation;
+- selected functional controls and keyboard focus;
 - the main action in a panel, such as **Save**, **Start**, **Refresh**, or **Apply**;
 - focus indication and links;
 - informational emphasis where a brand/interaction role is appropriate.
@@ -96,16 +96,17 @@ The light appearance retains its established cool-neutral canvas (`#F3F6FA`) and
 | --- | --- |
 | Application canvas | `#4D4E61` |
 | Sidebar | `#414354` |
-| Sidebar brand and navigation section heading | `#333648` |
+| Sidebar brand box | `#333648` |
 | Panel | `#55576A` |
 | Raised panel/control | `#5A5C70` |
 | Inset input | `#47495B` |
 | Muted panel | `#505266` |
 | Hover | `#616375` |
 | Pressed | `#5B5D70` |
-| Selected item | `#2F585A` |
+| Selected functional control | `#2F585A` |
+| Selected sidebar page | `#5A5C70` |
 
-A separate brand panel and bordered navigation headings distinguish sections from page buttons. Junction cards have a full-width draggable title bar above a separate 3×3 layout: observation/status information is centered, while edge labels 1–4 occupy the north/east/south/west sides of that content area. Their responsive text wraps and card height adapts to content. Use solid surfaces for panel hierarchy; retain translucent fills only for image overlays and text selection.
+A separate brand panel and muted uppercase section headings with subtle dividers distinguish sections from page buttons. Active navigation rows use neutral slate (`#5A5C70`), not mint. Hover uses `#505266`; keyboard focus remains mint. Junction cards have a full-width draggable title bar above a separate 3×3 layout: observation/status information is centered, while edge labels 1–4 occupy the north/east/south/west sides of that content area. Their responsive text wraps and card height adapts to content. Use solid surfaces for panel hierarchy; retain translucent fills only for image overlays and text selection.
 
 ### Semantic colors
 

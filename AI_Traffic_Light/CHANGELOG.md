@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_13 — Quiet slate sidebar navigation
+
+- Replace sidebar section title boxes and thick mint bars with small, muted uppercase headings and subtle horizontal dividers.
+- Use a neutral slate background and brighter text for the active navigation row instead of teal selection fill, mint left bar and trailing dot; make hover subtle and keep 6px corners.
+- Reserve mint for functional control selections and keyboard focus. The separate sidebar brand panel remains, and the light theme uses matching neutral navigation roles.
+- Add navigation-specific light/dark contrast checks and update historical styling regressions. No routes, APIs, dependencies, simulation, camera, junction or traffic changes. Previous candidate `0_4_12`; accepted stable baseline `0_4_0`.
+
+
 ## 0_4_12 — Junction card regression selector alignment
 
 - Fix `test_v0411_junction_card_layout.py` to inspect the last matching CSS selector rule instead of its earlier occurrence in a grouped selector list. This resolves the reported false assertion for `.junction-node-alerts` alignment.

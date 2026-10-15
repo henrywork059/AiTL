@@ -1,12 +1,16 @@
-# V0412 Test Checklist
+# V0413 Test Checklist
 
 ```text
-version: 0_4_12
-previous_version: 0_4_11
+version: 0_4_13
+previous_version: 0_4_12
 passed_baseline: 0_4_0
-status: Junction Network layout regression selector repair candidate
+status: Quiet slate navigation candidate
 ```
 
+- [ ] Sidebar group headings use muted text and hairline divider instead of mint-bordered boxes.
+- [ ] Selected navigation row uses neutral slate, no mint bar or dot, with clear text contrast.
+- [ ] Sidebar hover remains subtle and keyboard focus is visibly outlined; other mint control states remain.
+- [ ] Light/dark appearance and navigation work; frontend typecheck/build and smoke pass.
 - [ ] V0411 layout regression checks the last alert CSS declaration and does not stop on its earlier grouped selector.
 - [ ] Windows typecheck, frontend build, live smoke and app startup proceed.
 - [ ] Junction cards display full-width draggable title bar with name and ID.

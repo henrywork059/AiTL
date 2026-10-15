@@ -44,7 +44,9 @@ def main() -> None:
     assert "--color-secondary: var(--color-primary);" in dark
 
     shared = read("styles/components.css")
-    assert ".nav-button.active::after" in shared
+    assert ".nav-button.active::after" not in shared
+    assert ".nav-section h2::after" in shared
+    assert "background: var(--color-nav-selected);" in shared
     assert ".camera-status-entry.is-selected::before" in shared
     assert 'button[aria-pressed="true"]:not(.primary):not(.danger)' in shared
     assert '.experiment-toggle button[aria-pressed="true"]::before' in shared
