@@ -1,5 +1,5 @@
-version: 0_5_2
-status: Region editor save candidate
-previous_version: 0_5_1
+version: 0_5_3
+status: V052 release metadata repair candidate
+previous_version: 0_5_2
 passed_baseline: 0_5_0
-notes: Save regions directly in Region Editor using existing crosswalk persistence. Camera-specific counting regions and backend identifiers require a separate data-model change.
+notes: Repair release metadata and current patch document required by update runner; Region Editor Save regions functionality unchanged.

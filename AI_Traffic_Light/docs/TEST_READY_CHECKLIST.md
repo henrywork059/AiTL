@@ -1,17 +1,22 @@
-# V0501 Candidate Checklist
+# V053 Release Consistency Candidate
 
 ```text
-version: 0_5_1
-previous_version: 0_5_0
+version: 0_5_3
+previous_version: 0_5_2
 passed_baseline: 0_5_0
-status: Simulation visibility candidate
+status: V052 release metadata repair candidate
 ```
 
 - [ ] Simulator controls and Experiments initially hidden; physical ESP options remain usable.
 - [ ] Brand toggle by click/Enter/Space reveals/hides simulator tools across Camera Settings, Crosswalks, Region Editor and Junction Network.
 - [ ] Saved source state, assignments and signal behavior unchanged; run Windows frontend tests and app smoke.
 
-## Previous V050 stable checklist
+## V053 acceptance
+
+- Verify update runner structure/version validation, frontend typecheck/build, backend smoke and Region Editor Save regions persistence.
+- V052 Save regions implementation remains unchanged. Owner PASS pending.
+
+## V0501 acceptance
 
 
 ```text

@@ -1,6 +1,12 @@
-# Start Here — V0501
+# Start Here — V053
 
-Current candidate `0_5_1`, accepted baseline `0_5_0`. Toggle the top-left AI Traffic Light panel to show or hide simulation options; default is hidden. The toggle does not stop existing simulation or modify saved assignments.
+Current candidate `0_5_3`, previous candidate `0_5_2`, accepted baseline `0_5_0`.
+
+V053 repairs V052 release metadata so the update runner can proceed. The Region Editor Save regions button introduced in V052 is unchanged. Toggle the top-left AI Traffic Light panel to show or hide simulation options; default is hidden. The toggle does not stop existing simulation or modify saved assignments.
+
+## Previous V0501 candidate
+
+Current candidate `0_5_1`, accepted baseline `0_5_0`.
 
 ## Previous stable release
 

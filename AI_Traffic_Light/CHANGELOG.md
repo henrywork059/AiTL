@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_5_3 — Fix V052 release consistency
+
+- Repair current version label and required candidate documents so the structure/version gate can proceed.
+- No Region Editor, backend, camera or signal runtime changes. Accepted baseline remains `0_5_0`; Windows acceptance pending.
+
+
 ## 0_5_2 — Save from Region Editor
 
 - Add Save regions in the Region Editor, using the existing Crosswalks save API and existing unsaved-change/busy states.
