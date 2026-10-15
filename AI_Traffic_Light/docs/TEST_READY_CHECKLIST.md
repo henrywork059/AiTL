@@ -1,4 +1,19 @@
-# V055 Regression Alignment Candidate Checklist
+# V056 Shared Physical Region Checklist
+
+```text
+version: 0_5_6
+previous_version: 0_5_5
+passed_baseline: 0_5_0
+status: Two-view region geometry candidate
+```
+
+- [ ] Region 1 uses one name on A/B, top polygon on A and bottom polygon on B.
+- [ ] Side switching retains logical region selection; no backend ID field is shown.
+- [ ] Save/reload retains both polygons and shared name; legacy saved regions remain valid.
+- [ ] Per-camera inferred counts have distinct camera-region IDs and a shared physical-region ID, without double-counting.
+- [ ] Run full offline regression suite, frontend TypeScript/build, live smoke/startup and Windows visual acceptance. Baseline remains `0_5_0`.
+
+## Previous V055 Regression Alignment Candidate Checklist
 
 ```text
 version: 0_5_5

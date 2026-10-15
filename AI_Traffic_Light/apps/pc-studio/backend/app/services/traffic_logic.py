@@ -78,9 +78,10 @@ def count_crosswalk_regions(frame: dict[str, Any] | None, crosswalks: list[dict[
                 if region.get("camera_side") not in (None, side):
                     continue
                 classes = {}
+                polygon = (region.get("vertices_by_side") or {}).get(side, region["vertices"])
                 for detection in frame.get("detections", []):
                     try:
-                        inside = point_in_polygon(_scaled_center(detection, width, height), region["vertices"])
+                        inside = point_in_polygon(_scaled_center(detection, width, height), polygon)
                     except (KeyError, TypeError, ValueError):
                         continue
                     if inside:
@@ -89,6 +90,8 @@ def count_crosswalk_regions(frame: dict[str, Any] | None, crosswalks: list[dict[
                 key = f"{crosswalk['id']}:{side}:{region['id']}"
                 counts[key] = {"crosswalk_id": crosswalk["id"], "camera_side": side,
                                "source_id": source_id, "region_id": region["id"],
+                               "physical_region_id": f"{crosswalk['id']}:{region['id']}",
+                               "camera_region_id": key,
                                "label": region["label"], "class_counts": classes,
                                "total": sum(classes.values())}
     return counts

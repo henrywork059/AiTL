@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_5_6 — Shared physical regions with independent A/B polygons
+
+- A new Region Editor region is a single named physical area shown on both camera sides; dragging handles on one side changes only that side's polygon. Its internal ID is hidden from users.
+- Preserve the validated schema-1 crosswalk API, current Save regions button, original `vertices` fallback, and previously saved one-sided regions. No automatic merging of old unrelated region IDs.
+- Per-frame detector counts keep independent camera-region IDs and expose a shared physical-region ID; do not sum A/B counts as distinct people/vehicles or imply simultaneous inference.
+- Extend deterministic persistence/counting regressions and update historical frontend assertions for shared selection across camera sides.
+- Candidate `0_5_6`; previous `0_5_5`, owner-accepted baseline remains `0_5_0`. Windows startup, full regression and visual acceptance pending.
+
+
 ## 0_5_5 — Align camera/region regressions with current implementation
 
 - Update Camera Settings structure assertions to the existing paired simulation save call, concealed simulator controls, filtered saved-camera list and effective ESP-only form state.

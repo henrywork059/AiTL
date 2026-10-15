@@ -1,4 +1,22 @@
-# V055 Regression Alignment Candidate
+# V056 Shared Physical Region Candidate
+
+```text
+version: 0_5_6
+previous_version: 0_5_5
+passed_baseline: 0_5_0
+status: Two-view region geometry candidate
+```
+
+## V056 validation
+
+- Run the full updater without `-ChangedTests` to check **all** offline regressions, release consistency, frontend TypeScript/build, live smoke and startup.
+- Crosswalks → Edit regions: Add Region 1 on Side A and move its vertices to the top; switch to Side B, keep Region 1 selected, move the same region's vertices to the bottom. Return to Side A: its polygon must remain at the top. Change the name and confirm it is the same on both sides.
+- Select Save regions, navigate away/reload, confirm the shared name and both independent polygons persist. No backend ID input should appear.
+- With a trained model and an assigned active camera, inspect `GET /api/traffic/state` → `crosswalk_region_counts`. The A or B observation should carry the same `physical_region_id` but distinct `camera_region_id`, and only the active source produces counts. Do not add the counts to infer unique objects.
+- Confirm old shared and side-scoped regions still load, source switching does not leak counts, and simulator toggles stay hidden by default.
+- Owner PASS and hardware validation pending; stable baseline `0_5_0`.
+
+## Previous V055 Regression Alignment Candidate
 
 ```text
 version: 0_5_5

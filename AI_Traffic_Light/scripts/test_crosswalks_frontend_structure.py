@@ -42,7 +42,9 @@ def main() -> None:
     assert "setRegionEditorOpen(true)" in page
     assert "setPointerCapture" in editor and "onPointerMove" in editor
     assert "onPointerCancel" in editor and "onVertexDown" in editor
-    assert "vertices: [[390, 220], [890, 220], [890, 500], [390, 500]]" in editor
+    assert 'const initialVertices: CrosswalkRegion["vertices"]' in editor
+    assert "vertices_by_side:" in editor
+    assert "verticesForSide(region, sideKey)" in editor
     assert "Select camera for preview" in editor and "cameraStatus?.active_source_id === sourceId" in editor
     assert "Simulation pair" in editor
     assert "source_id=${encodeURIComponent(sourceId)}" in editor

@@ -10,16 +10,21 @@ const HEIGHT = 720;
 const MAX_REGIONS = 24;
 type Side = "camera_side_a_id" | "camera_side_b_id";
 
-function newRegion(regions: CrosswalkRegion[], side: "a" | "b"): CrosswalkRegion {
+function newRegion(regions: CrosswalkRegion[]): CrosswalkRegion {
   const ids = new Set(regions.map((item) => item.id));
   let number = 1;
   while (ids.has("region_" + number)) number++;
+  const initialVertices: CrosswalkRegion["vertices"] = [[390, 220], [890, 220], [890, 500], [390, 500]];
   return {
     id: "region_" + number,
-    label: "New region " + number,
-    camera_side: side,
-    vertices: [[390, 220], [890, 220], [890, 500], [390, 500]],
+    label: "Region " + number,
+    vertices: initialVertices,
+    vertices_by_side: { a: structuredClone(initialVertices), b: structuredClone(initialVertices) },
   };
+}
+
+function verticesForSide(region: CrosswalkRegion, side: "a" | "b"): CrosswalkRegion["vertices"] {
+  return region.vertices_by_side?.[side] ?? region.vertices;
 }
 
 type Props = {
@@ -57,7 +62,7 @@ export function CrosswalkRegionEditor({
     ? Boolean(cameraStatus?.frame_available && selectedCamera?.kind === "simulation")
     : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale));
   const previewName = sourceId ?? "No camera assigned";
-  const polygon = (region: CrosswalkRegion) => region.vertices.map(([x, y]) => x + "," + y).join(" ");
+  const polygon = (region: CrosswalkRegion) => verticesForSide(region, sideKey).map(([x, y]) => x + "," + y).join(" ");
 
   function updateRegion(id: string, patch: Partial<CrosswalkRegion>) {
     onRegionsChange(crosswalk.regions.map((region) => region.id === id ? { ...region, ...patch } : region));
@@ -65,7 +70,7 @@ export function CrosswalkRegionEditor({
 
   function addRegion() {
     if (crosswalk.regions.length >= MAX_REGIONS) return;
-    const region = newRegion(crosswalk.regions, sideKey);
+    const region = newRegion(crosswalk.regions);
     onRegionsChange([...crosswalk.regions, region]);
     setSelectedId(region.id);
     setError(null);
@@ -94,9 +99,9 @@ export function CrosswalkRegionEditor({
     const y = Math.max(0, Math.min(HEIGHT, Math.round((event.clientY - box.top) / box.height * HEIGHT)));
     const region = crosswalk.regions.find((item) => item.id === drag.id);
     if (!region) return;
-    const vertices = structuredClone(region.vertices);
+    const vertices = structuredClone(verticesForSide(region, sideKey));
     vertices[drag.index] = [x, y];
-    updateRegion(region.id, { vertices });
+    updateRegion(region.id, { vertices_by_side: { ...region.vertices_by_side, [sideKey]: vertices } });
   }
 
   function endDrag(event: ReactPointerEvent<SVGSVGElement>) {
@@ -137,7 +142,7 @@ export function CrosswalkRegionEditor({
       <div className="panel-header">
         <div>
           <h2>{crosswalk.label} — Region editor</h2>
-          <p className="placeholder-copy">New regions are unique to the selected camera side. Older shared regions remain available on both sides.</p>
+          <p className="placeholder-copy">Each region identifies one physical area. Define its polygon separately in the Side A and Side B camera views.</p>
         </div>
         <div className="button-row">
           <button className="primary" type="button" onClick={() => void onSave()} disabled={saving || !hasUnsavedChanges}>{saving ? "Saving…" : "Save regions"}</button>
@@ -159,7 +164,7 @@ export function CrosswalkRegionEditor({
                 onClick={() => setSelectedId(region.id)}
               >{region.label}</button>
             ))}
-            {crosswalk.regions.length === 0 && <p className="small-note">No regions yet.</p>}
+            {visibleRegions.length === 0 && <p className="small-note">No regions on this camera side.</p>}
           </div>
           <div className="button-row">
             <button className="primary" type="button" onClick={addRegion} disabled={crosswalk.regions.length >= MAX_REGIONS}>Add region</button>
@@ -175,25 +180,16 @@ export function CrosswalkRegionEditor({
               />
             </label>
           )}
-          {selected && <label>Backend region ID
-            <input value={selected.id} maxLength={64} disabled={!selected.camera_side}
-              onChange={(event) => {
-                const id = event.target.value;
-                if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || crosswalk.regions.some((item) => item.id === id && item.id !== selected.id)) return;
-                onRegionsChange(crosswalk.regions.map((item) => item.id === selected.id ? { ...item, id } : item));
-                setSelectedId(id);
-              }} />
-          </label>}
-          <hr />
+           <hr />
           <h3>Preview source</h3>
           <span className="status-pill">{simulated ? "Simulation pair" : "Physical cameras"}</span>
           {(
             <>
               <div className="crosswalk-region-side-toggle" role="group" aria-label="Camera side">
                 <button type="button" aria-pressed={side === "camera_side_a_id"}
-                  onClick={() => { setSide("camera_side_a_id"); setSelectedId(null); }} disabled={busy}>Side A</button>
+                  onClick={() => setSide("camera_side_a_id")} disabled={busy}>Side A</button>
                 <button type="button" aria-pressed={side === "camera_side_b_id"}
-                  onClick={() => { setSide("camera_side_b_id"); setSelectedId(null); }} disabled={busy}>Side B</button>
+                  onClick={() => setSide("camera_side_b_id")} disabled={busy}>Side B</button>
               </div>
               {!simulated && <button type="button" onClick={() => void previewPhysicalCamera()}
                 disabled={busy || changingMode || !selectedCamera}>
@@ -236,7 +232,7 @@ export function CrosswalkRegionEditor({
                     points={polygon(region)}
                     className={selected?.id === region.id ? "crosswalk-region-polygon is-selected" : "crosswalk-region-polygon"}
                   />
-                  {selected?.id === region.id && region.vertices.map(([x, y], index) => (
+                  {selected?.id === region.id && verticesForSide(region, sideKey).map(([x, y], index) => (
                     <g key={index}>
                       <circle
                         cx={x} cy={y} r="17"
@@ -251,7 +247,7 @@ export function CrosswalkRegionEditor({
               ))}
             </svg>
           </div>
-          <p className="small-note">Editing coordinates: {WIDTH} × {HEIGHT}. Side A and Side B regions can use different coordinates; legacy shared regions remain compatible. Select Save regions above to persist changes.</p>
+          <p className="small-note">Editing coordinates: {WIDTH} × {HEIGHT}. One region name refers to the same physical area in both cameras; each side has its own polygon. Counting remains separate per camera to prevent double-counting. Select Save regions above to persist changes.</p>
         </section>
       </div>
     </div>

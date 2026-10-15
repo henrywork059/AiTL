@@ -1,10 +1,12 @@
 export type CrosswalkVertex = [number, number];
+export type CrosswalkQuadrilateral = [CrosswalkVertex, CrosswalkVertex, CrosswalkVertex, CrosswalkVertex];
 
 export type CrosswalkRegion = {
   id: string;
   label: string;
-  camera_side?: "a" | "b";
-  vertices: [CrosswalkVertex, CrosswalkVertex, CrosswalkVertex, CrosswalkVertex];
+  camera_side?: "a" | "b"; // Read older one-sided regions without reassigning them.
+  vertices: CrosswalkQuadrilateral;
+  vertices_by_side?: Partial<Record<"a" | "b", CrosswalkQuadrilateral>>;
 };
 
 export type Crosswalk = {

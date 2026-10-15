@@ -1,5 +1,11 @@
 # API Contracts — current camera and junction-network highlights
 
+## V056 One physical region with two camera polygons
+
+Each newly created crosswalk region is **one logical region** with a stable internal `id` and an editable shared `label`. It retains `vertices` for older clients and may contain `vertices_by_side: {"a": [[x,y], ...], "b": [[x,y], ...]}` (one or both keys; each polygon is a validated convex quadrilateral in the existing 1280 × 720 reference frame). Region Editor does not expose backend IDs. Side A and B coordinates are edited separately and saved atomically through the existing crosswalk PUT endpoint, without changing schema version 1. Missing `vertices_by_side` falls back to the legacy `vertices` polygon. Earlier side-scoped `camera_side: "a" | "b"` records remain side-scoped; their associations are not guessed or silently rewritten.
+
+`GET /api/traffic/state` provides `crosswalk_region_counts` only for a camera source with a current inferred frame. Its keys `crosswalk_id:side:region_id` and `camera_region_id` distinguish the two camera views, while `physical_region_id` (`crosswalk_id:region_id`) links them to the **same physical area**. `class_counts` and `total` represent per-frame observations from one active camera; do **not** add A/B counts to infer unique pedestrians or vehicles without multi-camera identity matching. The current implementation does not perform simultaneous dual-camera inference, inter-camera deduplication, or physical signal control.
+
 ## V054 Camera-specific regions and live counts
 
 `camera_side` is optional on schema-1 crosswalk regions (`a` or `b`); missing values preserve legacy shared geometry. Per-frame active-source detections are counted by region under `crosswalk_region_counts` in `GET /api/traffic/state`, keyed `crosswalk:side:region`. Each result contains camera source, region ID, display label, per-class counts and total. No simultaneous camera inference or signal policy changes.

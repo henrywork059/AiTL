@@ -1,4 +1,10 @@
-# Start Here — V055
+# Start Here — V056
+
+Current candidate `0_5_6` (previous `0_5_5`; accepted baseline `0_5_0`).
+
+**Region Editor:** Add a logical Region 1 once, then switch between Side A and Side B to draw two different polygons for that same physical region. Its name is shared, backend IDs are hidden, and **Save regions** persists both polygons. Older side-scoped regions remain valid and are not silently paired. The backend counts only the active inferred camera; A/B observations are identified separately and cannot be summed without de-duplication.
+
+## Previous V055
 
 Current candidate `0_5_5`, previous candidate `0_5_4`, owner-accepted baseline `0_5_0`.
 

@@ -129,12 +129,20 @@ class CrosswalkService:
                 side = region.get("camera_side")
                 if side not in (None, "a", "b"):
                     invalid("Region camera_side must be a, b or omitted.")
+                side_vertices = region.get("vertices_by_side")
+                if side_vertices is not None and (
+                    not isinstance(side_vertices, dict) or not side_vertices
+                    or any(key not in ("a", "b") or not _quadrilateral(points)
+                           for key, points in side_vertices.items())
+                ):
+                    invalid("vertices_by_side must have valid convex quadrilaterals for Side A and/or B.")
                 region_ids.add(region_id)
                 regions.append({
                     "id": region_id,
                     "label": region_label.strip(),
                     "vertices": deepcopy(region["vertices"]),
                     **({"camera_side": side} if side is not None else {}),
+                    **({"vertices_by_side": deepcopy(side_vertices)} if side_vertices is not None else {}),
                 })
             items.append({"id": identity, "label": label.strip(), "location": location.strip(), **cameras, "regions": regions})
         return {"schema_version": 1, "crosswalks": items}

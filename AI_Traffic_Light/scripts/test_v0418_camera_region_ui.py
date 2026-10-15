@@ -40,9 +40,10 @@ def main() -> None:
     assert 'role="group" aria-label="Camera side"' in editor
     assert 'aria-pressed={side === "camera_side_a_id"}' in editor
     assert 'aria-pressed={side === "camera_side_b_id"}' in editor
-    # Switching camera sides clears an old polygon selection without mutating it.
-    assert 'setSide("camera_side_a_id"); setSelectedId(null);' in editor
-    assert 'setSide("camera_side_b_id"); setSelectedId(null);' in editor
+    # One logical region remains selected while switching camera perspectives.
+    assert 'onClick={() => setSide("camera_side_a_id")}' in editor
+    assert 'onClick={() => setSide("camera_side_b_id")}' in editor
+    assert "verticesForSide(region, sideKey)" in editor
     assert "<label>Camera side" not in editor
     assert 'fill="none"' not in editor
     assert 'fillOpacity={0}' not in editor

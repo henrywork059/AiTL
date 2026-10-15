@@ -1,5 +1,5 @@
-version: 0_5_5
-status: Camera and region regression alignment candidate
-previous_version: 0_5_4
+version: 0_5_6
+status: Shared physical region two-view geometry candidate
+previous_version: 0_5_5
 passed_baseline: 0_5_0
-notes: Align stale Camera Settings and Region Editor static tests with current simulator toggle, camera pair selection and camera side-switch handlers. No runtime application changes; Windows acceptance pending.
+notes: Share one logical region name across camera sides while preserving independent polygon coordinates; hide backend IDs and retain per-source inference counts without summing duplicate observations. Windows acceptance pending.
