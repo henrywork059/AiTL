@@ -287,11 +287,30 @@ def main() -> int:
         assert SIMULATION_SOURCE_ID not in simulator._sessions
         assert simulator.save_simulation_profile()["camera_count"] == 3
         assert any(item["kind"] == "simulation" for item in RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession).status()["cameras"])
+        pair2 = simulator.save_simulation_profile(pair_index=2)
+        assert pair2["camera_count"] == 5
+        assert pair2["active_source_id"] == "simulation_camera_c"
+        assert {item["source_id"] for item in pair2["cameras"] if item["kind"] == "simulation"} == {
+            SIMULATION_SOURCE_ID, SIMULATION_MIRROR_SOURCE_ID, "simulation_camera_c", "simulation_camera_d",
+        }
+        assert RemoteCameraManager(registry_path=sim_registry, session_factory=FakeSession).status()["camera_count"] == 5
         simulator.select("physical_camera")
         assert not camera_frame_service.simulation_enabled
         simulator.select(SIMULATION_MIRROR_SOURCE_ID)
         assert camera_frame_service.latest_frame().source_id == SIMULATION_MIRROR_SOURCE_ID
+        simulator.delete_profile("simulation_camera_d")
+        assert simulator.status()["camera_count"] == 3
+        assert camera_frame_service.simulation_enabled
+        assert camera_frame_service.latest_frame().source_id == SIMULATION_MIRROR_SOURCE_ID
+
+        simulator.save_simulation_profile(pair_index=2)
+        simulator.select("simulation_camera_d")
+        assert camera_frame_service.latest_frame().source_id == "simulation_camera_d"
         simulator.delete_profile(SIMULATION_MIRROR_SOURCE_ID)
+        assert simulator.status()["camera_count"] == 3
+        assert camera_frame_service.simulation_enabled
+        assert camera_frame_service.latest_frame().source_id == "simulation_camera_d"
+        simulator.delete_profile("simulation_camera_c")
         assert all(item["kind"] != "simulation" for item in simulator.status()["cameras"])
         assert not camera_frame_service.simulation_enabled
 
@@ -302,7 +321,7 @@ def main() -> int:
         assert not session_a.reachable
         assert not replacement_session_b.reachable
 
-    print("[PASS] mirrored simulation camera pair saves, selects and deletes without ESP transport")
+    print("[PASS] two mirrored simulation pairs persist, select and delete separately without ESP transport")
     print("[PASS] multiple ESP profiles persist IP/FPS/OV2640 settings")
     print("[PASS] independent ESP streams can run simultaneously")
     print("[PASS] inactive and in-flight old-source frames cannot overwrite the selected PC Studio source")

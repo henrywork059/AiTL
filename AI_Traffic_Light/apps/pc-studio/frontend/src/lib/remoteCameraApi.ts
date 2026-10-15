@@ -150,8 +150,8 @@ export async function saveRemoteCamera(input: {
   });
 }
 
-export async function saveSimulationCamera(): Promise<RemoteCameraStatus> {
-  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/simulation`, { method: "POST" });
+export async function saveSimulationCamera(pair: 1 | 2 = 1): Promise<RemoteCameraStatus> {
+  return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/simulation?pair=${pair}`, { method: "POST" });
 }
 
 export async function selectRemoteCamera(source_id: string): Promise<RemoteCameraStatus> {

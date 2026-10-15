@@ -1,11 +1,20 @@
-# Local Testing — V0420
+# Local Testing — V0421
 
 ```text
-version: 0_4_20
-previous_version: 0_4_19
+version: 0_4_21
+previous_version: 0_4_20
 passed_baseline: 0_4_14
-status: Selected region soft highlight candidate
+status: Second simulation camera pair candidate
 ```
+
+## V0421 two-pair simulation acceptance
+
+- Run the standard one-line update/test runner with `-ChangedTests`; verify both backend camera regressions, frontend TypeScript/build and startup smoke.
+- In Camera Settings → New camera → Simulation pair, ensure Pair 1 is saved if absent, then use `Add second simulation pair`. Four saved simulated camera IDs should appear: `simulation_camera`, `simulation_camera_b`, `simulation_camera_c`, `simulation_camera_d`.
+- Select each saved camera and check its preview. Pair 1's two views are vertical mirrors; Pair 2 is the same synthetic intersection from a horizontally reflected viewpoint and its mirror. These are two camera pairs on one simulator, not two independent simulations.
+- In Crosswalks, assign C/D to the two camera sides of a crosswalk and save/reload. Do not overwrite existing assignments.
+- Delete Pair 2 through either C or D and verify Pair 1 survives and continues simulating. Restore Pair 2, delete Pair 1 and verify Pair 2 survives. Physical ESP configurations must stay intact.
+- Selected region's pale translucent overlay from V0420 is retained.
 
 ## V0420 selected-region visual acceptance
 

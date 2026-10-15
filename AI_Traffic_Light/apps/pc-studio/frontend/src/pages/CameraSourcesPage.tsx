@@ -133,6 +133,9 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     ? remote?.cameras.find((camera) => camera.source_id === selectedId) ?? null
     : null;
   const selectedSimulation = selectedProfile?.kind === "simulation";
+  const firstSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_b") ?? false;
+  const secondSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_d") ?? false;
+  const nextSimulationPair: 1 | 2 = firstSimulationPairSaved ? 2 : 1;
   const selectedStreaming = Boolean(selectedProfile?.streaming);
   const backgroundStreams = remote?.cameras.filter((camera) => camera.streaming && camera.source_id !== remote.active_source_id).length ?? 0;
   const deviceEffectiveQuality = typeof remote?.device?.effective_jpeg_quality === "number" ? remote.device.effective_jpeg_quality : null;
@@ -219,7 +222,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
     setRemoteMessage(null);
     try {
       const next = newCameraType === "simulation" && !selectedSaved
-        ? await saveSimulationCamera()
+        ? await saveSimulationCamera(nextSimulationPair)
         : await saveRemoteCamera({
         host: host.trim(),
         source_id: sourceId.trim() || "esp32_cam_01",
@@ -228,7 +231,7 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
       });
       loadSelectedProfile(next);
       onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage(newCameraType === "simulation" && !selectedSaved ? "Simulation camera pair saved and started." : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
+      setRemoteMessage(newCameraType === "simulation" && !selectedSaved ? `Simulation camera pair ${nextSimulationPair} saved and started.` : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM profile could not be saved.");
     } finally {
@@ -471,8 +474,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             </label>}
             {!selectedSaved && newCameraType === "simulation" && <div className="button-row">
               <button className="primary" type="button" onClick={() => void saveEspProfile()}
-                disabled={busy || (remote?.cameras.some((camera) => camera.source_id === "simulation_camera_b") ?? false)}>
-                Add simulation pair
+                disabled={busy || (firstSimulationPairSaved && secondSimulationPairSaved) || (remote?.camera_count ?? 0) + 2 > (remote?.max_saved_cameras ?? 12)}>
+                {firstSimulationPairSaved ? "Add second simulation pair" : "Add simulation pair"}
               </button>
             </div>}
             {!selectedSimulation && newCameraType === "esp32" && <details className="camera-fold">

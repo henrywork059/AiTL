@@ -167,6 +167,13 @@ def _draw_vehicle(
     cv2.circle(canvas, (x + width - 34, wheel_y), 6, (125, 133, 144), thickness=-1)
 
 
+SIMULATION_CAMERA_PAIRS = (
+    ("simulation_camera", "simulation_camera_b"),
+    ("simulation_camera_c", "simulation_camera_d"),
+)
+SIMULATION_CAMERA_SOURCE_IDS = tuple(source for pair in SIMULATION_CAMERA_PAIRS for source in pair)
+
+
 class CameraFrameService:
     """Store the latest uploaded frame and provide a signal-aware hardware-free simulator."""
 
@@ -174,7 +181,7 @@ class CameraFrameService:
         self._lock = Lock()
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
-        self._mirrored_frame: CameraFrame | None = None
+        self._simulation_view_frames: dict[str, CameraFrame] = {}
         self._simulation_source_id = "simulation_camera"
         self._simulation_enabled = False
         self._simulation_paused = False
@@ -238,7 +245,7 @@ class CameraFrameService:
 
     def _reset_simulation_locked(self) -> None:
         self._simulation_frame = None
-        self._mirrored_frame = None
+        self._simulation_view_frames.clear()
         self._last_simulation_tick = -1
         self._simulation_clock_s = 0.0
         self._simulation_last_update_monotonic = time.monotonic()
@@ -255,7 +262,7 @@ class CameraFrameService:
                 self._reset_simulation_locked()
             else:
                 self._simulation_frame = None
-                self._mirrored_frame = None
+                self._simulation_view_frames.clear()
                 self._last_simulation_tick = -1
                 self._simulation_last_update_monotonic = None
                 self._vehicles = []
@@ -296,7 +303,7 @@ class CameraFrameService:
         return self.status()
 
     def set_simulation_source(self, source_id: str) -> None:
-        if source_id not in {"simulation_camera", "simulation_camera_b"}:
+        if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
             raise ValueError("Unknown simulation camera")
         with self._lock:
             self._simulation_source_id = source_id
@@ -307,24 +314,28 @@ class CameraFrameService:
         if self._simulation_frame is None or not self._simulation_paused:
             self._refresh_simulation_locked()
         original = self._simulation_frame
-        if original is None or source_id == "simulation_camera":
-            return original
-        if source_id != "simulation_camera_b":
+        if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
             raise ValueError("Unknown simulation camera")
-        if self._mirrored_frame is None or self._mirrored_frame.frame_number != original.frame_number:
+        if original is None or source_id == SIMULATION_CAMERA_PAIRS[0][0]:
+            return original
+        cached = self._simulation_view_frames.get(source_id)
+        if cached is None or cached.frame_number != original.frame_number:
             image = cv2.imdecode(np.frombuffer(original.content, dtype=np.uint8), cv2.IMREAD_COLOR)
             if image is None:
                 raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Simulation frame decode failed.", status_code=500)
-            success, encoded = cv2.imencode(".png", cv2.flip(image, 0))
+            # Each pair shows vertically mirrored sides; pair 2 uses a horizontal viewpoint.
+            flip = {"simulation_camera_b": 0, "simulation_camera_c": 1, "simulation_camera_d": -1}[source_id]
+            success, encoded = cv2.imencode(".png", cv2.flip(image, flip))
             if not success:
                 raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Mirrored simulation frame encoding failed.", status_code=500)
-            self._mirrored_frame = CameraFrame(
+            cached = CameraFrame(
                 content=encoded.tobytes(), content_type="image/png",
-                source_id="simulation_camera_b", width=original.width, height=original.height,
+                source_id=source_id, width=original.width, height=original.height,
                 received_at_ms=original.received_at_ms, frame_number=original.frame_number,
                 origin="simulation",
             )
-        return self._mirrored_frame
+            self._simulation_view_frames[source_id] = cached
+        return cached
 
     def simulation_frame_for(self, source_id: str) -> CameraFrame | None:
         with self._lock:
@@ -536,7 +547,7 @@ class CameraFrameService:
         if self._simulation_frame is not None and tick == self._last_simulation_tick:
             return
         self._last_simulation_tick = tick
-        self._mirrored_frame = None
+        self._simulation_view_frames.clear()
         self._frame_counter += 1
         now_ms = int(time.time() * 1000)
         canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), (29, 33, 37), dtype=np.uint8)

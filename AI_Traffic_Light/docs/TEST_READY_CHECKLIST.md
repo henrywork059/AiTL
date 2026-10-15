@@ -1,12 +1,17 @@
-# V0420 Test Checklist
+# V0421 Test Checklist
 
 ```text
-version: 0_4_20
-previous_version: 0_4_19
+version: 0_4_21
+previous_version: 0_4_20
 passed_baseline: 0_4_14
-status: Selected region soft highlight candidate
+status: Second simulation camera pair candidate
 ```
 
+- [ ] Camera Settings can add Pair 1 and then a second pair (C/D); all four saved IDs persist after restart.
+- [ ] Saved camera selection and preview stream work for A/B/C/D; corresponding views are mirrored and share one signal-clock simulation.
+- [ ] Deleting one simulation pair preserves the other pair and unrelated ESP profiles.
+- [ ] Crosswalk camera-side dropdowns can select Pair 2 cameras, and saving/reloading keeps assignments.
+- [ ] Python regressions, frontend typecheck/build, backend smoke and startup pass.
 - [ ] Unselected Crosswalk Region polygons are fully transparent.
 - [ ] Selected polygon has pale 22%-opaque highlight, visible camera, yellow dashed border and editable vertices.
 - [ ] Legacy selected regions match; Live AI and simulation overlays remain fully transparent.

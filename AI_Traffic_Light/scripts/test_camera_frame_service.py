@@ -54,6 +54,13 @@ def main() -> int:
     mirrored_frame = service.simulation_frame_for("simulation_camera_b")
     assert mirrored_frame is not None and mirrored_frame.source_id == "simulation_camera_b"
     assert np.array_equal(decode_png(mirrored_frame.content), cv2.flip(image, 0))
+    for source_id, flip in (("simulation_camera_c", 1), ("simulation_camera_d", -1)):
+        view = service.simulation_frame_for(source_id)
+        assert view is not None and view.source_id == source_id
+        assert np.array_equal(decode_png(view.content), cv2.flip(image, flip))
+        assert service.simulation_frame_for(source_id).frame_number == view.frame_number
+    service.set_simulation_source("simulation_camera_d")
+    assert service.latest_frame().source_id == "simulation_camera_d"
     service.set_simulation_source("simulation_camera_b")
     assert service.latest_frame().source_id == "simulation_camera_b"
     service.set_simulation_source("simulation_camera")
@@ -167,7 +174,7 @@ def main() -> int:
     else:
         raise AssertionError("Unsupported camera content type was accepted")
 
-    print("[PASS] camera B mirrors A vertically on the shared simulation clock")
+    print("[PASS] two simulation pairs provide mirrored opposite views on one safe signal clock")
     print("[PASS] camera receiver accepts PNG frames")
     print("[PASS] simulation renders road, crosswalk, cars and pedestrians while signal state remains available separately")
     print("[PASS] vehicles queue at the stop line and resume only on vehicle green")

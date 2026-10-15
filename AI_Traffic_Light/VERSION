@@ -1,5 +1,5 @@
-version: 0_4_20
-status: Selected region soft highlight candidate
-previous_version: 0_4_19
+version: 0_4_21
+status: Second simulation camera pair candidate
+previous_version: 0_4_20
 passed_baseline: 0_4_14
-notes: V0420 keeps unselected region polygons fully transparent but gives selected regions a lighter pale-cream 22%-opacity overlay with highlighted yellow dashed outline and existing vertex handles. Removes the unconditional fillOpacity=0 SVG attribute that would suppress the selected fill. Applies the same selection styling to the legacy region editor. Camera, region geometry, Live AI overlays, persistence, backend, and traffic signals remain unchanged. Windows validation and owner PASS pending.
+notes: V0421 adds a second saved simulated camera pair (simulation_camera_c/d) alongside the original simulation_camera/b, with per-pair saving/deletion, selection, MJPEG preview and shared-clock mirrored viewpoints. Pair 2 uses a horizontally mirrored perspective of the same synthetic scene, not a second independent traffic controller. Reuses the current simulation and camera APIs, preserving existing crosswalk and ESP configurations. Windows/regression and UI owner validation pending; accepted baseline remains 0_4_14.

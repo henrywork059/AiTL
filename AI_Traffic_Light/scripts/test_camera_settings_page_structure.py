@@ -34,6 +34,10 @@ def main() -> int:
     assert "saveSimulationCamera()" in page
     assert "Add simulation pair" in page
     assert "simulation_camera_b" in page
+    assert "simulation_camera_d" in page
+    assert "nextSimulationPair" in page
+    assert "Add second simulation pair" in page
+    assert "saveSimulationCamera(nextSimulationPair)" in page
     assert "New camera type" in page
     assert "selectedSimulation && <SimulationControls" in page
     for marker in ("camera.streaming", "camera.stream_connected", "camera.connected",

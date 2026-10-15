@@ -12,7 +12,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
-from app.services.camera_frames import CameraFrame, camera_frame_service
+from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, camera_frame_service
 from app.services.remote_camera import (
     CAMERA_SETTING_KEYS,
     DEFAULT_TARGET_FPS,
@@ -32,7 +32,8 @@ MAX_SWITCH_CACHE_AGE_MS = 1500
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 SIMULATION_SOURCE_ID = "simulation_camera"
 SIMULATION_MIRROR_SOURCE_ID = "simulation_camera_b"
-SIMULATION_SOURCE_IDS = (SIMULATION_SOURCE_ID, SIMULATION_MIRROR_SOURCE_ID)
+SIMULATION_PAIRS = SIMULATION_CAMERA_PAIRS
+SIMULATION_SOURCE_IDS = SIMULATION_CAMERA_SOURCE_IDS
 
 DEFAULT_CAMERA_SETTINGS: dict[str, Any] = {
     "frame_size": "QVGA",
@@ -507,26 +508,29 @@ class RemoteCameraManager:
 
         return self.status()
 
-    def save_simulation_profile(self) -> dict:
-        """Save two synchronized, vertically mirrored virtual cameras."""
+    def save_simulation_profile(self, pair_index: int = 1) -> dict:
+        """Save one synchronized pair without modifying the other pair."""
+        if pair_index not in (1, 2):
+            raise AppError(ErrorCode.INVALID_REQUEST, "Simulation pair must be 1 or 2.", status_code=422)
+        pair = SIMULATION_PAIRS[pair_index - 1]
         with self._publish_lock:
             with self._frame_condition:
-                missing = [sid for sid in SIMULATION_SOURCE_IDS if sid not in self._profiles]
+                missing = [sid for sid in pair if sid not in self._profiles]
                 if len(self._profiles) + len(missing) > MAX_SAVED_CAMERAS:
                     raise AppError(ErrorCode.INVALID_REQUEST, "Two saved camera slots are required for the simulation pair.", status_code=409)
-                for sid in SIMULATION_SOURCE_IDS:
+                for sid in pair:
                     existing = self._profiles.get(sid)
                     if existing is not None and existing.get("kind") != "simulation":
                         raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Simulation source ID is already in use.", status_code=409)
-                for sid in SIMULATION_SOURCE_IDS:
+                for sid in pair:
                     self._profiles[sid] = {
                         "source_id": sid, "kind": "simulation", "host": "",
                         "target_fps": 2, "settings": dict(DEFAULT_CAMERA_SETTINGS),
                         "last_used_ms": self._now_ms(),
                     }
-                self._active_source_id = SIMULATION_SOURCE_ID
+                self._active_source_id = pair[0]
                 self._persist_locked()
-            camera_frame_service.set_simulation_source(SIMULATION_SOURCE_ID)
+            camera_frame_service.set_simulation_source(pair[0])
             camera_frame_service.set_simulation(True)
             self._publish_selected_cache_locked()
         return self.status(refresh_device=False)
@@ -572,9 +576,10 @@ class RemoteCameraManager:
                     )
                 was_active = self._active_source_id == normalized_source
                 session = self._invalidate_session_locked(normalized_source)
-                for sid in (SIMULATION_SOURCE_IDS if normalized_source in SIMULATION_SOURCE_IDS else (normalized_source,)):
+                pair = next((ids for ids in SIMULATION_PAIRS if normalized_source in ids), None)
+                for sid in (pair if pair is not None else (normalized_source,)):
                     self._profiles.pop(sid, None)
-                if was_active or (self._active_source_id in SIMULATION_SOURCE_IDS and normalized_source in SIMULATION_SOURCE_IDS):
+                if self._active_source_id not in self._profiles:
                     self._active_source_id = max(
                         self._profiles.values(),
                         key=lambda item: int(item["last_used_ms"]),
@@ -584,9 +589,12 @@ class RemoteCameraManager:
                 self._persist_locked()
                 self._frame_condition.notify_all()
 
-            if was_active or normalized_source in SIMULATION_SOURCE_IDS:
-                if normalized_source in SIMULATION_SOURCE_IDS and camera_frame_service.simulation_enabled:
-                    camera_frame_service.set_simulation(False)
+            if was_active or pair is not None:
+                selected_simulation = self._active_source_id in SIMULATION_SOURCE_IDS
+                if selected_simulation:
+                    camera_frame_service.set_simulation_source(self._active_source_id)
+                if camera_frame_service.simulation_enabled != selected_simulation:
+                    camera_frame_service.set_simulation(selected_simulation)
                 self._publish_selected_cache_locked()
 
         if session is not None:

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_4_21 — Second saved simulation camera pair
+
+- Add simulation camera Pair 2 (`simulation_camera_c` and `simulation_camera_d`) alongside the existing Pair 1 (`simulation_camera` and `simulation_camera_b`).
+- Extend the existing saved-camera manager to persist and delete each pair separately. Switching between the two pairs and physical cameras reuses the existing selection service, keeping the active stream and simulated-mode transitions consistent.
+- Extend the existing camera renderer's per-source frame views and MJPEG preview routing: Pair 2 shows a distinct horizontally reflected view of the existing synthetic scene; its two sides are vertically mirrored. Both pairs share one simulation clock and safety policy, **not** separate intersections.
+- Camera Settings now enables `Add second simulation pair` after Pair 1 exists, enforcing the existing 12 saved-camera limit. Existing Crosswalks `Assign simulation pair` remains backward-compatible with Pair 1, while its camera pickers can select Pair 2 IDs.
+- Add a dedicated structure test, extend camera-frame and remote-camera-manager regressions for four simulation views, persistence, pair isolation and safe deletion.
+- No new dependencies or separate camera services; previous candidate `0_4_20`, owner-accepted stable baseline `0_4_14`. Windows backend, frontend build and live acceptance pending.
+
+
 ## 0_4_20 — Subtle selected-region highlight
 
 - Keep unselected polygons fully clear; when selected, use a pale cream `rgba(255, 246, 210, 0.22)` fill. Camera frames remain visible through the 22% highlight.
