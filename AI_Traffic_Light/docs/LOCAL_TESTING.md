@@ -1,4 +1,20 @@
-# V054 Camera-Scoped Regions Candidate
+# V055 Regression Alignment Candidate
+
+```text
+version: 0_5_5
+previous_version: 0_5_4
+passed_baseline: 0_5_0
+status: Camera/region regression alignment candidate
+```
+
+## V055 validation
+
+- Run the full updater (no `-ChangedTests`) once to verify all existing offline tests, in particular `test_camera_settings_page_structure.py` and `test_v0418_camera_region_ui.py`.
+- Confirm TypeScript, frontend build, backend `/health`, live smoke and PC Studio startup.
+- Manually verify Simulation Camera Pair 1/2 choices behind the brand toggle and independent Crosswalk Side A/B region editing and Save regions.
+- No application runtime changes; awaiting owner PASS.
+
+## Previous V054 Camera-Scoped Regions Candidate
 
 ```text
 version: 0_5_4

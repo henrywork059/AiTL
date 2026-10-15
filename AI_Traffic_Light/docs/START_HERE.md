@@ -1,4 +1,10 @@
-# Start Here — V054
+# Start Here — V055
+
+Current candidate `0_5_5`, previous candidate `0_5_4`, owner-accepted baseline `0_5_0`.
+
+V055 updates two stale offline regressions (Camera Settings structure and historical V0418 Region Editor side-switch behavior) to reflect existing implemented code. No application runtime code or camera/region data is changed. Use the existing Windows runner to validate all regressions, frontend build and smoke before acceptance.
+
+## Previous V054
 
 Candidate `0_5_4`, previous `0_5_3`, accepted baseline `0_5_0`. The Region Editor creates distinct Side A/B regions and supports an editable backend ID; Save regions persists them. Per-class detection counts are exposed for the active camera only.
 

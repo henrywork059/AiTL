@@ -21,7 +21,7 @@ def main() -> int:
     # Both routes share one camera registry, rather than duplicating state or transport.
     assert 'view="settings"' in page
     assert "cameraSettingsView && (" in page
-    assert "!cameraSettingsView && (" in page
+    assert "!cameraSettingsView && showSimulationTools && (" in page
     assert page.count("fetchRemoteCameraStatus()") == 1
     for call in ("saveRemoteCamera(", "selectRemoteCamera(", "connectRemoteCamera(",
                  "startRemoteCamera(", "stopRemoteCamera(", "deleteRemoteCamera("):
@@ -31,7 +31,6 @@ def main() -> int:
     assert "selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled" in page
     assert "Measured stream FPS" in page and "Frame age" in page
     assert "cameraIndicator(camera)" in page
-    assert "saveSimulationCamera()" in page
     assert "Add simulation pair" in page
     assert "simulation_camera_b" in page
     assert "simulation_camera_d" in page
@@ -39,23 +38,25 @@ def main() -> int:
     assert "Add second simulation pair" in page
     assert "saveSimulationCamera(nextSimulationPair)" in page
     assert "New camera type" in page
-    assert "selectedSimulation && <SimulationControls" in page
+    assert "showSimulationTools && selectedSimulation && <SimulationControls" in page
     for marker in ("camera.streaming", "camera.stream_connected", "camera.connected",
                    "camera.device_reachable", "camera.paused_for_simulation"):
         assert marker in page, marker
     for state in ("Streaming", "Reconnecting", "Paused", "Connected", "Unreachable", "Saved"):
         assert f'label: "{state}"' in page, state
-    assert "remote?.cameras.map((camera) => {" in page
+    assert "visibleCameras.map((camera) => {" in page
+    assert 'showSimulationTools || camera.kind !== "simulation"' in page
     assert "camera-status-entry" in page and "camera.selected" in page
     assert 'role="list"' in page and 'role="listitem"' in page
     assert 'className="camera-fold"' in page
     assert 'className="panel compact-panel training-form camera-fold"' in page
     assert 'className="panel compact-panel camera-fold"' in page
     assert "Manage IP addresses and connections" in page
-    # The ESP-only form is already narrowed to newCameraType === "esp32".
-    # Avoid TS2367 by not comparing that narrowed type to "simulation" again.
-    esp_form = page.split('newCameraType === "esp32" && <details className="camera-fold">', 1)[1].split("</details>", 1)[0]
-    assert 'newCameraType === "simulation"' not in esp_form
+    # The ESP-only form uses effectiveCameraType so concealed simulation tools
+    # cannot accidentally select the simulator save path.
+    assert 'const effectiveCameraType = showSimulationTools ? newCameraType : "esp32"' in page
+    esp_form = page.split('effectiveCameraType === "esp32" && <details className="camera-fold">', 1)[1].split("</details>", 1)[0]
+    assert 'effectiveCameraType === "simulation"' not in esp_form
     assert 'disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}' in esp_form
     assert "Detailed camera & stream status" in page
     assert "Each saved ESP keeps its own OV2640 settings" not in page

@@ -1,4 +1,18 @@
-# V054 Candidate Checklist
+# V055 Regression Alignment Candidate Checklist
+
+```text
+version: 0_5_5
+previous_version: 0_5_4
+passed_baseline: 0_5_0
+status: Camera/region regression alignment candidate
+```
+
+- [ ] Camera Settings structural regression accepts the current paired simulator API call and hidden-controls wiring.
+- [ ] Historical V0418 regression verifies Side A/B switching clears stale polygon selection.
+- [ ] Full offline regressions, frontend build, live backend smoke and visual confirmation on Windows.
+- [ ] No camera/simulation/region persistence or signal behavior changed; owner PASS pending.
+
+## Previous V054 Candidate Checklist
 
 ```text
 version: 0_5_4

@@ -1,5 +1,5 @@
-version: 0_5_4
-status: Camera-scoped counting regions candidate
-previous_version: 0_5_3
+version: 0_5_5
+status: Camera and region regression alignment candidate
+previous_version: 0_5_4
 passed_baseline: 0_5_0
-notes: Independent camera-side regions, editable IDs, class occupancy counts from active inference source; Windows acceptance pending.
+notes: Align stale Camera Settings and Region Editor static tests with current simulator toggle, camera pair selection and camera side-switch handlers. No runtime application changes; Windows acceptance pending.

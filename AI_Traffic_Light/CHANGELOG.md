@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_5_5 — Align camera/region regressions with current implementation
+
+- Update Camera Settings structure assertions to the existing paired simulation save call, concealed simulator controls, filtered saved-camera list and effective ESP-only form state.
+- Update the historical V0418 Region Editor assertions for Side A/B camera switching that also clears the previous selection.
+- Preserve all application/firmware/backend runtime files, camera pairing, region IDs, counts and signal logic unchanged. Candidate after failing 0_5_4 regression; accepted stable baseline remains `0_5_0`. Windows full acceptance pending.
+
+
 ## 0_5_4 — Camera-scoped counting regions
 
 - New regions are independently defined on Side A or B, including polygon, display label and backend identifier. Legacy shared regions remain readable.
