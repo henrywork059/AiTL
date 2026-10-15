@@ -14,10 +14,17 @@ def ui(path: str) -> str:
 def css_rule(css: str, selector: str) -> str:
     found = list(re.finditer(re.escape(selector) + r"\s*\{([^{}]*)\}", css))
     assert found, f"Missing selector {selector}"
-    return found[-1].group(1)
+    # CSS may define the same selector in separate rules (e.g. layout, then color).
+    # Test declarations across those rules rather than only the final block.
+    return "\n".join(match.group(1) for match in found)
 
 
 def main() -> None:
+    # Regression: a background-only override must not hide earlier cursor/layout.
+    sample = ".camera-status-entry { cursor: pointer; }\n.camera-status-entry { background: slate; }"
+    assert "cursor: pointer;" in css_rule(sample, ".camera-status-entry")
+    assert "background: slate;" in css_rule(sample, ".camera-status-entry")
+
     cameras = ui("pages/CameraSourcesPage.tsx")
     saved = cameras.split('<div className="camera-status-strip-items" role="list">', 1)[1].split("!remote &&", 1)[0]
     assert 'role="listitem"' in saved

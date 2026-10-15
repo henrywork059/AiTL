@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_19 — Fix duplicate CSS selector regression lookup
+
+- Fix the V0418 first-run `test_v0418_camera_region_ui.py` failure by inspecting all declarations of `.camera-status-entry`. The pointer cursor is present in the original CSS block; a later background-only rule was incorrectly selected by the test helper.
+- Add a two-rule fixture asserting that the helper sees both layout and background declarations. Check the remaining camera, region and simulation structure assertions against the current sources.
+- Keep the complete pre-V0418 source archive and add a reminder to avoid assuming CSS selectors occur only once.
+- No runtime application, CSS, backend, traffic, camera or API changes. Previous candidate `0_4_18`; accepted stable baseline remains `0_4_14`. Windows regressions/build/live smoke pending.
+
+
 ## 0_4_18 — Camera selection, cleaner simulation and region controls
 
 - Allow direct selection of saved cameras by clicking their cards, reusing the existing `chooseSavedCamera` path. Keep selection, busy and keyboard-focus indicators accessible.

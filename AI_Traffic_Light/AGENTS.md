@@ -275,6 +275,7 @@ For camera source selection, simulation frame rendering, Crosswalk Region Editor
 - A selected region has a visible stroke/vertex handles while its interior remains transparent.
 - Camera-side toggles must not mutate region coordinates or camera-side assignments.
 - Update old visual expectations when appearance intentionally changes; run affected regression tests and TypeScript/build rather than relying only on source-text checks.
+- A CSS selector may be repeated across multiple rule blocks; structure tests must inspect all relevant declarations (or the effective cascade), not blindly select the first or last match.
 - This snapshot is **recovery documentation, not active source**; do not import its code or restore it unless investigating a regression.
 
 ## 15. Handoff/acceptance

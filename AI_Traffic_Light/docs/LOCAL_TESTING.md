@@ -1,11 +1,18 @@
-# Local Testing — V0418
+# Local Testing — V0419
 
 ```text
-version: 0_4_18
-previous_version: 0_4_17
+version: 0_4_19
+previous_version: 0_4_18
 passed_baseline: 0_4_14
-status: Camera selection and region preview polish candidate
+status: Saved-camera CSS regression helper repair candidate
 ```
+
+## V0419 duplicate CSS rule regression verification
+
+- Run the standard updater with `-ChangedTests` and verify the V0418 regression now inspects both the original cursor declaration and later camera-card background declaration.
+- The earlier `assert "cursor: pointer;" in entry` should pass; confirm remaining selected tests, frontend typecheck/build, backend smoke and startup.
+- V0418's camera selection, simulation image, region Side A/B buttons, transparency and Simulation active badge alignment are unchanged; continue their visual acceptance.
+- Owner-accepted baseline remains V0414; V0419 is a candidate until Windows PASS.
 
 ## V0418 camera and region acceptance
 
