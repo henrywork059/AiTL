@@ -48,6 +48,11 @@ def main() -> int:
     assert 'className="panel compact-panel training-form camera-fold"' in page
     assert 'className="panel compact-panel camera-fold"' in page
     assert "Manage IP addresses and connections" in page
+    # The ESP-only form is already narrowed to newCameraType === "esp32".
+    # Avoid TS2367 by not comparing that narrowed type to "simulation" again.
+    esp_form = page.split('newCameraType === "esp32" && <details className="camera-fold">', 1)[1].split("</details>", 1)[0]
+    assert 'newCameraType === "simulation"' not in esp_form
+    assert 'disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}' in esp_form
     assert "Detailed camera & stream status" in page
     assert "Each saved ESP keeps its own OV2640 settings" not in page
     assert "V037 R6" not in page

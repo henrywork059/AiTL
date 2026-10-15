@@ -1,11 +1,19 @@
-# Local Testing — V0409
+# Local Testing — V0410
 
 ```text
-version: 0_4_9
-previous_version: 0_4_8
+version: 0_4_10
+previous_version: 0_4_9
 passed_baseline: 0_4_0
-status: Slate and mint design alignment candidate
+status: Camera Settings TypeScript guard correction candidate
 ```
+
+## V0410 TypeScript repair validation
+
+- Run the standard single-line update/test/run command from the repository root.
+- Verify the Camera Settings static regression, TypeScript typecheck (`npm run typecheck`) and frontend production build (`npm run build`) pass.
+- Add an ESP32 camera and confirm Save/Connect controls still reflect streaming, busy and missing IP/source ID.
+- Verify adding a simulation pair remains available as a separate action. Camera simulation/ESP routing is unchanged.
+- Continue V0409 slate/mint and Junction Network visual acceptance, plus live backend smoke.
 
 ## V0409 visual acceptance
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_10 — Camera Settings TypeScript typecheck repair
+
+- Remove two unreachable `newCameraType === "simulation"` comparisons inside an ESP-only branch in Camera Settings, fixing the two reported `TS2367` frontend errors.
+- Keep Save/Connect disabled when busy, streaming or ESP configuration is incomplete. Leave simulation-pair creation, camera selection and transport behavior unchanged.
+- Add targeted regression assertions to prevent comparisons against `simulation` inside the narrowed ESP-only form.
+- V0409's slate/mint visual design remains unchanged. Previous candidate `0_4_9`; accepted baseline `0_4_0`. Windows TypeScript build/startup pending.
+
+
 ## 0_4_9 — Slate/mint design alignment
 
 - Use the approved `#4D4E61` dark canvas with coordinated opaque sidebar (`#414354`), brand/header boxes (`#333648`), panel (`#55576A`), nested surface (`#5A5C70`), input (`#47495B`) and selected (`#2F585A`) color roles.

@@ -1,5 +1,5 @@
-version: 0_4_9
-status: Slate and mint design alignment candidate
-previous_version: 0_4_8
+version: 0_4_10
+status: Camera Settings TypeScript guard correction candidate
+previous_version: 0_4_9
 passed_baseline: 0_4_0
-notes: V0409 applies the approved #4D4E61 slate dark canvas with opaque coordinated sidebar, panel, input, selected and semantic surfaces while retaining #57FFED mint interaction color. The sidebar brand and section titles use distinct panels, and numbered Junction Network edge controls fit inside reserved card space. No backend, camera or signal behavior changed. Candidate awaits owner PASS; accepted stable baseline remains 0_4_0.
+notes: V0410 removes unreachable simulation-type comparisons inside the ESP-only Camera Settings form that blocked frontend TypeScript compilation. Camera behavior and V0409 slate/mint styling are unchanged. Includes a scoped structural regression. Owner Windows validation pending; accepted baseline remains 0_4_0.

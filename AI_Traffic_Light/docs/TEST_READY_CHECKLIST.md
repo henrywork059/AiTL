@@ -1,12 +1,15 @@
-# V0409 Test Checklist
+# V0410 Test Checklist
 
 ```text
-version: 0_4_9
-previous_version: 0_4_8
+version: 0_4_10
+previous_version: 0_4_9
 passed_baseline: 0_4_0
-status: Slate and mint design alignment candidate
+status: Camera Settings TypeScript guard correction candidate
 ```
 
+- [ ] Camera Settings ESP-only form has no unreachable `simulation` comparisons (TS2367).
+- [ ] `npm run typecheck` and `npm run build` pass locally.
+- [ ] ESP Save/Connect enable/disable states and simulation-pair creation work normally.
 - [ ] Dark canvas `#4D4E61` and opaque sidebar, input, panel, selected, and semantic layers are legible.
 - [ ] Sidebar brand and each navigation group title are visually separated from page links.
 - [ ] Junction edge labels 1–4 are inside the card and leave all card data and drag handle accessible.

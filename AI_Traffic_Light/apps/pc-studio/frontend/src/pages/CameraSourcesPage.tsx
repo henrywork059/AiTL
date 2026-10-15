@@ -486,8 +486,8 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
 
             <div className="button-row">
               <button type="button" onClick={() => resetNewCamera()} disabled={busy}>New camera</button>
-              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || selectedStreaming || (newCameraType === "esp32" && (!host.trim() || !sourceId.trim())) || (newCameraType === "simulation" && (remote?.cameras.some((camera) => camera.kind === "simulation") ?? false))}>Save</button>
-              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || newCameraType === "simulation" || !host.trim() || !sourceId.trim() || selectedStreaming}>
+              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}>Save</button>
+              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}>
                 {busy ? "Working..." : remote?.configured && selectedSaved ? "Reconnect" : "Connect"}
               </button>
               <button type="button" onClick={() => void disconnectEsp()} disabled={busy || !selectedSaved || !remote?.configured}>
