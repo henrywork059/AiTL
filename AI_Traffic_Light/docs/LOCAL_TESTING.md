@@ -1,11 +1,19 @@
-# Local Testing — V0415
+# Local Testing — V0416
 
 ```text
-version: 0_4_15
-previous_version: 0_4_14
+version: 0_4_16
+previous_version: 0_4_15
 passed_baseline: 0_4_14
-status: Slightly darker slate background candidate
+status: Regions terminology and empty Zones page removal candidate
 ```
+
+## V0416 Regions wording and navigation validation
+
+- Run the standard one-line updater with `-ChangedTests`; confirm focused Python regressions, TypeScript, build, backend smoke and app startup.
+- Traffic sidebar must include Junctions and Crosswalks but no empty Zones page. The Crosswalks → Edit regions workflow must still open its quadrilateral region editor.
+- Live AI must show Regions instead of Zones; Signal Control and Traffic Analytics use Region/Regions labels. No visible legacy Zone Editor terminology should remain.
+- Verify camera overlays, configured region selection and scenarios still work with saved zone IDs. Internal `zone_id` and `/api/zones` keys deliberately remain unchanged.
+- Previous candidate V0415 darker canvas remains included. Owner-accepted stable baseline is V0414.
 
 ## V0415 dark canvas validation
 

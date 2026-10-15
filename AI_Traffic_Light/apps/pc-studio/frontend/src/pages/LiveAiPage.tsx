@@ -318,7 +318,7 @@ export function LiveAiPage({
             <div className="button-row wrap-row">
               <label className="inline-toggle"><input type="checkbox" checked={showBoxes} onChange={(event) => setShowBoxes(event.target.checked)} /> Boxes</label>
               <label className="inline-toggle"><input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} /> Labels</label>
-              <label className="inline-toggle"><input type="checkbox" checked={showZones} onChange={(event) => setShowZones(event.target.checked)} /> Zones</label>
+              <label className="inline-toggle"><input type="checkbox" checked={showZones} onChange={(event) => setShowZones(event.target.checked)} /> Regions</label>
             </div>
             <div className="class-filter-group">
               <strong>Visible classes</strong>

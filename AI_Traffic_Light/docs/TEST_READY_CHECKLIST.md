@@ -1,12 +1,17 @@
-# V0415 Test Checklist
+# V0416 Test Checklist
 
 ```text
-version: 0_4_15
-previous_version: 0_4_14
+version: 0_4_16
+previous_version: 0_4_15
 passed_baseline: 0_4_14
-status: Slightly darker slate background candidate
+status: Regions terminology and empty Zones page removal candidate
 ```
 
+- [ ] Traffic sidebar has no empty Zones page; Junctions and Crosswalks remain.
+- [ ] Crosswalks → Edit regions still creates/edits/saves the same region geometry.
+- [ ] Live AI, Signal Control, Analytics and feature descriptions show Region/Regions wording.
+- [ ] Existing `/api/zones`, `zone_id` and saved configs remain fully compatible.
+- [ ] Python regressions, TypeScript build, backend live smoke and app startup pass.
 - [ ] Main dark canvas uses `#444557` without changing the sidebar, panels, mint accent or light mode.
 - [ ] Palette/design regressions, frontend build, startup and live smoke pass on Windows.
 - [ ] Old V0409 palette regression no longer requires `color-nav-heading-surface`.

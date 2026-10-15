@@ -30,7 +30,6 @@ import { TrafficAnalyticsPage } from "./pages/TrafficAnalyticsPage";
 import { TrafficLogicPage } from "./pages/TrafficLogicPage";
 import { TrainExportPage } from "./pages/TrainExportPage";
 import { ZoneEditorPage } from "./pages/ZoneEditorPage";
-import { ZonesPage } from "./pages/ZonesPage";
 import type { AppPageId } from "./types/app";
 import type {
   ApiConnectionState,
@@ -246,8 +245,6 @@ export default function App() {
         );
       case "zone_editor":
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
-      case "zones":
-        return <ZonesPage />;
       case "traffic_logic":
         return <TrafficLogicPage />;
       case "traffic_analytics":

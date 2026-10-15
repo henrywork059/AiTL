@@ -93,8 +93,8 @@ export function TrafficAnalyticsPage() {
   async function clearCurrent() {
     const occupancy = mode === "occupancy";
     const prompt = occupancy
-      ? "Clear all stored occupancy samples? Flow events, captures, labels, zones, and models will not be changed."
-      : "Clear all stored tracked flow events? Occupancy history, captures, labels, zones, and models will not be changed.";
+      ? "Clear all stored occupancy samples? Flow events, captures, labels, regions, and models will not be changed."
+      : "Clear all stored tracked flow events? Occupancy history, captures, labels, regions, and models will not be changed.";
     if (!window.confirm(prompt)) return;
     setClearing(true);
     try {
@@ -217,7 +217,7 @@ export function TrafficAnalyticsPage() {
             <div className="metric-card"><span>Region entries</span><strong>{flowSummary?.region_entries ?? 0}</strong><small>outside → inside</small></div>
             <div className="metric-card"><span>Region exits</span><strong>{flowSummary?.region_exits ?? 0}</strong><small>inside → outside</small></div>
             <div className="metric-card"><span>Average dwell</span><strong>{durationLabel(flowSummary?.average_dwell_ms)}</strong><small>completed region visits</small></div>
-            <div className="metric-card"><span>Average pedestrian wait</span><strong>{durationLabel(flowSummary?.average_pedestrian_wait_ms)}</strong><small>pedestrian waiting zones</small></div>
+            <div className="metric-card"><span>Average pedestrian wait</span><strong>{durationLabel(flowSummary?.average_pedestrian_wait_ms)}</strong><small>pedestrian waiting regions</small></div>
           </div>
 
           <div className="two-column-grid">
@@ -279,7 +279,7 @@ export function TrafficAnalyticsPage() {
       )}
 
       <section className="panel">
-        <div className="panel-header"><h2>Analytics geometry</h2><span className="status-pill status-info">Zone Editor</span></div>
+        <div className="panel-header"><h2>Analytics geometry</h2><span className="status-pill status-info">Region Editor</span></div>
         <p className="placeholder-copy"><strong>Counting regions</strong> support occupancy and track entry/exit/dwell metrics. <strong>Counting lines</strong> use two points and create directional passage events. Both are analytics geometry and do not directly alter simulated signal timing.</p>
       </section>
       <FunctionChecklist area="Traffic analytics" />

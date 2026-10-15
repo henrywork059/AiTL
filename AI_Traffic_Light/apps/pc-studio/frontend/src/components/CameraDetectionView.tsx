@@ -62,7 +62,7 @@ export function CameraDetectionView({
           className="live-detection-overlay"
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
-          aria-label="Live object detection and configured zone overlay"
+          aria-label="Live object detection and configured region overlay"
         >
           {showZones && zones.map((zone) => (
             <g key={zone.id} className="live-zone-group">

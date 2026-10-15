@@ -7,7 +7,6 @@ export type AppPageId =
   | "junction_network"
   | "crosswalks"
   | "zone_editor"
-  | "zones"
   | "traffic_logic"
   | "traffic_analytics"
   | "simulation_lab"

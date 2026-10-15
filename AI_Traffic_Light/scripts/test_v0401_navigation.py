@@ -22,15 +22,17 @@ def main() -> None:
         assert f'PAGE_DETAILS.{item}' not in sections
         assert f'case "{item}":' in app
     assert 'status: "legacy"' in nav and 'status: "stable"' in nav
-    assert 'PAGE_DETAILS.zones' in sections
-    assert 'case "zones":' in app and '<ZonesPage />' in app
-    assert '"zones"' in types
-    assert 'pages/ZonesPage' in app
-    assert 'return <div className="page-stack" />;' in read("pages/ZonesPage.tsx")
+    assert 'PAGE_DETAILS.zones' not in sections
+    assert 'case "zones":' not in app and '<ZonesPage />' not in app
+    assert '"zones"' not in types
+    assert 'pages/ZonesPage' not in app
+    assert 'PAGE_DETAILS.crosswalks' in sections
+    assert 'Region Editor (Legacy)' in nav
+    assert 'Legacy Zones' not in nav
     assert '<small>{navPage.status}</small>' not in shell
     assert '<div className="eyebrow">{page.status}</div>' not in shell
     assert 'test-ready</span>' not in read("pages/DashboardPage.tsx")
-    print("[PASS] stable labels, hidden legacy pages, concise navigation and empty Zones page")
+    print("[PASS] stable labels, hidden legacy region editor and removed empty Zones page")
 
 
 if __name__ == "__main__":

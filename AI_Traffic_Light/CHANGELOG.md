@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_16 — Remove empty Zones page; standardize Regions terminology
+
+- Remove the empty Traffic → Zones page, navigation entry, route and unused page component. Crosswalk Region Editor remains the place to define crosswalk regions.
+- Display `Region/Regions` rather than `Zone/Zones` in Live AI, Signal Control, Traffic Analytics, feature descriptions, mock labels and the preserved hidden legacy editor.
+- Preserve the legacy `zone_editor` route for compatibility and leave stored `zone_id`, `zones` JSON, backend `/api/zones` routes and historic IDs unchanged. This is a UI naming change, **not** a storage/API migration.
+- Replace the historic navigation test's empty-Zones requirement and add focused terminology and compatibility regression checks. No camera, simulation, traffic-signal or backend behavior changes.
+- Previous candidate `0_4_15`; owner-accepted baseline remains `0_4_14`. Windows frontend typecheck/build, regressions and live smoke pending.
+
+
 ## 0_4_15 — Slightly darker dark-mode canvas
 
 - Darken the shared dark application canvas from `#4D4E61` to `#444557` while retaining the approved mint `#57FFED`, sidebar, controls, panels and light theme.

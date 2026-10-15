@@ -37,7 +37,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
   }
 
   useEffect(() => {
-    void loadZones().catch((nextError) => setError(nextError instanceof Error ? nextError.message : "Zones could not be loaded."));
+    void loadZones().catch((nextError) => setError(nextError instanceof Error ? nextError.message : "Regions could not be loaded."));
   }, []);
 
   const selectedZone = useMemo(() => zones.find((zone) => zone.id === selectedId) ?? null, [zones, selectedId]);
@@ -56,7 +56,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     const candidate = `zone_${zones.length + 1}`;
     setSelectedId(null);
     setZoneId(candidate);
-    setLabel("New Zone");
+    setLabel("New Region");
     setZoneType("counting_region");
     setPoints([]);
     setMessage("Create a polygon by clicking the frame. Counting lines use exactly two points.");
@@ -75,7 +75,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     const cleanId = zoneId.trim();
     const cleanLabel = label.trim();
     if (!cleanId || !/^[A-Za-z0-9_-]{1,64}$/.test(cleanId)) {
-      setError("Zone ID must use 1-64 letters, numbers, underscores, or dashes.");
+      setError("Region ID must use 1-64 letters, numbers, underscores, or dashes.");
       return;
     }
     const validGeometry = zoneType === "counting_line" ? points.length === 2 : points.length >= 3;
@@ -90,7 +90,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       return;
     }
     if (zones.some((zone) => zone.id === cleanId && zone.id !== selectedId)) {
-      setError("That zone ID is already in use.");
+      setError("That region ID is already in use.");
       return;
     }
     const next: Zone = { id: cleanId, label: cleanLabel, type: zoneType, polygon: clonePoints(points) };
@@ -98,7 +98,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       ? current.map((zone) => zone.id === selectedId ? next : zone)
       : [...current, next]);
     setSelectedId(cleanId);
-    setMessage("Draft applied locally. Save zones to write the complete configuration.");
+    setMessage("Draft applied locally. Save regions to write the complete configuration.");
     setError(null);
   }
 
@@ -111,7 +111,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
     setZones(remaining);
     if (remaining[0]) selectZone(remaining[0]);
     else newZone();
-    setMessage("Zone removed from the draft. Save zones to persist the change.");
+    setMessage("Region removed from the draft. Save regions to persist the change.");
   }
 
   async function persistZones() {
@@ -121,16 +121,16 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       const next = await saveActiveZones(zones);
       setStatus(next);
       setZones(next.zones);
-      setMessage(`Saved ${next.zones.length} zones to ${next.config_path}.`);
+      setMessage(`Saved ${next.zones.length} regions to ${next.config_path}.`);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Zone configuration could not be saved.");
+      setError(nextError instanceof Error ? nextError.message : "Region configuration could not be saved.");
     } finally {
       setSaving(false);
     }
   }
 
   async function restoreDefaults() {
-    if (!window.confirm("Replace the current zone configuration with the built-in reference zones?")) return;
+    if (!window.confirm("Replace the current region configuration with the built-in reference regions?")) return;
     setSaving(true);
     setError(null);
     try {
@@ -138,9 +138,9 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
       setStatus(next);
       setZones(next.zones);
       if (next.zones[0]) selectZone(next.zones[0]);
-      setMessage("Reference zones restored.");
+      setMessage("Reference regions restored.");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Default zones could not be restored.");
+      setError(nextError instanceof Error ? nextError.message : "Default regions could not be restored.");
     } finally {
       setSaving(false);
     }
@@ -156,15 +156,15 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
         <section className="panel zone-canvas-panel">
           <div className="panel-header">
             <div>
-              <h2>Zones & counting geometry</h2>
-              <p className="placeholder-copy">Draw geometry against the current frame. Decision zones support signal analysis; counting regions and lines provide analytics.</p>
+              <h2>Regions & counting geometry</h2>
+              <p className="placeholder-copy">Draw geometry against the current frame. Decision regions support signal analysis; counting regions and lines provide analytics.</p>
             </div>
             <span className={`status-pill ${cameraStatus?.frame_available ? "status-implemented" : "status-planned"}`}>
               {cameraStatus?.frame_available ? `${cameraStatus.origin ?? "camera"} · frame ${cameraStatus.frame_number}` : "frame required"}
             </span>
           </div>
 
-          <svg className="zone-editor-canvas" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} onClick={canvasClick} role="img" aria-label="Editable traffic zone reference canvas">
+          <svg className="zone-editor-canvas" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} onClick={canvasClick} role="img" aria-label="Editable traffic region reference canvas">
             {cameraUrl ? (
               <image
                 href={cameraUrl}
@@ -179,7 +179,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
               <>
                 <rect x="0" y="0" width={WIDTH} height={HEIGHT} className="zone-camera-empty" />
                 <text x={WIDTH / 2} y={HEIGHT / 2} textAnchor="middle" className="zone-camera-empty-text">
-                  Start simulation or provide a camera frame before aligning zones.
+                  Start simulation or provide a camera frame before aligning regions.
                 </text>
               </>
             )}
@@ -208,7 +208,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
         <aside className="side-column">
           <section className="panel compact-panel zone-editor-form">
             <div className="panel-header"><h2>Geometry draft</h2><button type="button" onClick={newZone}>New</button></div>
-            <label>Zone ID<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} /></label>
+            <label>Region ID<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} /></label>
             <label>Display label<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
             <label>Type
               <select value={zoneType} onChange={(event) => {
@@ -232,7 +232,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
           </section>
 
           <section className="panel compact-panel">
-            <div className="panel-header"><h2>Saved configuration</h2><span className="status-pill muted">{zones.length} zones</span></div>
+            <div className="panel-header"><h2>Saved configuration</h2><span className="status-pill muted">{zones.length} regions</span></div>
             <div className="zone-selector-list">
               {zones.map((zone) => (
                 <button type="button" key={zone.id} className={zone.id === selectedId ? "active" : ""} onClick={() => selectZone(zone)}>
@@ -241,7 +241,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
               ))}
             </div>
             <div className="button-row wrap-row">
-              <button className="primary" type="button" onClick={() => void persistZones()} disabled={saving || !status?.editable}>{saving ? "Saving..." : "Save zones"}</button>
+              <button className="primary" type="button" onClick={() => void persistZones()} disabled={saving || !status?.editable}>{saving ? "Saving..." : "Save regions"}</button>
               <button type="button" onClick={() => void restoreDefaults()} disabled={saving || !status?.editable}>Restore defaults</button>
             </div>
             {message && <p className="success-message">{message}</p>}
@@ -249,7 +249,7 @@ export function ZoneEditorPage({ cameraStatus }: Props) {
           </section>
         </aside>
       </div>
-      <FunctionChecklist area="Zones" />
+      <FunctionChecklist area="Regions" />
     </div>
   );
 }

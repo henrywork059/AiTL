@@ -43,13 +43,13 @@ export const mockZones: Zone[] = [
   {
     id: "ped_waiting_top",
     type: "pedestrian_waiting",
-    label: "Pedestrian Waiting Zone",
+    label: "Pedestrian Waiting Region",
     polygon: [[500, 0], [780, 0], [780, 178], [500, 178]],
   },
   {
     id: "crossing_main",
     type: "crossing",
-    label: "Crossing Zone",
+    label: "Crossing Region",
     polygon: [[500, 179], [780, 179], [780, 625], [500, 625]],
   },
   {

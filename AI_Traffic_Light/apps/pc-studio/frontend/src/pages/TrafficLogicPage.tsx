@@ -333,7 +333,7 @@ export function TrafficLogicPage() {
   }
 
   async function resetDefaults() {
-    if (!window.confirm("Reset signal timing and scenario rules to source defaults? Runtime datasets, models, zones, analytics and experiment results are not deleted.")) return;
+    if (!window.confirm("Reset signal timing and scenario rules to source defaults? Runtime datasets, models, regions, analytics and experiment results are not deleted.")) return;
     setSaving(true);
     try {
       const config = await resetSignalRules() as unknown as ScenarioSignalRulesConfig;
@@ -483,9 +483,9 @@ export function TrafficLogicPage() {
           </div>
 
           <section className="panel">
-            <div className="panel-header"><div><h2>Live zone / class observation</h2><p className="placeholder-copy">These per-frame class counts are the values available to zone/class scenario conditions.</p></div><button type="button" onClick={() => void previewLiveObservation()}>Preview current observation</button></div>
+            <div className="panel-header"><div><h2>Live region / class observation</h2><p className="placeholder-copy">These per-frame class counts are the values available to region/class scenario conditions.</p></div><button type="button" onClick={() => void previewLiveObservation()}>Preview current observation</button></div>
             <div className="scenario-zone-grid">
-              {countableZones.length === 0 ? <p className="placeholder-copy">Create zones first to use zone/class scenario conditions.</p> : countableZones.map((zone) => {
+              {countableZones.length === 0 ? <p className="placeholder-copy">Configure regions first to use region/class scenario conditions.</p> : countableZones.map((zone) => {
                 const counts = traffic?.zone_class_counts?.[zone.id] ?? {};
                 return (
                   <article className="scenario-zone-card" key={zone.id}>
@@ -536,7 +536,7 @@ export function TrafficLogicPage() {
         <div className="signal-tab-body">
           <section className="panel">
             <div className="panel-header">
-              <div><h2>Ranked scenario rules</h2><p className="placeholder-copy">Define one or more conditions, then choose the bounded signal action. Conditions can use a controller metric or a detected class count inside a specific zone.</p></div>
+              <div><h2>Ranked scenario rules</h2><p className="placeholder-copy">Define one or more conditions, then choose the bounded signal action. Conditions can use a controller metric or a detected class count inside a specific region.</p></div>
               <button className="primary" type="button" onClick={addScenario}>Add scenario</button>
             </div>
             <div className="scenario-workspace">
@@ -578,10 +578,10 @@ export function TrafficLogicPage() {
                       {selectedScenario.conditions.map((condition, index) => (
                         <div className="scenario-condition-row" key={`${selectedScenario.id}-${index}`}>
                           <span className="scenario-condition-index">{index + 1}</span>
-                          <label>Source<select value={condition.source} onChange={(event) => changeConditionSource(selectedScenario, index, event.target.value as "metric" | "zone_class_count")}><option value="zone_class_count">Zone / class count</option><option value="metric">Controller metric</option></select></label>
+                          <label>Source<select value={condition.source} onChange={(event) => changeConditionSource(selectedScenario, index, event.target.value as "metric" | "zone_class_count")}><option value="zone_class_count">Region / class count</option><option value="metric">Controller metric</option></select></label>
                           {condition.source === "zone_class_count" ? (
                             <>
-                              <label>Zone<select value={condition.zone_id} onChange={(event) => mutateScenario(selectedScenario.id, (next) => { const item = next.conditions[index]; if (item.source === "zone_class_count") item.zone_id = event.target.value; })}>{countableZones.length === 0 && <option value={condition.zone_id}>{condition.zone_id}</option>}{countableZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.label} ({zone.id})</option>)}</select></label>
+                              <label>Region<select value={condition.zone_id} onChange={(event) => mutateScenario(selectedScenario.id, (next) => { const item = next.conditions[index]; if (item.source === "zone_class_count") item.zone_id = event.target.value; })}>{countableZones.length === 0 && <option value={condition.zone_id}>{condition.zone_id}</option>}{countableZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.label} ({zone.id})</option>)}</select></label>
                               <label>Class<input list="signal-scenario-class-options" value={condition.class_name} onChange={(event) => mutateScenario(selectedScenario.id, (next) => { const item = next.conditions[index]; if (item.source === "zone_class_count") item.class_name = event.target.value; })} /></label>
                             </>
                           ) : (
@@ -627,7 +627,7 @@ export function TrafficLogicPage() {
         <div className="signal-tab-body">
           <div className="two-column-grid">
             <section className="panel">
-              <div className="panel-header"><div><h2>Manual Test-mode inputs</h2><p className="placeholder-copy">Use these only to exercise metric conditions. Zone/class scenarios continue to use live zone observations.</p></div><span className="status-pill muted">Test mode only</span></div>
+              <div className="panel-header"><div><h2>Manual Test-mode inputs</h2><p className="placeholder-copy">Use these only to exercise metric conditions. Region/class scenarios continue to use live region observations.</p></div><span className="status-pill muted">Test mode only</span></div>
               <div className="scenario-form-grid">
                 <label>Pedestrians waiting<input type="number" min="0" max="500" value={testInputs.pedestrians_waiting} onChange={(event) => setTestInputs((current) => ({ ...current, pedestrians_waiting: numeric(event.target.value) }))} /></label>
                 <label>Pedestrians crossing<input type="number" min="0" max="500" value={testInputs.pedestrians_crossing} onChange={(event) => setTestInputs((current) => ({ ...current, pedestrians_crossing: numeric(event.target.value) }))} /></label>
@@ -654,7 +654,7 @@ export function TrafficLogicPage() {
       {tab === "history" && (
         <div className="signal-tab-body">
           <section className="panel">
-            <div className="panel-header"><div><h2>Scenario decision history</h2><p className="placeholder-copy">Phase changes, configuration saves, incident state and executed scenario adjustments.</p></div><div className="button-row wrap-row"><button type="button" onClick={() => void refreshHistory()}>Refresh</button><button className="danger" type="button" onClick={async () => { if (!window.confirm("Clear signal decision history only? Saved rules, zones, datasets, analytics, models and experiments are unchanged.")) return; await clearSignalDecisionHistory(); await refreshHistory(); }}>Clear history</button></div></div>
+            <div className="panel-header"><div><h2>Scenario decision history</h2><p className="placeholder-copy">Phase changes, configuration saves, incident state and executed scenario adjustments.</p></div><div className="button-row wrap-row"><button type="button" onClick={() => void refreshHistory()}>Refresh</button><button className="danger" type="button" onClick={async () => { if (!window.confirm("Clear signal decision history only? Saved rules, regions, datasets, analytics, models and experiments are unchanged.")) return; await clearSignalDecisionHistory(); await refreshHistory(); }}>Clear history</button></div></div>
             <div className="scenario-history-wrap">
               <table className="scenario-history-table">
                 <thead><tr><th>Time</th><th>Event</th><th>Scenario / phase</th><th>Details</th></tr></thead>

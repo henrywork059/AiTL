@@ -8,7 +8,7 @@ export function ZonePanel({ zones }: Props) {
   return (
     <section className="panel compact-panel">
       <div className="panel-header">
-        <h2>Zones</h2>
+        <h2>Regions</h2>
       </div>
       <ul className="zone-list">
         {zones.map((zone) => (
