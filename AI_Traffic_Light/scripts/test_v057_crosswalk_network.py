@@ -82,6 +82,10 @@ def main() -> None:
     assert "<CrosswalkNetworkPanel" in page
     assert "crosswalks.map((crosswalk" in panel
     assert "Connect crossings" in panel and "Save network" in panel
+    assert "beginConnection" in panel and "finishConnection" in panel
+    assert 'data-crosswalk-edge={edge}' in panel and "edgeCenters[" in panel
+    assert "document.elementFromPoint" in panel and "onPointerCancel" in panel
+    assert "<h4>Connect crossings</h4>" not in panel
     assert "fetchCrosswalks()" in panel and "saveCrosswalks(" in panel
     assert "observation_provenance" in panel and "crosswalk_region_counts" in panel
     print("[PASS] Network graph persistence, data-integrity checks and legacy compatibility")

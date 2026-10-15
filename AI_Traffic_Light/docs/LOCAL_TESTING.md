@@ -1,4 +1,22 @@
-# V057 Crossing-first Network Candidate
+# V058 AI Group / Direct Edge Connections Candidate
+
+```text
+version: 0_5_8
+previous_version: 0_5_7
+passed_baseline: 0_5_0
+status: AI workspace and Network drag connections candidate
+```
+
+## V058 Windows validation
+
+- Run the full `scripts/update_test_run.ps1` without `-ChangedTests`; check structure and version gate, all Python tests, TypeScript, Vite build, backend health and smoke.
+- Confirm Operate lists Camera Settings/Camera Diagnostics before the new AI sidebar group, which contains exactly Camera AI Preview and AI Models. The old AI Detection and Model Registry sidebar entries must not appear elsewhere.
+- Camera AI Preview: with a real or connected simulation camera and a loaded model, show the selected camera frame, detection boxes and class filtering. Without a frame, show a clear camera-unavailable message with no fake detections; no model deletion/load controls or automatic model loading on the preview.
+- AI Models: list existing trained models, load/set default/unload, change default confidence 0.01–1.00, save it and verify it persists after refresh; backend errors should appear without losing UI state.
+- Network: press on Crossing A numbered edge 2, drag until the preview line reaches Crossing B edge 4, release and confirm the link appears at the edge label endpoints. Save network, reload, verify persistence. Drag a crossing title separately; canceled release or same-crossing release must add no connection. Test duplicate rejection and keyboard source/destination activation.
+- Existing Crosswalk creation, Region Save, camera assignments, simulation hiding toggle, junction advanced configuration and signal safety must remain unchanged. Owner PASS pending, accepted baseline `0_5_0`.
+
+## Previous V057 Crossing-first Network Candidate
 
 ```text
 version: 0_5_7

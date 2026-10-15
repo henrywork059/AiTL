@@ -1,4 +1,20 @@
-# V057 Crossing-first Network Checklist
+# V058 AI & Network Drag Candidate Checklist
+
+```text
+version: 0_5_8
+previous_version: 0_5_7
+passed_baseline: 0_5_0
+status: AI workspace and Network drag connections candidate
+```
+
+- [ ] Camera Settings above AI group, with Camera AI Preview and AI Models only in AI group.
+- [ ] Preview shows real selected camera inference, labeled boxes and class filters; no fake fallback detections or duplicate model mutation controls.
+- [ ] AI Models loads/unloads/selects/defaults saved models and persists validated default detection confidence through existing runtime settings.
+- [ ] Network connects only by dragging edge label to a different crossing edge label (or keyboard activation); preview line, cancel, duplicate rejection, and saved exact label-to-label lines work.
+- [ ] Moving crossing boxes uses the title drag; previous connections/save API remain intact.
+- [ ] Full Python regression, TypeScript/Vite build, backend startup/smoke and Windows visual acceptance pass; baseline remains `0_5_0`.
+
+## Previous V057 Crossing-first Network Checklist
 
 ```text
 version: 0_5_7

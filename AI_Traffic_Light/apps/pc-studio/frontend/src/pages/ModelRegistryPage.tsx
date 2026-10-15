@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, setDefaultModel } from "../api";
-import type { InferenceStatus, ModelRegistryStatus } from "../types";
+import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, saveRuntimeSettings, setDefaultModel, unloadInferenceModel } from "../api";
+import type { InferenceStatus, ModelRegistryStatus, RuntimeSettings } from "../types";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Model registry request failed.";
@@ -12,11 +12,21 @@ function formatSize(sizeBytes: number): string {
   return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-export function ModelRegistryPage() {
+type Props = {
+  runtimeSettings: RuntimeSettings;
+  onSettingsChange: (value: RuntimeSettings) => void;
+};
+
+export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) {
   const [registry, setRegistry] = useState<ModelRegistryStatus | null>(null);
   const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus | null>(null);
   const [busyModelId, setBusyModelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [defaultConfidence, setDefaultConfidence] = useState(runtimeSettings.default_confidence);
+  const [savingConfidence, setSavingConfidence] = useState(false);
+
+  useEffect(() => setDefaultConfidence(runtimeSettings.default_confidence), [runtimeSettings.default_confidence]);
 
   const refresh = useCallback(async () => {
     const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistry(), fetchInferenceStatus()]);
@@ -25,7 +35,7 @@ export function ModelRegistryPage() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void refresh().catch((reason) => setError(errorMessage(reason)));
   }, [refresh]);
 
   async function handleLoad(modelId: string) {
@@ -68,15 +78,47 @@ export function ModelRegistryPage() {
     }
   }
 
+  async function handleSaveConfidence() {
+    if (!Number.isFinite(defaultConfidence) || defaultConfidence < 0.01 || defaultConfidence > 1) {
+      setError("Detection confidence must be between 0.01 and 1.");
+      return;
+    }
+    setSavingConfidence(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const saved = await saveRuntimeSettings({ ...runtimeSettings, default_confidence: defaultConfidence });
+      onSettingsChange(saved);
+      setNotice("Default AI confidence saved.");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSavingConfidence(false);
+    }
+  }
+
+  async function handleUnload() {
+    setBusyModelId("__unload__");
+    setError(null);
+    try {
+      setInferenceStatus(await unloadInferenceModel());
+      await refresh();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusyModelId(null);
+    }
+  }
+
   return (
     <div className="page-stack">
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Local model inventory</h2>
+            <h2>AI Models</h2>
             <p className="placeholder-copy">Models are discovered from local training runs. Loading changes the current inference model; setting default controls which model PC Studio prefers after restart.</p>
           </div>
-          <button className="primary" onClick={() => void refresh()}>Refresh</button>
+          <button className="primary" onClick={() => void refresh().catch((reason) => setError(errorMessage(reason)))}>Refresh</button>
         </div>
         <div className="camera-status-list inference-status-list">
           <div><span>Saved models</span><strong>{registry?.total ?? 0}</strong></div>
@@ -84,7 +126,37 @@ export function ModelRegistryPage() {
           <div><span>Default on startup</span><strong>{registry?.default_model_id ?? "none"}</strong></div>
           <div><span>Inference dependency</span><strong>{inferenceStatus?.backend_available ? "available" : "not installed"}</strong></div>
         </div>
-        {error && <p className="error-message">{error}</p>}
+        <div className="button-row">
+          <button type="button" disabled={!inferenceStatus?.model_loaded || busyModelId !== null} onClick={() => void handleUnload()}>
+            {busyModelId === "__unload__" ? "Unloading..." : "Unload active model"}
+          </button>
+        </div>
+        {notice && <p className="success-message" role="status">{notice}</p>}
+        {error && <p className="error-message" role="alert">{error}</p>}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>AI detection defaults</h2>
+            <p className="placeholder-copy">Saved in the existing backend runtime settings. Affects the default confidence used by Camera AI Preview.</p>
+          </div>
+        </div>
+        <div className="form-grid">
+          <label>Default detection confidence (0.01–1.00)
+            <input type="number" min={0.01} max={1} step={0.01}
+              value={defaultConfidence}
+              onChange={(event) => setDefaultConfidence(Number(event.target.value))} />
+          </label>
+        </div>
+        <div className="button-row">
+          <button className="primary" type="button"
+            disabled={savingConfidence || defaultConfidence === runtimeSettings.default_confidence
+              || !Number.isFinite(defaultConfidence) || defaultConfidence < 0.01 || defaultConfidence > 1}
+            onClick={() => void handleSaveConfidence()}>
+            {savingConfidence ? "Saving..." : "Save AI settings"}
+          </button>
+        </div>
       </section>
 
       <section className="panel">

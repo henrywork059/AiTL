@@ -1,5 +1,5 @@
-version: 0_5_7
-status: Crossing-first Network workspace candidate
-previous_version: 0_5_6
+version: 0_5_8
+status: AI workspace and drag-connected Network candidate
+previous_version: 0_5_7
 passed_baseline: 0_5_0
-notes: Crosswalks precede Network; all saved crossings auto-render as monitor boxes with draggable positions, numbered-edge links and selected-source-only observations. Junction controller data retained unchanged. Windows PASS pending.
+notes: Camera Settings precedes the AI group; AI Models and real Camera AI Preview share existing inference APIs. Crossing edges connect by dragging numbered labels; backend schema and signal control unchanged. Windows acceptance pending.

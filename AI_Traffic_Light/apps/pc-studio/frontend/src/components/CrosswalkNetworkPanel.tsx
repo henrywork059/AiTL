@@ -51,9 +51,11 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
   const incomingKey = JSON.stringify(config.network ?? EMPTY_NETWORK);
   const [savedKey, setSavedKey] = useState(incomingKey);
   const [selectedId, setSelectedId] = useState<string | null>(config.crosswalks[0]?.id ?? null);
-  const [sourceEdge, setSourceEdge] = useState<CrosswalkNetworkEdge>("2");
-  const [targetId, setTargetId] = useState("");
-  const [targetEdge, setTargetEdge] = useState<CrosswalkNetworkEdge>("4");
+  const [keyboardSource, setKeyboardSource] = useState<{ id: string; edge: CrosswalkNetworkEdge } | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ from: CrosswalkNetworkPosition; to: CrosswalkNetworkPosition } | null>(null);
+  const [hoverEdge, setHoverEdge] = useState<string | null>(null);
+  const [edgeCenters, setEdgeCenters] = useState<Record<string, CrosswalkNetworkPosition>>({});
+  const linkDragRef = useRef<{ id: string; edge: CrosswalkNetworkEdge; pointerId: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,8 +65,6 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
   const dirty = JSON.stringify(draft) !== savedKey;
   const crosswalks = config.crosswalks;
   const selected = crosswalks.find((item) => item.id === selectedId) ?? crosswalks[0] ?? null;
-  const targets = crosswalks.filter((item) => item.id !== selected?.id);
-  const destination = targets.some((item) => item.id === targetId) ? targetId : targets[0]?.id ?? "";
   const canvasHeight = Math.max(480, Math.ceil(crosswalks.length / 3) * 250);
 
   useEffect(() => {
@@ -94,6 +94,52 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
     return result;
   }, [overview]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const updateEdgeCenters = () => {
+      const bounds = canvas.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const points: Record<string, CrosswalkNetworkPosition> = {};
+      canvas.querySelectorAll<HTMLButtonElement>("[data-crosswalk-id][data-crosswalk-edge]").forEach((button) => {
+        const id = button.dataset.crosswalkId;
+        const edge = button.dataset.crosswalkEdge;
+        if (!id || !edge) return;
+        const rect = button.getBoundingClientRect();
+        points[id + ":" + edge] = {
+          x: (rect.left + rect.width / 2 - bounds.left) / bounds.width * 100,
+          y: (rect.top + rect.height / 2 - bounds.top) / bounds.height * 100,
+        };
+      });
+      setEdgeCenters((current) => JSON.stringify(current) === JSON.stringify(points) ? current : points);
+    };
+    updateEdgeCenters();
+    const observer = new ResizeObserver(updateEdgeCenters);
+    observer.observe(canvas);
+    canvas.querySelectorAll<HTMLElement>(".crossing-network-node").forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [positions, overview]);
+
+  function edgeUnderPointer(clientX: number, clientY: number) {
+    const button = document.elementFromPoint(clientX, clientY)?.closest<HTMLButtonElement>("[data-crosswalk-id][data-crosswalk-edge]");
+    if (!button || !canvasRef.current?.contains(button)) return null;
+    const id = button.dataset.crosswalkId;
+    const edge = button.dataset.crosswalkEdge;
+    if (!id || !EDGES.includes(edge as CrosswalkNetworkEdge)) return null;
+    return { id, edge: edge as CrosswalkNetworkEdge };
+  }
+
+  function pointFromPointer(clientX: number, clientY: number): CrosswalkNetworkPosition | null {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      x: (clientX - rect.left) / rect.width * 100,
+      y: (clientY - rect.top) / rect.height * 100,
+    };
+  }
+
   function changeDraft(next: CrosswalkNetwork) {
     setDraft(next);
     setNotice(null);
@@ -116,6 +162,14 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
   }
 
   function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const connection = linkDragRef.current;
+    if (connection && connection.pointerId === event.pointerId) {
+      const next = pointFromPointer(event.clientX, event.clientY);
+      if (next) setLinkPreview((current) => current ? { ...current, to: next } : current);
+      const target = edgeUnderPointer(event.clientX, event.clientY);
+      setHoverEdge(target && target.id !== connection.id ? target.id + ":" + target.edge : null);
+      return;
+    }
     const drag = dragRef.current;
     const canvas = canvasRef.current;
     if (!drag || !canvas || drag.pointerId !== event.pointerId) return;
@@ -139,24 +193,85 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
     dragRef.current = null;
   }
 
-  function connect() {
-    if (!selected || !destination || draft.links.length >= MAX_LINKS) return;
+  function connectEdges(fromId: string, fromEdge: CrosswalkNetworkEdge, toId: string, toEdge: CrosswalkNetworkEdge) {
+    if (saving) return;
+    if (fromId === toId) {
+      setError("Connections must join two different crossings.");
+      return;
+    }
+    if (draft.links.length >= MAX_LINKS) {
+      setError("Maximum number of crossing connections reached.");
+      return;
+    }
     const duplicate = draft.links.some((link) =>
-      (link.source_crosswalk_id === selected.id && link.destination_crosswalk_id === destination
-        && link.source_edge === sourceEdge && link.destination_edge === targetEdge)
-      || (link.source_crosswalk_id === destination && link.destination_crosswalk_id === selected.id
-        && link.source_edge === targetEdge && link.destination_edge === sourceEdge));
+      (link.source_crosswalk_id === fromId && link.destination_crosswalk_id === toId
+        && link.source_edge === fromEdge && link.destination_edge === toEdge)
+      || (link.source_crosswalk_id === toId && link.destination_crosswalk_id === fromId
+        && link.source_edge === toEdge && link.destination_edge === fromEdge));
     if (duplicate) {
-      setError("These numbered edges are already connected.");
+      setError("These two numbered edges are already connected.");
       return;
     }
     changeDraft({
       ...draft, links: [...draft.links, {
         id: nextLinkId(draft.links.map((link) => link.id)),
-        source_crosswalk_id: selected.id, destination_crosswalk_id: destination,
-        source_edge: sourceEdge, destination_edge: targetEdge,
+        source_crosswalk_id: fromId, destination_crosswalk_id: toId,
+        source_edge: fromEdge, destination_edge: toEdge,
       }],
     });
+  }
+
+  function beginConnection(id: string, edge: CrosswalkNetworkEdge, event: ReactPointerEvent<HTMLButtonElement>) {
+    const canvas = canvasRef.current;
+    if (!canvas || saving) return;
+    const bounds = canvas.getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const origin = {
+      x: (rect.left + rect.width / 2 - bounds.left) / bounds.width * 100,
+      y: (rect.top + rect.height / 2 - bounds.top) / bounds.height * 100,
+    };
+    linkDragRef.current = { id, edge, pointerId: event.pointerId };
+    setLinkPreview({ from: origin, to: origin });
+    setHoverEdge(null);
+    setKeyboardSource(null);
+    setSelectedId(id);
+    canvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function finishConnection(event: ReactPointerEvent<HTMLDivElement>): boolean {
+    const connection = linkDragRef.current;
+    if (!connection || connection.pointerId !== event.pointerId) return false;
+    const target = edgeUnderPointer(event.clientX, event.clientY);
+    if (target && target.id !== connection.id) connectEdges(connection.id, connection.edge, target.id, target.edge);
+    linkDragRef.current = null;
+    setLinkPreview(null);
+    setHoverEdge(null);
+    const canvas = canvasRef.current;
+    if (canvas?.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    return true;
+  }
+
+  function cancelConnection(event: ReactPointerEvent<HTMLDivElement>): boolean {
+    const connection = linkDragRef.current;
+    if (!connection || connection.pointerId !== event.pointerId) return false;
+    linkDragRef.current = null;
+    setLinkPreview(null);
+    setHoverEdge(null);
+    const canvas = canvasRef.current;
+    if (canvas?.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    return true;
+  }
+
+  function connectWithKeyboard(id: string, edge: CrosswalkNetworkEdge) {
+    setSelectedId(id);
+    if (keyboardSource) {
+      if (keyboardSource.id !== id) connectEdges(keyboardSource.id, keyboardSource.edge, id, edge);
+      setKeyboardSource(null);
+    } else {
+      setKeyboardSource({ id, edge });
+    }
   }
 
   async function save() {
@@ -202,7 +317,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
         <div className="panel-header">
           <div>
             <h2>Network</h2>
-            <p className="placeholder-copy">All saved crossings appear automatically. Move their boxes and connect numbered edges.</p>
+            <p className="placeholder-copy">Saved crossings appear automatically. Drag one numbered edge label to another crossing’s edge label to connect them.</p>
           </div>
           <div className="button-row">
             <button className="primary" type="button" disabled={!dirty || saving} onClick={() => void save()}>
@@ -226,17 +341,21 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
 
       <div className="crossing-network-layout">
         <div className="panel crossing-network-map">
-          <div className="panel-header"><h3>Crossing map</h3><span className="small-note">Drag crossing titles to rearrange</span></div>
+          <div className="panel-header"><h3>Crossing map</h3><span className="small-note">Drag a title to move · Drag edge label to edge label to connect</span></div>
           <div className="crossing-network-scroll">
             <div ref={canvasRef} className="crossing-network-canvas" style={{ height: canvasHeight }}
-              onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
+              onPointerMove={moveDrag}
+              onPointerUp={(event) => { if (!finishConnection(event)) endDrag(event); }}
+              onPointerCancel={(event) => { if (!cancelConnection(event)) endDrag(event); }}>
               <svg className="crossing-network-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 {draft.links.map((link) => {
-                  const a = positions.get(link.source_crosswalk_id);
-                  const b = positions.get(link.destination_crosswalk_id);
+                  const a = edgeCenters[link.source_crosswalk_id + ":" + link.source_edge] ?? positions.get(link.source_crosswalk_id);
+                  const b = edgeCenters[link.destination_crosswalk_id + ":" + link.destination_edge] ?? positions.get(link.destination_crosswalk_id);
                   if (!a || !b) return null;
                   return <line key={link.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
                 })}
+                {linkPreview && <line className="crossing-network-preview" x1={linkPreview.from.x} y1={linkPreview.from.y}
+                  x2={linkPreview.to.x} y2={linkPreview.to.y} />}
               </svg>
               {crosswalks.map((crosswalk) => {
                 const position = positions.get(crosswalk.id);
@@ -255,10 +374,19 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                     </button>
                     <div className="crossing-network-edge-grid" aria-label={"Edges of " + crosswalk.label}>
                       {EDGES.map((edge) => <button type="button" key={edge}
-                        className={"crossing-network-edge crossing-network-edge-" + edge}
-                        aria-label={crosswalk.label + " edge " + edge}
-                        aria-pressed={selected?.id === crosswalk.id && sourceEdge === edge}
-                        onClick={() => { setSelectedId(crosswalk.id); setSourceEdge(edge); }}>{edge}</button>)}
+                        data-crosswalk-id={crosswalk.id} data-crosswalk-edge={edge}
+                        className={"crossing-network-edge crossing-network-edge-" + edge
+                          + (hoverEdge === crosswalk.id + ":" + edge ? " is-drop-target" : "")}
+                        aria-label={crosswalk.label + " edge " + edge + ". Drag to another crossing edge."}
+                        title="Drag this label to a label on another crossing"
+                        aria-pressed={keyboardSource?.id === crosswalk.id && keyboardSource.edge === edge}
+                        onPointerDown={(event) => beginConnection(crosswalk.id, edge, event)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            connectWithKeyboard(crosswalk.id, edge);
+                          }
+                        }}>{edge}</button>)}
                       <div className="crossing-network-status">
                         <small>Side A: {cameraLabel(crosswalk.camera_side_a_id, cameras)}</small>
                         <small>Side B: {cameraLabel(crosswalk.camera_side_b_id, cameras)}</small>
@@ -288,27 +416,11 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
             <>
               <h3>{selected.label}</h3>
               <p className="small-note">{selected.location || "No location description"} · {selected.regions.length} region(s)</p>
-              <div className="crossing-network-link-form">
-                <h4>Connect crossings</h4>
-                <label>From edge
-                  <select value={sourceEdge} disabled={saving} onChange={(event) => setSourceEdge(event.target.value as CrosswalkNetworkEdge)}>
-                    {EDGES.map((edge) => <option key={edge} value={edge}>{edge}</option>)}
-                  </select>
-                </label>
-                <label>Destination crossing
-                  <select value={destination} disabled={saving || targets.length === 0} onChange={(event) => setTargetId(event.target.value)}>
-                    {targets.length === 0 && <option value="">Add another crossing first</option>}
-                    {targets.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  </select>
-                </label>
-                <label>Destination edge
-                  <select value={targetEdge} disabled={saving || !destination} onChange={(event) => setTargetEdge(event.target.value as CrosswalkNetworkEdge)}>
-                    {EDGES.map((edge) => <option key={edge} value={edge}>{edge}</option>)}
-                  </select>
-                </label>
-                <button className="primary" type="button" disabled={saving || !destination || draft.links.length >= MAX_LINKS} onClick={connect}>Connect crossings</button>
-                <p className="small-note">Edge numbers are connection points, not compass directions. Connections are topology only.</p>
-              </div>
+              <p className="small-note">
+                Connect crossings by dragging directly from a numbered edge label on one crossing
+                to a numbered edge label on another. The line is added when released on the destination.
+                Keyboard: activate the first edge, then the destination edge.
+              </p>
               <div className="crossing-network-link-list">
                 <h4>Connections</h4>
                 {draft.links.map((link) => {
@@ -320,7 +432,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                       onClick={() => changeDraft({ ...draft, links: draft.links.filter((item) => item.id !== link.id) })}>Remove</button>
                   </div>;
                 })}
-                {draft.links.length === 0 && <p className="small-note">No connections defined.</p>}
+                {draft.links.length === 0 && <p className="small-note">No connections defined. Drag between numbered labels to create one.</p>}
               </div>
             </>
           )}

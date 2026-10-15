@@ -1,37 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  deleteModel,
-  fetchInferenceStatus,
-  fetchLiveDetections,
-  loadInferenceModel,
-  loadLatestInferenceModel,
-  setDefaultModel,
-  unloadInferenceModel,
-} from "../api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchInferenceStatus, fetchLiveDetections } from "../api";
 import { CameraDetectionView } from "../components/CameraDetectionView";
 import { DetectionTable } from "../components/DetectionTable";
-import { InferencePanel } from "../components/InferencePanel";
-import { LiveView } from "../components/LiveView";
-import { LiveTrafficSignalOverlay } from "../components/LiveTrafficSignalOverlay";
-import { StatusPanel } from "../components/StatusPanel";
-import { TrafficLight } from "../components/TrafficLight";
-import { ZonePanel } from "../components/ZonePanel";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import type {
   CameraStatus,
-  Detection,
   DetectionFrame,
   InferenceStatus,
-  TrafficState,
   Zone,
 } from "../types";
 import "./liveInference.css";
 
 type Props = {
-  mockFrame: DetectionFrame | null;
   zones: Zone[];
-  traffic: TrafficState | null;
-  mockDetections: Detection[];
   cameraStatus: CameraStatus | null;
   confidenceThreshold: number;
   onConfidenceChange: (value: number) => void;
@@ -45,10 +26,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function LiveAiPage({
-  mockFrame,
   zones,
-  traffic,
-  mockDetections,
   cameraStatus,
   confidenceThreshold,
   onConfidenceChange,
@@ -60,139 +38,30 @@ export function LiveAiPage({
   const [inferenceInitialized, setInferenceInitialized] = useState(false);
   const [liveFrame, setLiveFrame] = useState<DetectionFrame | null>(null);
   const [inferenceError, setInferenceError] = useState<string | null>(null);
-  const [loadingModel, setLoadingModel] = useState(false);
-  const [deletingModel, setDeletingModel] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showZones, setShowZones] = useState(true);
   const [enabledClasses, setEnabledClasses] = useState<string[]>([]);
-  const autoLoadAttempted = useRef(false);
 
   const refreshInferenceStatus = useCallback(async () => {
     const nextStatus = await fetchInferenceStatus();
     setInferenceStatus(nextStatus);
-    setSelectedModelId((current) => current ?? nextStatus.active_model_id ?? nextStatus.default_model_id ?? nextStatus.models[0]?.model_id ?? null);
     return nextStatus;
-  }, []);
-
-  const loadLatest = useCallback(async () => {
-    setLoadingModel(true);
-    setInferenceError(null);
-    try {
-      const nextStatus = await loadLatestInferenceModel();
-      setInferenceStatus(nextStatus);
-      setSelectedModelId(nextStatus.active_model_id ?? nextStatus.default_model_id ?? nextStatus.models[0]?.model_id ?? null);
-      setLiveFrame(null);
-    } catch (error) {
-      setInferenceError(errorMessage(error));
-      await refreshInferenceStatus();
-    } finally {
-      setLoadingModel(false);
-    }
-  }, [refreshInferenceStatus]);
-
-  const loadSelected = useCallback(async () => {
-    setLoadingModel(true);
-    setInferenceError(null);
-    try {
-      const nextStatus = await loadInferenceModel(selectedModelId);
-      setInferenceStatus(nextStatus);
-      setSelectedModelId(nextStatus.active_model_id ?? selectedModelId);
-      setLiveFrame(null);
-    } catch (error) {
-      setInferenceError(errorMessage(error));
-      await refreshInferenceStatus();
-    } finally {
-      setLoadingModel(false);
-    }
-  }, [refreshInferenceStatus, selectedModelId]);
-
-  const setDefault = useCallback(async () => {
-    if (!selectedModelId) return;
-    setInferenceError(null);
-    try {
-      await setDefaultModel(selectedModelId);
-      await refreshInferenceStatus();
-    } catch (error) {
-      setInferenceError(errorMessage(error));
-    }
-  }, [refreshInferenceStatus, selectedModelId]);
-
-  const deleteSelected = useCallback(async () => {
-    if (!selectedModelId) return;
-    if (!window.confirm(`Permanently delete trained run ${selectedModelId}? This removes its directory under outputs/training.`)) {
-      return;
-    }
-    setDeletingModel(true);
-    setInferenceError(null);
-    try {
-      const registry = await deleteModel(selectedModelId);
-      const nextSelection = registry.default_model_id ?? registry.active_model_id ?? registry.models[0]?.model_id ?? null;
-      setSelectedModelId(nextSelection);
-      const nextStatus = await fetchInferenceStatus();
-      setInferenceStatus(nextStatus);
-      setLiveFrame(null);
-    } catch (error) {
-      setInferenceError(errorMessage(error));
-    } finally {
-      setDeletingModel(false);
-    }
-  }, [selectedModelId]);
-
-  const unload = useCallback(async () => {
-    setLoadingModel(true);
-    setInferenceError(null);
-    try {
-      setInferenceStatus(await unloadInferenceModel());
-      setLiveFrame(null);
-    } catch (error) {
-      setInferenceError(errorMessage(error));
-    } finally {
-      setLoadingModel(false);
-    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function initializeInference() {
-      const status = await fetchInferenceStatus();
-      if (cancelled) return;
-      setInferenceStatus(status);
-      setSelectedModelId(status.active_model_id ?? status.default_model_id ?? status.models[0]?.model_id ?? null);
-      if (
-        !autoLoadAttempted.current
-        && !status.model_loaded
-        && status.backend_available
-        && status.available_model_count > 0
-      ) {
-        autoLoadAttempted.current = true;
-        setLoadingModel(true);
-        try {
-          const loaded = await loadInferenceModel(status.default_model_id ?? status.models[0]?.model_id ?? null);
-          if (!cancelled) {
-            setInferenceStatus(loaded);
-            setSelectedModelId(loaded.active_model_id ?? status.default_model_id ?? status.models[0]?.model_id ?? null);
-          }
-        } catch (error) {
-          if (!cancelled) setInferenceError(errorMessage(error));
-        } finally {
-          if (!cancelled) setLoadingModel(false);
-        }
-      }
-    }
-
-    void initializeInference()
+    void fetchInferenceStatus()
+      .then((status) => {
+        if (!cancelled) setInferenceStatus(status);
+      })
       .catch((error) => {
         if (!cancelled) setInferenceError(errorMessage(error));
       })
       .finally(() => {
         if (!cancelled) setInferenceInitialized(true);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useSerialPolling(
@@ -250,7 +119,7 @@ export function LiveAiPage({
     [rawLiveDetections, effectiveClasses],
   );
   const hasCameraFrame = Boolean(cameraStatus?.frame_available);
-  const displayedDetections = hasCameraFrame ? liveDetections : mockDetections;
+  const displayedDetections = hasCameraFrame && inferenceStatus?.model_loaded ? liveDetections : [];
 
   useEffect(() => {
     onDetectionCountChange(displayedDetections.length);
@@ -258,7 +127,7 @@ export function LiveAiPage({
 
   const modeLabel = hasCameraFrame
     ? inferenceStatus?.model_loaded ? "model running" : "model idle"
-    : "fallback view";
+    : "camera unavailable";
 
   function toggleClass(className: string) {
     setEnabledClasses((current) => current.includes(className)
@@ -271,11 +140,11 @@ export function LiveAiPage({
       <section className="panel live-panel">
         <div className="panel-header">
           <div>
-            <h2>Live inference</h2>
+            <h2>Camera AI Preview</h2>
             <p className="placeholder-copy">
               {hasCameraFrame
                 ? "Runs the loaded local model on the current camera/simulation frame. Detections use original-image coordinates."
-                : "No camera frame is available. The fallback scene is shown only to keep the interface inspectable."}
+                : "Connect or select a camera in Camera Settings to preview real frames and AI detections."}
             </p>
           </div>
           <div className="button-row">
@@ -297,12 +166,12 @@ export function LiveAiPage({
               showLabels={showLabels}
               showZones={showZones}
             />
-          ) : mockFrame ? (
-            <LiveView frame={mockFrame} detections={mockDetections} zones={showZones ? zones : []} />
           ) : (
-            <p>Waiting for view data...</p>
+            <div className="live-camera-empty">
+              <strong>No camera preview available</strong>
+              <span>Connect a camera in Camera Settings. No synthetic detection results are shown.</span>
+            </div>
           )}
-          <LiveTrafficSignalOverlay traffic={traffic} />
         </div>
 
         <div className="live-inference-meta wrap-row">
@@ -344,31 +213,35 @@ export function LiveAiPage({
       </section>
 
       <aside className="side-column">
-        <InferencePanel
-          status={inferenceStatus}
-          selectedModelId={selectedModelId}
-          onSelectedModelChange={setSelectedModelId}
-          confidenceThreshold={confidenceThreshold}
-          onConfidenceChange={onConfidenceChange}
-          onLoadSelected={() => void loadSelected()}
-          onLoadLatest={() => void loadLatest()}
-          onSetDefault={() => void setDefault()}
-          onDeleteSelected={() => void deleteSelected()}
-          onUnload={() => void unload()}
-          loadingModel={loadingModel}
-          deletingModel={deletingModel}
-          error={inferenceError}
-        />
-        {traffic && <TrafficLight traffic={traffic} />}
-        {traffic && <StatusPanel traffic={traffic} />}
-        <p className="small-note">The signal overlay and decision cards show simulation state only. They do not send commands to physical traffic infrastructure.</p>
-        <ZonePanel zones={zones} />
+        <section className="panel compact-panel inference-panel">
+          <div className="panel-header">
+            <h2>Preview status</h2>
+            <span className={`status-pill ${inferenceStatus?.model_loaded ? "status-implemented" : "muted"}`}>
+              {inferenceStatus?.model_loaded ? "Model loaded" : "No model loaded"}
+            </span>
+          </div>
+          <div className="camera-status-list inference-status-list">
+            <div><span>Camera</span><strong>{cameraStatus?.active_source_id ?? "None"}</strong></div>
+            <div><span>Model</span><strong>{inferenceStatus?.active_model_id ?? "None"}</strong></div>
+            <div><span>Inference</span><strong>{inferenceStatus?.backend_available ? "Available" : "Unavailable"}</strong></div>
+            <div><span>Latency</span><strong>{inferenceStatus?.last_latency_ms != null ? `${inferenceStatus.last_latency_ms.toFixed(1)} ms` : "n/a"}</strong></div>
+          </div>
+          <label className="control-label inference-threshold">
+            Preview confidence: {(confidenceThreshold * 100).toFixed(0)}%
+            <input type="range" min={inferenceStatus?.confidence_floor ?? 0.01} max="1" step="0.01"
+              value={Math.max(confidenceThreshold, inferenceStatus?.confidence_floor ?? 0.01)}
+              onChange={(event) => onConfidenceChange(Number(event.target.value))} />
+          </label>
+          <p className="small-note">Use AI → AI Models to load, unload or select models and save the default detection confidence. Preview confidence applies to this session.</p>
+          {inferenceError && <p className="error-message" role="alert">{inferenceError}</p>}
+          {inferenceStatus?.error && <p className="error-message">Backend: {inferenceStatus.error}</p>}
+        </section>
       </aside>
 
       <section className="panel bottom-panel full-span">
         <div className="panel-header">
           <div>
-            <h2>{hasCameraFrame ? "Detection results" : "Fallback detections"}</h2>
+            <h2>Detection results</h2>
             <p className="placeholder-copy">Results after the current confidence and class visibility filters.</p>
           </div>
           <span className="status-pill muted">{displayedDetections.length} visible</span>

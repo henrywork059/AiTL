@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_5_8 — AI workspace and direct Network edge connections
+
+- Move Camera Settings and Camera Diagnostics above the new AI sidebar group.
+- Group Camera AI Preview (existing live inference page) and AI Models (existing model registry) under **AI**, keeping original internal page IDs and API routes. The preview shows actual camera inference with detection boxes, class filters and a clear no-camera state instead of presenting synthetic fallback detections. The preview no longer auto-loads models; model loading is explicitly controlled through AI Models. AI Models retains loading/defaulting/deleting models and adds unloading and persistent default inference confidence using existing runtime settings.
+- Replace Network's connection dropdown form with direct pointer dragging between numbered edge labels. Provide a live preview line, valid target highlighting, keyboard edge-to-edge alternative and cancel-on-invalid-release; draw saved connections from the actual label centers. Keep drag-to-reposition on crossing titles and existing network persistence/validation.
+- No backend, hardware firmware or physical traffic controller changes. The original selected-source-only inference, safe signal behavior and Crosswalk configuration schema remain intact.
+- Candidate `0_5_8` (previous `0_5_7`), accepted baseline remains `0_5_0`. Full Windows regression/typecheck/build/smoke and owner PASS pending.
+
+
 ## 0_5_7 — Crossing-first Network workspace
 
 - Place Crosswalks above Network in the Traffic menu and rename Junction Network to Network, retaining its internal route for compatibility.

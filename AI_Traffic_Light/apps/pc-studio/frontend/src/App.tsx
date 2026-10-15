@@ -195,10 +195,7 @@ export default function App() {
       case "live_ai":
         return (
           <LiveAiPage
-            mockFrame={frame}
             zones={zones}
-            traffic={traffic}
-            mockDetections={filteredDetections}
             cameraStatus={cameraStatus}
             confidenceThreshold={confidenceThreshold}
             onConfidenceChange={setConfidenceThreshold}
@@ -263,7 +260,7 @@ export default function App() {
       case "train_export":
         return <TrainExportPage />;
       case "model_registry":
-        return <ModelRegistryPage />;
+        return <ModelRegistryPage runtimeSettings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
       case "settings":
         return <SettingsPage apiState={apiState} health={health} settings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
       case "logs":

@@ -1,4 +1,12 @@
-# Start Here — V057
+# Start Here — V058
+
+Current candidate `0_5_8`, previous candidate `0_5_7`, owner-accepted baseline `0_5_0`.
+
+**Navigation:** Operate now shows Dashboard, Camera Settings and Camera Diagnostics. The new **AI** group contains **Camera AI Preview** and **AI Models**. Camera AI Preview replaces the former AI Detection navigation item, reusing its live inference route. AI Models reuses the former Model Registry route and existing backend model APIs. Model loading/unloading and persistent default confidence are configured there. Camera AI Preview is read-only with respect to model selection, has a session-only confidence slider, and does not display mocked detections as real.
+
+**Network:** Drag from a numbered edge label on one crossing directly onto a numbered edge label on another. The temporary line follows the pointer, and releasing onto a valid destination adds the connection to the draft. Use Save network to persist. Crossing title drag still repositions a box; Save network persists both. Click/keyboard activation of two edge labels also supports connection without a pointer. Existing junction advanced tools, topology schema and signal behavior are unchanged.
+
+## Previous V057
 
 Current candidate `0_5_7`, previous `0_5_6`, accepted baseline `0_5_0`.
 
