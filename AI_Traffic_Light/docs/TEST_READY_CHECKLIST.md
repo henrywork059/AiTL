@@ -1,12 +1,14 @@
-# V0414 Test Checklist
+# V0415 Test Checklist
 
 ```text
-version: 0_4_14
-previous_version: 0_4_13
-passed_baseline: 0_4_0
-status: Historical palette regression isolation candidate
+version: 0_4_15
+previous_version: 0_4_14
+passed_baseline: 0_4_14
+status: Slightly darker slate background candidate
 ```
 
+- [ ] Main dark canvas uses `#444557` without changing the sidebar, panels, mint accent or light mode.
+- [ ] Palette/design regressions, frontend build, startup and live smoke pass on Windows.
 - [ ] Old V0409 palette regression no longer requires `color-nav-heading-surface`.
 - [ ] V0413 dedicated navigation regression still verifies the current sidebar.
 - [ ] Python regressions, frontend typecheck/build, live backend smoke and app startup pass.

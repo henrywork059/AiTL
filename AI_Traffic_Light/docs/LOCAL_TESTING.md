@@ -1,11 +1,18 @@
-# Local Testing — V0414
+# Local Testing — V0415
 
 ```text
-version: 0_4_14
-previous_version: 0_4_13
-passed_baseline: 0_4_0
-status: Historical palette regression isolation candidate
+version: 0_4_15
+previous_version: 0_4_14
+passed_baseline: 0_4_14
+status: Slightly darker slate background candidate
 ```
+
+## V0415 dark canvas validation
+
+- Run the normal single-command updater with `-ChangedTests`.
+- Confirm the dark main canvas is `#444557`, slightly darker than accepted V0414 `#4D4E61`; panels, quiet sidebar, mint `#57FFED`, and light mode should remain unchanged.
+- Confirm the existing palette and design-structure regressions pass with the new background token; verify TypeScript/frontend build, startup, and live backend smoke.
+- Accepted stable baseline is V0414. V0415 remains a candidate until owner PASS.
 
 ## V0414 test ownership correction
 

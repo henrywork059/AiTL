@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_4_15 — Slightly darker dark-mode canvas
+
+- Darken the shared dark application canvas from `#4D4E61` to `#444557` while retaining the approved mint `#57FFED`, sidebar, controls, panels and light theme.
+- Align the existing palette and invalid-token regression fixtures with the new canvas value. No API, hardware, camera, traffic, layout or dependency changes.
+- User accepted `0_4_14` as the latest stable baseline; `0_4_15` is a candidate awaiting Windows startup and visual confirmation.
+
+
 ## 0_4_14 — Remove stale historical navigation assertions
 
 - Repair the V0413 first-run `test_v0409_palette_layout.py` failure: the test still required `color-nav-heading-surface`, a token intentionally removed by the quiet-navigation redesign.

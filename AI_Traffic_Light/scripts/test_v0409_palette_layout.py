@@ -33,7 +33,7 @@ def main() -> None:
     light, dark = tokens.split("@media (prefers-color-scheme: dark)", 1)
     dark = dark.split("@media (prefers-contrast: more)", 1)[0]
     colors = {
-        "color-dark-surface-0": "#4d4e61",
+        "color-dark-surface-0": "#444557",
         "color-shell": "#414354",
         "color-brand-surface": "#333648",
         "color-dark-surface-1": "#55576a",

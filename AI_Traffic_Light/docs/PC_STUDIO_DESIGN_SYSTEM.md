@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0413
+# AiTL PC Studio Design System — V0415
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,7 +6,7 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Current benchmark and decisions (V0413)
+## Current benchmark and decisions (V0415)
 
 AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
@@ -17,11 +17,11 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 - [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
 - [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-### V0413 implementation parameters
+### V0415 implementation parameters
 
 | Element | Light | Dark | Decision |
 | --- | --- | --- | --- |
-| Main canvas | `#F3F6FA` | `#4D4E61` | User-selected slate backdrop |
+| Main canvas | `#F3F6FA` | `#444557` | User-selected slate backdrop |
 | Main panel | `#FFFFFF` | `#55576A` | Opaque content surface |
 | Primary text | `#172B45` | `#F9FAFF` | High-contrast hierarchy |
 | Muted text | `#52677D` | `#D6D9E8` | Legible secondary data |
@@ -94,7 +94,7 @@ The light appearance retains its established cool-neutral canvas (`#F3F6FA`) and
 
 | Role | Dark solid surface |
 | --- | --- |
-| Application canvas | `#4D4E61` |
+| Application canvas | `#444557` |
 | Sidebar | `#414354` |
 | Sidebar brand box | `#333648` |
 | Panel | `#55576A` |
