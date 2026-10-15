@@ -1,4 +1,22 @@
-# V056 Shared Physical Region Candidate
+# V057 Crossing-first Network Candidate
+
+```text
+version: 0_5_7
+previous_version: 0_5_6
+passed_baseline: 0_5_0
+status: Crossing-first Network workspace candidate
+```
+
+## V057 Windows validation
+
+- Run the full `scripts/update_test_run.ps1` (no `-ChangedTests`) including structural guards, all offline regressions, frontend typecheck/build, backend startup and live smoke.
+- Confirm Crosswalks appears above Network and the sidebar no longer labels the page Junction Network.
+- In Crosswalks, add and **Save** A and B. Open Network: both boxes must appear automatically. Save another crossing; after the Network page refresh, the new box appears.
+- Select A and edge 2, connect to B and edge 4. Drag both boxes, Save network, reload and verify links/positions persist. Remove a link and verify its removal. Delete a crossing in Crosswalks, save and confirm its Network links/position are cleaned.
+- Verify active-source-only region observations, correct camera stream/offline state, narrow-viewport map scrolling, and existing advanced junction controls. Connections are metadata, not traffic commands.
+- Owner PASS pending; baseline remains `0_5_0`.
+
+## Previous V056 Shared Physical Region Candidate
 
 ```text
 version: 0_5_6

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { JunctionNodeCard } from "../components/junctions/JunctionNodeCard";
+import { CrosswalkNetworkPanel } from "../components/CrosswalkNetworkPanel";
 import { fetchCrosswalks } from "../lib/crosswalksApi";
-import type { Crosswalk } from "../types/crosswalks";
+import type { Crosswalk, CrosswalkConfig } from "../types/crosswalks";
 import { fetchJunctionNetworkOverview, resetJunctionNetwork, saveJunctionNetwork } from "../lib/junctionNetworkApi";
 import {
   JUNCTION_LOAD_LABELS,
@@ -41,7 +42,8 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   const [draft, setDraft] = useState<JunctionNetworkConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<JunctionEdge>("north");
-  const [crosswalks, setCrosswalks] = useState<Crosswalk[]>([]);
+  const [crosswalkConfig, setCrosswalkConfig] = useState<CrosswalkConfig | null>(null);
+  const crosswalks: Crosswalk[] = useMemo(() => crosswalkConfig?.crosswalks ?? [], [crosswalkConfig]);
   const [crosswalkError, setCrosswalkError] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState("");
   const [linkTargetEdge, setLinkTargetEdge] = useState<JunctionEdge>("north");
@@ -72,7 +74,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
 
   const refreshCrosswalks = useCallback(async () => {
     try {
-      setCrosswalks((await fetchCrosswalks()).crosswalks);
+      setCrosswalkConfig(await fetchCrosswalks());
       setCrosswalkError(null);
     } catch (nextError) {
       setCrosswalkError(nextError instanceof Error ? nextError.message : "Crosswalks could not be loaded.");
@@ -82,6 +84,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   useEffect(() => {
     void refreshCrosswalks();
   }, [refreshCrosswalks]);
+  useSerialPolling(refreshCrosswalks, 5000, { immediate: false });
 
   const pollOverview = useCallback(async () => {
     try {
@@ -362,10 +365,11 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
 
   if (!draft || !overview) {
     return (
-      <div className="page-stack">
+      <div className="page-stack junction-network-page">
+        {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} />}
         <section className="panel">
-          <h2>Junction Network</h2>
-          <p className="placeholder-copy">Loading junction topology and camera assignments...</p>
+          <h2>Network</h2>
+          <p className="placeholder-copy">Loading legacy junction topology and camera status...</p>
           {error && <p className="error-message">{error}</p>}
         </section>
       </div>
@@ -376,15 +380,19 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
 
   return (
     <div className="page-stack junction-network-page">
+      {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} />}
+      {crosswalkError && <p role="alert" className="error-message">{crosswalkError}</p>}
+      <details className="junction-advanced-config">
+        <summary>Advanced junction configuration (existing)</summary>
       <section className="panel junction-network-toolbar">
         <div className="junction-network-title-row">
           <div>
-            <h2>Junction Network</h2>
-            <p className="placeholder-copy">Arrange junctions, connect numbered edges and assign cameras or crosswalks.</p>
+            <h2>Junction configuration</h2>
+            <p className="placeholder-copy">Existing junction, camera assignments and directed topology remain available as advanced controls.</p>
           </div>
           <div className="junction-network-actions">
             <button type="button" onClick={addJunction} disabled={draft.intersections.length >= 16}>Add junction</button>
-            <button className="primary" type="button" onClick={() => void save()} disabled={!dirty || saving}>{saving ? "Saving..." : "Save network"}</button>
+            <button className="primary" type="button" onClick={() => void save()} disabled={!dirty || saving}>{saving ? "Saving..." : "Save junction configuration"}</button>
             <button type="button" onClick={() => void reset()} disabled={saving}>Reset</button>
           </div>
         </div>
@@ -618,6 +626,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
           )}
         </aside>
       </div>
+      </details>
     </div>
   );
 }

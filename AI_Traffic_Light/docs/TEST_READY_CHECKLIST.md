@@ -1,4 +1,20 @@
-# V056 Shared Physical Region Checklist
+# V057 Crossing-first Network Checklist
+
+```text
+version: 0_5_7
+previous_version: 0_5_6
+passed_baseline: 0_5_0
+status: Crossing-first Network workspace candidate
+```
+
+- [ ] Crosswalks navigation above Network; saved crossing creates a Network box without another add action.
+- [ ] Connections use numbered edges 1–4, can be removed, and remain after Save/reload; draggable positions persist.
+- [ ] Deleting a crossing removes its Network links; invalid graph data rejected without overwriting prior config.
+- [ ] Camera health on each box, selected-source-only AI observations, clear unavailable status for unobserved crossings.
+- [ ] Legacy junction management accessible in Advanced section; no signal-control changes.
+- [ ] Full Python offline regressions, frontend TypeScript/build, live backend smoke, responsive UI and owner PASS.
+
+## Previous V056 Shared Physical Region Checklist
 
 ```text
 version: 0_5_6

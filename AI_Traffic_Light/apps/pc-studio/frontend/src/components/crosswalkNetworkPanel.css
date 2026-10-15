@@ -1,0 +1,108 @@
+.crossing-network-section { display: grid; gap: var(--space-4); min-width: 0; }
+.crossing-network-toolbar .panel-header { align-items: flex-start; }
+.crossing-network-toolbar .button-row { flex-wrap: wrap; }
+.crossing-network-metrics { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.crossing-network-metrics span {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+.crossing-network-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+  gap: var(--space-4);
+  min-width: 0;
+  align-items: start;
+}
+.crossing-network-map, .crossing-network-inspector { min-width: 0; }
+.crossing-network-scroll {
+  max-width: 100%; overflow: auto; border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+.crossing-network-canvas {
+  position: relative; width: 100%; min-width: 900px; min-height: 480px;
+  background-color: var(--color-surface-muted);
+  background-image:
+    linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-border-subtle) 1px, transparent 1px);
+  background-size: 32px 32px;
+  touch-action: none; user-select: none;
+}
+.crossing-network-links {
+  position: absolute; inset: 0; height: 100%; width: 100%;
+  pointer-events: none;
+}
+.crossing-network-links line {
+  stroke: var(--color-primary); stroke-width: 2;
+  vector-effect: non-scaling-stroke; stroke-dasharray: 9 5; opacity: 0.8;
+}
+.crossing-network-node {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 246px; max-width: 246px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  overflow-wrap: anywhere; z-index: 2;
+}
+.crossing-network-node.is-selected { border: 2px solid var(--color-primary); }
+.crossing-network-heading {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 2px; width: 100%; text-align: left;
+  border: 0; border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  cursor: grab; background: var(--color-surface-raised);
+  touch-action: none;
+}
+.crossing-network-heading strong,
+.crossing-network-heading small { overflow-wrap: anywhere; white-space: normal; }
+.crossing-network-heading:active { cursor: grabbing; }
+.crossing-network-edge-grid {
+  display: grid;
+  grid-template-columns: 29px minmax(0, 1fr) 29px;
+  grid-template-rows: 29px auto 29px;
+  gap: 2px; align-items: center; justify-items: center; padding: 4px;
+}
+.crossing-network-edge { padding: 0; min-height: 28px; width: 28px; font-size: 0.8rem; }
+.crossing-network-edge[aria-pressed="true"] { border-color: var(--color-primary); color: var(--color-primary); }
+.crossing-network-edge-1 { grid-column: 2; grid-row: 1; }
+.crossing-network-edge-2 { grid-column: 3; grid-row: 2; }
+.crossing-network-edge-3 { grid-column: 2; grid-row: 3; }
+.crossing-network-edge-4 { grid-column: 1; grid-row: 2; }
+.crossing-network-status {
+  grid-column: 2; grid-row: 2; display: grid;
+  gap: 5px; justify-items: center; text-align: center;
+  width: 100%; min-width: 0;
+}
+.crossing-network-status small {
+  font-size: 0.7rem; white-space: normal; overflow-wrap: anywhere;
+}
+.crossing-network-status .status-pill {
+  font-size: 0.66rem; text-align: center; white-space: normal;
+}
+.crossing-network-empty {
+  display: grid; place-items: center; text-align: center; min-height: 480px;
+  padding: 24px; color: var(--color-text-secondary);
+}
+.crossing-network-link-form, .crossing-network-link-list {
+  display: grid; gap: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  margin-top: var(--space-3); padding-top: var(--space-3);
+}
+.crossing-network-link-form label { display: grid; gap: 4px; min-width: 0; }
+.crossing-network-link-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle);
+  overflow-wrap: anywhere;
+}
+.crossing-network-link-row span { min-width: 0; }
+.junction-advanced-config { min-width: 0; }
+.junction-advanced-config > summary {
+  cursor: pointer; padding: var(--space-3); margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+}
+.junction-advanced-config > .panel { margin-bottom: var(--space-4); }
+@media (max-width: 1280px) {
+  .crossing-network-layout { grid-template-columns: minmax(0, 1fr); }
+}

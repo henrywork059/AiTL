@@ -1,4 +1,10 @@
-# Start Here — V056
+# Start Here — V057
+
+Current candidate `0_5_7`, previous `0_5_6`, accepted baseline `0_5_0`.
+
+**Traffic → Crosswalks** is above **Traffic → Network**. Save a crossing and it automatically appears as a draggable Network box. Select a crossing and its numbered edge 1–4, choose a destination crossing/edge, click Connect crossings, then Save network. Saved camera health is visible for all assigned sources. AI counts are provided only for the currently inferred camera; unobserved crossings are clearly marked. Existing junction topology is preserved under Advanced junction configuration (existing).
+
+## Previous V056
 
 Current candidate `0_5_6` (previous `0_5_5`; accepted baseline `0_5_0`).
 

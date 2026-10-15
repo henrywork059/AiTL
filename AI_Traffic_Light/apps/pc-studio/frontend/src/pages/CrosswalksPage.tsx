@@ -89,7 +89,12 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
   function remove() {
     if (!selected || !draft || !window.confirm("Remove this crosswalk? Save to confirm deletion.")) return;
     const others = draft.crosswalks.filter((item) => item.id !== selected.id);
-    setDraft({ ...draft, crosswalks: others });
+    // Removing a crossing also removes its visual Network connections.
+    const network = draft.network ? {
+      positions: Object.fromEntries(Object.entries(draft.network.positions).filter(([id]) => id !== selected.id)),
+      links: draft.network.links.filter((link) => link.source_crosswalk_id !== selected.id && link.destination_crosswalk_id !== selected.id),
+    } : undefined;
+    setDraft({ ...draft, crosswalks: others, ...(network ? { network } : {}) });
     setSelectedId(others[0]?.id ?? null);
     setNotice(null);
   }

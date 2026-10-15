@@ -35,7 +35,15 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 - toggle the same one-camera simulation source from Crosswalks or Junction Network; physical camera input follows the shared simulation mode;
 - count detected classes per physical region and currently selected camera, keeping camera-specific observations distinct; no simultaneous dual-camera inference, cross-camera deduplication, camera-view calibration or physical signal-control authority.
 
-## Junction Network
+## Network — crossing-first monitoring
+
+- Render one crossing box automatically from each saved crosswalk; no separate Network node creation.
+- Monitor source assignments, camera connection/stream status, and per-region detector counts **only** for the selected inferred camera.
+- Drag crossing boxes and connect numbered edges 1–4 to other crossings, with optional graph positions and links persisted in the existing Crosswalk config.
+- Deleting a crossing automatically removes its visual Network links and position.
+- Existing junction/source assignment and directed legacy topology tools remain under Advanced junction configuration.
+
+### Retained junction model / advanced configuration
 
 - editable PC Studio page representing installed/model junctions as logical draggable nodes;
 - directed lines reuse persisted intersection-network topology links;
@@ -51,7 +59,7 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 - explicitly show unavailable traffic observations for junctions not currently observed by the shared live/simulation pipeline;
 - use `GET /api/traffic/network/overview` as a read-only projection rather than creating a parallel controller or camera registry.
 
-The Junction Network page does not implement simultaneous multi-junction inference, cross-camera identity/transfer matching, live emergency recognition or physical/public-road signal control.
+The Network page does not implement simultaneous multi-junction or multi-crossing inference, cross-camera identity/transfer matching, live emergency recognition or physical/public-road signal control.
 
 ## Camera Diagnostics
 

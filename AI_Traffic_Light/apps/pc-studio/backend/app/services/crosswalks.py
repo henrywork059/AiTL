@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+import math
 import os
 from pathlib import Path
 from threading import RLock
@@ -17,6 +18,8 @@ DEFAULT_PATH = Path(__file__).resolve().parents[5] / "config" / "crosswalks.json
 CAMERA_FIELDS = ("camera_side_a_id", "camera_side_b_id")
 MAX_CROSSWALKS = 32
 MAX_REGIONS = 24
+MAX_CROSSWALK_LINKS = 64
+CROSSWALK_NETWORK_EDGES = ("1", "2", "3", "4")
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
 
@@ -145,7 +148,57 @@ class CrosswalkService:
                     **({"vertices_by_side": deepcopy(side_vertices)} if side_vertices is not None else {}),
                 })
             items.append({"id": identity, "label": label.strip(), "location": location.strip(), **cameras, "regions": regions})
-        return {"schema_version": 1, "crosswalks": items}
+        result = {"schema_version": 1, "crosswalks": items}
+        if "network" in payload:
+            raw_network = payload["network"]
+            if not isinstance(raw_network, dict):
+                invalid("Crosswalk network must be an object.")
+            raw_positions = raw_network.get("positions", {})
+            if not isinstance(raw_positions, dict) or len(raw_positions) > MAX_CROSSWALKS:
+                invalid("Network positions must be keyed by saved crosswalk IDs.")
+            positions: dict[str, dict[str, float]] = {}
+            for crosswalk_id, point in raw_positions.items():
+                if not isinstance(crosswalk_id, str) or crosswalk_id not in identifiers or not isinstance(point, dict):
+                    invalid("Network positions must reference saved crosswalks.")
+                x, y = point.get("x"), point.get("y")
+                if any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 100 for value in (x, y)):
+                    invalid("Network position x/y must be finite percentages from 0 to 100.")
+                positions[crosswalk_id] = {"x": round(float(x), 2), "y": round(float(y), 2)}
+            raw_links = raw_network.get("links", [])
+            if not isinstance(raw_links, list) or len(raw_links) > MAX_CROSSWALK_LINKS:
+                invalid(f"Crosswalk network links must contain at most {MAX_CROSSWALK_LINKS} entries.")
+            links: list[dict[str, str]] = []
+            link_ids: set[str] = set()
+            connected_edges: set[tuple[str, str, str, str]] = set()
+            for link in raw_links:
+                if not isinstance(link, dict):
+                    invalid("Each crosswalk connection must be an object.")
+                link_id = link.get("id")
+                source_id = link.get("source_crosswalk_id")
+                destination_id = link.get("destination_crosswalk_id")
+                source_edge = link.get("source_edge")
+                destination_edge = link.get("destination_edge")
+                if not isinstance(link_id, str) or not ID_PATTERN.fullmatch(link_id) or link_id in link_ids:
+                    invalid("Crosswalk connection IDs must be valid and unique.")
+                if not isinstance(source_id, str) or not isinstance(destination_id, str) or source_id not in identifiers or destination_id not in identifiers or source_id == destination_id:
+                    invalid("Connections must reference two different saved crossings.")
+                if source_edge not in CROSSWALK_NETWORK_EDGES or destination_edge not in CROSSWALK_NETWORK_EDGES:
+                    invalid("Connection edge labels must be 1, 2, 3 or 4.")
+                endpoints = (source_id, source_edge, destination_id, destination_edge)
+                opposite = (destination_id, destination_edge, source_id, source_edge)
+                if endpoints in connected_edges or opposite in connected_edges:
+                    invalid("Duplicate crosswalk connection.")
+                link_ids.add(link_id)
+                connected_edges.add(endpoints)
+                links.append({
+                    "id": link_id,
+                    "source_crosswalk_id": source_id,
+                    "destination_crosswalk_id": destination_id,
+                    "source_edge": source_edge,
+                    "destination_edge": destination_edge,
+                })
+            result["network"] = {"positions": positions, "links": links}
+        return result
 
 
 crosswalk_service = CrosswalkService()

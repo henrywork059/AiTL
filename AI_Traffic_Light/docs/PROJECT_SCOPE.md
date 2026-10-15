@@ -19,7 +19,11 @@ Source switching is freshness-guarded: the previous selected physical frame is c
 
 Camera diagnostics are local prototype evidence. A run may temporarily quiesce the selected stream/simulation, measure the selected camera using its saved image settings at a conservative target FPS, and restore the prior state. A diagnostic label identifies the most likely failing layer; it is not a certification of network, detector, or camera reliability.
 
-## Junction installation / topology view
+## Network — crossing graph and junction compatibility
+
+The Network page now prioritizes all saved crosswalks as automatically created crossing boxes, with camera connection health and current-source-only region observations. Users can arrange them and connect numbered edges as persisted logical topology. This does not establish measured vehicle transfers, multi-camera inference or cooperative signal control. Existing junction configuration remains available as an advanced section.
+
+### Retained junction installation / topology view
 
 V0311 implements a logical Junction Network workspace over the existing intersection-network configuration.
 

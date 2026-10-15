@@ -399,6 +399,7 @@ class JunctionNetworkOverviewService:
             "available_cameras": available_cameras,
             "active_source_id": camera_status.get("active_source_id"),
             "current_frame_source_id": current_source_id,
+            "crosswalk_region_counts": dict(live_state.get("crosswalk_region_counts") or {}),
             "observation_intersection_id": observation_intersection_id,
             "observation_provenance": provenance,
             "source_mapping_matched": bool(resolution.get("source_mapping_matched")),

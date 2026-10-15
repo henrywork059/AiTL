@@ -119,6 +119,15 @@ export type JunctionOverviewNode = {
 
 export type JunctionNetworkOverview = {
   schema_version: 1;
+  crosswalk_region_counts?: Record<string, {
+    crosswalk_id: string;
+    camera_side: "a" | "b";
+    source_id: string;
+    region_id: string;
+    label: string;
+    class_counts: Record<string, number>;
+    total: number;
+  }>;
   generated_at_ms: number;
   network: JunctionNetworkConfig;
   available_cameras: JunctionCameraView[];

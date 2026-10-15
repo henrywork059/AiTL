@@ -1,5 +1,5 @@
-version: 0_5_6
-status: Shared physical region two-view geometry candidate
-previous_version: 0_5_5
+version: 0_5_7
+status: Crossing-first Network workspace candidate
+previous_version: 0_5_6
 passed_baseline: 0_5_0
-notes: Share one logical region name across camera sides while preserving independent polygon coordinates; hide backend IDs and retain per-source inference counts without summing duplicate observations. Windows acceptance pending.
+notes: Crosswalks precede Network; all saved crossings auto-render as monitor boxes with draggable positions, numbered-edge links and selected-source-only observations. Junction controller data retained unchanged. Windows PASS pending.

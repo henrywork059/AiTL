@@ -18,7 +18,24 @@ export type Crosswalk = {
   regions: CrosswalkRegion[];
 };
 
+export type CrosswalkNetworkPosition = { x: number; y: number };
+export type CrosswalkNetworkEdge = "1" | "2" | "3" | "4";
+
+export type CrosswalkNetworkLink = {
+  id: string;
+  source_crosswalk_id: string;
+  destination_crosswalk_id: string;
+  source_edge: CrosswalkNetworkEdge;
+  destination_edge: CrosswalkNetworkEdge;
+};
+
+export type CrosswalkNetwork = {
+  positions: Record<string, CrosswalkNetworkPosition>;
+  links: CrosswalkNetworkLink[];
+};
+
 export type CrosswalkConfig = {
   schema_version: 1;
   crosswalks: Crosswalk[];
+  network?: CrosswalkNetwork;
 };

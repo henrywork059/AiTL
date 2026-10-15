@@ -1,5 +1,13 @@
 # API Contracts — current camera and junction-network highlights
 
+## V057 Crossing Network graph (additive to Crosswalk schema 1)
+
+`GET /api/crosswalks` and `PUT /api/crosswalks` continue using `schema_version: 1`. An **optional** `network` object contains `positions` (a map of saved crosswalk IDs to finite numeric x/y percentages 0–100) and `links` (at most 64 named crossing-to-crossing connections, with distinct existing source/destination crossing IDs and `source_edge`/`destination_edge` values 1–4). At most 32 saved crossing positions are permitted; duplicate or reverse-equivalent endpoint/edge connections are rejected with the existing CROSSWALK_INVALID (422) error, preserving the previously saved JSON. Older records without `network` round-trip unchanged.
+
+A Network box is derived automatically from each saved `crosswalks[]` entry, whether or not its ID has an explicit position; the default visual layout is computed in the frontend. When a crosswalk is removed through Crosswalks, its visual links and position are removed in the same atomic save. Crossing names/camera assignments remain defined only in Crosswalks; Network does not introduce a second registry.
+
+`GET /api/traffic/network/overview` adds `crosswalk_region_counts` from its existing selected-source traffic-state computation, without triggering a second detection pass. Network boxes display assigned camera connectivity; region counts are available only for a currently inferred source. Unobserved cameras have no fabricated occupancy. Connections represent configuration metadata only, not observed traffic transfers, multi-camera inference or live signal control.
+
 ## V056 One physical region with two camera polygons
 
 Each newly created crosswalk region is **one logical region** with a stable internal `id` and an editable shared `label`. It retains `vertices` for older clients and may contain `vertices_by_side: {"a": [[x,y], ...], "b": [[x,y], ...]}` (one or both keys; each polygon is a validated convex quadrilateral in the existing 1280 × 720 reference frame). Region Editor does not expose backend IDs. Side A and B coordinates are edited separately and saved atomically through the existing crosswalk PUT endpoint, without changing schema version 1. Missing `vertices_by_side` falls back to the legacy `vertices` polygon. Earlier side-scoped `camera_side: "a" | "b"` records remain side-scoped; their associations are not guessed or silently rewritten.

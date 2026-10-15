@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_5_7 — Crossing-first Network workspace
+
+- Place Crosswalks above Network in the Traffic menu and rename Junction Network to Network, retaining its internal route for compatibility.
+- All saved crossings appear automatically as crossing boxes; save crossing positions and numbered-edge connections through optional crosswalk-network metadata in existing atomic Crosswalk persistence.
+- Show assigned camera connection/stream health for each crossing and selected-source-only detector region counts. No fabricated observations, simultaneous inference, vehicle transfers or physical signal commands.
+- Preserve current junction/source topology and editors in a collapsed advanced section. Existing intersections.json, APIs and signal safety remain unchanged.
+- Extend focused crosswalk network validation/persistence regression. Candidate `0_5_7`; previous `0_5_6`; owner-accepted baseline remains `0_5_0`. Windows full-suite PASS pending.
+
+
 ## 0_5_6 — Shared physical regions with independent A/B polygons
 
 - A new Region Editor region is a single named physical area shown on both camera sides; dragging handles on one side changes only that side's polygon. Its internal ID is hidden from users.
