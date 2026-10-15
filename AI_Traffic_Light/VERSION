@@ -1,5 +1,5 @@
-version: 0_4_13
-status: Quiet slate navigation candidate
-previous_version: 0_4_12
+version: 0_4_14
+status: Historical palette regression isolation candidate
+previous_version: 0_4_13
 passed_baseline: 0_4_0
-notes: V0413 replaces sidebar neon/mint navigation decoration with muted section headings and thin dividers plus solid slate selected-page rows. Removes navigation-only mint bars and dots but preserves mint focus and functional control indicators. No routes, app behavior, camera, junction or backend changes. Owner Windows validation pending; stable baseline remains 0_4_0.
+notes: V0414 removes obsolete sidebar styling assumptions from the historical V0409 palette test; V0413's dedicated navigation regression remains responsible for the current quiet slate sidebar. This prevents independent visual changes from breaking duplicated assertions. No application runtime, API or palette files changed. Full Windows build and live startup pending; owner-accepted baseline remains 0_4_0.

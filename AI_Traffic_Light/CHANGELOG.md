@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_4_14 — Remove stale historical navigation assertions
+
+- Repair the V0413 first-run `test_v0409_palette_layout.py` failure: the test still required `color-nav-heading-surface`, a token intentionally removed by the quiet-navigation redesign.
+- Keep V0409's slate/mint color and Junction Network layout checks, but remove duplicated navigation appearance assertions. V0413's dedicated quiet-navigation regression now owns the sidebar's current visual contract.
+- No runtime application, sidebar CSS, backend, traffic, camera or dependency changes. Previous candidate `0_4_13`; accepted baseline `0_4_0`; Windows typecheck/build and live smoke pending.
+
+
 ## 0_4_13 — Quiet slate sidebar navigation
 
 - Replace sidebar section title boxes and thick mint bars with small, muted uppercase headings and subtle horizontal dividers.

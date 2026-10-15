@@ -36,7 +36,6 @@ def main() -> None:
         "color-dark-surface-0": "#4d4e61",
         "color-shell": "#414354",
         "color-brand-surface": "#333648",
-        "color-nav-heading-surface": "#333648",
         "color-dark-surface-1": "#55576a",
         "color-dark-surface-2": "#5a5c70",
         "color-field": "#47495b",
@@ -76,11 +75,8 @@ def main() -> None:
     assert "background: var(--color-brand-surface);" in layout
     assert "border-radius: var(--radius-lg);" in layout
     assert ".brand-block h1" in components
-    assert ".nav-section h2" in components
-    assert ".nav-section h2::after" in components
-    assert "background: var(--color-nav-divider);" in components
-    assert "background: var(--color-nav-selected);" in components
-    assert ".nav-button.active::after" not in components
+    # Navigation styling is owned by test_v0413_quiet_navigation.py.
+    # Avoid coupling this older palette test to a later sidebar redesign.
 
     junction = source("pages/junctionNetworkPage.css")
     assert "width: clamp(268px, 27vw, 336px);" in junction
@@ -100,7 +96,7 @@ def main() -> None:
     assert 'className="junction-node-edge-layout"' in source("components/junctions/JunctionNodeCard.tsx")
     assert 'JUNCTION_EDGES.map((edge) =>' in source("components/junctions/JunctionNodeCard.tsx")
     print(f"[PASS] Slate/mint palette with {len(checks)} contrast checks and preserved light mode")
-    print("[PASS] Boxed brand, quiet navigation headings and neutral page selection")
+    print("[PASS] Boxed brand and shared palette remain intact")
     print("[PASS] Edge labels 1-4 use the four sides of a central content grid")
 
 

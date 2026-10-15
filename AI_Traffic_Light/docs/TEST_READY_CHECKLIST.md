@@ -1,12 +1,15 @@
-# V0413 Test Checklist
+# V0414 Test Checklist
 
 ```text
-version: 0_4_13
-previous_version: 0_4_12
+version: 0_4_14
+previous_version: 0_4_13
 passed_baseline: 0_4_0
-status: Quiet slate navigation candidate
+status: Historical palette regression isolation candidate
 ```
 
+- [ ] Old V0409 palette regression no longer requires `color-nav-heading-surface`.
+- [ ] V0413 dedicated navigation regression still verifies the current sidebar.
+- [ ] Python regressions, frontend typecheck/build, live backend smoke and app startup pass.
 - [ ] Sidebar group headings use muted text and hairline divider instead of mint-bordered boxes.
 - [ ] Selected navigation row uses neutral slate, no mint bar or dot, with clear text contrast.
 - [ ] Sidebar hover remains subtle and keyboard focus is visibly outlined; other mint control states remain.

@@ -1,11 +1,18 @@
-# Local Testing — V0413
+# Local Testing — V0414
 
 ```text
-version: 0_4_13
-previous_version: 0_4_12
+version: 0_4_14
+previous_version: 0_4_13
 passed_baseline: 0_4_0
-status: Quiet slate navigation candidate
+status: Historical palette regression isolation candidate
 ```
+
+## V0414 test ownership correction
+
+- Run the normal single-command updater with `-ChangedTests`.
+- The previously failing historical `test_v0409_palette_layout.py` should retain palette and junction checks without demanding a removed navigation-heading token.
+- `test_v0413_quiet_navigation.py` remains the single focused regression for current sidebar appearance.
+- Confirm frontend TypeScript check, production build, backend live smoke and app startup. The workspace CSS and UI are unchanged by V0414.
 
 ## V0413 quiet navigation acceptance
 
