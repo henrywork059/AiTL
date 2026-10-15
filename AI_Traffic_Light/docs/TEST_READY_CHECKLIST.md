@@ -1,12 +1,15 @@
-# V0407 Test Checklist
+# V0408 Test Checklist
 
 ```text
-version: 0_4_7
-previous_version: 0_4_6
+version: 0_4_8
+previous_version: 0_4_7
 passed_baseline: 0_4_0
-status: Safe Windows Uvicorn worker restart candidate
+status: Windows system-Python Uvicorn child recognition candidate
 ```
 
+- [ ] Mocked Windows PowerShell worker/parent identity regression passes.
+- [ ] System-Python Uvicorn child on port 8000 restarts through verified AiTL parent.
+- [ ] Application startup and backend health/live smoke pass; unrelated processes remain untouched.
 - [ ] Windows runner safely restarts project Uvicorn reload parent/worker on port 8000, without closing unrelated processes.
 - [ ] Other Python services on port 8000 remain protected.
 - [ ] Backend health, frontend launch and smoke pass.

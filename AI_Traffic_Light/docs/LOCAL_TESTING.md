@@ -1,11 +1,18 @@
-# Local Testing — V0407
+# Local Testing — V0408
 
 ```text
-version: 0_4_7
-previous_version: 0_4_6
+version: 0_4_8
+previous_version: 0_4_7
 passed_baseline: 0_4_0
-status: Safe Windows Uvicorn worker restart candidate
+status: Windows system-Python Uvicorn child recognition candidate
 ```
+
+## V0408 Windows port-8000 acceptance
+
+- Run the existing one-line update/test/run command. Its preflight regression now executes the real process-identification predicates against Windows process fixtures.
+- Port 8000 with system-Python Uvicorn child and verified AiTL virtualenv launcher must restart; unknown or unrelated Python owners must remain protected.
+- Confirm backend `/health`, live smoke, frontend startup, and the existing UI behavior. The parent PowerShell host must remain open.
+- Hardware tests remain manual. V0408 is a candidate until the owner confirms PASS.
 
 ## V0407 backend port-owner validation
 

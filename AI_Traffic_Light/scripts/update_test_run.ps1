@@ -90,21 +90,25 @@ function Test-AiTLProcessRecord {
 
     $combined = "$($ProcessRecord.ExecutablePath) $($ProcessRecord.CommandLine)".ToLowerInvariant()
     if ($Port -eq 8000) {
-        # Only this project's virtualenv may own an automatically replaced backend.
-        if ("$($ProcessRecord.ExecutablePath)".ToLowerInvariant() -ne $python.ToLowerInvariant()) {
-            return $false
-        }
-        $backendLaunch = $combined.Contains("uvicorn") -and
-            $combined.Contains("app.main:app") -and
-            $combined.Contains("--port 8000")
-        if ($backendLaunch) {
+        $executable = "$($ProcessRecord.ExecutablePath)".ToLowerInvariant()
+        $command = "$($ProcessRecord.CommandLine)".ToLowerInvariant()
+        $backendLaunch = $command.Contains("uvicorn") -and
+            $command.Contains("app.main:app") -and
+            $command.Contains("--port 8000")
+
+        # The AiTL venv launcher is trusted only with the expected app/port.
+        if ($executable -eq $python.ToLowerInvariant() -and $backendLaunch) {
             return $true
         }
 
-        # Windows uvicorn --reload serves requests from a multiprocessing child
-        # whose command line contains spawn_main rather than uvicorn. Verify its
-        # actual parent, never accept an arbitrary python.exe port owner.
-        if (-not ($combined.Contains("spawn_main") -and $combined.Contains("--multiprocessing-fork"))) {
+        # Windows venv launchers can start a child using system python.exe.
+        # Require direct ancestry to the verified AiTL launcher for either
+        # an inherited uvicorn command or a multiprocessing spawn worker.
+        $spawnWorker = $command.Contains("spawn_main") -and
+            $command.Contains("--multiprocessing-fork")
+        if (-not $executable.EndsWith("\python.exe") -or
+            -not ($backendLaunch -or $spawnWorker) -or
+            [int]$ProcessRecord.ParentProcessId -le 0) {
             return $false
         }
         $parent = Get-ProcessRecord -ProcessId ([int]$ProcessRecord.ParentProcessId)

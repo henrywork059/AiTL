@@ -1,5 +1,5 @@
-version: 0_4_7
-status: Safe Windows Uvicorn worker restart candidate
-previous_version: 0_4_6
+version: 0_4_8
+status: Windows system-Python Uvicorn child recognition candidate
+previous_version: 0_4_7
 passed_baseline: 0_4_0
-notes: V0407 identifies Windows uvicorn --reload spawned workers through this project's virtualenv Python executable and verified uvicorn parent, without treating other Python listeners as AiTL. Process-tree termination stops at the uvicorn parent rather than the PowerShell host. No API, frontend, traffic, camera or dependencies changed. Owner validation pending; stable baseline remains 0_4_0.
+notes: V0408 recognizes the Windows Uvicorn --reload child launched by system Python only when it is a direct descendant of this project's verified virtualenv Uvicorn launcher. The runner still refuses unrelated port owners and does not kill the parent PowerShell host. No application, camera or traffic logic changed. Windows acceptance pending; stable baseline stays 0_4_0.

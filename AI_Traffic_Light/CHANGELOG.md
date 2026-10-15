@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_4_8 — Safe recognition of system-Python Uvicorn reload child
+
+- The user's Windows process trace shows the port-8000 Uvicorn child (system Python) under the project's virtualenv Uvicorn launcher. Extend the runner's identity check to verify this direct relationship, the expected application and port, and the parent's reload command before stopping the backend tree.
+- Preserve refusal to terminate unrelated Python processes and keep the hosting PowerShell window outside the terminated process tree.
+- Add a mocked Windows PowerShell process regression for the reported child/parent layout, multiprocessing workers, and unrelated-port-owner rejection.
+- No frontend behavior, backend services, dependencies, camera transport or traffic controller changes; accepted stable baseline remains `0_4_0`.
+
+
 ## 0_4_7 — Safe Windows backend restart
 
 - Recognize Windows Uvicorn `--reload` worker processes by matching the project's virtualenv Python and verifying their Uvicorn parent, addressing unrecognized `python.exe` listeners on port 8000.
