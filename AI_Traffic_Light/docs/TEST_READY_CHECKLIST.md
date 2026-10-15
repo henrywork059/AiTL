@@ -1,12 +1,16 @@
-# V0404 Test Checklist
+# V0405 Test Checklist
 
 ```text
-version: 0_4_4
-previous_version: 0_4_3
+version: 0_4_5
+previous_version: 0_4_4
 passed_baseline: 0_4_0
-status: Theme structure validation repair candidate
+status: Mint theme and selected-state indicators candidate
 ```
 
+- [ ] Dark mode displays `#57FFED` accent; light mode uses accessible dark teal.
+- [ ] Selected navigation, tabs, mode buttons, Crosswalks and Dataset rows show dots/bars/rings as applicable.
+- [ ] Live AI checked filters and Junction edge selection have visible active styling.
+- [ ] Keyboard focus, button hover, app startup and existing camera/junction behavior remain correct.
 - [ ] Updated structure validator accepts the new semantic dark base token and rejects an invalid token.
 - [ ] V0404 changed-tests startup proceeds beyond the previous structure failure.
 - [ ] Shared semantic palette passes contrast validation; light/dark page styles share tokens.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_5 — Mint accent and visible selection states
+
+- The dark-theme primary accent is `#57FFED`; the light theme uses contrast-safe `#006F66`. Related hover, pressed, secondary, focus and selected-surface roles share the teal family.
+- Selected navigation, active tabs, segmented/toggled choices, selected crosswalks, camera status, dataset items and junction edge choices gain a colored dot, bar or ring alongside the selected fill.
+- Crosswalk schematic guide/camera marks use a legible dark-teal scene token rather than obsolete blue literals.
+- ARIA current/pressed/selected attributes expose existing UI states; the Live AI visibility filter styling reflects checked settings.
+- No new dependencies, camera transport, intersection behavior or signal safety changes. Previous candidate `0_4_4`; stable accepted baseline `0_4_0`.
+
+
 ## 0_4_4 — Dark theme structure-validator repair
 
 - Replaced the obsolete `#121212` dark-canvas assertion with a check for a valid hexadecimal dark-base token and a canvas that references it.

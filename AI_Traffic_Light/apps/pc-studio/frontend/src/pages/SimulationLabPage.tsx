@@ -393,7 +393,7 @@ function SamplesTab({ mode, onModeChange, pageSize, onPageSizeChange, page, page
   return (
     <div className="experiment-samples">
       <div className="experiment-sample-toolbar">
-        <div className="experiment-toggle" role="group" aria-label="Sample mode"><button className={mode === "fixed" ? "active" : ""} onClick={() => onModeChange("fixed")}>Fixed</button><button className={mode === "adaptive" ? "active" : ""} onClick={() => onModeChange("adaptive")}>Adaptive</button></div>
+        <div className="experiment-toggle" role="group" aria-label="Sample mode"><button aria-pressed={mode === "fixed"} className={mode === "fixed" ? "active" : ""} onClick={() => onModeChange("fixed")}>Fixed</button><button aria-pressed={mode === "adaptive"} className={mode === "adaptive" ? "active" : ""} onClick={() => onModeChange("adaptive")}>Adaptive</button></div>
         <label>Rows <select value={pageSize} onChange={(event: ChangeEvent<HTMLSelectElement>) => onPageSizeChange(Number(event.target.value))}>{[25, 50, 100].map((value) => <option key={value}>{value}</option>)}</select></label>
         <span>{total} samples · page {page + 1}/{pageCount}</span>
         <div className="button-row"><button disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={page >= pageCount - 1} onClick={() => onPageChange(page + 1)}>Next</button></div>

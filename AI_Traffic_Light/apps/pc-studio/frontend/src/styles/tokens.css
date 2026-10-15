@@ -7,6 +7,7 @@
   /* Shared Fluent-inspired role tokens. */
   --control-height: 40px;
   --sidebar-width: 252px;
+  --color-crosswalk-guide: #006f66;
   --color-chart-vehicle: #a85120;
   --color-chart-pedestrian: #6b4ea3;
 
@@ -40,16 +41,16 @@
    * secondary = selective controls/progress;
    * neither is used as a generic status color.
    */
-  --color-primary: #225fa8;
-  --color-primary-hover: #184f90;
-  --color-primary-active: #133e74;
-  --color-primary-surface: #e9f1fc;
+  --color-primary: #006f66;
+  --color-primary-hover: #00594f;
+  --color-primary-active: #00473f;
+  --color-primary-surface: #e1f5f1;
   --color-on-primary: #ffffff;
 
-  --color-secondary: #00796b;
-  --color-secondary-hover: #00695c;
-  --color-secondary-active: #00574c;
-  --color-secondary-surface: #e0f2f1;
+  --color-secondary: var(--color-primary);
+  --color-secondary-hover: var(--color-primary-hover);
+  --color-secondary-active: var(--color-primary-active);
+  --color-secondary-surface: var(--color-primary-surface);
   --color-on-secondary: #ffffff;
 
   /* Compatibility aliases for existing components. */
@@ -58,7 +59,7 @@
   --color-accent-active: var(--color-primary-active);
   --color-accent-surface: var(--color-primary-surface);
   --color-focus: var(--color-primary);
-  --color-selection: #cbdaf0;
+  --color-selection: #b6e9e0;
 
   /* Semantic state colors are reserved for meaning. */
   --color-success: #216a3c;
@@ -141,24 +142,24 @@
     --color-border-strong: rgba(255, 255, 255, 0.36);
 
     /* Lighter variants preserve legibility on dark surfaces. */
-    --color-primary: #95c3ff;
-    --color-primary-hover: #b8d8ff;
-    --color-primary-active: #79b1f5;
-    --color-primary-surface: rgba(149, 195, 255, 0.13);
-    --color-on-primary: #0c203a;
+    --color-primary: #57ffed;
+    --color-primary-hover: #8cfff1;
+    --color-primary-active: #2be6d2;
+    --color-primary-surface: rgba(87, 255, 237, 0.13);
+    --color-on-primary: #08312c;
 
-    --color-secondary: #80cbc4;
-    --color-secondary-hover: #b2dfdb;
-    --color-secondary-active: #4db6ac;
-    --color-secondary-surface: rgba(128, 203, 196, 0.12);
-    --color-on-secondary: #0d1b2a;
+    --color-secondary: var(--color-primary);
+    --color-secondary-hover: var(--color-primary-hover);
+    --color-secondary-active: var(--color-primary-active);
+    --color-secondary-surface: var(--color-primary-surface);
+    --color-on-secondary: var(--color-on-primary);
 
     --color-accent: var(--color-primary);
     --color-accent-hover: var(--color-primary-hover);
     --color-accent-active: var(--color-primary-active);
     --color-accent-surface: var(--color-primary-surface);
     --color-focus: var(--color-primary);
-    --color-selection: rgba(144, 202, 249, 0.24);
+    --color-selection: rgba(87, 255, 237, 0.28);
 
     --color-success: #a5d6a7;
     --color-success-surface: rgba(165, 214, 167, 0.10);

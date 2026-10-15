@@ -197,6 +197,7 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
                 type="button"
                 key={item.id}
                 className={item.id === selectedId ? "crosswalk-list-item active" : "crosswalk-list-item"}
+                aria-pressed={item.id === selectedId}
                 onClick={() => setSelectedId(item.id)}
               >
                 <strong>{item.label || item.id}</strong>
@@ -266,16 +267,16 @@ export function CrosswalksPage({ cameraStatus, changingMode, onSimulationChange,
                 <rect width="640" height="380" fill="#d1d8d0" rx="12" />
                 <rect y="125" width="640" height="130" fill="#39434a" />
                 <path d="M0 190 H640" stroke="#f0cd73" strokeWidth="3" strokeDasharray="24 20" />
-                <path d="M240 75 V305 M400 75 V305" stroke="#315f9e" strokeWidth="3" strokeDasharray="10 8" opacity="0.6" fill="none" />
+                <path d="M240 75 V305 M400 75 V305" stroke="var(--color-crosswalk-guide)" strokeWidth="3" strokeDasharray="10 8" opacity="0.6" fill="none" />
                 {Array.from({ length: 7 }, (_, index) => (
                   <rect key={index} x="250" y={138 + index * 17} width="140" height="10" rx="2" fill="#f7f8f5" />
                 ))}
-                <path d="M320 89 V120 M307 109 L320 122 L333 109" fill="none" stroke="#315f9e" strokeWidth="5" strokeLinecap="round" />
-                <path d="M320 291 V260 M307 272 L320 259 L333 272" fill="none" stroke="#315f9e" strokeWidth="5" strokeLinecap="round" />
-                <rect x="280" y="25" width="80" height="48" rx="9" fill={selected.camera_side_a_id ? "#315f9e" : "#6d747d"} />
+                <path d="M320 89 V120 M307 109 L320 122 L333 109" fill="none" stroke="var(--color-crosswalk-guide)" strokeWidth="5" strokeLinecap="round" />
+                <path d="M320 291 V260 M307 272 L320 259 L333 272" fill="none" stroke="var(--color-crosswalk-guide)" strokeWidth="5" strokeLinecap="round" />
+                <rect x="280" y="25" width="80" height="48" rx="9" fill={selected.camera_side_a_id ? "var(--color-crosswalk-guide)" : "#6d747d"} />
                 <circle cx="302" cy="49" r="10" fill="#dbeafe" />
                 <text x="332" y="55" fontSize="17" fill="white">A</text>
-                <rect x="280" y="307" width="80" height="48" rx="9" fill={selected.camera_side_b_id ? "#315f9e" : "#6d747d"} />
+                <rect x="280" y="307" width="80" height="48" rx="9" fill={selected.camera_side_b_id ? "var(--color-crosswalk-guide)" : "#6d747d"} />
                 <circle cx="302" cy="331" r="10" fill="#dbeafe" />
                 <text x="332" y="337" fontSize="17" fill="white">B</text>
                 <text x="18" y="102" fontSize="16" fill="#26352c">Pedestrian side A</text>

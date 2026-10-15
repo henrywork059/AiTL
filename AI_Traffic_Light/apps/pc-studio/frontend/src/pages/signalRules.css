@@ -455,3 +455,29 @@
     justify-self: start;
   }
 }
+
+.signal-tab.active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-primary-surface);
+}
+.signal-tab.active::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+.scenario-list-item.active { position: relative; padding-right: 34px; }
+.scenario-list-item.active::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 15px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}

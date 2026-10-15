@@ -701,3 +701,14 @@ button.compact {
 .junction-crosswalk-edge-choice span { overflow-wrap: anywhere; min-width: 0; }
 .junction-crosswalk-edge-choice.is-selected { border-color: var(--color-primary); background: var(--color-primary-surface); }
 .junction-crosswalk-missing { color: var(--color-danger); font-size: 0.7rem; }
+
+.junction-crosswalk-edge-choice[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-primary);
+}
+.junction-edge-tag.is-selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-primary);
+}

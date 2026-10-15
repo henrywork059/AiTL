@@ -28,6 +28,7 @@ export function AppShell({ activePage, onPageChange, children }: Props) {
                 <button
                   key={navPage.id}
                   className={activePage === navPage.id ? "nav-button active" : "nav-button"}
+                  aria-current={activePage === navPage.id ? "page" : undefined}
                   onClick={() => onPageChange(navPage.id)}
                 >
                   <span>{navPage.shortLabel}</span>

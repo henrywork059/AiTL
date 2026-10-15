@@ -48,3 +48,5 @@
 .crosswalk-region-vertex:active { cursor: grabbing; }
 .crosswalk-region-vertex-label { fill: #113c6d; font-weight: 700; font-size: 19px; }
 @media (max-width: 1300px) { .crosswalk-region-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.crosswalk-region-list button.active { box-shadow: inset 3px 0 0 var(--color-primary); }

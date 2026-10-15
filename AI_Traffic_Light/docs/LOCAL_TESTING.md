@@ -1,11 +1,20 @@
-# Local Testing — V0404
+# Local Testing — V0405
 
 ```text
-version: 0_4_4
-previous_version: 0_4_3
+version: 0_4_5
+previous_version: 0_4_4
 passed_baseline: 0_4_0
-status: Theme structure validation repair candidate
+status: Mint theme and selected-state indicators candidate
 ```
+
+## V0405 theme and selection acceptance
+
+- From the existing project root run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests`.
+- In Windows dark appearance, primary buttons, focus rings, active navigation and selected/toggled controls should use mint `#57FFED` with dark text on filled mint buttons.
+- In light appearance, the same interactions should use legible dark teal `#006F66` instead of pale mint on white.
+- Inspect Dashboard navigation, Camera Settings selected camera status, Crosswalk list, Junction Network selected edges, Traffic Analytics, Signal Control, Simulation Experiments, Dataset Review and Live AI checked class filters.
+- Confirm every selection is also indicated by a dot, underline or border, not color alone; hover and keyboard focus must remain distinct from selection.
+- Backend/ESP behavior is unchanged. Frontend build, full startup smoke and owner visual PASS are still required.
 
 ## V0404 startup gate repair
 

@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0403
+# AiTL PC Studio Design System — V0405
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,7 +6,7 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Current benchmark and decisions (V0403)
+## Current benchmark and decisions (V0405)
 
 AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
@@ -17,7 +17,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 - [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
 - [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-### V0403 implementation parameters
+### V0405 implementation parameters
 
 | Element | Light | Dark | Decision |
 | --- | --- | --- | --- |
@@ -25,7 +25,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 | Main panel | `#FFFFFF` | `#152236` | Elevated neutral content surface |
 | Primary text | `#172B45` | `#EFF5FF` | High-contrast hierarchy |
 | Muted text | `#52677D` | `#A8BAD0` | Legible secondary data |
-| Primary control | `#225FA8` | `#95C3FF` | Actions/selection, not health or warning |
+| Primary control | `#006F66` | `#57FFED` | Teal theme, readable on each background |
 | Input/interactive border | `#7B8FA7` | `#657B95` | 3:1+ contrast against typical field surface |
 | Controls | 40px minimum height | same | Consistent pointer/keyboard target |
 | Page/panel spacing | 4px increments; 20–32px sections | same | Deliberate proximity hierarchy |
@@ -33,7 +33,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 | Tab selection | underline/segmented active surface | same | Distinguishes selected state from action |
 | Focus | 3px outline, 2px offset | same | Strong keyboard focus without changed tab order |
 
-Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
+Selection states use a teal tint plus a dot, underline or ring; color alone does not indicate selection. Mint filled buttons use a dark foreground, while light-mode dark-teal buttons use white. Hover must remain distinct from selected state. Status green/amber/red remains semantic; the camera and traffic visualization palette is independent of light/dark application chrome. Dataset, Analytics, Live AI and Settings forms now use shared roles rather than always-dark literal hex values.
 
 ## Color-role model
 
@@ -47,21 +47,21 @@ Light appearance:
 
 | Role | Value |
 | --- | --- |
-| Primary | `#225FA8` |
-| Primary hover | `#184F90` |
-| Primary active | `#133E74` |
-| Primary surface | `#E9F1FC` |
+| Primary | `#006F66` |
+| Primary hover | `#00594F` |
+| Primary active | `#00473F` |
+| Primary surface | `#E1F5F1` |
 | On primary | `#FFFFFF` |
 
 Dark appearance:
 
 | Role | Value |
 | --- | --- |
-| Primary | `#95C3FF` |
-| Primary hover | `#B8D8FF` |
-| Primary active | `#79B1F5` |
-| Primary surface | `rgba(144, 202, 249, 0.12)` |
-| On primary | `#0C203A` |
+| Primary | `#57FFED` |
+| Primary hover | `#8CFFF1` |
+| Primary active | `#2BE6D2` |
+| Primary surface | `rgba(87, 255, 237, 0.13)` |
+| On primary | `#08312C` |
 
 Use primary for:
 
@@ -76,8 +76,8 @@ Do not use primary merely to make a panel more interesting.
 
 Secondary is deliberately sparse. It distinguishes selected/active secondary controls and continuous progress without competing with the main action.
 
-Light: `#00796B` with `#FFFFFF` on-secondary.
-Dark: `#80CBC4` with `#102522` on-secondary.
+Light: `#006F66` with `#FFFFFF` on-secondary.
+Dark: `#57FFED` with `#08312C` on-secondary.
 
 Use secondary for:
 

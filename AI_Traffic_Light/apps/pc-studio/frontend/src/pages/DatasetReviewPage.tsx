@@ -185,6 +185,7 @@ export function DatasetReviewPage() {
               <button
                 key={capture.capture_id}
                 className={`capture-browser-item ${capture.capture_id === selectedCaptureId ? "active" : ""}`}
+                aria-pressed={capture.capture_id === selectedCaptureId}
                 onClick={() => {
                   if (dirty && !window.confirm("Discard unsaved label changes and switch images?")) return;
                   setSelectedCaptureId(capture.capture_id);

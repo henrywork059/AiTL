@@ -176,3 +176,15 @@
     max-height: 300px;
   }
 }
+
+.capture-browser-item.active { position: relative; padding-right: 34px; }
+.capture-browser-item.active::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 17px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}

@@ -149,3 +149,10 @@
 .traffic-mode-tabs button { border-color: transparent; background: transparent; border-radius: var(--radius-sm); padding-inline: var(--space-4); }
 .traffic-mode-tabs button:hover:not(.active) { background: var(--color-control-hover); }
 .traffic-chart-legend span { color: var(--color-text-secondary); }
+
+.traffic-mode-tabs button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  box-shadow: inset 0 -3px 0 var(--color-primary);
+}
+.traffic-mode-tabs button[aria-pressed="true"]::before { margin-right: var(--space-2); }

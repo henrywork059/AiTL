@@ -408,7 +408,7 @@ export function TrafficLogicPage() {
             ["test", "Test & Safety"],
             ["history", "History"],
           ] as [TabId, string][]).map(([id, label]) => (
-            <button key={id} type="button" className={tab === id ? "signal-tab active" : "signal-tab"} onClick={() => setTab(id)}>{label}</button>
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "signal-tab active" : "signal-tab"} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
 

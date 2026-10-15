@@ -1,5 +1,5 @@
-version: 0_4_4
-status: Theme structure validation repair candidate
-previous_version: 0_4_3
+version: 0_4_5
+status: Mint theme and selected-state indicators candidate
+previous_version: 0_4_4
 passed_baseline: 0_4_0
-notes: V0404 replaces the obsolete fixed #121212 dark-canvas guard with validation of the current semantic dark base token and canvas reference. Adds regression coverage; no UI palette or application runtime changes. Owner validation pending; accepted baseline remains 0_4_0.
+notes: V0405 applies owner-selected #57FFED as the dark accent with a contrast-safe teal light variant. Active navigation, tabs, selected rows, mode buttons and checked filters gain explicit selection indicators. No backend or control logic changed. Candidate awaits owner PASS; stable baseline remains 0_4_0.
