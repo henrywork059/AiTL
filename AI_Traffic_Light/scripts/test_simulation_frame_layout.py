@@ -1,4 +1,4 @@
-"""Focused layout checks for the signal-aware simulation frame."""
+"""Focused layout checks for camera-only simulation without annotations or lamps."""
 from __future__ import annotations
 
 import sys
@@ -28,19 +28,18 @@ def main() -> int:
     assert frame is not None
     image = _decode_png(frame.content)
 
-    # The compact metadata panel still exists in the top-left corner.
-    assert int(image[40, 40].mean()) < 40
-    # The resized panel should no longer extend deep into the upper-left scene.
-    assert int(image[90, 620].mean()) > 45
-    assert int(image[150, 120].mean()) > 45
+    # Empty sidewalk retains the scene background: no dark metadata banner.
+    assert np.array_equal(image[40, 40], np.array([72, 79, 84], dtype=np.uint8))
+    # The old signal housing (upper right) is gone.
+    assert float(image[240, 1095].mean()) > 40
 
-    # The traffic signal housing remains visible.
-    assert int(image[240, 1095].mean()) < 40
-    # The pedestrian signal should be smaller, leaving the far-right lane visible.
-    assert int(image[300, 1250].mean()) > 45
-
-    print("[PASS] simulation metadata panel stays compact and leaves more scene visible")
-    print("[PASS] pedestrian signal housing is reduced and no longer dominates the right lane")
+    # Only car and pedestrian actors; signal logic remains separate from rendering.
+    assert all(vehicle.vehicle_type == "car" for vehicle in service._vehicles)
+    renderer = (BACKEND_ROOT / "app" / "services" / "camera_frames.py").read_text(encoding="utf-8")
+    frame_render = renderer.split("def _refresh_simulation_locked(", 1)[1].split("encoded_ok, encoded =", 1)[0]
+    assert "cv2.putText(" not in frame_render
+    assert "_draw_signal_heads(" not in frame_render
+    print("[PASS] camera simulation contains cars/pedestrians without metadata text or traffic lamps")
     return 0
 
 

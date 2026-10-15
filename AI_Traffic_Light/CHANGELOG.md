@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_4_18 — Camera selection, cleaner simulation and region controls
+
+- Allow direct selection of saved cameras by clicking their cards, reusing the existing `chooseSavedCamera` path. Keep selection, busy and keyboard-focus indicators accessible.
+- Remove all text banners, `STOP` labels, vehicle/pedestrian signal heads and synthetic buses from the simulated camera **image**. Cars, pedestrians, road/crossing geometry and the separate signal-policy logic remain.
+- Replace the Crosswalk Region Editor camera-side dropdown with two accessible Side A / Side B toggle buttons; preserve camera preview and region geometry.
+- Explicitly mark SVG polygons as unfilled in addition to existing CSS, with warning-colored selected outlines and four draggable vertex handles unchanged.
+- Center status-pill text horizontally and vertically, addressing the `Simulation active` alignment issue.
+- Store the six complete pre-patch affected source files in `docs/backups/V0417_PRE_V0418_CODE.md`, including failure-prevention notes and the immutable V0417 Git reference.
+- Add a focused UI/renderer regression and update the historical simulation-frame layout test. Previous candidate `0_4_17`; accepted stable baseline `0_4_14`. Windows build, smoke and visual validation pending.
+
+
 ## 0_4_17 — Transparent region polygons
 
 - Remove polygon interior fills from the Crosswalk Region Editor, including selected regions, so camera frames remain unobstructed. Unselected regions retain mint outlines; selected regions retain transparent interiors but are highlighted by thicker, contrasting warning-colored dashed outlines and draggable numbered vertices.

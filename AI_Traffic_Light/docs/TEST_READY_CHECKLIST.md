@@ -1,12 +1,19 @@
-# V0417 Test Checklist
+# V0418 Test Checklist
 
 ```text
-version: 0_4_17
-previous_version: 0_4_16
+version: 0_4_18
+previous_version: 0_4_17
 passed_baseline: 0_4_14
-status: Transparent region polygon overlays candidate
+status: Camera selection and region preview polish candidate
 ```
 
+- [ ] Saved cameras click selects the camera and shows the correct stream; keyboard and busy states work.
+- [ ] Simulation frames contain only cars/people on the road/crossing, without labels or signal heads; signal-state API and behavior are intact.
+- [ ] Crosswalk region Camera side uses selectable Side A/B toggle buttons.
+- [ ] Region polygons remain completely unfilled, selected outlines/handles remain visible.
+- [ ] Simulation active pill text is centered in its rounded border.
+- [ ] Pre-patch source and regression reminder archive exists.
+- [ ] TypeScript/build, Python regressions, startup and backend live smoke pass.
 - [ ] Crosswalk region polygons are completely transparent in both normal and selected states, with outlines and draggable vertices preserved.
 - [ ] Live AI and simulation region outlines remain visible without hiding camera frames.
 - [ ] Dataset Review bounding boxes are unchanged; region geometry and saves work normally.

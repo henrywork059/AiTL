@@ -1,5 +1,5 @@
-version: 0_4_17
-status: Transparent region polygon overlays candidate
-previous_version: 0_4_16
+version: 0_4_18
+status: Camera selection and region preview polish candidate
+previous_version: 0_4_17
 passed_baseline: 0_4_14
-notes: V0417 makes region polygon interiors fully transparent in Crosswalk Region Editor, Live AI, simulation overlay and legacy region editor. Existing outlines, selected borders, vertices and object-label bounding boxes are preserved. No geometry, saved configuration, camera stream, backend or signal behavior changes. Owner Windows validation pending; accepted baseline remains 0_4_14.
+notes: V0418 makes Saved cameras selectable by clicking their cards, simplifies the simulated camera image to cars/pedestrians without captions or signal lamps, changes Crosswalk Region Editor Camera side into a two-button toggle, enforces transparent region interiors, and centers status-pill text. The previous affected source is saved under docs/backups/V0417_PRE_V0418_CODE.md with regression reminders. Internal signal control, persisted camera/region APIs and crosswalk data remain unchanged. Windows acceptance pending; baseline stays 0_4_14.

@@ -1,11 +1,20 @@
-# Local Testing — V0417
+# Local Testing — V0418
 
 ```text
-version: 0_4_17
-previous_version: 0_4_16
+version: 0_4_18
+previous_version: 0_4_17
 passed_baseline: 0_4_14
-status: Transparent region polygon overlays candidate
+status: Camera selection and region preview polish candidate
 ```
+
+## V0418 camera and region acceptance
+
+- Run the standard one-line updater and confirm the new and historical regressions, frontend TypeScript/build, backend smoke and app startup.
+- In Camera Settings → Saved cameras, click a saved ESP or simulation camera card. It should select the camera and update the active preview without duplicating camera-selection services. Verify keyboard focus and busy protection.
+- Start PC simulation: the image should show cars and people on the street and crosswalk, **without** text banners, STOP text, traffic signal housings or buses. The simulation signal-state API and safe vehicle/pedestrian timing remain functional.
+- In Crosswalks → Edit regions, toggle Side A and Side B with buttons and confirm the correct source preview. Selected regions retain contrasting dashed outlines and numbered drag handles, but normal/selected interiors show the image without translucent fill.
+- Check the Simulation active status pill: text should be visually centered. Verify the backup file and regression notes exist at `docs/backups/V0417_PRE_V0418_CODE.md`.
+- Accepted baseline remains V0414; V0418 is unaccepted until Windows PASS.
 
 ## V0417 transparent region polygon validation
 

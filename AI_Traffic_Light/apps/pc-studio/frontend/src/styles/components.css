@@ -109,6 +109,11 @@
 
 .status-pill,
 .status-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  vertical-align: middle;
   border: var(--border-width) solid var(--color-border-subtle);
   background: var(--color-surface-muted);
   color: var(--color-text-secondary);
@@ -702,6 +707,8 @@ th {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  text-align: left;
+  cursor: pointer;
   gap: var(--space-2);
   padding: var(--space-2);
   min-width: 0;
@@ -712,6 +719,9 @@ th {
 .camera-status-entry.is-selected {
   border-color: var(--color-primary);
 }
+.camera-status-entry:hover:not(:disabled) { border-color: var(--color-control-stroke); background: var(--color-control-hover); }
+.camera-status-entry.is-selected:hover:not(:disabled) { border-color: var(--color-primary); background: var(--color-primary-surface); }
+.camera-status-entry:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
 .camera-status-entry-name {
   display: flex;

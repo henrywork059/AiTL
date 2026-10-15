@@ -266,7 +266,18 @@ Normalized `decision_evidence` remains an additive projection over detailed hist
 
 Vehicle-class/emergency/cooperation evidence remains synthetic experiment evidence unless a later explicit live implementation provides and tests real provenance.
 
-## 14. Handoff/acceptance
+## 14. Camera/region pre-patch recovery reference
+
+For camera source selection, simulation frame rendering, Crosswalk Region Editor and status-pill changes, see `docs/backups/V0417_PRE_V0418_CODE.md`. It contains complete pre-V0418 source snapshots and reminders to avoid recurring mistakes.
+
+- Reuse the existing camera selection API/service; never create a second camera-selection state.
+- Keep signal phase/safety computations separate from optional simulated-camera decorations.
+- A selected region has a visible stroke/vertex handles while its interior remains transparent.
+- Camera-side toggles must not mutate region coordinates or camera-side assignments.
+- Update old visual expectations when appearance intentionally changes; run affected regression tests and TypeScript/build rather than relying only on source-text checks.
+- This snapshot is **recovery documentation, not active source**; do not import its code or restore it unless investigating a regression.
+
+## 15. Handoff/acceptance
 
 Keep handoff concise:
 

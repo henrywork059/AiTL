@@ -169,12 +169,12 @@ export function CrosswalkRegionEditor({
           <span className="status-pill">{simulated ? "Simulation pair" : "Physical cameras"}</span>
           {(
             <>
-              <label>Camera side
-                <select value={side} onChange={(event) => setSide(event.target.value as Side)}>
-                  <option value="camera_side_a_id">Side A</option>
-                  <option value="camera_side_b_id">Side B</option>
-                </select>
-              </label>
+              <div className="crosswalk-region-side-toggle" role="group" aria-label="Camera side">
+                <button type="button" aria-pressed={side === "camera_side_a_id"}
+                  onClick={() => setSide("camera_side_a_id")} disabled={busy}>Side A</button>
+                <button type="button" aria-pressed={side === "camera_side_b_id"}
+                  onClick={() => setSide("camera_side_b_id")} disabled={busy}>Side B</button>
+              </div>
               {!simulated && <button type="button" onClick={() => void previewPhysicalCamera()}
                 disabled={busy || changingMode || !selectedCamera}>
                 Select camera for preview
@@ -214,6 +214,8 @@ export function CrosswalkRegionEditor({
                 <g key={region.id}>
                   <polygon
                     points={polygon(region)}
+                    fill="none"
+                    fillOpacity={0}
                     className={selected?.id === region.id ? "crosswalk-region-polygon is-selected" : "crosswalk-region-polygon"}
                   />
                   {selected?.id === region.id && region.vertices.map(([x, y], index) => (

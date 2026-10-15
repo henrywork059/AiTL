@@ -169,7 +169,7 @@ def main() -> int:
 
     print("[PASS] camera B mirrors A vertically on the shared simulation clock")
     print("[PASS] camera receiver accepts PNG frames")
-    print("[PASS] signal-aware simulation renders the road, crosswalk, stop lines, and signal state")
+    print("[PASS] simulation renders road, crosswalk, cars and pedestrians while signal state remains available separately")
     print("[PASS] vehicles queue at the stop line and resume only on vehicle green")
     print("[PASS] pedestrians wait at the curb and enter the crossing only on WALK")
     print("[PASS] yellow/all-red/WALK/CLEAR signal cycle is deterministic")

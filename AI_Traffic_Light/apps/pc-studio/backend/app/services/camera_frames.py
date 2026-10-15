@@ -408,8 +408,8 @@ class CameraFrameService:
         for index in range(vehicle_count):
             direction = 1 if index % 2 == 0 else -1
             lane_index = index // 2
-            vehicle_type = "bus" if index % 5 == 4 else "car"
-            width = 220 if vehicle_type == "bus" else self._simulation_rng.randint(125, 170)
+            vehicle_type = "car"
+            width = self._simulation_rng.randint(125, 170)
             spacing = 300
             if direction > 0:
                 x = -240.0 + lane_index * spacing
@@ -539,8 +539,6 @@ class CameraFrameService:
         self._mirrored_frame = None
         self._frame_counter += 1
         now_ms = int(time.time() * 1000)
-        signal = self._simulation_signal_state_locked()
-
         canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), (29, 33, 37), dtype=np.uint8)
         cv2.rectangle(canvas, (0, 0), (FRAME_WIDTH - 1, ROAD_TOP - 1), (72, 79, 84), thickness=-1)
         cv2.rectangle(canvas, (0, ROAD_TOP), (FRAME_WIDTH - 1, ROAD_BOTTOM - 1), (48, 52, 57), thickness=-1)
@@ -561,8 +559,6 @@ class CameraFrameService:
             )
         cv2.line(canvas, (EASTBOUND_STOP_LINE, ROAD_TOP), (EASTBOUND_STOP_LINE, ROAD_BOTTOM), (240, 240, 240), thickness=6)
         cv2.line(canvas, (WESTBOUND_STOP_LINE, ROAD_TOP), (WESTBOUND_STOP_LINE, ROAD_BOTTOM), (240, 240, 240), thickness=6)
-        cv2.putText(canvas, "STOP", (410, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (220, 220, 220), 2)
-        cv2.putText(canvas, "STOP", (800, 445), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (220, 220, 220), 2)
         for vehicle in self._vehicles:
             _draw_vehicle(
                 canvas,
@@ -581,38 +577,6 @@ class CameraFrameService:
                 color=pedestrian.color,
                 stride=stride_sign if index % 2 == 0 else -stride_sign,
             )
-        self._draw_signal_heads(canvas, signal)
-        cv2.rectangle(canvas, (24, 20), (564, 126), (14, 17, 20), thickness=-1)
-        cv2.putText(canvas, "PC CAMERA SIMULATION - SIGNAL AWARE", (42, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (126, 231, 135), 2)
-        cv2.putText(
-            canvas,
-            f"density: {self._simulation_density}   pedestrians: {len(self._pedestrians)}   vehicles: {len(self._vehicles)}",
-            (42, 72),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.42,
-            (217, 221, 224),
-            1,
-        )
-        cv2.putText(
-            canvas,
-            f"signal: {signal['phase'].replace('_', ' ')}   {signal['seconds_remaining']:.1f}s",
-            (42, 94),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.44,
-            (217, 221, 224),
-            1,
-        )
-        rule_label = ", ".join(signal.get("active_rules", [])[:2]) or "normal timing"
-        state_label = "paused" if self._simulation_paused else f"frame {self._frame_counter}"
-        cv2.putText(
-            canvas,
-            f"policy: {signal.get('mode', 'fixed')} / {signal.get('active_profile', 'Normal')}   {rule_label}   {state_label}",
-            (42, 116),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.38,
-            (217, 221, 224),
-            1,
-        )
         encoded_ok, encoded = cv2.imencode(".png", canvas)
         if not encoded_ok:
             raise AppError(
@@ -631,32 +595,6 @@ class CameraFrameService:
             origin="simulation",
         )
 
-    @staticmethod
-    def _draw_signal_heads(canvas: np.ndarray, signal: dict) -> None:
-        phase = signal["phase"]
-        red_on = phase not in {"vehicle_green", "vehicle_yellow"}
-        amber_on = phase == "vehicle_yellow"
-        green_on = phase == "vehicle_green"
-        housing_x, housing_y = 1084, 206
-        housing_width, housing_height = 66, 186
-        cv2.rectangle(canvas, (housing_x, housing_y), (housing_x + housing_width, housing_y + housing_height), (18, 20, 23), thickness=-1)
-        lamps = [
-            ((housing_x + 33, housing_y + 34), (35, 35, 120), (70, 70, 255), red_on),
-            ((housing_x + 33, housing_y + 93), (35, 95, 110), (0, 205, 255), amber_on),
-            ((housing_x + 33, housing_y + 152), (35, 95, 35), (60, 220, 80), green_on),
-        ]
-        for center, off_color, on_color, active in lamps:
-            cv2.circle(canvas, center, 19, on_color if active else off_color, thickness=-1)
-        ped_walk = phase == "pedestrian_green"
-        ped_clear = phase == "pedestrian_flashing"
-        ped_x, ped_y = 1158, 228
-        ped_width, ped_height = 84, 92
-        cv2.rectangle(canvas, (ped_x, ped_y), (ped_x + ped_width, ped_y + ped_height), (18, 20, 23), thickness=-1)
-        ped_text = "WALK" if ped_walk else "CLEAR" if ped_clear else "WAIT"
-        ped_color = (70, 230, 90) if ped_walk else (0, 205, 255) if ped_clear else (70, 70, 255)
-        cv2.putText(canvas, "PED", (ped_x + 20, ped_y + 27), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (220, 220, 220), 1)
-        text_x = ped_x + 10 if ped_text == "CLEAR" else ped_x + 15
-        cv2.putText(canvas, ped_text, (text_x, ped_y + 63), cv2.FONT_HERSHEY_SIMPLEX, 0.48, ped_color, 2)
 
 
 camera_frame_service = CameraFrameService()

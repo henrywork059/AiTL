@@ -348,17 +348,21 @@ export function CameraSourcesPage({ status, onSimulationChange, onStatusChange, 
             {remote?.cameras.map((camera) => {
               const indicator = cameraIndicator(camera);
               return (
-                <div
-                  role="listitem"
-                  key={camera.source_id}
-                  className={`camera-status-entry${camera.selected ? " is-selected" : ""}`}
-                >
-                  <div className="camera-status-entry-name">
-                    <strong title={camera.source_id}>{camera.source_id}</strong>
-                    {camera.selected && <small>Active preview</small>}
-                  </div>
-                  <small title={camera.host || "PC simulation"}>{camera.kind === "simulation" ? "PC simulation" : camera.host}</small>
-                  <span className={`status-pill ${indicator.tone}`}>{indicator.label}</span>
+                <div role="listitem" key={camera.source_id}>
+                  <button
+                    type="button"
+                    className={`camera-status-entry${camera.selected ? " is-selected" : ""}`}
+                    aria-pressed={camera.selected}
+                    disabled={busy}
+                    onClick={() => void chooseSavedCamera(camera.source_id)}
+                  >
+                    <span className="camera-status-entry-name">
+                      <strong title={camera.source_id}>{camera.source_id}</strong>
+                      {camera.selected && <small>Active preview</small>}
+                    </span>
+                    <small title={camera.host || "PC simulation"}>{camera.kind === "simulation" ? "PC simulation" : camera.host}</small>
+                    <span className={`status-pill ${indicator.tone}`}>{indicator.label}</span>
+                  </button>
                 </div>
               );
             })}
