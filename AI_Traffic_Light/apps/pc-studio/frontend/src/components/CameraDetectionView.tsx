@@ -9,6 +9,8 @@ type Props = {
   showBoxes: boolean;
   showLabels: boolean;
   showZones: boolean;
+  imageUrlOverride?: string;
+  isAvailable?: boolean;
 };
 
 const ZONE_REFERENCE_WIDTH = 1280;
@@ -32,8 +34,10 @@ export function CameraDetectionView({
   showBoxes,
   showLabels,
   showZones,
+  imageUrlOverride,
+  isAvailable,
 }: Props) {
-  if (!cameraStatus?.frame_available) {
+  if (!(isAvailable ?? cameraStatus?.frame_available)) {
     return (
       <div className="live-camera-empty">
         <strong>No camera frame available</strong>
@@ -44,9 +48,9 @@ export function CameraDetectionView({
 
   const width = frame?.image_width ?? cameraStatus.resolution?.width ?? 1280;
   const height = frame?.image_height ?? cameraStatus.resolution?.height ?? 720;
-  const imageUrl = frame?.source_frame_number
+  const imageUrl = imageUrlOverride ?? (frame?.source_frame_number
     ? inferredFrameUrl(frame.source_id, frame.source_frame_number, frame.timestamp_ms)
-    : `${API_BASE}/api/camera/frame?t=${cameraStatus.frame_number}`;
+    : `${API_BASE}/api/camera/frame?t=${cameraStatus?.frame_number ?? 0}`);
 
   const shouldRenderOverlay = (showZones && zones.length > 0) || (frame !== null && showBoxes);
 

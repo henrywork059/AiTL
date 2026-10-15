@@ -201,7 +201,7 @@ class InferenceService:
         with self._state_lock:
             active_model_id = self._active_model_id
         if active_model_id == model_id:
-            self.unload()
+            raise AppError(ErrorCode.INVALID_REQUEST, "Activate another model before deleting the active model.", status_code=409)
         return self._registry.delete_model(model_id)
 
     def detect_frame(self, frame: CameraFrame | None, *, confidence_threshold: float | None = None) -> dict[str, Any]:
@@ -274,7 +274,7 @@ class InferenceService:
                 self._last_detection_frame = detection_frame
                 self._last_source_frame = frame
                 self._source_frame_cache[(frame.source_id, frame.frame_number)] = frame
-                while len(self._source_frame_cache) > 8:
+                while len(self._source_frame_cache) > 32:
                     oldest_key = next(iter(self._source_frame_cache))
                     self._source_frame_cache.pop(oldest_key, None)
                 self._last_error = None

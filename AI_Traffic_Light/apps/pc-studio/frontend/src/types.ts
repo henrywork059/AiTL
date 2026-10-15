@@ -527,6 +527,7 @@ export type TrainingStatus = {
 export type RuntimeSettings = {
   default_confidence: number;
   live_poll_interval_ms: number;
+  inference_interval_ms: number;
   training_patience: number;
   log_level: "DEBUG" | "INFO" | "WARNING" | "ERROR";
 };

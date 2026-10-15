@@ -205,7 +205,7 @@ const fallbackInferenceStatus: InferenceStatus = {
   models: [],
 };
 const fallbackModelRegistryStatus: ModelRegistryStatus = { default_model_id: null, active_model_id: null, total: 0, models: [] };
-export const fallbackRuntimeSettings: RuntimeSettings = { default_confidence: 0.10, live_poll_interval_ms: 500, training_patience: 5, log_level: "INFO" };
+export const fallbackRuntimeSettings: RuntimeSettings = { default_confidence: 0.10, live_poll_interval_ms: 500, inference_interval_ms: 500, training_patience: 5, log_level: "INFO" };
 const fallbackZoneStatus: ZoneStatus = {
   zones: mockZones,
   editable: false,
@@ -344,6 +344,18 @@ export async function setDefaultModel(modelId: string): Promise<ModelRegistrySta
   return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/default`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
 }
 export async function deleteModel(modelId: string): Promise<ModelRegistryStatus> { return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/${encodeURIComponent(modelId)}`, { method: "DELETE" }); }
+export async function uploadInferenceModel(modelId: string, data: File): Promise<ModelRegistryStatus> {
+  return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/upload?model_id=${encodeURIComponent(modelId)}`, {
+    method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: data,
+  });
+}
+export type CameraInferenceResult = { source_id: string; frame: DetectionFrame | null; error: string | null };
+export async function fetchCameraInference(sourceId: string): Promise<CameraInferenceResult> {
+  return requestJsonStrict<CameraInferenceResult>(`${API_BASE}/api/inference/cameras/${encodeURIComponent(sourceId)}`);
+}
+export function cameraPreviewUrl(sourceId: string, timestamp: number): string {
+  return `${API_BASE}/api/camera/preview/${encodeURIComponent(sourceId)}?t=${timestamp}`;
+}
 export async function fetchLiveDetections(confidenceThreshold = 0.1): Promise<DetectionFrame> {
   const params = new URLSearchParams({ confidence: String(confidenceThreshold) });
   return requestJsonStrict<DetectionFrame>(`${API_BASE}/api/inference/detections?${params.toString()}`);

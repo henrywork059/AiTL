@@ -1,5 +1,16 @@
 # Changelog
 
+## 0_5_9 — Global AI Models and multi-camera preview
+
+- Place Traffic above the AI navigation group and remove the Settings page from navigation, preserving the existing runtime-settings API and old saved settings.
+- AI Models now imports new local .pt weights (up to 200 MiB, no overwrite), lists/loads/defaults/unloads/deletes models, prevents deletion of the active model, and saves one global confidence threshold and an inference-interval slider (100–2000 ms).
+- Run a single active model sequentially against the newest available frame from each saved active ESP or saved simulated camera via a background worker. Keep per-camera results and reject stale frames without accumulating a processing queue; actual interval is best-effort and may be slower if inference saturates the PC.
+- Redesign Camera AI Preview to select any registered camera without changing the shared camera selection, show the latest selected-camera feed and labeled detection boxes, overlay existing crossing region polygons with Side A/B geometry, and display per-class per-region current counts outside the image.
+- Leave legacy selected-source traffic analytics/tracking/network overview, camera dataset capture, firmware, signal safety, and physical control unchanged. Multiple preview results do not establish cross-camera identity fusion, live multi-junction control, or certified safety.
+- Candidate `0_5_9` (previous `0_5_8`); accepted baseline `0_5_0`. Windows regression/build/smoke and owner PASS pending.
+
+
+
 ## 0_5_8 — AI workspace and direct Network edge connections
 
 - Move Camera Settings and Camera Diagnostics above the new AI sidebar group.

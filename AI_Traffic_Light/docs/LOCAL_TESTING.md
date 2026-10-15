@@ -1,4 +1,24 @@
-# V058 AI Group / Direct Edge Connections Candidate
+# V059 Global AI Models and Multi-Camera Preview Candidate
+
+```text
+version: 0_5_9
+previous_version: 0_5_8
+passed_baseline: 0_5_0
+status: Global AI Models and multi-camera preview candidate
+```
+
+## V059 Windows validation
+
+- From repository root run the full `scripts/update_test_run.ps1` (without `-ChangedTests`). Check Python/structure regressions, TypeScript/Vite build, backend startup `/health`, smoke, and app launch.
+- Confirm sidebar Traffic precedes AI, AI Models precedes Camera AI Preview, and Settings page is absent. Other navigation/Camera Settings and Traffic behaviors should be unchanged.
+- AI Models: upload a small valid `.pt` model with a unique ID; confirm list, load/activate, default, and persist. Refuse duplicate IDs, invalid IDs, empty/oversized files; refuse deletion of the active model. Delete an inactive model and confirm only its run directory is removed. Invalid model weights may upload but must show an activation error.
+- Set global confidence and inference interval slider (100–2000 ms), save, refresh app and verify settings remain. Preview should not offer a confidence slider.
+- With saved simulated pairs and a valid loaded model, select A, B, C and D independently in Camera AI Preview. Verify frame matches source, class/confidence boxes align, each region uses the correct Side A/B saved polygon, counts appear in the separate region table (not drawn over camera image), and switching preview does not change the selected camera in Camera Settings.
+- Connect and stream 2+ ESP cameras; verify inference on both while one is selected, the inactive saved stream still contributes preview detections, disconnected/stale streams show unavailable and do not inherit detections from other cameras. Target frequency depends on CPU/GPU and total camera count. With no model loaded, show no detection boxes; do not fabricate counts.
+- Check legacy selected-source `/api/inference/detections`, `/api/traffic/state`, Network, dataset capture, manual camera switching, signal transitions and crosswalk region save/reload. No multi-camera identity fusion or physical signal authorization is introduced.
+- Owner PASS pending; accepted baseline stays `0_5_0`.
+
+## Previous V058 AI Group and Network Drag Candidate
 
 ```text
 version: 0_5_8

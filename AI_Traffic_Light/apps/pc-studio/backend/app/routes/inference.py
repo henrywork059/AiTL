@@ -5,6 +5,7 @@ from app.core.logging_config import get_logger
 from app.models import InferenceLoadRequest
 from app.services.camera_frames import camera_frame_service
 from app.services.inference import inference_service
+from app.services.multi_camera_inference import multi_camera_inference_service
 from app.services.object_tracking import object_tracking_service
 from app.services.zones import zone_service
 
@@ -77,6 +78,12 @@ def live_detections(
         },
     )
     return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/cameras/{source_id}")
+def camera_detection_result(source_id: str, request: Request) -> dict:
+    """Read background inference; no camera selection side effects."""
+    return ok(multi_camera_inference_service.result(source_id), request_id=request.state.request_id)
 
 
 @router.get("/frame")

@@ -24,7 +24,6 @@ import { JunctionNetworkPage } from "./pages/JunctionNetworkPage";
 import { LiveAiPage } from "./pages/LiveAiPage";
 import { LogsPage } from "./pages/LogsPage";
 import { ModelRegistryPage } from "./pages/ModelRegistryPage";
-import { SettingsPage } from "./pages/SettingsPage";
 import { SimulationLabPage } from "./pages/SimulationLabPage";
 import { TrafficAnalyticsPage } from "./pages/TrafficAnalyticsPage";
 import { TrafficLogicPage } from "./pages/TrafficLogicPage";
@@ -197,8 +196,6 @@ export default function App() {
           <LiveAiPage
             zones={zones}
             cameraStatus={cameraStatus}
-            confidenceThreshold={confidenceThreshold}
-            onConfidenceChange={setConfidenceThreshold}
             onRefresh={refreshAll}
             refreshing={refreshing}
             onDetectionCountChange={setLiveDetectionCount}
@@ -261,8 +258,6 @@ export default function App() {
         return <TrainExportPage />;
       case "model_registry":
         return <ModelRegistryPage runtimeSettings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
-      case "settings":
-        return <SettingsPage apiState={apiState} health={health} settings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
       case "logs":
         return <LogsPage logs={recentLogs} apiState={apiState} onLogsChange={setRecentLogs} />;
       default:

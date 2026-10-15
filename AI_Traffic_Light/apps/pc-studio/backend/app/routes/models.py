@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.core.api_response import ok
 from app.core.error_codes import ErrorCode
@@ -37,9 +37,16 @@ def set_default_model(payload: InferenceLoadRequest, request: Request) -> dict:
     return ok(data, request_id=request.state.request_id)
 
 
+@router.post("/upload")
+async def upload_model(request: Request, model_id: str = Query(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")) -> dict:
+    """Accept raw model bytes with a validated server-side model ID."""
+    data = await model_registry_service.upload_model(model_id, request.stream())
+    return ok(data, request_id=request.state.request_id)
+
+
 @router.delete("/{model_id}")
 def delete_model(model_id: str, request: Request) -> dict:
-    """Delete a trained model run directory and unload it if active."""
+    """Delete an inactive trained model run directory."""
     data = inference_service.delete_model(model_id)
     logger.info(
         "Trained model deleted through API",

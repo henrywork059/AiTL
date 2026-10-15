@@ -35,7 +35,7 @@ HTTP port 80 is used for ESP status/config/start/stop control. After Start Strea
 
 The production V0310 tuning keeps one framebuffer. On the normal PSRAM path it uses `CAMERA_GRAB_LATEST` and preserves the existing `ATL1` wire format while replacing the inherited vectored hot-path write with bounded plain `send()` progress capped at 11,680 application bytes per outer write. TCP/lwIP remains responsible for actual packet segmentation. Saved Camera Sources frame size, JPEG quality and target FPS remain authoritative.
 
-Multiple saved ESP sessions may stream concurrently. Each session has an independent worker and newest-frame cache, but exactly one saved ESP is selected to feed the existing shared inference/capture/traffic pipeline. Switching source clears the previous physical frame first and promotes a cached frame only when it is recent; an old cache is never re-stamped as a fresh AI input. Replacing a saved IP retires the previous session generation, so a late frame from that worker is ignored even if the source ID is reused.
+Multiple saved ESP sessions may stream concurrently. Each session has an independent worker and newest-frame cache, but exactly one saved ESP is selected to feed the existing shared capture/tracking/traffic pipeline. Switching source clears the previous physical frame first and promotes a cached frame only when it is recent; an old cache is never re-stamped as a fresh AI input. Replacing a saved IP retires the previous session generation, so a late frame from that worker is ignored even if the source ID is reused.
 
 If an ESP stream drops or the device reboots, its session can recover using the retained configuration. Simulation temporarily suspends physical image transfer while retaining saved profiles/session intent, and physical streams resume afterward.
 
@@ -81,9 +81,13 @@ Only the junction resolved from the **currently shared selected camera/simulatio
 
 The multi-camera input architecture and Junction Network page are foundations for later live multi-intersection work. They do **not** currently provide:
 
-- simultaneous independent inference/controller pipelines for all junctions;
+- simultaneous independent traffic-controller pipelines for all junctions;
 - cross-camera object identity or physical transfer matching;
 - live emergency-vehicle recognition/priority;
 - active public-road signal control.
 
 Network cooperation, pedestrian-aware, vehicle-class and emergency-priority behavior retain their documented simulation/evidence scope unless a later explicit live implementation changes that boundary.
+
+## V059 global AI preview
+
+`RemoteCameraManager.frames_for_inference()` snapshots the newest fresh JPEG from every saved connected ESP source and each saved simulated camera; it also supports recent receiver uploads. `MultiCameraInferenceService` runs as one background worker under FastAPI lifespan, sequentially serving all feeds with the one globally loaded inference model. The persisted `inference_interval_ms` targets a *complete pass* over available cameras (best effort, not guaranteed per-camera throughput). No frame backlog is queued. Latest inference results are cached by camera ID and stale observations suppressed. Preview selection reads results via `/api/inference/cameras/{source_id}` and uses existing side-specific crosswalk polygons for per-frame counts. Physical/network signal control and legacy selected-source traffic, tracking and capture remain unchanged. Do not sum Side A/B results as unique objects without identity fusion.

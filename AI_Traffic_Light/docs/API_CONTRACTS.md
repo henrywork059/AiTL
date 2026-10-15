@@ -1,22 +1,33 @@
 # API Contracts — current camera and junction-network highlights
 
+## V059 global camera inference (preview-only)
+
+- `POST /api/models/upload?model_id=<safe-id>` accepts raw application/octet-stream .pt weights (limit 200 MiB), stores them as a new `outputs/training/<safe-id>/weights/best.pt` without overwrite and returns the standard model registry envelope. Reject invalid model IDs, duplicate IDs, empty or oversized uploads. Uploaded weights must still be explicitly loaded; unsupported model files can fail during activation.
+- `DELETE /api/models/{model_id}` rejects deletion of the active model with 409; activation remains `POST /api/inference/load`.
+- `PUT /api/settings/runtime` adds optional `inference_interval_ms` (100–2000; default 500) to existing persistent settings. `default_confidence` is the global inference threshold. `live_poll_interval_ms` continues to control camera status polling, not inference.
+- `GET /api/inference/cameras/{source_id}` returns `{"source_id": "...", "frame": <detection-frame-or-null>, "error": <null-or-message>}` inside the normal API envelope. These observations originate in one background worker using the same active model across saved live ESP streams, saved simulated cameras and recent legacy frame receiver uploads. The worker processes newest available frames on a best-effort interval without queued backlogs and prevents stale results from appearing current.
+- `GET /api/camera/preview/{source_id}` returns a current JPEG/PNG from a registered camera without changing active selection. Image responses retain X-Request-ID. The frontend counts classes only within the selected camera's configured Side A/B region polygons; cross-camera counts are *not* deduplicated or summed.
+- The existing selected-source `GET /api/inference/detections`, `GET /api/traffic/state`, tracking, capture, signal rules and Network overview keep their previous single-current-source semantics; do not misrepresent global preview detections as traffic-controller observations.
+
+
+
 ## V057 Crossing Network graph (additive to Crosswalk schema 1)
 
 `GET /api/crosswalks` and `PUT /api/crosswalks` continue using `schema_version: 1`. An **optional** `network` object contains `positions` (a map of saved crosswalk IDs to finite numeric x/y percentages 0–100) and `links` (at most 64 named crossing-to-crossing connections, with distinct existing source/destination crossing IDs and `source_edge`/`destination_edge` values 1–4). At most 32 saved crossing positions are permitted; duplicate or reverse-equivalent endpoint/edge connections are rejected with the existing CROSSWALK_INVALID (422) error, preserving the previously saved JSON. Older records without `network` round-trip unchanged.
 
 A Network box is derived automatically from each saved `crosswalks[]` entry, whether or not its ID has an explicit position; the default visual layout is computed in the frontend. When a crosswalk is removed through Crosswalks, its visual links and position are removed in the same atomic save. Crossing names/camera assignments remain defined only in Crosswalks; Network does not introduce a second registry.
 
-`GET /api/traffic/network/overview` adds `crosswalk_region_counts` from its existing selected-source traffic-state computation, without triggering a second detection pass. Network boxes display assigned camera connectivity; region counts are available only for a currently inferred source. Unobserved cameras have no fabricated occupancy. Connections represent configuration metadata only, not observed traffic transfers, multi-camera inference or live signal control.
+`GET /api/traffic/network/overview` adds `crosswalk_region_counts` from its existing selected-source traffic-state computation, without triggering a second detection pass. Network boxes display assigned camera connectivity; region counts are available only for a currently inferred source. Unobserved cameras have no fabricated occupancy. Connections represent configuration metadata only, not observed traffic transfers or live signal control. V059 background detection is separate from Network overview.
 
 ## V056 One physical region with two camera polygons
 
 Each newly created crosswalk region is **one logical region** with a stable internal `id` and an editable shared `label`. It retains `vertices` for older clients and may contain `vertices_by_side: {"a": [[x,y], ...], "b": [[x,y], ...]}` (one or both keys; each polygon is a validated convex quadrilateral in the existing 1280 × 720 reference frame). Region Editor does not expose backend IDs. Side A and B coordinates are edited separately and saved atomically through the existing crosswalk PUT endpoint, without changing schema version 1. Missing `vertices_by_side` falls back to the legacy `vertices` polygon. Earlier side-scoped `camera_side: "a" | "b"` records remain side-scoped; their associations are not guessed or silently rewritten.
 
-`GET /api/traffic/state` provides `crosswalk_region_counts` only for a camera source with a current inferred frame. Its keys `crosswalk_id:side:region_id` and `camera_region_id` distinguish the two camera views, while `physical_region_id` (`crosswalk_id:region_id`) links them to the **same physical area**. `class_counts` and `total` represent per-frame observations from one active camera; do **not** add A/B counts to infer unique pedestrians or vehicles without multi-camera identity matching. The current implementation does not perform simultaneous dual-camera inference, inter-camera deduplication, or physical signal control.
+`GET /api/traffic/state` provides `crosswalk_region_counts` only for a camera source with a current inferred frame. Its keys `crosswalk_id:side:region_id` and `camera_region_id` distinguish the two camera views, while `physical_region_id` (`crosswalk_id:region_id`) links them to the **same physical area**. `class_counts` and `total` represent per-frame observations from one active camera; do **not** add A/B counts to infer unique pedestrians or vehicles without multi-camera identity matching. V059 runs independent background detection for multiple saved camera feeds, but does not perform inter-camera deduplication or physical signal control. This older traffic-state route remains selected-source-only.
 
 ## V054 Camera-specific regions and live counts
 
-`camera_side` is optional on schema-1 crosswalk regions (`a` or `b`); missing values preserve legacy shared geometry. Per-frame active-source detections are counted by region under `crosswalk_region_counts` in `GET /api/traffic/state`, keyed `crosswalk:side:region`. Each result contains camera source, region ID, display label, per-class counts and total. No simultaneous camera inference or signal policy changes.
+`camera_side` is optional on schema-1 crosswalk regions (`a` or `b`); missing values preserve legacy shared geometry. Per-frame active-source detections are counted by region under `crosswalk_region_counts` in `GET /api/traffic/state`, keyed `crosswalk:side:region`. Each result contains camera source, region ID, display label, per-class counts and total. The legacy traffic-state observation remains selected-source-only; V059 adds independent per-camera preview inference without signal policy changes.
 
 ## V0323 Crosswalk shared quadrilateral regions
 
@@ -143,7 +154,7 @@ Each `junctions[]` entry includes persisted identity/layout/source metadata plus
 - structured event records for current ranked scenario, protected service request, manual/test input or observed crossing activity where supported by the existing live decision context;
 - warnings for missing/unassigned source profiles, unavailable assigned ESPs, camera errors, offline primary camera, unmapped current source, or unavailable live traffic observation.
 
-The live-data rule is strict: PC Studio still has one shared selected camera/simulation inference pipeline. Only the junction resolved from the current frame/source receives current live traffic metrics and decision context. Other configured junctions return `observation_provenance: "unavailable"` and unavailable load instead of copying the selected junction's occupancy. Camera assignment does not imply multi-camera fusion, cross-camera identity matching, observed network transfer, emergency recognition, or active cooperative signal control.
+The live-data rule is strict: PC Studio still has one shared selected camera/simulation inference pipeline. Only the junction resolved from the current frame/source receives current live traffic metrics and decision context. Other configured junctions return `observation_provenance: "unavailable"` and unavailable load instead of copying the selected junction's occupancy. Camera assignment does not imply multi-camera fusion, cross-camera identity matching, observed network transfer, emergency recognition, or active cooperative signal control; V059 independently infers camera preview frames without changing this overview.
 
 ## Connect
 
@@ -231,7 +242,7 @@ The saved multi-camera registry retained from V036 provides:
 
 Profiles are stored locally in `config/remote_cameras.json` using the existing atomic JSON-store helper. Socket state is never persisted: after PC Studio restarts, the list/settings are restored but devices must be connected again.
 
-Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; therefore Live AI, Dataset Capture, zones and analytics continue to consume one unambiguous active source. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.
+Several ESP streams may be active simultaneously. Each has its own TCP worker and newest-frame cache. Only the selected ESP publishes into the existing global `CameraFrameService`; Dataset Capture, zones, legacy inference/tracking and analytics continue to consume one unambiguous active source. V059 Camera AI Preview separately reads the per-camera background inference worker. Selecting another already-running ESP promotes its cached newest frame only when it was received recently; otherwise the previous physical frame is cleared and the shared pipeline waits for the next fresh frame from the selected ESP.
 
 ## V037 R6 quality-preserving transport telemetry
 

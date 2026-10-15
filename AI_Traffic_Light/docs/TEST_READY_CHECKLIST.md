@@ -1,4 +1,21 @@
-# V058 AI & Network Drag Candidate Checklist
+# V059 Global AI and Preview Candidate Checklist
+
+```text
+version: 0_5_9
+previous_version: 0_5_8
+passed_baseline: 0_5_0
+status: Global AI multi-camera preview candidate
+```
+
+- [ ] Traffic section above AI, AI Models / Camera AI Preview in AI, Settings page absent.
+- [ ] Upload/import .pt without overwrite, load one running model, set default, delete inactive model; active deletion rejected.
+- [ ] Global confidence and model interval slider (100–2000 ms) persist after app restart; no duplicated confidence slider in Preview.
+- [ ] Active saved ESP and simulated camera frames are independently inferred with one global model. No stale frame queues; missing cameras do not show stale observations.
+- [ ] Preview switches among saved cameras without changing global selected source. Boxes/labels/confidence show on exact source image; saved Side A/B polygon aligns, per-class per-region counts appear separately and do not count an object twice in overlapping regions.
+- [ ] Existing camera, crosswalk, legacy traffic analytics, Network, dataset capture and signal safety operate unchanged.
+- [ ] Full Python regression, TypeScript/Vite, backend startup/`/health`, live smoke and owner hardware/UI acceptance; accepted baseline remains `0_5_0`.
+
+## Previous V058 AI & Network Drag Candidate Checklist
 
 ```text
 version: 0_5_8

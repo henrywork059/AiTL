@@ -12,7 +12,7 @@ AiTL implements a local PC-controlled ESP32-CAM input path with:
 - transport/session recovery after temporary network or ESP restart;
 - a persistent list of saved ESP private-LAN IP addresses and per-camera settings;
 - several independent ESP stream workers/newest-frame caches that may run concurrently;
-- explicit user selection of exactly one ESP to feed the shared preview, inference, dataset capture, zones/tracking and analytics pipeline;
+- explicit user selection of exactly one ESP for the legacy selected-source dataset capture, zones/tracking and analytics pipeline; V059 adds one shared background model serving independent latest frames from saved cameras for Camera AI Preview;
 - a V038 one-click diagnostic workflow that isolates control reachability, firmware/camera readiness, Wi-Fi margin, direct camera TCP transport, control/stream contention, and the normal PC Studio managed receiver path.
 
 Source switching is freshness-guarded: the previous selected physical frame is cleared during a switch, a cached frame is promoted only when it is recent, and replaced device sessions are generation-guarded so late old-IP frames are rejected. This prevents an old or wrong-source image from being presented as a new active AI input.
@@ -21,7 +21,7 @@ Camera diagnostics are local prototype evidence. A run may temporarily quiesce t
 
 ## Network — crossing graph and junction compatibility
 
-The Network page now prioritizes all saved crosswalks as automatically created crossing boxes, with camera connection health and current-source-only region observations. Users can arrange them and connect numbered edges as persisted logical topology. This does not establish measured vehicle transfers, multi-camera inference or cooperative signal control. Existing junction configuration remains available as an advanced section.
+The Network page now prioritizes all saved crosswalks as automatically created crossing boxes, with camera connection health and current-source-only region observations. Users can arrange them and connect numbered edges as persisted logical topology. This does not establish measured vehicle transfers, multi-camera identity matching or cooperative signal control. Camera AI Preview independently infers available cameras in V059. Existing junction configuration remains available as an advanced section.
 
 ### Retained junction installation / topology view
 
@@ -46,10 +46,14 @@ This does not imply:
 
 - ESP-side inference;
 - validated production detector accuracy;
-- simultaneous independent inference/traffic-controller pipelines for all connected cameras/junctions;
+- independent per-camera traffic-controller pipelines for all connected cameras/junctions (one background model provides independent camera preview detections only);
 - multi-camera image fusion at one junction;
 - automatic cross-camera object identity/transfer matching;
 - live emergency-vehicle recognition/pre-emption;
 - physical/public-road traffic-signal authority.
 
 Existing cooperation, pedestrian, class, emergency and explainability/evidence features retain their documented prototype/simulation provenance. Multiple physical camera inputs plus V0311 camera-to-junction assignments are a stronger data/configuration foundation for later multi-intersection work; they do not by themselves activate live cooperative control.
+
+## V059 AI Models and Camera AI Preview
+
+AI Models uploads/activates/deletes local YOLO .pt files, blocks deletion of the running model, and persists global confidence and target inference interval. A single background inference worker samples the freshest frame from each saved streaming ESP or saved simulation camera, with per-camera detection results and no queued backlog. Camera AI Preview lets users switch among registered cameras, displays labeled boxes and side-specific crossing regions, and counts current per-class observations outside the frame. These are **preview-only detections**; not calibrated cross-camera uniqueness, fused occupancy, autonomous network control or reliable on-road signal actuation. The Settings UI is removed without removing the existing backend settings API.

@@ -19,14 +19,13 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   dataset_review: { id: "dataset_review", label: "Dataset Review", shortLabel: "Review", description: "Review, label and organize captured data.", status: "test-ready" },
   train_export: { id: "train_export", label: "Model Training", shortLabel: "Training", description: "Train local models and review training metrics.", status: "test-ready" },
   model_registry: { id: "model_registry", label: "AI Models", shortLabel: "Models", description: "Select trained inference models and configure AI detection defaults.", status: "test-ready" },
-  settings: { id: "settings", label: "Settings", shortLabel: "Settings", description: "Manage application defaults.", status: "test-ready" },
   logs: { id: "logs", label: "System Logs", shortLabel: "Logs", description: "Inspect backend events, errors and request IDs.", status: "test-ready" },
 };
 
 export const APP_SECTIONS: AppSection[] = [
   { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.camera_settings, PAGE_DETAILS.camera_diagnostics] },
-  { id: "ai", label: "AI", pages: [PAGE_DETAILS.live_ai, PAGE_DETAILS.model_registry] },
   { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.crosswalks, PAGE_DETAILS.junction_network, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
+  { id: "ai", label: "AI", pages: [PAGE_DETAILS.model_registry, PAGE_DETAILS.live_ai] },
   { id: "data", label: "Data & Training", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export] },
-  { id: "system", label: "System", pages: [PAGE_DETAILS.settings, PAGE_DETAILS.logs] },
+  { id: "system", label: "System", pages: [PAGE_DETAILS.logs] },
 ];

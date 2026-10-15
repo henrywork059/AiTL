@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, saveRuntimeSettings, setDefaultModel, unloadInferenceModel } from "../api";
+import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, saveRuntimeSettings, uploadInferenceModel, setDefaultModel, unloadInferenceModel } from "../api";
 import type { InferenceStatus, ModelRegistryStatus, RuntimeSettings } from "../types";
 
 function errorMessage(error: unknown): string {
@@ -25,8 +25,13 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
   const [notice, setNotice] = useState<string | null>(null);
   const [defaultConfidence, setDefaultConfidence] = useState(runtimeSettings.default_confidence);
   const [savingConfidence, setSavingConfidence] = useState(false);
+  const [inferenceInterval, setInferenceInterval] = useState(runtimeSettings.inference_interval_ms);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadId, setUploadId] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => setDefaultConfidence(runtimeSettings.default_confidence), [runtimeSettings.default_confidence]);
+  useEffect(() => setInferenceInterval(runtimeSettings.inference_interval_ms), [runtimeSettings.inference_interval_ms]);
 
   const refresh = useCallback(async () => {
     const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistry(), fetchInferenceStatus()]);
@@ -78,6 +83,27 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
     }
   }
 
+  async function handleUpload() {
+    if (!uploadFile || !uploadFile.name.toLowerCase().endsWith(".pt") || !/^[A-Za-z0-9_-]{1,64}$/.test(uploadId)) {
+      setError("Select a .pt file and enter a model ID containing letters, numbers, - or _.");
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await uploadInferenceModel(uploadId, uploadFile);
+      await refresh();
+      setUploadFile(null);
+      setUploadId("");
+      setNotice("Model uploaded. Select Load model to activate it.");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleSaveConfidence() {
     if (!Number.isFinite(defaultConfidence) || defaultConfidence < 0.01 || defaultConfidence > 1) {
       setError("Detection confidence must be between 0.01 and 1.");
@@ -87,9 +113,12 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
     setError(null);
     setNotice(null);
     try {
-      const saved = await saveRuntimeSettings({ ...runtimeSettings, default_confidence: defaultConfidence });
+      const saved = await saveRuntimeSettings({
+        ...runtimeSettings, default_confidence: defaultConfidence,
+        inference_interval_ms: inferenceInterval,
+      });
       onSettingsChange(saved);
-      setNotice("Default AI confidence saved.");
+      setNotice("Global AI settings saved for all cameras.");
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -116,7 +145,7 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
         <div className="panel-header">
           <div>
             <h2>AI Models</h2>
-            <p className="placeholder-copy">Models are discovered from local training runs. Loading changes the current inference model; setting default controls which model PC Studio prefers after restart.</p>
+            <p className="placeholder-copy">Manage saved AI models and choose one running model shared by all registered cameras.</p>
           </div>
           <button className="primary" onClick={() => void refresh().catch((reason) => setError(errorMessage(reason)))}>Refresh</button>
         </div>
@@ -138,20 +167,46 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>AI detection defaults</h2>
-            <p className="placeholder-copy">Saved in the existing backend runtime settings. Affects the default confidence used by Camera AI Preview.</p>
+            <h2>Upload AI model</h2>
+            <p className="placeholder-copy">Import an Ultralytics-compatible .pt model (maximum 200 MiB). Existing runs cannot be overwritten.</p>
           </div>
         </div>
         <div className="form-grid">
-          <label>Default detection confidence (0.01–1.00)
-            <input type="number" min={0.01} max={1} step={0.01}
+          <label>New model ID
+            <input value={uploadId} maxLength={64} placeholder="custom_model_1" onChange={(event) => setUploadId(event.target.value)} />
+          </label>
+          <label>Weights file (.pt)
+            <input type="file" accept=".pt" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        <div className="button-row">
+          <button className="primary" type="button" disabled={uploading || busyModelId !== null || !uploadFile}
+            onClick={() => void handleUpload()}>{uploading ? "Uploading..." : "Upload model"}</button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Global AI settings</h2>
+            <p className="placeholder-copy">Both settings apply to inference for every camera, including cameras not currently previewed.</p>
+          </div>
+        </div>
+        <div className="form-grid">
+          <label>Detection confidence — {Math.round(defaultConfidence * 100)}%
+            <input type="range" min={0.01} max={1} step={0.01}
               value={defaultConfidence}
               onChange={(event) => setDefaultConfidence(Number(event.target.value))} />
+          </label>
+          <label>Model inference interval — {inferenceInterval} ms
+            <input type="range" min={100} max={2000} step={50}
+              value={inferenceInterval}
+              onChange={(event) => setInferenceInterval(Number(event.target.value))} />
           </label>
         </div>
         <div className="button-row">
           <button className="primary" type="button"
-            disabled={savingConfidence || defaultConfidence === runtimeSettings.default_confidence
+            disabled={savingConfidence || (defaultConfidence === runtimeSettings.default_confidence && inferenceInterval === runtimeSettings.inference_interval_ms)
               || !Number.isFinite(defaultConfidence) || defaultConfidence < 0.01 || defaultConfidence > 1}
             onClick={() => void handleSaveConfidence()}>
             {savingConfidence ? "Saving..." : "Save AI settings"}
@@ -162,8 +217,8 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>Training runs</h2>
-            <p className="placeholder-copy">Choose one model at a time for live inference. Deleting a run removes its local files.</p>
+            <h2>Installed AI models</h2>
+            <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
           </div>
           <span className="status-pill muted">{registry?.total ?? 0} models</span>
         </div>
@@ -180,9 +235,9 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
               <p>Updated {new Date(model.modified_at_ms).toLocaleString()}</p>
               <p>{formatSize(model.size_bytes)}</p>
               <div className="button-row wrap-row">
-                <button className="primary" disabled={busyModelId === model.model_id || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
-                <button disabled={busyModelId === model.model_id || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
-                <button className="danger" disabled={busyModelId === model.model_id} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
+                <button className="primary" disabled={busyModelId !== null || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
+                <button disabled={busyModelId !== null || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
+                <button className="danger" disabled={busyModelId !== null || model.is_active} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
               </div>
             </article>
           ))}

@@ -106,6 +106,7 @@ class TrainingStartRequest(BaseModel):
 class RuntimeSettingsRequest(BaseModel):
     default_confidence: float = Field(default=0.10, ge=0.01, le=1.0)
     live_poll_interval_ms: int = Field(default=500, ge=250, le=5000)
+    inference_interval_ms: int = Field(default=500, ge=100, le=2000)
     training_patience: int = Field(default=5, ge=1, le=100)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 

@@ -83,7 +83,7 @@ Do not implement, document, or imply:
 
 Use exact status words: **implemented**, **foundation**, **simulation-only**, **planned**, **out of scope**.
 
-Multiple saved/streaming cameras and multiple junction assignments do **not** imply simultaneous multi-camera/multi-junction inference. A configured topology link does **not** prove observed vehicle transfer or live cooperation. Synthetic/manual evidence must stay labeled synthetic/manual.
+Multiple saved/streaming cameras and multiple junction assignments alone do **not** imply active multi-junction traffic observations. V059 separately enables one global background model to infer saved camera feeds for Camera AI Preview; the traffic/control pipeline remains selected-source-only. A configured topology link does **not** prove observed vehicle transfer or live cooperation. Synthetic/manual evidence must stay labeled synthetic/manual.
 
 ## 4. Architecture ownership
 
@@ -141,7 +141,7 @@ Preserve unless the task explicitly changes them:
 
 Canonical boxes remain original-image coordinates. Zone geometry remains in its validated reference coordinate system.
 
-The shared live pipeline currently has one selected `CameraFrameService` source. Do not copy its live occupancy/decision data onto unobserved junctions.
+The legacy traffic/control pipeline has one selected `CameraFrameService` source. V059 background per-camera preview detections must not be copied into live occupancy/decision data for unobserved junctions.
 
 ## 6. API/error/logging contract
 

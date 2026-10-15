@@ -14,7 +14,6 @@ export type AppPageId =
   | "dataset_review"
   | "train_export"
   | "model_registry"
-  | "settings"
   | "logs";
 
 export type AppSection = {

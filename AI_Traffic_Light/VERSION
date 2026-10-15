@@ -1,5 +1,5 @@
-version: 0_5_8
-status: AI workspace and drag-connected Network candidate
-previous_version: 0_5_7
+version: 0_5_9
+status: Global AI Models and multi-camera preview candidate
+previous_version: 0_5_8
 passed_baseline: 0_5_0
-notes: Camera Settings precedes the AI group; AI Models and real Camera AI Preview share existing inference APIs. Crossing edges connect by dragging numbered labels; backend schema and signal control unchanged. Windows acceptance pending.
+notes: One active YOLO model serves fresh frames of all saved cameras for separate preview detections; inference interval and confidence global. Legacy selected-source traffic and signal control unchanged. Windows acceptance pending.

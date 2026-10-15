@@ -12,7 +12,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
-from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, camera_frame_service
+from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, _image_dimensions, camera_frame_service
 from app.services.remote_camera import (
     CAMERA_SETTING_KEYS,
     DEFAULT_TARGET_FPS,
@@ -754,6 +754,41 @@ class RemoteCameraManager:
             "last_success_at_ms": session_status.get("last_success_at_ms") if session_status else None,
             "last_error": session_status.get("last_error") if session_status else None,
         }
+
+    def frames_for_inference(self) -> list[CameraFrame]:
+        """Snapshot fresh frames for every saved stream, independently of selected camera."""
+        with self._lock:
+            profiles = list(self._profiles.values())
+            cached = dict(self._latest_packets)
+        if camera_frame_service.simulation_enabled:
+            return [frame for profile in profiles if profile["kind"] == "simulation"
+                    if (frame := camera_frame_service.simulation_frame_for(profile["source_id"])) is not None]
+        now_ms = self._now_ms()
+        frames: list[CameraFrame] = []
+        for profile in profiles:
+            source_id = profile["source_id"]
+            item = cached.get(source_id)
+            if profile["kind"] != "esp32" or item is None or now_ms - item.received_at_ms > 5000:
+                continue
+            dims = _image_dimensions(item.packet.content, "image/jpeg")
+            if dims:
+                frames.append(CameraFrame(
+                    content=item.packet.content, content_type="image/jpeg", source_id=source_id,
+                    width=dims[0], height=dims[1], received_at_ms=item.received_at_ms,
+                    frame_number=max(1, int(item.packet.sequence)), origin="upload",
+                ))
+        uploaded = camera_frame_service.latest_frame()
+        if uploaded and uploaded.source_id not in {f.source_id for f in frames} and not any(
+            x["source_id"] == uploaded.source_id for x in profiles
+        ) and now_ms - uploaded.received_at_ms <= 5000:
+            frames.append(uploaded)
+        return frames
+
+    def frame_for_preview(self, source_id: str) -> CameraFrame | None:
+        """Read the same cached source as global inference without changing selection."""
+        if source_id not in {profile["source_id"] for profile in self.status()["cameras"]}:
+            raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Camera is not registered.", status_code=404)
+        return next((frame for frame in self.frames_for_inference() if frame.source_id == source_id), None)
 
     def status(self, *, refresh_device: bool = False) -> dict:
         with self._lock:

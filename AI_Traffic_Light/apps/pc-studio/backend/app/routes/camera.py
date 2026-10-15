@@ -142,6 +142,19 @@ def live_camera_mjpeg(request: Request, source_id: str | None = Query(default=No
     )
 
 
+@router.get("/preview/{source_id}")
+def camera_preview_frame(source_id: str, request: Request) -> Response:
+    """Return a saved camera's latest JPEG/PNG without changing selected source."""
+    frame = remote_camera_service.frame_for_preview(source_id)
+    if frame is None:
+        raise AppError(ErrorCode.INFERENCE_SOURCE_MISSING, "Camera has no fresh frame.", status_code=404)
+    return Response(content=frame.content, media_type=frame.content_type, headers={
+        "Cache-Control": "no-store, max-age=0",
+        "X-Request-ID": request.state.request_id,
+        "X-Camera-Source": frame.source_id,
+    })
+
+
 @router.get("/remote/status")
 def remote_camera_status(request: Request) -> dict:
     return ok(remote_camera_service.status(refresh_device=True), request_id=request.state.request_id)

@@ -17,6 +17,7 @@ DEFAULT_SETTINGS_PATH = PROJECT_ROOT / "config" / "runtime_settings.json"
 DEFAULT_SETTINGS: dict[str, Any] = {
     "default_confidence": 0.10,
     "live_poll_interval_ms": 500,
+    "inference_interval_ms": 500,
     "training_patience": 5,
     "log_level": "INFO",
 }
@@ -71,11 +72,12 @@ class RuntimeSettingsService:
         try:
             confidence = float(settings.get("default_confidence", 0.10))
             poll_ms = int(settings.get("live_poll_interval_ms", 500))
+            inference_ms = int(settings.get("inference_interval_ms", 500))
             patience = int(settings.get("training_patience", 5))
             log_level = str(settings.get("log_level", "INFO")).upper()
         except (TypeError, ValueError) as exc:
             raise AppError(error_code, "Runtime settings contain invalid values.", status_code=422) from exc
-        if not 0.01 <= confidence <= 1.0 or not 250 <= poll_ms <= 5000 or not 1 <= patience <= 100:
+        if not 0.01 <= confidence <= 1.0 or not 250 <= poll_ms <= 5000 or not 100 <= inference_ms <= 2000 or not 1 <= patience <= 100:
             raise AppError(
                 error_code,
                 "Runtime settings are outside the supported prototype limits.",
@@ -90,6 +92,7 @@ class RuntimeSettingsService:
         return {
             "default_confidence": round(confidence, 2),
             "live_poll_interval_ms": poll_ms,
+            "inference_interval_ms": inference_ms,
             "training_patience": patience,
             "log_level": log_level,
         }

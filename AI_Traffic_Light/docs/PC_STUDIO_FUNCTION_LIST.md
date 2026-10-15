@@ -18,14 +18,14 @@ This durable catalog describes implemented PC Studio capabilities without owning
 - up to the configured maximum persisted ESP camera profiles with IP/FPS/OV2640 settings;
 - separate Camera Settings page for adding IP cameras, selecting the live ESP preview, reading selected-source diagnostics, and configuring each camera's saved image/stream settings; Camera Sources retains local simulation controls;
 - independent background TCP workers and newest-frame cache per connected ESP;
-- one explicitly selected ESP feeds the shared Live AI / Dataset Capture / zones / analytics pipeline;
+- one explicitly selected ESP feeds the legacy Dataset Capture / zones / analytics pipeline; Camera AI Preview can independently display any saved streaming camera under V059;
 - freshness-guarded switching so stale caches, retired sessions and old-IP frames cannot replace the selected source;
 - simulation pause/resume across physical ESP streams;
 - backend shutdown disconnects active ESP sessions;
 - legacy raw JPEG/PNG upload compatibility;
 - browser preview remains the backend MJPEG relay rather than opening additional browser→ESP streams.
 
-Several ESP streams may exist at once, but this is **multi-camera input/session support**, not simultaneous independent inference for every camera.
+Several ESP streams may exist at once, but this is **multi-camera input/session support**, not independent traffic control for every camera. V059 adds one shared detector that processes the newest available frames from all saved sources for preview.
 
 ## Crosswalks
 
@@ -33,7 +33,7 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 - optionally assign two distinct saved ESP camera source IDs to opposite pedestrian approaches and inspect camera status;
 - edit up to 24 logical counting regions per crosswalk, with one shared display name and separate convex four-vertex polygon coordinates for Side A and Side B (old side-scoped entries remain readable);
 - toggle the same one-camera simulation source from Crosswalks or Junction Network; physical camera input follows the shared simulation mode;
-- count detected classes per physical region and currently selected camera, keeping camera-specific observations distinct; no simultaneous dual-camera inference, cross-camera deduplication, camera-view calibration or physical signal-control authority.
+- count detector classes per physical region and per selected-source traffic observation; V059 additionally displays background inference per saved camera in Camera AI Preview. No cross-camera deduplication, camera-view calibration or physical signal-control authority.
 
 ## Network — crossing-first monitoring
 
@@ -59,7 +59,7 @@ Several ESP streams may exist at once, but this is **multi-camera input/session 
 - explicitly show unavailable traffic observations for junctions not currently observed by the shared live/simulation pipeline;
 - use `GET /api/traffic/network/overview` as a read-only projection rather than creating a parallel controller or camera registry.
 
-The Network page does not implement simultaneous multi-junction or multi-crossing inference, cross-camera identity/transfer matching, live emergency recognition or physical/public-road signal control.
+The Network page does not combine V059 background camera detections into live multi-junction control, cross-camera identity/transfer matching, live emergency recognition or physical/public-road signal control.
 
 ## Camera Diagnostics
 
@@ -101,3 +101,11 @@ Model export remains a later capability unless the current source/contract expli
 ## Scope boundary
 
 Multiple ESP image streams, Junction Network configuration, simulated network experiments and diagnostic results do **not** imply multiple simultaneous independent live signal controllers, validated detector reliability, ESP-side inference, certified control authority or physical/public-road traffic-signal actuation.
+
+## V059 Global AI
+
+- AI Models: upload local .pt YOLO models, choose one global running model, set default model for explicit load, prevent active deletion, and persist one confidence slider and one 100–2000 ms inference interval slider.
+- All available saved streaming ESP and simulation camera frames feed one background AI worker; results remain per-camera and latest-frame-only, without a queue.
+- Camera AI Preview: pick any registered camera, show its current frame with detection boxes and class/confidence labels, overlay saved Side A/B regions, and present counts per region/class outside the frame. Viewing a different camera does not alter global source selection.
+- Settings UI is removed; persistent backend settings API remains for compatibility.
+- Limits: YOLO/Ultralytics must be installed and valid weights activated. Model latency and number of cameras limit throughput. Other analytics, Network overview and signal logic remain selected-source-only, without cross-camera identity fusion.

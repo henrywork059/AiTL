@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 import os
 from pathlib import Path
+import re
 import shutil
 from threading import RLock
 from typing import Any
@@ -18,6 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "outputs" / "training"
 MODEL_GLOB = "*/weights/best.pt"
 REGISTRY_FILENAME = ".aitl_model_registry.json"
+MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -125,6 +129,32 @@ class ModelRegistryService:
                     details={"model_id": model_id},
                 )
             return path
+
+    async def upload_model(self, model_id: str, chunks: AsyncIterator[bytes]) -> dict[str, Any]:
+        """Import .pt weights without overwriting an existing run."""
+        if not MODEL_ID_PATTERN.fullmatch(model_id):
+            raise AppError(ErrorCode.INVALID_REQUEST, "Invalid model ID.", status_code=422)
+        run_dir = self._output_root / model_id
+        try:
+            (run_dir / "weights").mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise AppError(ErrorCode.INVALID_REQUEST, "Model ID already exists.", status_code=409) from exc
+        except OSError as exc:
+            raise AppError(ErrorCode.SETTINGS_WRITE_FAILED, "Cannot create model directory.", status_code=500) from exc
+        size = 0
+        try:
+            with (run_dir / "weights" / "best.pt").open("xb") as file:
+                async for chunk in chunks:
+                    size += len(chunk)
+                    if size > MAX_UPLOAD_BYTES:
+                        raise AppError(ErrorCode.INVALID_REQUEST, "Model exceeds 200 MiB.", status_code=413)
+                    file.write(chunk)
+            if size == 0:
+                raise AppError(ErrorCode.INVALID_REQUEST, "Empty model file.", status_code=422)
+        except BaseException:
+            shutil.rmtree(run_dir, ignore_errors=True)
+            raise
+        return self.status()
 
     def delete_model(self, model_id: str) -> dict[str, Any]:
         with self._lock:

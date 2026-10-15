@@ -1,3 +1,25 @@
+# Start Here — V059
+
+Current candidate `0_5_9`, previous candidate `0_5_8`, owner-accepted baseline `0_5_0`.
+
+**Sidebar:** Traffic is now above AI. AI contains AI Models and Camera AI Preview. The Settings page is removed from navigation, while existing settings API and persisted values are preserved.
+
+**AI Models:** Upload an Ultralytics-compatible `.pt` model with a unique ID (limit 200 MiB), load it, set a default or delete an inactive model. Only one loaded model serves all cameras. Detection confidence and the global target inference interval (100–2000 ms slider) are saved here.
+
+**Camera AI Preview:** Choose any registered camera, including saved ESP streams and simulation camera pairs. See its fresh frame, model box/class/confidence overlays and its existing Crosswalk region polygons (Side A/B coordinates). A separate table shows current counts by region and detected class. Camera preview selection does not change the app's active camera selection. Each object is assigned to at most one overlapping region in this preview.
+
+**Limits:** The inference worker runs the single loaded model over fresh camera frames without queuing old frames. Requested intervals are best-effort. Camera AI Preview is separate from existing selected-source traffic analytics/tracking and signal control; there is no cross-camera identity deduplication or public-road traffic authority.
+
+**Run and test:**
+
+```powershell
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1"
+```
+
+The accepted baseline remains `0_5_0`; V059 is not accepted until owner PASS.
+
+---
+
 # Start Here — V058
 
 Current candidate `0_5_8`, previous candidate `0_5_7`, owner-accepted baseline `0_5_0`.
