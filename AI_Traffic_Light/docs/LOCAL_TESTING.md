@@ -1,4 +1,21 @@
-# Local Testing — V0424
+# Local Testing — V050
+
+```text
+version: 0_5_0
+previous_version: 0_4_24
+passed_baseline: 0_5_0
+status: Owner-accepted stable release
+```
+
+## V050 stable release verification
+
+- The owner explicitly confirmed PASS for V0424 and requested the next stable version. V050 promotes that accepted implementation without new runtime features or code changes.
+- Confirm the app reports `0_5_0 Stable` and the Crosswalk layout still shows Side A / Side B camera selectors side by side, with each source state in its own section.
+- Verify the previously accepted region translucency, simulation cameras and crosswalk configuration are unchanged. The Windows updater/test runner remains available for optional revalidation; its results have not been observed here.
+- Accepted baseline: `0_5_0`.
+
+## Historical V0424 and earlier checks (archival)
+
 
 ```text
 version: 0_4_24

@@ -1,6 +1,8 @@
-# Start Here — V0424
+# Start Here — V050
 
-Current candidate `0_4_24` (previous `0_4_23`); passed stable baseline `0_4_14`.
+Current stable release `0_5_0` (previous `0_4_24`); owner-accepted stable baseline `0_5_0`.
+
+The owner confirmed PASS for V0424 and requested the next stable version. V050 is a release-label/documentation promotion of that accepted implementation, with no app, backend, hardware, signal, API or data changes.
 
 V0424 combines each Crosswalk Side A/B camera selector and connection state into one section per side, arranged as two columns above the schematic (stacked on narrow screens). The duplicate status rows and bottom Side B picker are removed. Camera assignment, simulation, regions and V0423 translucent fills are unchanged.
 

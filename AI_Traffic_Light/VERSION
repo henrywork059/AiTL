@@ -1,5 +1,5 @@
-version: 0_4_24
-status: Crosswalk camera-side layout candidate
-previous_version: 0_4_23
-passed_baseline: 0_4_14
-notes: V0424 consolidates Crosswalk Side A/B camera selectors and source states into one row per side and displays the two sides in left/right columns above the schematic, stacking at narrow widths. Duplicate rows beneath the schematic are removed. Region editing, V0423 translucent polygons, camera pairing, persistence and signal safety remain unchanged. Windows acceptance pending; passed baseline remains 0_4_14.
+version: 0_5_0
+status: Owner-accepted stable release
+previous_version: 0_4_24
+passed_baseline: 0_5_0
+notes: Owner confirmed PASS for 0_4_24 and explicitly requested the next stable version. V050 promotes that accepted implementation without application-code, API, firmware, data or signal-behavior changes. The accepted Crosswalk Side A/B layout, V0423 translucent Region Editor fills and existing simulation camera pairs are retained. Stable release based on owner acceptance; no additional runtime tests are claimed.

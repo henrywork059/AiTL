@@ -1,4 +1,19 @@
-# V0424 Test Checklist
+# V050 Stable Release Checklist
+
+```text
+version: 0_5_0
+previous_version: 0_4_24
+passed_baseline: 0_5_0
+status: Owner-accepted stable release
+```
+
+- [x] Owner confirmed PASS for `0_4_24` and explicitly requested the next stable version.
+- [x] No application code, API, camera, hardware, data or signal logic changed for the V050 promotion.
+- [ ] Optional local confirmation: app displays `0_5_0 Stable`.
+- [ ] Optional local revalidation: Windows updater/test runner and existing Crosswalk/Region Editor acceptance paths.
+
+## Historical V0424 and earlier checks (archival)
+
 
 ```text
 version: 0_4_24

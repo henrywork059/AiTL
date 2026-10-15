@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_5_0 — Owner-accepted stable release
+
+- The owner confirmed PASS for candidate `0_4_24` and explicitly requested the next stable version; promote the accepted code as stable `0_5_0`.
+- Preserve the tested Crosswalk layout (Side A and Side B side-by-side selectors and source states), translucent selected/unselected region polygons, simulation camera pairing, camera selection and existing safety constraints.
+- This is a version and release-documentation milestone only. No application-code, firmware, API, data-model, dependency or signal-control logic changes.
+- Previous version: `0_4_24`. Accepted stable baseline: `0_5_0`. The owner may run the normal Windows update/test runner to verify the updated release label; no additional test run is implied by the promotion.
+
+
 ## 0_4_24 — Consolidate Crosswalk camera-side rows
 
 - Crosswalk layout shows Side A and Side B as two equal-width columns above the schematic, each containing the existing camera selector and the corresponding live camera state.
