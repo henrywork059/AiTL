@@ -1,11 +1,20 @@
-# Local Testing — V0410
+# Local Testing — V0411
 
 ```text
-version: 0_4_10
-previous_version: 0_4_9
+version: 0_4_11
+previous_version: 0_4_10
 passed_baseline: 0_4_0
-status: Camera Settings TypeScript guard correction candidate
+status: Junction Network card layout and responsive text candidate
 ```
+
+## V0411 Junction Network card acceptance
+
+- Run the standard one-line updater/test/runner.
+- On Junction Network, each node should have an independent full-width title bar with junction name and ID; drag anywhere on the title bar.
+- Verify traffic vehicle/pedestrian load, camera count, current phase, events and warnings remain centered and fully readable in the main content area.
+- Verify numbered edge controls 1–4 sit on the four corresponding sides of the content area, below the title bar, without overlapping information.
+- Test very long junction names, IDs, long phase text and narrow windows: fonts adapt to card width, text wraps and node height grows rather than truncating or hiding content.
+- Check edge click/selection, crosswalk assignment, drag offset, light/dark themes and frontend TypeScript/build. No hardware required for visual checks.
 
 ## V0410 TypeScript repair validation
 

@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0409
+# AiTL PC Studio Design System — V0411
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -105,7 +105,7 @@ The light appearance retains its established cool-neutral canvas (`#F3F6FA`) and
 | Pressed | `#5B5D70` |
 | Selected item | `#2F585A` |
 
-A separate brand panel and bordered navigation headings distinguish sections from page buttons. Crosswalk/junction edge buttons remain inside each junction card's reserved border space. Use solid surfaces for panel hierarchy; retain translucent fills only for image overlays and text selection.
+A separate brand panel and bordered navigation headings distinguish sections from page buttons. Junction cards have a full-width draggable title bar above a separate 3×3 layout: observation/status information is centered, while edge labels 1–4 occupy the north/east/south/west sides of that content area. Their responsive text wraps and card height adapts to content. Use solid surfaces for panel hierarchy; retain translucent fills only for image overlays and text selection.
 
 ### Semantic colors
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_11 — Junction card title/content/edge layout and responsive text
+
+- Reorganize each Junction Network node into a full-width draggable title bar (junction name, ID, current active status) and a centered information area for traffic load, camera count, phase and alerts.
+- Place numbered edge buttons 1–4 in a 3×3 content grid: top, right, bottom and left around the information area, never over the title bar.
+- Replace fixed card insets with fluid card width and container-relative text sizing; allow labels, statuses and IDs to wrap, and let card height grow to fit available content.
+- Keep existing drag offset, edge-to-crosswalk assignment, selection and data/API logic unchanged. Extend card-layout regressions and align earlier layout tests.
+- Previous candidate `0_4_10`, accepted stable baseline `0_4_0`; owner Windows build and visual acceptance pending.
+
+
 ## 0_4_10 — Camera Settings TypeScript typecheck repair
 
 - Remove two unreachable `newCameraType === "simulation"` comparisons inside an ESP-only branch in Camera Settings, fixing the two reported `TS2367` frontend errors.

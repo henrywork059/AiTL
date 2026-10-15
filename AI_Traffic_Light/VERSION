@@ -1,5 +1,5 @@
-version: 0_4_10
-status: Camera Settings TypeScript guard correction candidate
-previous_version: 0_4_9
+version: 0_4_11
+status: Junction Network card layout and responsive text candidate
+previous_version: 0_4_10
 passed_baseline: 0_4_0
-notes: V0410 removes unreachable simulation-type comparisons inside the ESP-only Camera Settings form that blocked frontend TypeScript compilation. Camera behavior and V0409 slate/mint styling are unchanged. Includes a scoped structural regression. Owner Windows validation pending; accepted baseline remains 0_4_0.
+notes: V0411 restructures Junction Network cards with a full-width draggable title bar, centered observation/status content and edge labels 1-4 on four sides of the content grid. Fluid container-relative fonts, wrapping, and content-driven card height reduce clipping. No camera, topology, drag interaction, API, or traffic-signal logic changed. Owner validation pending; accepted baseline remains 0_4_0.

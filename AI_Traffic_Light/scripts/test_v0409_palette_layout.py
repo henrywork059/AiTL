@@ -82,24 +82,25 @@ def main() -> None:
     assert ".nav-button.active::after" in components
 
     junction = source("pages/junctionNetworkPage.css")
-    assert "width: 284px;" in junction
-    assert "padding: 28px 32px;" in junction
-    for key, offset in (
-        ("north", "top: 3px;"),
-        ("south", "bottom: 3px;"),
-        ("east", "right: 3px;"),
-        ("west", "left: 3px;"),
+    assert "width: clamp(268px, 27vw, 336px);" in junction
+    assert "grid-template-columns: 34px minmax(0, 1fr) 34px;" in junction
+    for key, position in (
+        ("north", "grid-column: 2; grid-row: 1;"),
+        ("south", "grid-column: 2; grid-row: 3;"),
+        ("east", "grid-column: 3; grid-row: 2;"),
+        ("west", "grid-column: 1; grid-row: 2;"),
     ):
         marker = re.search(r"\.junction-edge-" + key + r"\s*\{([^}]+)\}", junction)
-        assert marker and offset in marker.group(1), (key, offset)
+        assert marker and position in marker.group(1), (key, position)
     assert "top: -31px;" not in junction
     assert "bottom: -31px;" not in junction
     assert "left: -38px;" not in junction
     assert "right: -38px;" not in junction
+    assert 'className="junction-node-edge-layout"' in source("components/junctions/JunctionNodeCard.tsx")
     assert 'JUNCTION_EDGES.map((edge) =>' in source("components/junctions/JunctionNodeCard.tsx")
     print(f"[PASS] Slate/mint palette with {len(checks)} contrast checks and preserved light mode")
     print("[PASS] Boxed sidebar header, distinct navigation sections and selected state")
-    print("[PASS] Edge labels 1-4 remain interactive and inside reserved junction-card space")
+    print("[PASS] Edge labels 1-4 use the four sides of a central content grid")
 
 
 if __name__ == "__main__":

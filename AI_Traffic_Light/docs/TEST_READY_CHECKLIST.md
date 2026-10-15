@@ -1,12 +1,17 @@
-# V0410 Test Checklist
+# V0411 Test Checklist
 
 ```text
-version: 0_4_10
-previous_version: 0_4_9
+version: 0_4_11
+previous_version: 0_4_10
 passed_baseline: 0_4_0
-status: Camera Settings TypeScript guard correction candidate
+status: Junction Network card layout and responsive text candidate
 ```
 
+- [ ] Junction cards display full-width draggable title bar with name and ID.
+- [ ] Junction load, camera count, phase and alert statuses remain centered and readable without clipping.
+- [ ] Numbered edge controls are placed north/east/south/west of the information area, not the whole card.
+- [ ] Long names/IDs/statuses wrap and font sizes scale with card width at desktop/mobile sizes.
+- [ ] Edge selection, node dragging, crosswalk linking and frontend typecheck/build work.
 - [ ] Camera Settings ESP-only form has no unreachable `simulation` comparisons (TS2367).
 - [ ] `npm run typecheck` and `npm run build` pass locally.
 - [ ] ESP Save/Connect enable/disable states and simulation-pair creation work normally.
