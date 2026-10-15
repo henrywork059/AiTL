@@ -1,5 +1,9 @@
 # API Contracts — current camera and junction-network highlights
 
+## V054 Camera-specific regions and live counts
+
+`camera_side` is optional on schema-1 crosswalk regions (`a` or `b`); missing values preserve legacy shared geometry. Per-frame active-source detections are counted by region under `crosswalk_region_counts` in `GET /api/traffic/state`, keyed `crosswalk:side:region`. Each result contains camera source, region ID, display label, per-class counts and total. No simultaneous camera inference or signal policy changes.
+
 ## V0323 Crosswalk shared quadrilateral regions
 
 Crosswalk schema version **remains 1**. Each crosswalk has an optional `regions` list (missing in older records means `[]`), up to 24 regions per crosswalk, with unique `id`, `label` (1–120 characters), and `vertices` holding exactly four integer `[x, y]` points. Coordinates use the editor's 1280 × 720 reference view (inclusive bounds) in clockwise or counterclockwise order; the outline must be a non-degenerate convex quadrilateral. Invalid data uses the existing `ATL-CROSSWALK-001` (422), and the prior data remains intact. Regions are shared crosswalk metadata, **not independently calibrated** for two physical camera perspectives and do not activate AI counting, inference or signal logic. No new endpoints.

@@ -1,4 +1,17 @@
-# V053 Release Consistency Candidate
+# V054 Candidate Checklist
+
+```text
+version: 0_5_4
+previous_version: 0_5_3
+passed_baseline: 0_5_0
+status: Camera-scoped counting candidate
+```
+
+- [ ] Different regions and IDs per camera side, Save regions persists both.
+- [ ] Count detected classes only for active camera; no signal policy changes.
+- [ ] Windows frontend build, smoke and user acceptance.
+
+## V053 Release Consistency Candidate
 
 ```text
 version: 0_5_3

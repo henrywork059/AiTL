@@ -7,6 +7,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.services.camera_frames import camera_frame_service
+from app.services.crosswalks import crosswalk_service
 from app.services.inference import inference_service
 from app.services.object_tracking import object_tracking_service
 from app.services.runtime_settings import runtime_settings_service
@@ -59,6 +60,38 @@ def _scaled_center(detection: dict[str, Any], width: int, height: int) -> tuple[
     scale_x = REFERENCE_WIDTH / max(1, width)
     scale_y = REFERENCE_HEIGHT / max(1, height)
     return centre_x * scale_x, centre_y * scale_y
+
+
+def count_crosswalk_regions(frame: dict[str, Any] | None, crosswalks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per-frame counts for the currently inferred camera only."""
+    if not frame or not frame.get("source_id"):
+        return {}
+    source_id = frame["source_id"]
+    width = int(frame.get("image_width") or REFERENCE_WIDTH)
+    height = int(frame.get("image_height") or REFERENCE_HEIGHT)
+    counts = {}
+    for crosswalk in crosswalks:
+        for side in ("a", "b"):
+            if crosswalk.get(f"camera_side_{side}_id") != source_id:
+                continue
+            for region in crosswalk.get("regions", []):
+                if region.get("camera_side") not in (None, side):
+                    continue
+                classes = {}
+                for detection in frame.get("detections", []):
+                    try:
+                        inside = point_in_polygon(_scaled_center(detection, width, height), region["vertices"])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if inside:
+                        category = str(detection.get("class_name") or "unknown")
+                        classes[category] = classes.get(category, 0) + 1
+                key = f"{crosswalk['id']}:{side}:{region['id']}"
+                counts[key] = {"crosswalk_id": crosswalk["id"], "camera_side": side,
+                               "source_id": source_id, "region_id": region["id"],
+                               "label": region["label"], "class_counts": classes,
+                               "total": sum(classes.values())}
+    return counts
 
 
 def _empty_region_counts(zones: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
@@ -308,7 +341,9 @@ def get_live_traffic_state() -> dict[str, Any]:
             logger.warning("Traffic simulation could not obtain live detections", extra={"error_code": exc.code.value})
             return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}"))
         raise
-    return _apply_active_simulation_signal(evaluate_traffic_state(detection_frame, zones))
+    state = evaluate_traffic_state(detection_frame, zones)
+    state["crosswalk_region_counts"] = count_crosswalk_regions(detection_frame, crosswalk_service.get()["crosswalks"])
+    return _apply_active_simulation_signal(state)
 
 
 def get_mock_traffic_state() -> dict[str, Any]:

@@ -1,5 +1,5 @@
-version: 0_5_3
-status: V052 release metadata repair candidate
-previous_version: 0_5_2
+version: 0_5_4
+status: Camera-scoped counting regions candidate
+previous_version: 0_5_3
 passed_baseline: 0_5_0
-notes: Repair release metadata and current patch document required by update runner; Region Editor Save regions functionality unchanged.
+notes: Independent camera-side regions, editable IDs, class occupancy counts from active inference source; Windows acceptance pending.

@@ -3,6 +3,7 @@ export type CrosswalkVertex = [number, number];
 export type CrosswalkRegion = {
   id: string;
   label: string;
+  camera_side?: "a" | "b";
   vertices: [CrosswalkVertex, CrosswalkVertex, CrosswalkVertex, CrosswalkVertex];
 };
 

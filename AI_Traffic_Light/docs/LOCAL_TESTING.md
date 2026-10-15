@@ -1,4 +1,15 @@
-# V053 Release Consistency Candidate
+# V054 Camera-Scoped Regions Candidate
+
+```text
+version: 0_5_4
+previous_version: 0_5_3
+passed_baseline: 0_5_0
+status: Camera-scoped counting candidate
+```
+
+Test Side A/B independent polygons, rename IDs and Save regions; verify GET /api/traffic/state crosswalk_region_counts under trained inference for active camera. Run frontend typecheck/build and smoke. Owner PASS pending.
+
+## V053 Release Consistency Candidate
 
 ```text
 version: 0_5_3

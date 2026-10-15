@@ -126,11 +126,15 @@ class CrosswalkService:
                     invalid("Region name must contain 1–120 characters.")
                 if not _quadrilateral(region.get("vertices")):
                     invalid("Region must have four bounded integer vertices forming a convex quadrilateral.")
+                side = region.get("camera_side")
+                if side not in (None, "a", "b"):
+                    invalid("Region camera_side must be a, b or omitted.")
                 region_ids.add(region_id)
                 regions.append({
                     "id": region_id,
                     "label": region_label.strip(),
                     "vertices": deepcopy(region["vertices"]),
+                    **({"camera_side": side} if side is not None else {}),
                 })
             items.append({"id": identity, "label": label.strip(), "location": location.strip(), **cameras, "regions": regions})
         return {"schema_version": 1, "crosswalks": items}

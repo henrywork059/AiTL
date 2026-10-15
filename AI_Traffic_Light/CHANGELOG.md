@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_5_4 — Camera-scoped counting regions
+
+- New regions are independently defined on Side A or B, including polygon, display label and backend identifier. Legacy shared regions remain readable.
+- Active-source detections are counted per class and region without changing signal control. Save regions reuses existing storage. Candidate; Windows PASS pending.
+
+
 ## 0_5_3 — Fix V052 release consistency
 
 - Repair current version label and required candidate documents so the structure/version gate can proceed.

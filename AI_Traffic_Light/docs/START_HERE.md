@@ -1,4 +1,8 @@
-# Start Here — V053
+# Start Here — V054
+
+Candidate `0_5_4`, previous `0_5_3`, accepted baseline `0_5_0`. The Region Editor creates distinct Side A/B regions and supports an editable backend ID; Save regions persists them. Per-class detection counts are exposed for the active camera only.
+
+## Previous V053
 
 Current candidate `0_5_3`, previous candidate `0_5_2`, accepted baseline `0_5_0`.
 
