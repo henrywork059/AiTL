@@ -1,11 +1,18 @@
-# Local Testing — V0411
+# Local Testing — V0412
 
 ```text
-version: 0_4_11
-previous_version: 0_4_10
+version: 0_4_12
+previous_version: 0_4_11
 passed_baseline: 0_4_0
-status: Junction Network card layout and responsive text candidate
+status: Junction Network layout regression selector repair candidate
 ```
+
+## V0412 CSS selector regression correction
+
+- Run the standard one-line update/test/run command from the repository root.
+- The `test_v0411_junction_card_layout.py` regression should use the last `.junction-node-alerts` rule, not its earlier grouped-selector declaration, and pass.
+- Continue to the Windows frontend TypeScript check, production build, startup and live backend smoke.
+- Visually confirm the V0411 Junction Network title bar, centered information and four-sided labels. No runtime styling was changed in V0412.
 
 ## V0411 Junction Network card acceptance
 

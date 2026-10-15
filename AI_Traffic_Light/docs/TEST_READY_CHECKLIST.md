@@ -1,12 +1,14 @@
-# V0411 Test Checklist
+# V0412 Test Checklist
 
 ```text
-version: 0_4_11
-previous_version: 0_4_10
+version: 0_4_12
+previous_version: 0_4_11
 passed_baseline: 0_4_0
-status: Junction Network card layout and responsive text candidate
+status: Junction Network layout regression selector repair candidate
 ```
 
+- [ ] V0411 layout regression checks the last alert CSS declaration and does not stop on its earlier grouped selector.
+- [ ] Windows typecheck, frontend build, live smoke and app startup proceed.
 - [ ] Junction cards display full-width draggable title bar with name and ID.
 - [ ] Junction load, camera count, phase and alert statuses remain centered and readable without clipping.
 - [ ] Numbered edge controls are placed north/east/south/west of the information area, not the whole card.

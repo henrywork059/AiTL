@@ -1,5 +1,5 @@
-version: 0_4_11
-status: Junction Network card layout and responsive text candidate
-previous_version: 0_4_10
+version: 0_4_12
+status: Junction Network layout regression selector repair candidate
+previous_version: 0_4_11
 passed_baseline: 0_4_0
-notes: V0411 restructures Junction Network cards with a full-width draggable title bar, centered observation/status content and edge labels 1-4 on four sides of the content grid. Fluid container-relative fonts, wrapping, and content-driven card height reduce clipping. No camera, topology, drag interaction, API, or traffic-signal logic changed. Owner validation pending; accepted baseline remains 0_4_0.
+notes: V0412 fixes the V0411 static test helper so it matches a standalone CSS rule rather than an earlier grouped selector referencing the same class. The actual Junction Network UI, CSS layout, palette, drag and edge behavior remain unchanged. Adds a grouped-selector regression example. Owner Windows validation pending; accepted baseline remains 0_4_0.

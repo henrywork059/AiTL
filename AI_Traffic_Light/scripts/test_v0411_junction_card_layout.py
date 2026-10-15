@@ -10,12 +10,19 @@ def read(path: str) -> str:
 
 
 def block(css: str, selector: str) -> str:
-    found = re.search(re.escape(selector) + r"\s*\{([^}]+)\}", css)
-    assert found, selector
-    return found.group(1)
+    # A class may appear in a grouped rule before its own later override.
+    # Return the final matching rule to inspect the effective declaration.
+    matches = list(re.finditer(r"(?m)^" + re.escape(selector) + r"[ \t]*\{([^}]+)\}", css))
+    assert matches, selector
+    return matches[-1].group(1)
 
 
 def main() -> None:
+    # A grouped selector may mention the target before its own standalone rule.
+    sample = ".other,\n.junction-node-alerts { display: flex; }\n.junction-node-alerts { justify-content: center; }"
+    assert "justify-content: center;" in block(sample, ".junction-node-alerts")
+    assert "display: flex;" not in block(sample, ".junction-node-alerts")
+
     card = read("components/junctions/JunctionNodeCard.tsx")
     css = read("pages/junctionNetworkPage.css")
 

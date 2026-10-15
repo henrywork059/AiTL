@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_4_12 — Junction card regression selector alignment
+
+- Fix `test_v0411_junction_card_layout.py` to inspect the last matching CSS selector rule instead of its earlier occurrence in a grouped selector list. This resolves the reported false assertion for `.junction-node-alerts` alignment.
+- Add a synthetic grouped-selector regression so the helper continues checking the intended standalone declaration.
+- No Junction Network UI, CSS, geometry, camera, topology or signal behavior changed. Previous candidate `0_4_11`; accepted baseline `0_4_0`. Windows frontend build and smoke testing still pending.
+
+
 ## 0_4_11 — Junction card title/content/edge layout and responsive text
 
 - Reorganize each Junction Network node into a full-width draggable title bar (junction name, ID, current active status) and a centered information area for traffic load, camera count, phase and alerts.
