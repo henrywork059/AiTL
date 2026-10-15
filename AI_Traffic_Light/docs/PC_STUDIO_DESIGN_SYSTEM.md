@@ -1,4 +1,4 @@
-# AiTL PC Studio Design System — V0415
+# AiTL PC Studio Design System — V0422
 
 This is the authoritative presentation and interface-copy reference for PC Studio. Page/layout documents define information architecture; this document defines visual roles, color semantics, hierarchy, controls, states, and writing style.
 
@@ -6,7 +6,7 @@ This is the authoritative presentation and interface-copy reference for PC Studi
 
 PC Studio is a desktop engineering workbench for a local traffic-simulation and computer-vision prototype. It should look deliberate, quiet, and operational—not like a promotional AI dashboard. Information should be scannable before it is decorative.
 
-## Current benchmark and decisions (V0415)
+## Current benchmark and decisions (V0422)
 
 AiTL is a Windows-focused engineering console. Its desktop layout and interactions are informed by:
 
@@ -17,7 +17,7 @@ AiTL is a Windows-focused engineering console. Its desktop layout and interactio
 - [Material 3 surfaces](https://developer.android.com/develop/ui/compose/designsystems/material3) — layered tonal surface hierarchy rather than deep drop shadows.
 - [WCAG 2.2](https://www.w3.org/TR/WCAG22/) — 4.5:1 small text, 3:1 interactive graphics and meaningful visible keyboard focus.
 
-### V0415 implementation parameters
+### V0422 implementation parameters
 
 | Element | Light | Dark | Decision |
 | --- | --- | --- | --- |
@@ -214,3 +214,11 @@ Before adding or changing UI:
 - Are destructive effects explicit?
 - Are light and dark appearances both usable?
 - Does the page remain clearly a simulation/engineering tool rather than a promotional AI dashboard?
+
+## Responsive typography and content visibility (V0422)
+
+The existing shared CSS owns alignment defaults; do not create per-page copies of these rules. `styles/base.css` owns fluid heading sizes and safe word wrapping. `styles/layout.css` owns page containers and flexible headers. `styles/components.css` owns growing panels, badge alignment, camera/status cards and metric typography. Page CSS should override only genuinely unique structures.
+
+Prefer `clamp(...)`, `minmax(0, 1fr)`, `min-width: 0`, `flex-wrap: wrap`, `white-space: normal` and `overflow-wrap: anywhere` over fixed-font, truncation or hidden-overflow text layouts. Allow page/panel height to grow or provide scrolling to expose every label. Wide numeric tables retain explicit horizontal scrolling when necessary. Keep camera imagery aspect ratio and editing coordinates unchanged.
+
+**Region selection:** both normal and selected polygon interiors are fully transparent. A selected polygon is indicated only by a pale, opaque, thicker dashed outline and editable vertices; do not overlay color on the camera image.

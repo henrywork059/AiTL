@@ -1,5 +1,5 @@
-version: 0_4_21
-status: Second simulation camera pair candidate
-previous_version: 0_4_20
+version: 0_4_22
+status: Responsive text layout and clear selected-region outline candidate
+previous_version: 0_4_21
 passed_baseline: 0_4_14
-notes: V0421 adds a second saved simulated camera pair (simulation_camera_c/d) alongside the original simulation_camera/b, with per-pair saving/deletion, selection, MJPEG preview and shared-clock mirrored viewpoints. Pair 2 uses a horizontally mirrored perspective of the same synthetic scene, not a second independent traffic controller. Reuses the current simulation and camera APIs, preserving existing crosswalk and ESP configurations. Windows/regression and UI owner validation pending; accepted baseline remains 0_4_14.
+notes: V0422 standardizes responsive text and panel alignment in existing shared style files, fixes truncated camera IDs and simulation/signal summaries, and allows experiment content to scroll on short screens. Selected and unselected region polygons remain fully unfilled; selection uses a brighter thicker pale-yellow outline only. V0421 two-pair simulation cameras, backend APIs, saved geometry and traffic safety are unchanged. Windows acceptance pending; stable baseline remains 0_4_14.

@@ -1,11 +1,20 @@
-# Local Testing — V0421
+# Local Testing — V0422
 
 ```text
-version: 0_4_21
-previous_version: 0_4_20
+version: 0_4_22
+previous_version: 0_4_21
 passed_baseline: 0_4_14
-status: Second simulation camera pair candidate
+status: Responsive text layout and clear selected-region outline candidate
 ```
+
+## V0422 responsive text and selection acceptance
+
+- Run the standard single-command updater with `-ChangedTests` and confirm regressions, frontend typecheck/build, backend smoke and startup.
+- Resize the desktop browser to wide, medium and narrow widths; inspect the sidebar, page/panel headers, buttons, Saved cameras, and status pills. Text should wrap without clipping, with consistent alignment and readable font sizes.
+- Inspect Junction Network camera IDs and link names (including long identifiers), Signal Control scenario descriptions, and Simulation Experiment scenarios, tabs and results. Full wording must be readable; on short-height screens, scroll to see all experiment content. Data tables may scroll horizontally.
+- In Crosswalks → Edit regions, selected and unselected polygons must have no interior tint; selection should be indicated by a brighter, fully opaque, thicker dashed pale-yellow border with existing draggable vertices.
+- Confirm the V0421 second simulation-camera pair remains selectable/usable and saved region geometry is unchanged.
+- V0422 remains unaccepted until owner PASS. Accepted baseline stays V0414.
 
 ## V0421 two-pair simulation acceptance
 
@@ -14,12 +23,12 @@ status: Second simulation camera pair candidate
 - Select each saved camera and check its preview. Pair 1's two views are vertical mirrors; Pair 2 is the same synthetic intersection from a horizontally reflected viewpoint and its mirror. These are two camera pairs on one simulator, not two independent simulations.
 - In Crosswalks, assign C/D to the two camera sides of a crosswalk and save/reload. Do not overwrite existing assignments.
 - Delete Pair 2 through either C or D and verify Pair 1 survives and continues simulating. Restore Pair 2, delete Pair 1 and verify Pair 2 survives. Physical ESP configurations must stay intact.
-- Selected region's pale translucent overlay from V0420 is retained.
+- V0422 supersedes V0420's selected translucent overlay; both selected and unselected region interiors remain clear.
 
 ## V0420 selected-region visual acceptance
 
 - Run the standard one-line update/test/runner with `-ChangedTests`.
-- In Traffic → Crosswalks → Edit regions, unselected polygons should have no interior fill. Select a region: its interior should be lightly highlighted in pale cream (~22% opacity), still showing the camera, with a thicker dashed yellow border and draggable numbered vertices.
+- In Traffic → Crosswalks → Edit regions, selected and unselected polygons have no interior fill. Selection is indicated by a thicker opaque pale-yellow dashed border and draggable numbered vertices.
 - Toggle Side A/B and drag vertices to verify selecting/deselecting and geometry persistence. Normal Live AI region overlays should remain fully clear.
 - Legacy Region Editor selected polygons use the same light translucent highlight. Dataset object boxes and simulation imagery are unchanged.
 - Check TypeScript compilation, production build, live backend smoke, and app startup. V0420 remains a candidate until owner PASS.

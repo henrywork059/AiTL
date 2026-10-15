@@ -1,19 +1,24 @@
-# V0421 Test Checklist
+# V0422 Test Checklist
 
 ```text
-version: 0_4_21
-previous_version: 0_4_20
+version: 0_4_22
+previous_version: 0_4_21
 passed_baseline: 0_4_14
-status: Second simulation camera pair candidate
+status: Responsive text layout and clear selected-region outline candidate
 ```
 
+- [ ] Shared headings, buttons, status pills, cards and panel headers resize or wrap without text clipping.
+- [ ] Junction camera IDs/link labels, Signal Control scenario descriptions and Simulation Experiment summaries show complete text.
+- [ ] Short-height desktop windows can scroll Simulation Experiment results; data tables remain horizontally scrollable where necessary.
+- [ ] Both selected and unselected region interiors remain fully clear; selected outline is thicker and brighter.
+- [ ] Selected Python regressions, frontend typecheck/build, backend startup and live smoke pass.
 - [ ] Camera Settings can add Pair 1 and then a second pair (C/D); all four saved IDs persist after restart.
 - [ ] Saved camera selection and preview stream work for A/B/C/D; corresponding views are mirrored and share one signal-clock simulation.
 - [ ] Deleting one simulation pair preserves the other pair and unrelated ESP profiles.
 - [ ] Crosswalk camera-side dropdowns can select Pair 2 cameras, and saving/reloading keeps assignments.
 - [ ] Python regressions, frontend typecheck/build, backend smoke and startup pass.
 - [ ] Unselected Crosswalk Region polygons are fully transparent.
-- [ ] Selected polygon has pale 22%-opaque highlight, visible camera, yellow dashed border and editable vertices.
+- [ ] Selected polygon has no fill, visible camera, brighter yellow dashed border and editable vertices.
 - [ ] Legacy selected regions match; Live AI and simulation overlays remain fully transparent.
 - [ ] Regression tests, frontend typecheck/build, backend smoke and startup pass.
 - [ ] V0418 regression examines all matching camera-status-entry CSS declarations (cursor + background).

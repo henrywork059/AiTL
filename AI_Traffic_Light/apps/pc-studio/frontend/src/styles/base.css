@@ -158,20 +158,20 @@ p {
 }
 
 h1 {
-  font-size: 28px;
+  font-size: clamp(1.4rem, 1rem + 1vw, 1.75rem);
   line-height: 1.2;
   letter-spacing: -0.02em;
   font-weight: 650;
 }
 
 h2 {
-  font-size: 18px;
+  font-size: clamp(1rem, 0.85rem + 0.35vw, 1.125rem);
   line-height: 1.35;
   font-weight: 650;
 }
 
 h3 {
-  font-size: 15px;
+  font-size: clamp(0.875rem, 0.78rem + 0.25vw, 0.9375rem);
   line-height: 1.4;
 }
 
@@ -207,3 +207,8 @@ code {
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 select,
 textarea { max-width: 100%; }
+
+/* Shared readable text: compact viewports wrap content rather than hide it. */
+:where(h1, h2, h3, p, span, small, strong, code, label, button) {
+  overflow-wrap: anywhere;
+}

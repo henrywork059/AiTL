@@ -1,4 +1,4 @@
-"""Unselected regions remain clear; selected regions use a light translucent highlight."""
+"""Region interiors remain clear; selection uses a brighter outline only."""
 from pathlib import Path
 import re
 
@@ -21,10 +21,11 @@ def main() -> None:
     selected = rule(editor, ".crosswalk-region-polygon.is-selected")
     assert "fill: none;" in normal
     assert "stroke: var(--color-primary);" in normal
-    assert "fill: rgba(255, 246, 210, 0.22);" in selected
-    assert "stroke: var(--color-warning);" in selected
-    assert "stroke-width: 5;" in selected
-    assert "stroke-dasharray: 14 7;" in selected
+    assert "fill: none;" in selected
+    assert "stroke: #fff5c7;" in selected
+    assert "stroke-opacity: 1;" in selected
+    assert "stroke-width: 6;" in selected
+    assert "stroke-dasharray: 12 5;" in selected
     assert "cursor: grab;" in rule(editor, ".crosswalk-region-vertex")
     assert "stroke: var(--color-primary);" in rule(editor, ".crosswalk-region-vertex")
     crosswalk = read("pages/CrosswalkRegionEditor.tsx")
@@ -44,17 +45,17 @@ def main() -> None:
 
     legacy = read("pages/zoneEditor.css")
     assert "fill: none;" in rule(legacy, ".zone-editor-polygon")
-    assert "fill: rgba(255, 246, 210, 0.22);" in rule(legacy, ".zone-editor-selected")
-    assert "stroke: var(--color-warning);" in rule(legacy, ".zone-editor-selected")
-    assert "stroke-width: 6;" in rule(legacy, ".zone-editor-selected")
-    assert "stroke-dasharray: 14 7;" in rule(legacy, ".zone-editor-selected")
+    assert "fill: none;" in rule(legacy, ".zone-editor-selected")
+    assert "stroke: #fff5c7;" in rule(legacy, ".zone-editor-selected")
+    assert "stroke-width: 7;" in rule(legacy, ".zone-editor-selected")
+    assert "stroke-dasharray: 12 5;" in rule(legacy, ".zone-editor-selected")
     assert "fill: none;" in rule(legacy, ".zone-draft-line")
 
     # Dataset object bounding boxes are not region polygons.
     dataset = read("pages/datasetReview.css")
     assert "fill: var(--color-zone-fill);" in rule(dataset, ".manual-label-box")
-    print("[PASS] Unselected Crosswalk polygons clear; selected pale translucent highlight and handles preserved")
-    print("[PASS] Live/simulation overlays clear; selected legacy regions highlighted translucently")
+    print("[PASS] Crosswalk polygons clear; selected outline brighter with handles preserved")
+    print("[PASS] Live/simulation and legacy region interiors remain clear")
     print("[PASS] Dataset bounding boxes remain unchanged")
 
 

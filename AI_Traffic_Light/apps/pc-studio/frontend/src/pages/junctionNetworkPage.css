@@ -513,19 +513,17 @@
 }
 
 .junction-camera-copy strong {
-  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 0.74rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .junction-camera-copy small {
-  overflow: hidden;
   color: var(--color-text-muted);
   font-size: 0.66rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .junction-camera-fps {
@@ -555,6 +553,9 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-muted);
   font-size: 0.68rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .junction-add-link-row select {
@@ -580,9 +581,8 @@
 
 .junction-link-row strong,
 .junction-link-row small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .junction-link-row small {

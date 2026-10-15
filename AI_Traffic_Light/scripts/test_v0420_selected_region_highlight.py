@@ -1,4 +1,4 @@
-"""Selected regions are softly highlighted; unselected and live regions remain clear."""
+"""The selected-region contract: fully clear interiors and emphasized borders."""
 from pathlib import Path
 import re
 
@@ -15,21 +15,23 @@ def declaration(css: str, selector: str) -> str:
     return "\n".join(rules)
 
 
-def check_selected(css: str, base: str, selected: str) -> None:
-    normal = declaration(css, base)
-    active = declaration(css, selected)
+def check_selected(css: str, plain: str, active: str, width: int) -> None:
+    normal = declaration(css, plain)
+    selected = declaration(css, active)
     assert "fill: none;" in normal
-    match = re.search(r"fill:\s*rgba\(255,\s*246,\s*210,\s*([0-9.]+)\);", active)
-    assert match, selected
-    assert 0.15 <= float(match.group(1)) <= 0.30
-    assert "stroke: var(--color-warning);" in active
-    assert "stroke-dasharray: 14 7;" in active
+    assert "fill: none;" in selected
+    assert "rgba(" not in selected
+    assert "stroke: #fff5c7;" in selected
+    assert "stroke-opacity: 1;" in selected
+    assert f"stroke-width: {width};" in selected
+    assert "stroke-dasharray: 12 5;" in selected
+    assert "stroke-linejoin: round;" in selected
 
 
 def main() -> None:
     crosswalk = read("pages/crosswalkRegionEditor.css")
-    check_selected(crosswalk, ".crosswalk-region-polygon", ".crosswalk-region-polygon.is-selected")
-    assert "stroke-width: 5;" in declaration(crosswalk, ".crosswalk-region-polygon.is-selected")
+    check_selected(crosswalk, ".crosswalk-region-polygon",
+                   ".crosswalk-region-polygon.is-selected", 6)
     assert "cursor: grab;" in declaration(crosswalk, ".crosswalk-region-vertex")
     editor = read("pages/CrosswalkRegionEditor.tsx")
     assert 'fill="none"' in editor
@@ -37,15 +39,13 @@ def main() -> None:
     assert "onVertexDown(event, region.id, index)" in editor
 
     legacy = read("pages/zoneEditor.css")
-    check_selected(legacy, ".zone-editor-polygon", ".zone-editor-selected")
-    assert "stroke-width: 6;" in declaration(legacy, ".zone-editor-selected")
+    check_selected(legacy, ".zone-editor-polygon", ".zone-editor-selected", 7)
 
-    # No highlight tint is allowed on unselected camera overlays.
     assert "fill: none;" in declaration(read("pages/liveInference.css"), ".live-zone-polygon")
     assert "fill: none;" in declaration(read("styles/components.css"), ".zone")
-    print("[PASS] Unselected regions clear; selected regions have 22% pale highlight and dashed border")
-    print("[PASS] Crosswalk/legacy selection uses CSS fill without forced zero SVG opacity")
-    print("[PASS] Vertex editing and live/simulation overlay transparency preserved")
+    print("[PASS] Crosswalk and legacy polygons remain fully unfilled")
+    print("[PASS] Selected outline lighter, fully opaque, thicker and dashed")
+    print("[PASS] Existing vertices and live/simulation overlays preserved")
 
 
 if __name__ == "__main__":

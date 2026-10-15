@@ -5,12 +5,12 @@
 .experiment-control-grid { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)) auto; gap: var(--space-2); align-items: end; }
 .experiment-control-grid label, .experiment-saved-row label, .experiment-sample-toolbar label { display: grid; gap: var(--space-1); color: var(--color-text-secondary); font-size: 0.8rem; }
 .experiment-control-grid input, .experiment-control-grid select, .experiment-saved-row select, .experiment-sample-toolbar select { min-width: 0; width: 100%; }
-.experiment-run-button { white-space: nowrap; }
+.experiment-run-button { white-space: normal; }
 .experiment-saved-row { display: grid; grid-template-columns: minmax(250px, 1.2fr) auto minmax(300px, 2fr); gap: var(--space-3); align-items: end; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border-subtle); background: var(--color-surface-muted); border-radius: var(--radius-md); }
-.experiment-scenario-strip { display: flex; justify-content: flex-end; gap: var(--space-3); min-width: 0; color: var(--color-text-secondary); font-size: 0.8rem; white-space: nowrap; overflow: hidden; }
-.experiment-scenario-strip span, .experiment-scenario-strip strong { overflow: hidden; text-overflow: ellipsis; }
+.experiment-scenario-strip { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); min-width: 0; color: var(--color-text-secondary); font-size: 0.8rem; white-space: normal; }
+.experiment-scenario-strip span, .experiment-scenario-strip strong { min-width: 0; overflow-wrap: anywhere; }
 .experiment-error { margin: 0; }
-.experiment-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--color-border-subtle); }
+.experiment-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--color-border-subtle); }
 .experiment-tabs button, .experiment-toggle button { border: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: transparent; color: var(--color-text-secondary); padding: var(--space-2) var(--space-3); }
 .experiment-tabs button:hover, .experiment-toggle button:hover { background: var(--color-control-hover); color: var(--color-text-primary); }
 .experiment-tabs button.active, .experiment-toggle button.active { color: var(--color-primary); background: var(--color-primary-surface); font-weight: 600; }
@@ -36,7 +36,7 @@
 .experiment-data-table th:first-child, .experiment-data-table td:first-child { text-align: left; }
 .experiment-data-table thead th { color: var(--color-text-muted); font-weight: 600; background: var(--color-surface-muted); position: sticky; top: 0; z-index: 1; }
 .experiment-rule-list { display: grid; gap: var(--space-1); }
-.experiment-rule-list div { display: flex; justify-content: space-between; padding: var(--space-2); border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); }
+.experiment-rule-list div { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; padding: var(--space-2); border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); }
 .experiment-diagnostic { display: grid; gap: var(--space-1); margin-top: var(--space-3); padding: var(--space-3); background: var(--color-surface-muted); border-radius: var(--radius-sm); }
 .experiment-diagnostic small { color: var(--color-text-muted); }
 .experiment-samples { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -58,8 +58,8 @@
   .experiment-saved-row { grid-template-columns: 1fr; }
   .experiment-summary-grid, .experiment-table-grid { grid-template-columns: 1fr; }
   .experiment-summary-note { grid-column: auto; grid-template-columns: 1fr; }
-  .experiment-tabs { overflow-x: auto; }
-  .experiment-tabs button { white-space: nowrap; }
+  .experiment-tabs { flex-wrap: wrap; }
+  .experiment-tabs button { white-space: normal; }
   .experiment-tab-panel { overflow: visible; }
 }
 
@@ -90,4 +90,11 @@
   background: var(--color-primary-surface);
   color: var(--color-primary);
   box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+/* Short desktop viewports use document scrolling instead of hiding results. */
+@media (max-height: 700px) {
+  .experiment-workspace { height: auto; min-height: 0; overflow: visible; }
+  .experiment-tab-panel { overflow: visible; }
+  .experiment-empty { height: auto; min-height: 180px; }
 }

@@ -255,9 +255,8 @@
 }
 
 .scenario-list-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .scenario-editor {

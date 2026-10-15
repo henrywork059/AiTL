@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_22 — Responsive panel/text alignment and clear selected-region outlines
+
+- Standardize responsive typography and wrapping in existing shared `styles/base.css`, `styles/layout.css` and `styles/components.css`: fluid headings/metric figures, text wrapping in boxes/buttons/status pills, flexible page/panel headers, and status bars that grow rather than clip.
+- Remove ellipsis-based truncation from Junction Network camera IDs, source descriptions and link labels. Allow Simulation Experiment scenarios, rule descriptions and tabs to wrap, and use page scrolling on short desktop screens instead of concealing results. Allow Signal Control scenario descriptions to wrap.
+- Keep selected and unselected region interiors completely transparent. Selected Crosswalk polygons use an opaque pale-yellow `#FFF5C7` 6px dashed outline (7px in hidden legacy editor), with vertex handles unchanged.
+- Align historical V0417/V0418/V0420 tests to the revised selection contract and add `test_v0422_responsive_layout.py`. Preserve Live AI overlays, dataset boxes, camera switching, V0421's second simulation-camera pair, signal safety logic and stored data unchanged.
+- Previous candidate `0_4_21`; accepted stable baseline `0_4_14`. Windows frontend build, backend smoke and visual validation remain pending.
+
+
 ## 0_4_21 — Second saved simulation camera pair
 
 - Add simulation camera Pair 2 (`simulation_camera_c` and `simulation_camera_d`) alongside the existing Pair 1 (`simulation_camera` and `simulation_camera_b`).
