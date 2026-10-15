@@ -1,5 +1,5 @@
-version: 0_5_1
-status: Simulation tool visibility candidate
-previous_version: 0_5_0
+version: 0_5_2
+status: Region editor save candidate
+previous_version: 0_5_1
 passed_baseline: 0_5_0
-notes: Default-hide simulator controls; reveal them by toggling AI Traffic Light panel. Existing simulation runtime, stored camera sources, APIs and traffic safety unaffected. Windows acceptance pending.
+notes: Save regions directly in Region Editor using existing crosswalk persistence. Camera-specific counting regions and backend identifiers require a separate data-model change.

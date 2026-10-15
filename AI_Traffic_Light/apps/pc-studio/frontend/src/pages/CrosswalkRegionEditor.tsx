@@ -30,12 +30,15 @@ type Props = {
   onSimulationChange: (enabled: boolean) => Promise<void>;
   onCameraStatusChange: (status: CameraStatus) => void;
   onRegionsChange: (regions: CrosswalkRegion[]) => void;
+  onSave: () => Promise<void>;
+  saving: boolean;
+  hasUnsavedChanges: boolean;
   onClose: () => void;
 };
 
 export function CrosswalkRegionEditor({
   crosswalk, cameras, cameraStatus, showSimulationTools, changingMode,
-  onSimulationChange, onCameraStatusChange, onRegionsChange, onClose,
+  onSimulationChange, onCameraStatusChange, onRegionsChange, onSave, saving, hasUnsavedChanges, onClose,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(crosswalk.regions[0]?.id ?? null);
   const [side, setSide] = useState<Side>("camera_side_a_id");
@@ -133,7 +136,11 @@ export function CrosswalkRegionEditor({
           <h2>{crosswalk.label} — Region editor</h2>
           <p className="placeholder-copy">Four draggable vertices per region. The geometry belongs to this crosswalk and is shared by both camera slots.</p>
         </div>
-        <button type="button" onClick={onClose}>Back to crosswalks</button>
+        <div className="button-row">
+          <button className="primary" type="button" onClick={() => void onSave()} disabled={saving || !hasUnsavedChanges}>{saving ? "Saving…" : "Save regions"}</button>
+          <button type="button" onClick={onClose}>Back to crosswalks</button>
+          {hasUnsavedChanges && <span className="status-pill status-planned">Unsaved changes</span>}
+        </div>
       </div>
       <div className="crosswalk-region-layout">
         <aside className="panel compact-panel crosswalk-region-tools">
@@ -232,7 +239,7 @@ export function CrosswalkRegionEditor({
               ))}
             </svg>
           </div>
-          <p className="small-note">Editing coordinates: {WIDTH} × {HEIGHT}. Same coordinates are overlaid for Side A and Side B; viewpoints are not automatically calibrated. Return to Crosswalks and select Save changes to persist.</p>
+          <p className="small-note">Editing coordinates: {WIDTH} × {HEIGHT}. Same coordinates are overlaid for Side A and Side B; viewpoints are not automatically calibrated. Select Save regions above to persist changes.</p>
         </section>
       </div>
     </div>

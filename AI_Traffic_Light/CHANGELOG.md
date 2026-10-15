@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_5_2 — Save from Region Editor
+
+- Add Save regions in the Region Editor, using the existing Crosswalks save API and existing unsaved-change/busy states.
+- Do not change region geometry, existing shared-camera model or counting logic. Camera-specific region identities and counting semantics require an explicit schema/backend migration and are not yet implemented.
+- Candidate `0_5_2`, accepted baseline `0_5_0`; Windows tests pending.
+
+
 ## 0_5_1 — Hide simulation tools behind brand toggle
 
 - The top-left AI Traffic Light panel toggles simulation options throughout the PC app (click, Enter or Space). They are concealed by default.

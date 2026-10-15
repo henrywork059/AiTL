@@ -180,6 +180,9 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
         onSimulationChange={onSimulationChange}
         onCameraStatusChange={onCameraStatusChange}
         onRegionsChange={(regions: CrosswalkRegion[]) => update({ regions })}
+        onSave={save}
+        saving={busy}
+        hasUnsavedChanges={dirty}
         onClose={() => setRegionEditorOpen(false)}
       />
     );
