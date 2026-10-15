@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_4_6 — Junction Network regression assertion repair
+
+- Updated two stale Junction Network regression checks: verify the current simulation/physical-camera mode label and the actual primary-camera assignment control, instead of requiring removed instructional text.
+- No application runtime, theme, camera registry, topology, or traffic signal changes. Previous candidate `0_4_5`; owner-accepted baseline `0_4_0`. Windows re-test pending.
+
+
 ## 0_4_5 — Mint accent and visible selection states
 
 - The dark-theme primary accent is `#57FFED`; the light theme uses contrast-safe `#006F66`. Related hover, pressed, secondary, focus and selected-surface roles share the teal family.

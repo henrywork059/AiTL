@@ -1,5 +1,5 @@
-version: 0_4_5
-status: Mint theme and selected-state indicators candidate
-previous_version: 0_4_4
+version: 0_4_6
+status: Junction Network regression assertion repair candidate
+previous_version: 0_4_5
 passed_baseline: 0_4_0
-notes: V0405 applies owner-selected #57FFED as the dark accent with a contrast-safe teal light variant. Active navigation, tabs, selected rows, mode buttons and checked filters gain explicit selection indicators. No backend or control logic changed. Candidate awaits owner PASS; stable baseline remains 0_4_0.
+notes: V0406 repairs two stale Junction Network static assertions introduced before paired simulation cameras and UI text cleanup. Existing runtime, cameras, styles, and traffic controller behavior are unchanged. Owner acceptance remains pending; accepted baseline stays 0_4_0.

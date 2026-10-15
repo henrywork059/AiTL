@@ -1,12 +1,14 @@
-# V0405 Test Checklist
+# V0406 Test Checklist
 
 ```text
-version: 0_4_5
-previous_version: 0_4_4
+version: 0_4_6
+previous_version: 0_4_5
 passed_baseline: 0_4_0
-status: Mint theme and selected-state indicators candidate
+status: Junction Network regression assertion repair candidate
 ```
 
+- [ ] Junction Network regression asserts current mode text and primary-camera selector, not removed copy.
+- [ ] Windows update/test/run continues past the prior Junction Network failure.
 - [ ] Dark mode displays `#57FFED` accent; light mode uses accessible dark teal.
 - [ ] Selected navigation, tabs, mode buttons, Crosswalks and Dataset rows show dots/bars/rings as applicable.
 - [ ] Live AI checked filters and Junction edge selection have visible active styling.

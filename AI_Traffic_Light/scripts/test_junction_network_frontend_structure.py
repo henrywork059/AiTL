@@ -25,7 +25,7 @@ def main() -> int:
     assert "<JunctionNetworkPage" in app
     assert 'onSimulationChange={changeCameraSimulation}' in app
     assert 'cameraStatus?.simulation_enabled' in page
-    assert 'Simulation · 1 shared camera' in page
+    assert '{cameraStatus?.simulation_enabled ? "Simulation active" : "Physical cameras"}' in page
     assert '| "junction_network"' in app_types
     assert "junction_network:" in navigation
     assert "PAGE_DETAILS.junction_network" in navigation
@@ -43,7 +43,8 @@ def main() -> int:
     assert "saveJunctionNetwork" in page
     assert "resetJunctionNetwork" in page
     assert "source_ids" in page and "primary_source_id" in page
-    assert "single selected AI source" in page
+    assert 'value={selectedConfig.primary_source_id ?? ""}' in page
+    assert 'junction.primary_source_id = event.target.value || null;' in page
     assert "junction-map-canvas" in page
     assert "junction-link-layer" in page
 
@@ -108,7 +109,7 @@ def main() -> int:
     print("[PASS] Junction Network is registered in navigation, App routing and function registry")
     print("[PASS] page behavior, node presentation and pure view helpers have separate owners")
     print("[PASS] Junction Network uses serial polling, typed APIs and memoized lookup maps")
-    print("[PASS] multi-camera assignment and single-selected-source boundary remain visible")
+    print("[PASS] multi-camera assignment and primary-camera selection remain available")
     print("[PASS] node content remains responsive and non-clipping")
     return 0
 

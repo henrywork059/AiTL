@@ -1,11 +1,17 @@
-# Local Testing — V0405
+# Local Testing — V0406
 
 ```text
-version: 0_4_5
-previous_version: 0_4_4
+version: 0_4_6
+previous_version: 0_4_5
 passed_baseline: 0_4_0
-status: Mint theme and selected-state indicators candidate
+status: Junction Network regression assertion repair candidate
 ```
+
+## V0406 test alignment
+
+- Run the existing one-line update/test/run command from the repository root.
+- The Junction Network static regression must validate the current simulation/physical camera mode label and the editable primary-camera selector.
+- All pending V0405 dark/light theme, frontend typecheck/build and smoke checks remain required.
 
 ## V0405 theme and selection acceptance
 
