@@ -43,13 +43,14 @@ def main() -> None:
     assert 'onClick={() => setSide("camera_side_a_id")}' in editor
     assert 'onClick={() => setSide("camera_side_b_id")}' in editor
     assert "<label>Camera side" not in editor
-    assert 'fill="none"' in editor and 'fillOpacity={0}' in editor
+    assert 'fill="none"' in editor
+    assert 'fillOpacity={0}' not in editor
     assert "onVertexDown(event, region.id, index)" in editor
     region_css = ui("pages/crosswalkRegionEditor.css")
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in css_rule(region_css, ".crosswalk-region-side-toggle")
     assert "border-color: var(--color-primary);" in css_rule(region_css, '.crosswalk-region-side-toggle button[aria-pressed="true"]')
-    for selector in (".crosswalk-region-polygon", ".crosswalk-region-polygon.is-selected"):
-        assert "fill: none;" in css_rule(region_css, selector)
+    assert "fill: none;" in css_rule(region_css, ".crosswalk-region-polygon")
+    assert "fill: rgba(255, 246, 210, 0.22);" in css_rule(region_css, ".crosswalk-region-polygon.is-selected")
 
     shared = ui("styles/components.css")
     pill = css_rule(shared, ".status-pill,\n.status-placeholder")
@@ -78,7 +79,7 @@ def main() -> None:
     for path in ("camera_frames.py", "CameraSourcesPage.tsx", "CrosswalkRegionEditor.tsx"):
         assert path in text
     print("[PASS] Saved camera cards select via existing camera service")
-    print("[PASS] Region camera sides toggle, polygons transparent and selected outline retained")
+    print("[PASS] Region camera-side toggle, clear unselected and lightly highlighted selected polygons")
     print("[PASS] Simulation frame omits banners and signal drawings but keeps traffic policy")
     print("[PASS] Status pills centered and pre-patch source backup available")
 

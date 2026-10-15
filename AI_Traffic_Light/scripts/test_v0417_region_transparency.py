@@ -1,4 +1,4 @@
-"""Region outlines remain visible while polygon interiors stay fully transparent."""
+"""Unselected regions remain clear; selected regions use a light translucent highlight."""
 from pathlib import Path
 import re
 
@@ -21,7 +21,7 @@ def main() -> None:
     selected = rule(editor, ".crosswalk-region-polygon.is-selected")
     assert "fill: none;" in normal
     assert "stroke: var(--color-primary);" in normal
-    assert "fill: none;" in selected
+    assert "fill: rgba(255, 246, 210, 0.22);" in selected
     assert "stroke: var(--color-warning);" in selected
     assert "stroke-width: 5;" in selected
     assert "stroke-dasharray: 14 7;" in selected
@@ -44,7 +44,7 @@ def main() -> None:
 
     legacy = read("pages/zoneEditor.css")
     assert "fill: none;" in rule(legacy, ".zone-editor-polygon")
-    assert "fill: none;" in rule(legacy, ".zone-editor-selected")
+    assert "fill: rgba(255, 246, 210, 0.22);" in rule(legacy, ".zone-editor-selected")
     assert "stroke: var(--color-warning);" in rule(legacy, ".zone-editor-selected")
     assert "stroke-width: 6;" in rule(legacy, ".zone-editor-selected")
     assert "stroke-dasharray: 14 7;" in rule(legacy, ".zone-editor-selected")
@@ -53,8 +53,8 @@ def main() -> None:
     # Dataset object bounding boxes are not region polygons.
     dataset = read("pages/datasetReview.css")
     assert "fill: var(--color-zone-fill);" in rule(dataset, ".manual-label-box")
-    print("[PASS] Crosswalk polygons transparent; selected borders and drag handles preserved")
-    print("[PASS] Live/simulation and legacy region polygons use transparent interiors")
+    print("[PASS] Unselected Crosswalk polygons clear; selected pale translucent highlight and handles preserved")
+    print("[PASS] Live/simulation overlays clear; selected legacy regions highlighted translucently")
     print("[PASS] Dataset bounding boxes remain unchanged")
 
 

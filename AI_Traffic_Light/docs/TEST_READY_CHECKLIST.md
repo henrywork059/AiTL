@@ -1,12 +1,16 @@
-# V0419 Test Checklist
+# V0420 Test Checklist
 
 ```text
-version: 0_4_19
-previous_version: 0_4_18
+version: 0_4_20
+previous_version: 0_4_19
 passed_baseline: 0_4_14
-status: Saved-camera CSS regression helper repair candidate
+status: Selected region soft highlight candidate
 ```
 
+- [ ] Unselected Crosswalk Region polygons are fully transparent.
+- [ ] Selected polygon has pale 22%-opaque highlight, visible camera, yellow dashed border and editable vertices.
+- [ ] Legacy selected regions match; Live AI and simulation overlays remain fully transparent.
+- [ ] Regression tests, frontend typecheck/build, backend smoke and startup pass.
 - [ ] V0418 regression examines all matching camera-status-entry CSS declarations (cursor + background).
 - [ ] All selected offline regressions, frontend typecheck/build, backend live smoke and startup pass on Windows.
 - [ ] Saved cameras click selects the camera and shows the correct stream; keyboard and busy states work.

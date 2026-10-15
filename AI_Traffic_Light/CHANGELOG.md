@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_20 — Subtle selected-region highlight
+
+- Keep unselected polygons fully clear; when selected, use a pale cream `rgba(255, 246, 210, 0.22)` fill. Camera frames remain visible through the 22% highlight.
+- Preserve the thicker dashed warning-colored outline and draggable numbered vertices. Apply equivalent selected styling in the hidden legacy region editor.
+- Remove the Crosswalk Region Editor's unconditional SVG `fillOpacity={0}` presentation attribute, which prevented selected translucent fills from appearing. Continue using the normal SVG `fill="none"` plus state-specific CSS.
+- Update the historical V0417/V0418 transparency assertions and add `test_v0420_selected_region_highlight.py` to check opacity range, unselected transparency, borders and camera compatibility.
+- No geometry, region/camera data, APIs, simulator, traffic timing, dependency or other styling changes. Previous candidate `0_4_19`; owner-accepted stable baseline remains `0_4_14`. Windows build and live smoke pending.
+
+
 ## 0_4_19 — Fix duplicate CSS selector regression lookup
 
 - Fix the V0418 first-run `test_v0418_camera_region_ui.py` failure by inspecting all declarations of `.camera-status-entry`. The pointer cursor is present in the original CSS block; a later background-only rule was incorrectly selected by the test helper.

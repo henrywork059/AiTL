@@ -34,7 +34,7 @@
 .zone-editor-line { stroke-width: 7; vector-effect: non-scaling-stroke; }
 .zone-editor-selected-line { stroke-width: 11; }
 .zone-editor-ignore { stroke: #8b949e; }
-.zone-editor-selected { fill: none; stroke: var(--color-warning); stroke-width: 6; stroke-dasharray: 14 7; }
+.zone-editor-selected { fill: rgba(255, 246, 210, 0.22); stroke: var(--color-warning); stroke-width: 6; stroke-dasharray: 14 7; }
 
 .zone-draft-line {
   fill: none;

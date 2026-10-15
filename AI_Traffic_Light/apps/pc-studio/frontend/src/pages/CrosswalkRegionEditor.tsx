@@ -215,7 +215,6 @@ export function CrosswalkRegionEditor({
                   <polygon
                     points={polygon(region)}
                     fill="none"
-                    fillOpacity={0}
                     className={selected?.id === region.id ? "crosswalk-region-polygon is-selected" : "crosswalk-region-polygon"}
                   />
                   {selected?.id === region.id && region.vertices.map(([x, y], index) => (

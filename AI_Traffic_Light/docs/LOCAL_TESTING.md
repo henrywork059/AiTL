@@ -1,11 +1,19 @@
-# Local Testing — V0419
+# Local Testing — V0420
 
 ```text
-version: 0_4_19
-previous_version: 0_4_18
+version: 0_4_20
+previous_version: 0_4_19
 passed_baseline: 0_4_14
-status: Saved-camera CSS regression helper repair candidate
+status: Selected region soft highlight candidate
 ```
+
+## V0420 selected-region visual acceptance
+
+- Run the standard one-line update/test/runner with `-ChangedTests`.
+- In Traffic → Crosswalks → Edit regions, unselected polygons should have no interior fill. Select a region: its interior should be lightly highlighted in pale cream (~22% opacity), still showing the camera, with a thicker dashed yellow border and draggable numbered vertices.
+- Toggle Side A/B and drag vertices to verify selecting/deselecting and geometry persistence. Normal Live AI region overlays should remain fully clear.
+- Legacy Region Editor selected polygons use the same light translucent highlight. Dataset object boxes and simulation imagery are unchanged.
+- Check TypeScript compilation, production build, live backend smoke, and app startup. V0420 remains a candidate until owner PASS.
 
 ## V0419 duplicate CSS rule regression verification
 
