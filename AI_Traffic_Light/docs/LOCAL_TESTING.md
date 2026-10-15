@@ -1,4 +1,21 @@
-# Local Testing — V0422
+# Local Testing — V0423
+
+```text
+version: 0_4_23
+previous_version: 0_4_22
+passed_baseline: 0_4_14
+status: Translucent region overlay candidate
+```
+
+## V0423 translucent region appearance acceptance
+
+- Run `scripts/update_test_run.ps1 -ChangedTests`, verify the focused region regressions, frontend typecheck/build, backend smoke and startup.
+- Open Crosswalks → Edit regions with a simulation camera: unselected regions show a light 10% mint tint and the selected region shows a 22% pale cream tint. Both allow the video beneath to remain visible.
+- The selected pale-yellow dashed outline remains 6px and fully opaque; numbered vertices drag, Side A/B toggles work and saving/reloading leaves coordinates unchanged.
+- The hidden legacy editor uses the same fill opacity with its existing 7px selected outline. Live AI/simulation region outlines stay unfilled; dataset boxes stay unchanged.
+- V0423 awaits owner PASS; accepted baseline remains V0414.
+
+## Historical V0422 and earlier acceptance notes (preserved for reference)
 
 ```text
 version: 0_4_22

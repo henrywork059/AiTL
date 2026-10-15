@@ -1,5 +1,5 @@
-version: 0_4_22
-status: Responsive text layout and clear selected-region outline candidate
-previous_version: 0_4_21
+version: 0_4_23
+status: Translucent region overlay candidate
+previous_version: 0_4_22
 passed_baseline: 0_4_14
-notes: V0422 standardizes responsive text and panel alignment in existing shared style files, fixes truncated camera IDs and simulation/signal summaries, and allows experiment content to scroll on short screens. Selected and unselected region polygons remain fully unfilled; selection uses a brighter thicker pale-yellow outline only. V0421 two-pair simulation cameras, backend APIs, saved geometry and traffic safety are unchanged. Windows acceptance pending; stable baseline remains 0_4_14.
+notes: V0423 restores 10%-opacity mint fills for ordinary Crosswalk/legacy editor polygons and 22%-opacity pale cream fills for selected polygons while preserving visible camera frames, opaque bright dashed selection borders, draggable vertices and saved geometry. Live AI/simulation overlays remain unfilled; V0422 responsive text, V0421 two-pair simulation cameras and traffic safety are unchanged. Windows visual acceptance pending; baseline remains 0_4_14.

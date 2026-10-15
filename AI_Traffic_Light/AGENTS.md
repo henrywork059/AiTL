@@ -272,7 +272,7 @@ For camera source selection, simulation frame rendering, Crosswalk Region Editor
 
 - Reuse the existing camera selection API/service; never create a second camera-selection state.
 - Keep signal phase/safety computations separate from optional simulated-camera decorations.
-- Both selected and unselected region interiors must have **no fill**. Highlight a selected region with a lighter, fully opaque, thicker dashed outline and vertex handles only (V0422); never tint the camera image.
+- V0423 Crosswalk/legacy region interiors use low-opacity tints (normal mint 10%, selected pale cream 22%) so the underlying camera remains visible. Keep the lighter, fully opaque, thicker dashed selected outline and vertex handles. Live AI and simulation region outlines stay unfilled; do not tint those overlays.
 - Camera-side toggles must not mutate region coordinates or camera-side assignments.
 - Update old visual expectations when appearance intentionally changes; run affected regression tests and TypeScript/build rather than relying only on source-text checks.
 - A CSS selector may be repeated across multiple rule blocks; structure tests must inspect all relevant declarations (or the effective cascade), not blindly select the first or last match.

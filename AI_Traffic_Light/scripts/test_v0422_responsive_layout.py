@@ -67,17 +67,18 @@ def main() -> None:
     assert "@media (max-height: 700px)" in experiments
     assert "white-space: normal;" in rule(signals, ".scenario-list-copy small")
 
-    # The editor border must highlight selection without covering camera pixels.
+    # The translucent selected tint must leave camera pixels visible.
     crosswalk = read("pages/crosswalkRegionEditor.css")
     plain = rule(crosswalk, ".crosswalk-region-polygon")
     selected = rule(crosswalk, ".crosswalk-region-polygon.is-selected")
-    assert "fill: none;" in plain and "fill: none;" in selected
+    assert "fill: rgba(87, 255, 237, 0.10);" in plain
+    assert "fill: rgba(255, 246, 210, 0.22);" in selected
     assert "stroke: #fff5c7;" in selected and "stroke-width: 6;" in selected
 
     print("[PASS] Shared panels, headings, badges and buttons wrap at smaller widths")
     print("[PASS] Junction IDs, scenario descriptions and comparison labels are not ellipsized")
     print("[PASS] Short screen height can scroll full experiment content")
-    print("[PASS] Selected region shows lighter outline without any fill")
+    print("[PASS] Selected region shows a translucent highlight and lighter outline")
 
 
 if __name__ == "__main__":

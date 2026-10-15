@@ -1,4 +1,19 @@
-# V0422 Test Checklist
+# V0423 Test Checklist
+
+```text
+version: 0_4_23
+previous_version: 0_4_22
+passed_baseline: 0_4_14
+status: Translucent region overlay candidate
+```
+
+- [ ] Crosswalk Region Editor unselected polygons show mint RGBA 0.10 fill over a visible camera frame.
+- [ ] Selected polygon shows pale cream RGBA 0.22 fill, fully opaque 6px pale-yellow dashed stroke and draggable numbered vertices.
+- [ ] Side A/B previews, geometry save/reload and both simulation camera pairs work normally.
+- [ ] Hidden legacy editor uses the equivalent 0.10/0.22 translucent fills; Live AI/simulation overlays remain clear and dataset boxes unchanged.
+- [ ] Focused Python regressions, frontend typecheck/build, backend smoke, startup and browser appearance are verified.
+
+## Historical V0422 and earlier checks (archival; superseded appearance)
 
 ```text
 version: 0_4_22

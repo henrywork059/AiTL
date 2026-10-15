@@ -21,7 +21,7 @@
 .zone-zebra { fill: rgba(255, 255, 255, 0.82); }
 
 .zone-editor-polygon {
-  fill: none;
+  fill: rgba(87, 255, 237, 0.10);
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
 }
@@ -34,7 +34,7 @@
 .zone-editor-line { stroke-width: 7; vector-effect: non-scaling-stroke; }
 .zone-editor-selected-line { stroke-width: 11; }
 .zone-editor-ignore { stroke: #8b949e; }
-.zone-editor-selected { fill: none; stroke: #fff5c7; stroke-opacity: 1; stroke-width: 7; stroke-dasharray: 12 5; stroke-linejoin: round; }
+.zone-editor-selected { fill: rgba(255, 246, 210, 0.22); stroke: #fff5c7; stroke-opacity: 1; stroke-width: 7; stroke-dasharray: 12 5; stroke-linejoin: round; }
 
 .zone-draft-line {
   fill: none;

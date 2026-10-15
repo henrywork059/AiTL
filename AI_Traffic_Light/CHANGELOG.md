@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_23 — Restore translucent Crosswalk region fills
+
+- Correct the Crosswalk Region Editor's opaque/empty appearance: normal polygons receive a 10%-opacity mint tint; selected polygons receive a 22%-opacity pale cream tint. Both show the camera feed through the polygon.
+- Remove the redundant polygon SVG `fill="none"` presentation attribute; retain the brighter, fully opaque 6px pale-yellow dashed selected stroke, existing handles, coordinate mapping, saved geometry and camera-side controls.
+- Match the tint in the hidden legacy region editor while preserving its 7px selected outline. Live AI/simulation region overlays stay unfilled; dataset boxes, inference and signal logic are unchanged.
+- Update affected region regression expectations (V0417/V0418/V0420/V0422) to check the active translucent contract rather than the superseded no-fill contract.
+- Previous candidate `0_4_22`; passed stable baseline `0_4_14`. Windows GUI appearance, frontend build, startup and live smoke await owner PASS.
+
+
 ## 0_4_22 — Responsive panel/text alignment and clear selected-region outlines
 
 - Standardize responsive typography and wrapping in existing shared `styles/base.css`, `styles/layout.css` and `styles/components.css`: fluid headings/metric figures, text wrapping in boxes/buttons/status pills, flexible page/panel headers, and status bars that grow rather than clip.

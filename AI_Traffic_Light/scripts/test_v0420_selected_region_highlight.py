@@ -1,4 +1,4 @@
-"""The selected-region contract: fully clear interiors and emphasized borders."""
+"""The selected-region contract: soft translucent fills and emphasized borders."""
 from pathlib import Path
 import re
 
@@ -18,9 +18,12 @@ def declaration(css: str, selector: str) -> str:
 def check_selected(css: str, plain: str, active: str, width: int) -> None:
     normal = declaration(css, plain)
     selected = declaration(css, active)
-    assert "fill: none;" in normal
-    assert "fill: none;" in selected
-    assert "rgba(" not in selected
+    def alpha(rule: str) -> float:
+        match = re.search(r"fill:\s*rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*(0?\.\d+|1(?:\.0)?)\s*\)", rule)
+        assert match, "Expected explicit RGBA polygon fill"
+        return float(match.group(1))
+
+    assert 0 < alpha(normal) < alpha(selected) < 0.3
     assert "stroke: #fff5c7;" in selected
     assert "stroke-opacity: 1;" in selected
     assert f"stroke-width: {width};" in selected
@@ -34,7 +37,7 @@ def main() -> None:
                    ".crosswalk-region-polygon.is-selected", 6)
     assert "cursor: grab;" in declaration(crosswalk, ".crosswalk-region-vertex")
     editor = read("pages/CrosswalkRegionEditor.tsx")
-    assert 'fill="none"' in editor
+    assert 'fill="none"' not in editor
     assert "fillOpacity={0}" not in editor
     assert "onVertexDown(event, region.id, index)" in editor
 
@@ -43,7 +46,7 @@ def main() -> None:
 
     assert "fill: none;" in declaration(read("pages/liveInference.css"), ".live-zone-polygon")
     assert "fill: none;" in declaration(read("styles/components.css"), ".zone")
-    print("[PASS] Crosswalk and legacy polygons remain fully unfilled")
+    print("[PASS] Crosswalk and legacy polygon fills are translucent, selected tint stronger")
     print("[PASS] Selected outline lighter, fully opaque, thicker and dashed")
     print("[PASS] Existing vertices and live/simulation overlays preserved")
 

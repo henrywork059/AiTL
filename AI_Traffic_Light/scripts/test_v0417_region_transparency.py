@@ -1,4 +1,4 @@
-"""Region interiors remain clear; selection uses a brighter outline only."""
+"""Crosswalk/legacy regions have subtle translucent fills; live overlays stay clear."""
 from pathlib import Path
 import re
 
@@ -19,9 +19,9 @@ def main() -> None:
     editor = read("pages/crosswalkRegionEditor.css")
     normal = rule(editor, ".crosswalk-region-polygon")
     selected = rule(editor, ".crosswalk-region-polygon.is-selected")
-    assert "fill: none;" in normal
+    assert "fill: rgba(87, 255, 237, 0.10);" in normal
     assert "stroke: var(--color-primary);" in normal
-    assert "fill: none;" in selected
+    assert "fill: rgba(255, 246, 210, 0.22);" in selected
     assert "stroke: #fff5c7;" in selected
     assert "stroke-opacity: 1;" in selected
     assert "stroke-width: 6;" in selected
@@ -44,8 +44,8 @@ def main() -> None:
     assert "stroke-width: 4;" in rule(simulation, ".zone")
 
     legacy = read("pages/zoneEditor.css")
-    assert "fill: none;" in rule(legacy, ".zone-editor-polygon")
-    assert "fill: none;" in rule(legacy, ".zone-editor-selected")
+    assert "fill: rgba(87, 255, 237, 0.10);" in rule(legacy, ".zone-editor-polygon")
+    assert "fill: rgba(255, 246, 210, 0.22);" in rule(legacy, ".zone-editor-selected")
     assert "stroke: #fff5c7;" in rule(legacy, ".zone-editor-selected")
     assert "stroke-width: 7;" in rule(legacy, ".zone-editor-selected")
     assert "stroke-dasharray: 12 5;" in rule(legacy, ".zone-editor-selected")
@@ -54,8 +54,8 @@ def main() -> None:
     # Dataset object bounding boxes are not region polygons.
     dataset = read("pages/datasetReview.css")
     assert "fill: var(--color-zone-fill);" in rule(dataset, ".manual-label-box")
-    print("[PASS] Crosswalk polygons clear; selected outline brighter with handles preserved")
-    print("[PASS] Live/simulation and legacy region interiors remain clear")
+    print("[PASS] Crosswalk polygons translucent; selected outline brighter with handles preserved")
+    print("[PASS] Legacy regions translucent; Live AI/simulation region outlines remain clear")
     print("[PASS] Dataset bounding boxes remain unchanged")
 
 
