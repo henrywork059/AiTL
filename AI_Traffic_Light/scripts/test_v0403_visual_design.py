@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
+
+from check_structure import validate_frontend_style_system
 
 ROOT = Path(__file__).resolve().parents[1] / "apps" / "pc-studio" / "frontend" / "src"
 
@@ -74,6 +77,27 @@ def main() -> None:
     assert 'aria-pressed={mode === "flow"}' in read("pages/TrafficAnalyticsPage.tsx")
     assert 'aria-pressed={mode === "occupancy"}' in read("pages/TrafficAnalyticsPage.tsx")
 
+    # Verify the structure gate accepts a new valid dark palette but rejects
+    # malformed or disconnected base tokens.
+    with TemporaryDirectory() as directory:
+        project = Path(directory)
+        shared = project / "apps" / "pc-studio" / "frontend" / "src"
+        (shared / "styles").mkdir(parents=True)
+        (shared / "styles.css").write_text(read("styles.css"), encoding="utf-8")
+        token_file = shared / "styles" / "tokens.css"
+        token_file.write_text(tokens, encoding="utf-8")
+        errors: list[str] = []
+        validate_frontend_style_system(project, errors)
+        assert not errors, errors
+
+        invalid = tokens.replace("--color-dark-surface-0: #0e1725;", "--color-dark-surface-0: invalid;")
+        assert invalid != tokens
+        token_file.write_text(invalid, encoding="utf-8")
+        errors.clear()
+        validate_frontend_style_system(project, errors)
+        assert any("dark theme" in error for error in errors), errors
+
+    print("[PASS] dark-palette structure guard accepts valid themes and rejects invalid base tokens")
     print(f"[PASS] {len(cases)} color contrast checks (WCAG 4.5:1 text, 3:1 boundaries)")
     print("[PASS] shared controls, navigation, panels, themed page chrome and tab selection")
 

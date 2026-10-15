@@ -1,12 +1,14 @@
-# V0403 Test Checklist
+# V0404 Test Checklist
 
 ```text
-version: 0_4_3
-previous_version: 0_4_2
+version: 0_4_4
+previous_version: 0_4_3
 passed_baseline: 0_4_0
-status: Shared visual system and page palette consistency candidate
+status: Theme structure validation repair candidate
 ```
 
+- [ ] Updated structure validator accepts the new semantic dark base token and rejects an invalid token.
+- [ ] V0404 changed-tests startup proceeds beyond the previous structure failure.
 - [ ] Shared semantic palette passes contrast validation; light/dark page styles share tokens.
 - [ ] Buttons, input fields, panels, navigation selection and analytics/simulation tabs are usable.
 - [ ] Simulation tabs support keyboard navigation; chart labels remain readable.

@@ -1,11 +1,18 @@
-# Local Testing — V0403
+# Local Testing — V0404
 
 ```text
-version: 0_4_3
-previous_version: 0_4_2
+version: 0_4_4
+previous_version: 0_4_3
 passed_baseline: 0_4_0
-status: Shared visual system and page palette consistency candidate
+status: Theme structure validation repair candidate
 ```
+
+## V0404 startup gate repair
+
+- Run the existing one-line update/test/run command from the repository root.
+- The structure gate should accept the semantic dark base `#0E1725` instead of demanding `#121212`.
+- The V0403 visual regression now checks acceptance of the current palette and rejection of malformed base values.
+- Continue the pending V0403 frontend build, backend smoke and light/dark visual acceptance below.
 
 ## V0403 visual acceptance
 

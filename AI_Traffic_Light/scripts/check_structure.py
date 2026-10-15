@@ -319,8 +319,12 @@ def validate_frontend_style_system(root: Path, errors: list[str]) -> None:
                 add_error(errors, f"Frontend design tokens are missing required role: {token}")
         if "color-scheme: light dark" not in token_text or "prefers-color-scheme: dark" not in token_text:
             add_error(errors, "Frontend design tokens must preserve system-adaptive light/dark appearance support.")
-        if "--color-dark-surface-0: #121212;" not in token_text:
-            add_error(errors, "Frontend dark design tokens must preserve the Material-derived #121212 base surface.")
+        dark_section = token_text.split("@media (prefers-color-scheme: dark)", 1)[-1]
+        if (
+            not re.search(r"--color-dark-surface-0:\s*#[0-9a-fA-F]{6}\s*;", dark_section)
+            or "--color-canvas: var(--color-dark-surface-0);" not in dark_section
+        ):
+            add_error(errors, "Frontend dark theme must define a valid base color and apply it to the canvas.")
 
     signal_css = root / "apps/pc-studio/frontend/src/pages/signalRules.css"
     if signal_css.exists():

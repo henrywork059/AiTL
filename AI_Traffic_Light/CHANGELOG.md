@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_4_4 — Dark theme structure-validator repair
+
+- Replaced the obsolete `#121212` dark-canvas assertion with a check for a valid hexadecimal dark-base token and a canvas that references it.
+- Extended the existing visual regression to ensure the structure guard accepts the V0403 palette and rejects an invalid dark-base value.
+- No runtime, CSS palette, camera, topology, data or signal-control changes. Previous candidate `0_4_3`; owner-accepted baseline `0_4_0`.
+
+
 ## 0_4_3 — Shared UI design refinement
 
 - Rebalanced the semantic blue/slate light/dark tokens for Fluent-style neutral surfaces, readable foreground hierarchy and meaningful status colors.
