@@ -42,8 +42,8 @@
   text-align: center;
   padding: var(--space-4);
 }
-.crosswalk-region-polygon { fill: var(--color-zone-fill); stroke: var(--color-primary); stroke-width: 3; }
-.crosswalk-region-polygon.is-selected { fill: var(--color-warning-surface); stroke: var(--color-warning); stroke-width: 5; }
+.crosswalk-region-polygon { fill: none; stroke: var(--color-primary); stroke-width: 3; }
+.crosswalk-region-polygon.is-selected { fill: none; stroke: var(--color-warning); stroke-width: 5; stroke-dasharray: 14 7; }
 .crosswalk-region-vertex { fill: #ffffff; stroke: var(--color-primary); stroke-width: 5; cursor: grab; }
 .crosswalk-region-vertex:active { cursor: grabbing; }
 .crosswalk-region-vertex-label { fill: #113c6d; font-weight: 700; font-size: 19px; }

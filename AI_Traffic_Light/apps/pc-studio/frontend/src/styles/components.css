@@ -204,7 +204,7 @@
 }
 
 .zone {
-  fill: var(--color-zone-fill);
+  fill: none;
   stroke-width: 4;
 }
 

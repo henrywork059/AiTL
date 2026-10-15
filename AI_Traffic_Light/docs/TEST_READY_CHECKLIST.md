@@ -1,12 +1,16 @@
-# V0416 Test Checklist
+# V0417 Test Checklist
 
 ```text
-version: 0_4_16
-previous_version: 0_4_15
+version: 0_4_17
+previous_version: 0_4_16
 passed_baseline: 0_4_14
-status: Regions terminology and empty Zones page removal candidate
+status: Transparent region polygon overlays candidate
 ```
 
+- [ ] Crosswalk region polygons are completely transparent in both normal and selected states, with outlines and draggable vertices preserved.
+- [ ] Live AI and simulation region outlines remain visible without hiding camera frames.
+- [ ] Dataset Review bounding boxes are unchanged; region geometry and saves work normally.
+- [ ] Frontend typecheck/build and backend smoke pass.
 - [ ] Traffic sidebar has no empty Zones page; Junctions and Crosswalks remain.
 - [ ] Crosswalks → Edit regions still creates/edits/saves the same region geometry.
 - [ ] Live AI, Signal Control, Analytics and feature descriptions show Region/Regions wording.

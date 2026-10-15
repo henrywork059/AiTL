@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_4_17 — Transparent region polygons
+
+- Remove polygon interior fills from the Crosswalk Region Editor, including selected regions, so camera frames remain unobstructed. Unselected regions retain mint outlines; selected regions retain transparent interiors but are highlighted by thicker, contrasting warning-colored dashed outlines and draggable numbered vertices.
+- Apply fully transparent interiors to Live AI region overlays, simulation/mock regions and the retained legacy region editor. Keep strokes, labels and selection distinctions.
+- Leave Dataset Review object-label boxes unchanged; only region polygons are affected.
+- Add a focused CSS/interaction regression. No geometry, data storage, camera, signal controller, API or dependency changes.
+- Previous candidate `0_4_16`; owner-accepted baseline stays `0_4_14`. Local Windows build, smoke and visual acceptance pending.
+
+
 ## 0_4_16 — Remove empty Zones page; standardize Regions terminology
 
 - Remove the empty Traffic → Zones page, navigation entry, route and unused page component. Crosswalk Region Editor remains the place to define crosswalk regions.

@@ -1,11 +1,19 @@
-# Local Testing — V0416
+# Local Testing — V0417
 
 ```text
-version: 0_4_16
-previous_version: 0_4_15
+version: 0_4_17
+previous_version: 0_4_16
 passed_baseline: 0_4_14
-status: Regions terminology and empty Zones page removal candidate
+status: Transparent region polygon overlays candidate
 ```
+
+## V0417 transparent region polygon validation
+
+- Run the standard one-line updater and wait for offline regressions, frontend typecheck/build, live smoke and startup.
+- In Traffic → Crosswalks → Edit regions, normal and selected region polygons should have no interior fill. Selected polygons should stand out through a thicker warning-colored dashed outline and numbered draggable vertices while remaining completely transparent; unselected regions retain thinner mint outlines.
+- In Live AI, regions should overlay live/simulated cameras as unfilled outlines; labels and detections remain legible.
+- Legacy Region Editor polygon interior should be transparent for normal and selected states. Dataset Review bounding boxes retain their current display.
+- Confirm light and dark modes and saved region geometry are unchanged.
 
 ## V0416 Regions wording and navigation validation
 
