@@ -1,4 +1,22 @@
-# V059 Global AI and Preview Candidate Checklist
+# V0510 Network Signal and Adjustment Checklist (partial)
+
+```text
+version: 0_5_10
+previous_version: 0_5_9
+passed_baseline: 0_5_0
+status: Partially implemented; full validation and owner PASS pending
+```
+
+- [ ] Traffic Light Settings and Live Signal Adjustments appear under Traffic; existing Signal Control page still works.
+- [ ] Default signal phase time saves/reloads, respects minimums/maximums, preserves profile scenarios.
+- [ ] New adjustment templates are disabled by default; enabling supported class/zone or crowd rules persists without overwriting unrelated settings.
+- [ ] Pedestrian near-end rule checks crossing count and phase-remaining seconds; no unsafe clearance shortening or conflicting vehicle green.
+- [ ] Network cards show live simulator source-scoped signal colours/countdown and active adjustment label only for observed crossing; other crossing lamps are unavailable.
+- [ ] Directly linked neighbours display advisory-only adjustment notices; no false crosswalk phase or controller claim.
+- [ ] Existing Network drag/links/persistence, simulation, traffic state, tracking, camera operations and safety regression PASS.
+- [ ] Full Python/TypeScript/Vite/startup/smoke/Windows/manual checks and owner PASS; baseline `0_5_0` stays unchanged.
+
+## Previous V059 Global AI and Preview Candidate Checklist
 
 ```text
 version: 0_5_9

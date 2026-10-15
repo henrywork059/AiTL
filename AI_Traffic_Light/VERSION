@@ -1,5 +1,5 @@
-version: 0_5_9
-status: Global AI Models and multi-camera preview candidate
-previous_version: 0_5_8
+version: 0_5_10
+status: Partial Network signal and AI adjustment candidate
+previous_version: 0_5_9
 passed_baseline: 0_5_0
-notes: One active YOLO model serves fresh frames of all saved cameras for separate preview detections; inference interval and confidence global. Legacy selected-source traffic and signal control unchanged. Windows acceptance pending.
+notes: Adds guarded default timing, live scenario templates and source-scoped Network signal indicators. Neighbour signals have advisory notices only; no independent controllers or active coordination. Full tests and owner PASS pending.

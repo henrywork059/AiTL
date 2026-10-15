@@ -1,5 +1,12 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0510 timing and live adjustments
+
+No new signal REST endpoints: `GET/PUT /api/traffic/signal-rules` persists both default timing and the new UI's ranked scenario templates. The backend `ALLOWED_METRICS` now accepts `phase_remaining_seconds` as an evaluated read-only metric, derived from the protected current phase. A rule can combine `pedestrians_crossing >= 1` and `phase_remaining_seconds <= 3` to request bounded clearance hold.
+
+`GET /api/traffic/signal-status` remains a shared single simulation/prototype state; it is not a per-crosswalk controller. Network shows lamps only for the crosswalk assigned the current simulation source and marks other crosswalks unverified. Adjacent links provide advisory notices only; they do not change traffic signals or imply conflicts. Emergency class rules request protected phases through existing simulation rules; they do not flash vehicle green or command physical roads.
+
+
 ## V059 global camera inference (preview-only)
 
 - `POST /api/models/upload?model_id=<safe-id>` accepts raw application/octet-stream .pt weights (limit 200 MiB), stores them as a new `outputs/training/<safe-id>/weights/best.pt` without overwrite and returns the standard model registry envelope. Reject invalid model IDs, duplicate IDs, empty or oversized uploads. Uploaded weights must still be explicitly loaded; unsupported model files can fail during activation.

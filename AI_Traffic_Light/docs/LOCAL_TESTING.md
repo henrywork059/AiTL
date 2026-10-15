@@ -1,4 +1,23 @@
-# V059 Global AI Models and Multi-Camera Preview Candidate
+# V0510 Network signal and live-adjustment candidate (partial)
+
+```text
+version: 0_5_10
+previous_version: 0_5_9
+passed_baseline: 0_5_0
+status: Partially implemented signal controls and Network indicators candidate
+```
+
+## Validate on Windows
+
+- Run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"` without `-ChangedTests` from the repo root. Check structural gate, focused `test_v0510_signal_adjustments.py` and `test_v0510_signal_navigation.py`, all regression tests, TypeScript/Vite, health/smoke and startup.
+- Under Traffic, open Traffic Light Settings; change the active profile's vehicle green, pedestrian WALK and amber default times within displayed minimum/maximum constraints, Save, reload and verify persistence. Check invalid changes are blocked; original all-red protected phases remain enforced.
+- Open Live Signal Adjustments: templates are disabled until enabled. Configure a compatible active legacy zone for ambulance/wheelchair classes and verify active detector support, or use a controlled preview/test scenario. Test crowd thresholds and a crossing still occupied with 3 seconds of clearance remaining, verify protected extension and no conflicting green. Confirm dry-run and stale-data behavior and no emergency flashing-green command.
+- Network: select simulator and assign a saved matching simulation camera to Crosswalk A, confirm vehicle and pedestrian bulbs match the active phase and countdown. Other Crosswalk B without independent signal must show unavailable. Trigger a rule at A while A↔B is connected; B displays `not applied here` advisory, **not** a changed signal. Confirm dragging edge labels and crosswalk titles still works, and Save/reload retains links.
+- Test with simulation off: indicators display unavailable and do not depict hardware light state. Check existing Signal Control pages, Crosswalk Region Editor, camera preview, network topology and basic signal controller remain unchanged.
+- **Explicitly pending:** verified movement conflict topology, independent per-crosswalk controllers and actual adjacent signal coordination; this candidate cannot alter neighbour phase times and cannot command physical traffic signals.
+- Full local/Windows validation and owner PASS required. Accepted baseline remains `0_5_0`.
+
+## Previous V059 Global AI and Preview Candidate
 
 ```text
 version: 0_5_9

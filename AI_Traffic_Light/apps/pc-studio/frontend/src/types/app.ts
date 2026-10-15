@@ -8,6 +8,8 @@ export type AppPageId =
   | "crosswalks"
   | "zone_editor"
   | "traffic_logic"
+  | "signal_timing"
+  | "live_signal_adjustments"
   | "traffic_analytics"
   | "simulation_lab"
   | "dataset_capture"

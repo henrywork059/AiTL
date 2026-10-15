@@ -1,3 +1,21 @@
+# Start Here — V0510
+
+Current **candidate `0_5_10`**, previous candidate `0_5_9`, owner-accepted baseline `0_5_0`.
+
+**Traffic menu:** New **Traffic Light Settings** and **Live Signal Adjustments** appear after Network. Traffic Light Settings saves protected default phase times using the existing signal profile and signal-rules endpoint. Live Signal Adjustments adds disabled-by-default ranked scenario templates for ambulance-class priority requests, emergency vehicle-green extension, pedestrian/vehicle crowd responses, pedestrian near-end clearance and wheelchair-class accessibility extension. Class-based conditions only work if the active detector, active legacy region and current selected-source traffic observations actually support them; missing observations suppress rules.
+
+**Network:** Each crossing box displays miniature vehicle/pedestrian lights. Only a crossing with a matching source and an active **simulation** signal has a displayed phase/countdown. Other crosses show **No verified crosswalk signal**. A rule winner at one crossing can be shown to a directly connected neighbour as **advisory only / not applied here**. Saved Network connections do NOT establish movement conflicts or safe controller links, so neighbour phase commands are not implemented. There is no emergency flashing green or independent hardware control.
+
+**Validation:** run the full repository runner from your repo root:
+
+```powershell
+& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"
+```
+
+Verify timing save/reload, rules (including disabled templates), safe signal phase transitions, Network labels and existing camera/network flows. This is a **partial implementation**. Full validation and owner PASS are pending; accepted baseline remains `0_5_0`.
+
+---
+
 # Start Here — V059
 
 Current candidate `0_5_9`, previous candidate `0_5_8`, owner-accepted baseline `0_5_0`.

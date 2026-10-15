@@ -12,6 +12,8 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
   crosswalks: { id: "crosswalks", label: "Crosswalks", shortLabel: "Crosswalks", description: "Configure crosswalks, regions, edge labels and paired cameras.", status: "stable" },
   junction_network: { id: "junction_network", label: "Network", shortLabel: "Network", description: "Monitor saved crossings and connect their numbered edges.", status: "test-ready" },
   zone_editor: { id: "zone_editor", label: "Region Editor (Legacy)", shortLabel: "Legacy Regions", description: "Legacy region editor, retained for compatibility.", status: "legacy" },
+  signal_timing: { id: "signal_timing", label: "Traffic Light Settings", shortLabel: "Default Timing", description: "Configure protected default vehicle and pedestrian signal times.", status: "test-ready" },
+  live_signal_adjustments: { id: "live_signal_adjustments", label: "Live Signal Adjustments", shortLabel: "Live Adjustments", description: "Configure protected AI-triggered signal adjustment scenarios.", status: "test-ready" },
   traffic_logic: { id: "traffic_logic", label: "Signal Control", shortLabel: "Signal Control", description: "Configure signal scenarios, timing and decision rules.", status: "test-ready" },
   traffic_analytics: { id: "traffic_analytics", label: "Traffic Analytics", shortLabel: "Analytics", description: "Review measured occupancy and tracked traffic flow.", status: "test-ready" },
   simulation_lab: { id: "simulation_lab", label: "Simulation Experiments", shortLabel: "Experiments", description: "Compare signal policies in repeatable simulations.", status: "test-ready" },
@@ -24,7 +26,7 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
 
 export const APP_SECTIONS: AppSection[] = [
   { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.camera_settings, PAGE_DETAILS.camera_diagnostics] },
-  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.crosswalks, PAGE_DETAILS.junction_network, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
+  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.crosswalks, PAGE_DETAILS.junction_network, PAGE_DETAILS.signal_timing, PAGE_DETAILS.live_signal_adjustments, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
   { id: "ai", label: "AI", pages: [PAGE_DETAILS.model_registry, PAGE_DETAILS.live_ai] },
   { id: "data", label: "Data & Training", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export] },
   { id: "system", label: "System", pages: [PAGE_DETAILS.logs] },

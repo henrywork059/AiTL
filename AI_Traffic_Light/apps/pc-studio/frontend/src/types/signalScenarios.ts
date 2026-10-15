@@ -18,6 +18,7 @@ export type ScenarioRequestService = "pedestrian" | "vehicle" | null;
 export type SignalMetric =
   | "pedestrians_crossing"
   | "crossing_dwell_seconds"
+  | "phase_remaining_seconds"
   | "pedestrians_waiting"
   | "pedestrian_wait_seconds"
   | "vehicles_waiting"

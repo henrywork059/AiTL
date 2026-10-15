@@ -55,6 +55,7 @@ ALLOWED_OPERATORS = {"gt", "gte", "lt", "lte", "eq"}
 ALLOWED_MATCH = {"all", "any"}
 ALLOWED_REQUEST_SERVICES = {None, "pedestrian", "vehicle"}
 ALLOWED_METRICS = {
+    "phase_remaining_seconds",
     "pedestrians_crossing",
     "crossing_dwell_seconds",
     "pedestrians_waiting",
@@ -478,6 +479,7 @@ class SignalRulesService:
             }
             phase = profile["phases"][phase_key]
             effective = float(phase["base_seconds"])
+            values["phase_remaining_seconds"] = effective
             statuses, winner = self._evaluate_scenario_candidates_locked(config, profile, phase_key, values, clock=0.0, fresh=True, mutate=False)
             if winner:
                 action = winner["action"]
@@ -998,6 +1000,7 @@ class SignalRulesService:
         if config["mode"] == "fixed":
             fresh = False
             fallback_reason = "Fixed mode uses the configured normal timings only."
+        values["phase_remaining_seconds"] = max(0.0, self._phase_duration_seconds - max(0.0, clock - self._phase_started_clock))
         statuses, winner = self._evaluate_scenario_candidates_locked(config, profile, phase_key, values, clock=clock, fresh=fresh, mutate=True)
         self._last_rule_status = statuses
         self._winning_scenario_id = winner["id"] if winner else None
@@ -1090,6 +1093,7 @@ class SignalRulesService:
             fallback_reason = "Fixed mode uses the configured normal timings only."
         elapsed = max(0.0, clock - self._phase_started_clock)
         remaining = 0.0 if self._incident_hold else max(0.0, self._phase_duration_seconds - elapsed)
+        values["phase_remaining_seconds"] = remaining
         next_index = (self._phase_index + 1) % len(PHASE_SEQUENCE)
         next_key, next_phase = PHASE_SEQUENCE[next_index]
         cycle_base = sum(float(profile["phases"][key]["base_seconds"]) for key in PHASE_KEYS)

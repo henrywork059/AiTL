@@ -53,6 +53,7 @@ const METRICS: { value: SignalMetric; label: string; testOnly?: boolean }[] = [
   { value: "pedestrian_wait_seconds", label: "Pedestrian wait duration" },
   { value: "vehicle_wait_seconds", label: "Vehicle wait duration" },
   { value: "crossing_dwell_seconds", label: "Crossing dwell duration" },
+  { value: "phase_remaining_seconds", label: "Current phase time remaining" },
   { value: "mobility_assistance", label: "Mobility assistance test flag", testOnly: true },
   { value: "incident_person_fallen", label: "Fallen-person incident test flag", testOnly: true },
 ];

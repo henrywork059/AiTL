@@ -366,7 +366,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   if (!draft || !overview) {
     return (
       <div className="page-stack junction-network-page">
-        {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} />}
+        {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
         <section className="panel">
           <h2>Network</h2>
           <p className="placeholder-copy">Loading legacy junction topology and camera status...</p>
@@ -380,7 +380,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
 
   return (
     <div className="page-stack junction-network-page">
-      {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} />}
+      {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
       {crosswalkError && <p role="alert" className="error-message">{crosswalkError}</p>}
       <details className="junction-advanced-config">
         <summary>Advanced junction configuration (existing)</summary>

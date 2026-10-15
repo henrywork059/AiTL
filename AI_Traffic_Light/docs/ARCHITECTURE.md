@@ -91,3 +91,9 @@ Network cooperation, pedestrian-aware, vehicle-class and emergency-priority beha
 ## V059 global AI preview
 
 `RemoteCameraManager.frames_for_inference()` snapshots the newest fresh JPEG from every saved connected ESP source and each saved simulated camera; it also supports recent receiver uploads. `MultiCameraInferenceService` runs as one background worker under FastAPI lifespan, sequentially serving all feeds with the one globally loaded inference model. The persisted `inference_interval_ms` targets a *complete pass* over available cameras (best effort, not guaranteed per-camera throughput). No frame backlog is queued. Latest inference results are cached by camera ID and stale observations suppressed. Preview selection reads results via `/api/inference/cameras/{source_id}` and uses existing side-specific crosswalk polygons for per-frame counts. Physical/network signal control and legacy selected-source traffic, tracking and capture remain unchanged. Do not sum Side A/B results as unique objects without identity fusion.
+
+## V0510 Network signals and shared rule settings
+
+Traffic Light Settings and Live Signal Adjustments both edit the existing persisted `signal_rules` config. The former changes only default phase durations in the active profile; the latter configures disabled-by-default ranked scenarios. The existing protected phase controller handles requests. `phase_remaining_seconds` is derived from the current protected phase and can be used in crossing-clearance scenarios.
+
+Network's `CrosswalkSignalIndicators` uses only the shared simulation signal status associated with the current observed source. Connected neighbours receive a read-only notice, **not** a commanded phase. Crosswalk topology currently lacks conflict relationships and per-crosswalk controller instances; actual connected-crosswalk coordination is not implemented.

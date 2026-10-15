@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { fetchCrosswalks, saveCrosswalks } from "../lib/crosswalksApi";
+import { fetchSignalStatus } from "../api";
+import { useSerialPolling } from "../lib/useSerialPolling";
+import { CrosswalkSignalIndicators } from "./CrosswalkSignalIndicators";
+import type { ScenarioSignalStatus } from "../types/signalScenarios";
 import type {
   CrosswalkConfig, CrosswalkNetwork, CrosswalkNetworkEdge, CrosswalkNetworkPosition,
 } from "../types/crosswalks";
@@ -12,6 +16,7 @@ type Props = {
   overview: JunctionNetworkOverview | null;
   onSaved: (config: CrosswalkConfig) => void;
   onRefresh: () => Promise<void>;
+  simulationEnabled: boolean;
 };
 
 const EDGES: CrosswalkNetworkEdge[] = ["1", "2", "3", "4"];
@@ -46,7 +51,7 @@ function nextLinkId(ids: string[]): string {
   return "crosslink_" + number;
 }
 
-export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: Props) {
+export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, simulationEnabled }: Props) {
   const [draft, setDraft] = useState<CrosswalkNetwork>(() => cloneNetwork(config.network));
   const incomingKey = JSON.stringify(config.network ?? EMPTY_NETWORK);
   const [savedKey, setSavedKey] = useState(incomingKey);
@@ -59,13 +64,14 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [signal, setSignal] = useState<ScenarioSignalStatus | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; pointerId: number; offsetX: number; offsetY: number } | null>(null);
 
   const dirty = JSON.stringify(draft) !== savedKey;
   const crosswalks = config.crosswalks;
   const selected = crosswalks.find((item) => item.id === selectedId) ?? crosswalks[0] ?? null;
-  const canvasHeight = Math.max(480, Math.ceil(crosswalks.length / 3) * 250);
+  const canvasHeight = Math.max(560, Math.ceil(crosswalks.length / 3) * 340);
 
   useEffect(() => {
     // A camera/status refresh must not erase unsaved connection or layout edits.
@@ -78,9 +84,18 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
   const positions = useMemo(() => new Map(crosswalks.map((crosswalk, index) => [
     crosswalk.id, draft.positions[crosswalk.id] ?? defaultPosition(index, crosswalks.length),
   ] as const)), [crosswalks, draft.positions]);
+  useSerialPolling(async () => { setSignal(await fetchSignalStatus() as ScenarioSignalStatus); }, 1000,
+    { enabled: simulationEnabled, onError: () => setSignal(null) });
   const cameras = useMemo(() => new Map(
     (overview?.available_cameras ?? []).map((camera) => [camera.source_id, camera]),
   ), [overview]);
+
+  const observedSource = overview?.current_frame_source_id;
+  const signalOwner = simulationEnabled && observedSource && overview?.observation_provenance !== "unavailable"
+    ? crosswalks.find((item) => item.camera_side_a_id === observedSource || item.camera_side_b_id === observedSource)
+    : null;
+  const activeAdjustment = simulationEnabled && signal?.winning_scenario_label
+    ? signal.winning_scenario_label : null;
 
   const countsByCrosswalk = useMemo(() => {
     const result = new Map<string, { label: string; total: number; class_counts: Record<string, number> }[]>();
@@ -333,7 +348,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
           <span><strong>{crosswalks.filter((item) => item.camera_side_a_id || item.camera_side_b_id).length}</strong> with assigned cameras</span>
           <span><strong>{countsByCrosswalk.size}</strong> currently observed</span>
         </div>
-        <p className="small-note">Only the selected camera can provide current AI counts. Other crossings show camera health and configuration, not invented observations. Connections do not control traffic lights.</p>
+        <p className="small-note">Signal lamps display the existing shared simulation controller only for its observed crossing; other crossings are unverified. A connected neighbour may receive an adjustment notice, but Network links alone do not authorize phase changes, emergency green or independent traffic control.</p>
         {dirty && <p className="small-note" role="status">Unsaved Network changes</p>}
         {notice && <p className="success-message" role="status">{notice}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
@@ -363,6 +378,11 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                 const active = overview?.current_frame_source_id;
                 const liveHere = Boolean(overview && overview.observation_provenance !== "unavailable" && active
                   && (active === crosswalk.camera_side_a_id || active === crosswalk.camera_side_b_id));
+                const verifiedSignal = Boolean(simulationEnabled && signal && signalOwner?.id === crosswalk.id);
+                const adjacentNotice = activeAdjustment && signalOwner && signalOwner.id !== crosswalk.id && draft.links.some(
+                  (link) => (link.source_crosswalk_id === crosswalk.id && link.destination_crosswalk_id === signalOwner.id)
+                    || (link.destination_crosswalk_id === crosswalk.id && link.source_crosswalk_id === signalOwner.id),
+                ) ? "Adjacent adjustment at " + signalOwner.label + ": " + activeAdjustment + " (not applied here)" : null;
                 return (
                   <article key={crosswalk.id} className={"crossing-network-node" + (selected?.id === crosswalk.id ? " is-selected" : "")}
                     style={{ left: (position?.x ?? 50) + "%", top: (position?.y ?? 50) + "%" }}>
@@ -401,6 +421,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                         {liveHere && observed.length === 0 && <small>No current region counts</small>}
                       </div>
                     </div>
+                    <CrosswalkSignalIndicators signal={signal} available={verifiedSignal} adjacentNotice={adjacentNotice} />
                   </article>
                 );
               })}

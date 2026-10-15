@@ -1,5 +1,15 @@
 # Changelog
 
+## 0_5_10 — Network signals and adjustable timing/rules (partial)
+
+- Add Traffic Light Settings page for default vehicle, amber, pedestrian WALK/CLEAR and protected all-red phase durations, persisting through the existing signal-rules API with maximum/minimum guards.
+- Add Live Signal Adjustments page with disabled-by-default templates for ambulance-class priority requests/vehicle green extensions, wheelchair-class pedestrian extensions, crowd/vehicle queue thresholds and near-end pedestrian clearance protection. These reuse ranked scenario configuration, model/region-dependent observations and the shared simulation controller; no independent controller created.
+- Extend the existing scenario evaluation metrics with `phase_remaining_seconds` to combine crossing occupancy and an end-of-clearance threshold. Hold and extension actions remain bounded by safety minima, phase caps and cycle cap.
+- Enhance Network crosswalk cards with small vehicle/pedestrian signal heads, source-scoped live simulation state, countdowns, adjustment names, and **advisory-only** notices on directly linked neighbours. Non-observed crosswalks explicitly display unavailable—not copied phases or claimed coordinated holds.
+- **Not implemented:** per-crosswalk signal controllers, verified conflict-movement topology, actual neighbour phase adjustments, real emergency preemption or flashing-green public-road control. Cross-camera class detection to legacy active scenario-zone binding is not guaranteed. No ESP/physical signal commands changed.
+- Candidate `0_5_10`, previous `0_5_9`, accepted baseline `0_5_0`. Focused tests added; full Windows/typecheck/smoke/hardware validation and owner PASS pending.
+
+
 ## 0_5_9 — Global AI Models and multi-camera preview
 
 - Place Traffic above the AI navigation group and remove the Settings page from navigation, preserving the existing runtime-settings API and old saved settings.

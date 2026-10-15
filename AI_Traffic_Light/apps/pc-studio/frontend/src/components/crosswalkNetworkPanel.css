@@ -122,3 +122,35 @@
   stroke-dasharray: 5 3;
   stroke-width: 2.5;
 }
+
+/* Read-only signal lamps accompany crossing cards, not draggable connection points. */
+.crossing-signal-side {
+  position: absolute;
+  top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 5px 7px;
+  min-width: 27px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 9px;
+  background: #1b2228;
+  pointer-events: none;
+}
+.crossing-signal-vehicle { right: calc(100% + 4px); }
+.crossing-signal-pedestrian { left: calc(100% + 4px); }
+.crossing-signal-side strong { color: #e5e7eb; font-size: 10px; line-height: 1; }
+.crossing-signal-lamp {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #46505b; opacity: 0.65;
+}
+.crossing-signal-lamp-red.is-lit { background: #f05252; opacity: 1; box-shadow: 0 0 5px #f05252; }
+.crossing-signal-lamp-amber.is-lit { background: #f0bf53; opacity: 1; box-shadow: 0 0 5px #f0bf53; }
+.crossing-signal-lamp-green.is-lit { background: #42cd83; opacity: 1; box-shadow: 0 0 5px #42cd83; }
+.crossing-signal-summary {
+  display: grid; gap: 4px; text-align: center;
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 8px 7px; color: var(--color-text-secondary);
+}
+.crossing-signal-summary small { font-size: 0.68rem; line-height: 1.4; overflow-wrap: anywhere; }

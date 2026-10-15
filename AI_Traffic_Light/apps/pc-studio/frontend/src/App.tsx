@@ -26,6 +26,8 @@ import { LogsPage } from "./pages/LogsPage";
 import { ModelRegistryPage } from "./pages/ModelRegistryPage";
 import { SimulationLabPage } from "./pages/SimulationLabPage";
 import { TrafficAnalyticsPage } from "./pages/TrafficAnalyticsPage";
+import { SignalTimingPage } from "./pages/SignalTimingPage";
+import { LiveSignalAdjustmentsPage } from "./pages/LiveSignalAdjustmentsPage";
 import { TrafficLogicPage } from "./pages/TrafficLogicPage";
 import { TrainExportPage } from "./pages/TrainExportPage";
 import { ZoneEditorPage } from "./pages/ZoneEditorPage";
@@ -246,6 +248,10 @@ export default function App() {
         return <ZoneEditorPage cameraStatus={cameraStatus} />;
       case "traffic_logic":
         return <TrafficLogicPage />;
+      case "signal_timing":
+        return <SignalTimingPage />;
+      case "live_signal_adjustments":
+        return <LiveSignalAdjustmentsPage />;
       case "traffic_analytics":
         return <TrafficAnalyticsPage />;
       case "simulation_lab":

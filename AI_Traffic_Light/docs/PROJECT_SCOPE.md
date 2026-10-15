@@ -57,3 +57,9 @@ Existing cooperation, pedestrian, class, emergency and explainability/evidence f
 ## V059 AI Models and Camera AI Preview
 
 AI Models uploads/activates/deletes local YOLO .pt files, blocks deletion of the running model, and persists global confidence and target inference interval. A single background inference worker samples the freshest frame from each saved streaming ESP or saved simulation camera, with per-camera detection results and no queued backlog. Camera AI Preview lets users switch among registered cameras, displays labeled boxes and side-specific crossing regions, and counts current per-class observations outside the frame. These are **preview-only detections**; not calibrated cross-camera uniqueness, fused occupancy, autonomous network control or reliable on-road signal actuation. The Settings UI is removed without removing the existing backend settings API.
+
+## V0510 bounded signal adjustment prototype
+
+Implemented: editing active-profile default signal durations; disabled-by-default live-adjustment scenario presets; slow clearance near-end metric; read-only current simulator signal/adjustment display on a source-matched Network crosswalk; advisory notification to linked neighbours. Rule execution requires supported current observed detector/zone data and follows the existing safe transition sequence.
+
+Not implemented: independent signal controller per crosswalk, conflict movement definitions and validated adjacent phase arbitration, cross-camera observation fusion into each crossing's controller, hardware emergency priority/identity validation, public-road commands or flashing green. Connected Network edges alone do not authorize signal changes.
