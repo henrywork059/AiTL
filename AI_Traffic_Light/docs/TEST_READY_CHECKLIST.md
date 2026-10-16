@@ -1,3 +1,24 @@
+# V0514 Release Consistency Repair Candidate
+
+```text
+version: 0_5_14
+previous_version: 0_5_13
+passed_baseline: 0_5_0
+status: Unaccepted release-bundle correction candidate
+```
+
+- [ ] Version/structure guard passes and finds current `PATCH_0_5_14.md`, three candidate documents, changelog section and only `0_5_14` in frontend version constant.
+- [ ] `CameraDetectionView` TypeScript typecheck passes with missing `cameraStatus`; preview correctly falls back to frame or 1280×720 dimensions.
+- [ ] Vite build, backend `/health` and startup/smoke pass on Windows.
+- [ ] Existing camera AI preview, crosswalk independent simulation signals and Network virtual-only emergency priority do not regress.
+- [ ] Owner confirms PASS; accepted baseline remains `0_5_0` until then.
+
+## Previous 0_5_13
+
+Two null-safe preview resolution reads were patched, but the candidate's incomplete release files prevented running the normal startup validation.
+
+---
+
 # V0512 Camera-to-Crosswalk Observation Candidate
 
 ```text
