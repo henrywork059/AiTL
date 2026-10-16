@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_5_14 — Repair incomplete 0_5_13 release bundle
+
+- Complete the release metadata required by the project structure gate after the previous patch's TypeScript null-safety fix: add `docs/PATCH_0_5_14.md`, synchronize Start Here, Local Testing, Test Ready Checklist and the frontend shared version constant.
+- Keep the `CameraDetectionView` optional-resolution fix from `0_5_13`; no further runtime code, camera inference, controller safety, APIs, or hardware changes.
+- Previous candidate `0_5_13`; accepted baseline `0_5_0`. Full Windows structure/typecheck/build/startup and owner PASS pending.
+
 ## 0_5_13 — Camera AI Preview nullable status fix
 
 - Fix the frontend TypeScript nullability error in CameraDetectionView by reading optional resolution dimensions through `cameraStatus?.resolution` when the selected camera has no status yet.
