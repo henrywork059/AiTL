@@ -1,5 +1,5 @@
-version: 0_5_13
-status: AI preview null-status typecheck fix candidate
-previous_version: 0_5_12
+version: 0_5_14
+status: Release consistency repair candidate
+previous_version: 0_5_13
 passed_baseline: 0_5_0
-notes: Fixes Camera AI Preview dimension fallback when camera status is unavailable without changing inference, crosswalk controller, or virtual signal logic. Existing 0_5_12 capabilities retained. Focused nullable TypeScript check passed; full Windows frontend typecheck, startup and owner PASS pending.
+notes: Synchronizes current patch document, candidate guides, changelog and frontend shared version after 0_5_13 structure validation failed. Retains the Camera AI Preview null-safe resolution fix. No further runtime changes. Full Windows structure/typecheck/build/startup and owner PASS pending.
