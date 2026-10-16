@@ -1,3 +1,23 @@
+# V0514 Release Consistency Repair Candidate
+
+```text
+version: 0_5_14
+previous_version: 0_5_13
+passed_baseline: 0_5_0
+status: Release-metadata repair candidate; owner PASS pending
+```
+
+- The `0_5_13` preview null-safety code fix remains in place; `0_5_14` fixes the missing patch document and stale current-version documents/constant. No new backend, camera, AI, or signal runtime behavior.
+- At PowerShell `D:\AiTL`, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests`.
+- Check the project structure/version gate first, then frontend TypeScript typecheck and Vite build; confirm /health, smoke and normal app startup, Camera AI Preview with missing and available camera status.
+- Real ESP tests, full suite where appropriate, and owner acceptance are still required. Accepted baseline stays `0_5_0`.
+
+## Previous candidate 0_5_13
+
+The preceding candidate corrected two nullable camera resolution lookups in `CameraDetectionView`, but omitted the required release bundle, causing the startup structure gate to fail.
+
+---
+
 # V0512 Camera-to-Crosswalk AI Observations Candidate
 
 ```text
