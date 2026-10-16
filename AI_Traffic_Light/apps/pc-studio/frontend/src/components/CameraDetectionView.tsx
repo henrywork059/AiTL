@@ -46,8 +46,8 @@ export function CameraDetectionView({
     );
   }
 
-  const width = frame?.image_width ?? cameraStatus.resolution?.width ?? 1280;
-  const height = frame?.image_height ?? cameraStatus.resolution?.height ?? 720;
+  const width = frame?.image_width ?? cameraStatus?.resolution?.width ?? 1280;
+  const height = frame?.image_height ?? cameraStatus?.resolution?.height ?? 720;
   const imageUrl = imageUrlOverride ?? (frame?.source_frame_number
     ? inferredFrameUrl(frame.source_id, frame.source_frame_number, frame.timestamp_ms)
     : `${API_BASE}/api/camera/frame?t=${cameraStatus?.frame_number ?? 0}`);
