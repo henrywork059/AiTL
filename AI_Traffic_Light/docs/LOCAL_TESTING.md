@@ -1,3 +1,24 @@
+# V0512 Camera-to-Crosswalk AI Observations Candidate
+
+```text
+version: 0_5_12
+previous_version: 0_5_11
+passed_baseline: 0_5_0
+status: Automatic source-to-independent-crosswalk observation bridge candidate
+```
+
+## Focused and full validation
+
+- Run full `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"`, plus `scripts/test_v0512_camera_crosswalk.py` and `scripts/test_v0512_crosswalk_wiring.py`; check TypeScript build, `/health`, smoke and regression suite.
+- Create 2 crosswalks, assign distinct saved simulation/ESP cameras and physical polygon regions on Side A/B, load valid model, enable simulation. Check Network's per-crosswalk `region_class_counts` and `observation_provenance`; switching preview camera must not alter which controllers receive inference.
+- Put cars in only Crosswalk A's region; confirm Crosswalk B does not inherit counts. With two views observe average count per class; with only Side A valid observe Side A count with partial status. Valid zero detections must produce zero, not unavailable. Disconnect or stop streaming to confirm stale observations withdrawn.
+- On Live Signal Adjustments select `Crosswalk / Region` for a model-supported class, enable and save a class-based scenario, then confirm only that crosswalk can trigger it. Default and previously configured adaptive timing, signals and legacy pipeline must remain functional.
+- With camera simulation OFF and live ESP streaming, confirm Network reports a virtual (not physical) signal, the AI region classes update the assigned controller, and stopping the stream marks the virtual controller unavailable.
+- Explicitly verify that untyped region data does not claim pedestrians waiting/crossing or vehicle queues and that no physical or adjacent-crosswalk signal commands are issued.
+- Backend/frontend test evidence is pending execution on Windows; owner PASS is required.
+
+## Previous V0511 Independent Crosswalk Controllers
+
 # V0511 Independent Crosswalk Simulation Controllers
 
 version: 0_5_11; previous_version: 0_5_10; passed_baseline: 0_5_0.

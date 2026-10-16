@@ -52,7 +52,7 @@ function nextLinkId(ids: string[]): string {
   return "crosslink_" + number;
 }
 
-export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, simulationEnabled }: Props) {
+export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: Props) {
   const [draft, setDraft] = useState<CrosswalkNetwork>(() => cloneNetwork(config.network));
   const incomingKey = JSON.stringify(config.network ?? EMPTY_NETWORK);
   const [savedKey, setSavedKey] = useState(incomingKey);
@@ -342,7 +342,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
           <span><strong>{crosswalks.filter((item) => item.camera_side_a_id || item.camera_side_b_id).length}</strong> with assigned cameras</span>
           <span><strong>{countsByCrosswalk.size}</strong> currently observed</span>
         </div>
-        <p className="small-note">Each saved crosswalk has its own simulated signal controller. Network links do not yet define conflicting movements or command adjacent controllers; real signal states remain unavailable.</p>
+        <p className="small-note">Each saved crosswalk has its own software-only controller. Real ESP cameras can drive a clearly labeled virtual signal preview, not a physical traffic light. Network links do not yet define conflicting movements or coordinate adjacent controllers.</p>
         {dirty && <p className="small-note" role="status">Unsaved Network changes</p>}
         {notice && <p className="success-message" role="status">{notice}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
@@ -373,7 +373,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
                 const liveHere = Boolean(overview && overview.observation_provenance !== "unavailable" && active
                   && (active === crosswalk.camera_side_a_id || active === crosswalk.camera_side_b_id));
                 const crosswalkSignal = signalNetwork?.crosswalks[crosswalk.id];
-                const available = Boolean(simulationEnabled && crosswalkSignal?.signal);
+                const available = Boolean(crosswalkSignal?.signal);
                 const adjacentNotice = crosswalkSignal?.neighbors.length
                   ? "Linked to " + crosswalkSignal.neighbors.length + " crossing(s) · coordination not configured"
                   : null;
@@ -415,7 +415,12 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
                         {liveHere && observed.length === 0 && <small>No current region counts</small>}
                       </div>
                     </div>
-                    <CrosswalkSignalIndicators signal={(crosswalkSignal?.signal ?? null) as ScenarioSignalStatus | null} available={available} adjacentNotice={adjacentNotice} />
+                    <CrosswalkSignalIndicators signal={(crosswalkSignal?.signal ?? null) as ScenarioSignalStatus | null} available={available} adjacentNotice={adjacentNotice} virtualPreview={crosswalkSignal?.status === "virtual"} />
+                    {crosswalkSignal?.observation_provenance === "camera_ai" && <div className="crossing-signal-summary">
+                      <small>AI region counts ({crosswalkSignal.camera_coverage ?? "partial"}): {Object.entries(crosswalkSignal.region_class_counts ?? {}).map(([regionId, classes]) =>
+                        regionId + ": " + (Object.entries(classes).map(([name, count]) => name + " " + count).join(", ") || "0")
+                      ).join(" · ") || "No configured regions"}</small>
+                    </div>}
                   </article>
                 );
               })}

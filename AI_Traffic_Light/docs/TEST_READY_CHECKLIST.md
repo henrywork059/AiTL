@@ -1,3 +1,22 @@
+# V0512 Camera-to-Crosswalk Observation Candidate
+
+```text
+version: 0_5_12
+previous_version: 0_5_11
+passed_baseline: 0_5_0
+status: Unaccepted candidate — full Windows and hardware tests pending
+```
+
+- [ ] Background inference routes assigned Side A/B frames into the matching independent controller without opening Network.
+- [ ] Multi-camera region average, single-view, zero-objects and missing/stale/model-switched cases.
+- [ ] Class-specific conditions use physical Crosswalk regions; untyped regions do not claim waiting/crossing/queue metrics.
+- [ ] AI source/coverage and per-class counts visible in Network, selectable physical Crosswalk regions in Live Signal Adjustments.
+- [ ] Real ESP camera AI drives only virtual, clearly labeled software signals; missing/stale streams stop the virtual preview.
+- [ ] Existing signal transition limits, API envelopes, legacy traffic/AI pipeline, Network drag/persistence, camera switching and non-simulation mode unchanged.
+- [ ] Focused Python tests, full Windows runner, TypeScript/Vite, backend startup/smoke and owner PASS.
+
+## Previous V0511 Independent Controllers
+
 # V0511 Independent Controllers Candidate
 
 version: 0_5_11; previous_version: 0_5_10; passed_baseline: 0_5_0.

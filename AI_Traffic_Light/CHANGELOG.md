@@ -1,5 +1,14 @@
 # Changelog
 
+## 0_5_12 — Automatic camera detections for independent crosswalk controllers
+
+- Connect the existing background per-camera AI inference worker to saved Crosswalk Side A/B camera assignments; continuously route fresh detections into the correct independent simulated signal controller even when Network is closed.
+- Count object classes inside camera-specific polygons using the detection's bottom-center point, assigning each detection to at most one region per camera. Combine Side A/B region counts by per-class average when both cameras are recent and synchronized; otherwise use a single available view and mark partial coverage. Defined-only-on-one-side regions remain one-sided.
+- Route each crosswalk's class counts into both physical region ID and crosswalk-qualified scenario keys, making its existing ranked class-based adjustment rules observable without mutating other controllers. Show camera coverage and region class counts on Network and make saved Crosswalk regions selectable in Live Signal Adjustments.
+- Immediately withdraw observations when the camera/model becomes unavailable or stale. Valid empty frames remain valid zero-object counts. Prevent untyped region occupancy from being falsely interpreted as waiting pedestrians, crossing pedestrians, or vehicle queues. Preserve decimal averages in scenario class threshold checks.
+- Runs software-only simulated controllers from simulated cameras and virtual preview controllers from fresh real ESP camera AI. No new real signal actuation, no crosswalk conflict-coordination, and no fabricated wheelchair/ambulance classification. Candidate `0_5_12`, previous `0_5_11`, accepted baseline `0_5_0`. Python/Windows runtime validation and owner PASS pending.
+
+
 ## 0_5_11 — Separate crosswalk signal controllers
 
 - Add one independent simulation-only SignalRulesService runtime per saved crosswalk, using existing central timing/rule configuration but isolated controller state and separate history paths.

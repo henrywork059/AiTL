@@ -401,6 +401,11 @@ class CameraFrameService:
         with self._lock:
             return self._simulation_enabled
 
+    @property
+    def simulation_paused(self) -> bool:
+        with self._lock:
+            return self._simulation_paused
+
     def _simulation_signal_state_locked(self) -> dict:
         return signal_rules_service.signal_state(self._simulation_clock_s)
 

@@ -7,6 +7,8 @@ from typing import Any
 
 from app.core.logging_config import get_logger
 from app.services.inference import inference_service
+from app.services.camera_frames import camera_frame_service
+from app.services.crosswalk_signals import crosswalk_signal_service
 from app.services.remote_camera_manager import remote_camera_manager
 from app.services.runtime_settings import runtime_settings_service
 
@@ -86,6 +88,27 @@ class MultiCameraInferenceService:
                         with self._lock:
                             self._results[frame.source_id] = item
                             self._keys[frame.source_id] = key
+                # Publish per-camera detections to the correct simulated crossing
+                # irrespective of whether the Network page is currently open.
+                with self._lock:
+                    snapshot = dict(self._results)
+                active_model_id = inference_service.status()["active_model_id"]
+                simulation_enabled = camera_frame_service.simulation_enabled
+                now_ms = int(time.time() * 1000)
+                virtual_preview = not simulation_enabled and bool(active_model_id) and any(
+                    item.get("error") is None and item.get("model_id") == active_model_id
+                    and isinstance(item.get("frame"), dict)
+                    and isinstance(item["frame"].get("timestamp_ms"), (int, float))
+                    and 0 <= now_ms - item["frame"]["timestamp_ms"] <= STALE_RESULT_MS
+                    for item in snapshot.values()
+                )
+                crosswalk_signal_service.ingest_camera_results(
+                    snapshot,
+                    simulation_enabled=simulation_enabled,
+                    simulation_paused=camera_frame_service.simulation_paused,
+                    virtual_preview=virtual_preview,
+                    model_id=active_model_id,
+                )
             except Exception:
                 logger.exception("Global multi-camera inference iteration failed")
             try:

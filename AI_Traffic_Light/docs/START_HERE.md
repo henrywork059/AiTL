@@ -1,3 +1,25 @@
+# Start Here — V0512
+
+**Current candidate:** `0_5_12` | **Previous candidate:** `0_5_11` | **Accepted baseline:** `0_5_0`.
+
+**What changed:** The shared AI inference worker automatically forwards each saved camera's latest detections into its assigned Crosswalk's **independent simulation** controller. Assign cameras and draw Side A/B regions in Crosswalks. Live Signal Adjustments now lists those physical regions for class-based rules (including ambulance/wheelchair only if your loaded model recognizes them). Network shows per-crosswalk counts, camera coverage and signal adjustments.
+
+**Two views:** If a physical region has polygons for both cameras and both frames are fresh and synchronized within 2 seconds, counts are averaged per class. A valid single view uses its count; disconnected/stale frames are unavailable, never interpreted as zero. Region data is snapshot occupancy, not throughput or identity matching.
+
+**Real ESP cameras:** When camera simulation is off, fresh ESP camera AI can update a software-only virtual signal controller. Network labels it virtual (not a physical traffic light). The virtual controller becomes unavailable when detections stop.
+
+**Safety:** Crosswalk regions are not yet typed as waiting/crossing/vehicle queue, so only class-region occupancy triggers can be accurately derived. Slow-walking, waiting and vehicle-queue metrics require explicit region roles/tracking before automatic live activation. Independent controllers remain simulation-only; Network adjacency does not authorize coordinated signals or real hardware actuation.
+
+**Test:** From repository root run:
+
+```powershell
+& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"
+```
+
+Run full regression, TypeScript/Vite, backend health, simulation, two-camera AI preview and signal tests; owner PASS pending. Existing legacy traffic and global signal APIs unchanged.
+
+---
+
 # Start Here — V0511
 
 Current candidate `0_5_11`; previous `0_5_10`; owner-accepted baseline `0_5_0`.

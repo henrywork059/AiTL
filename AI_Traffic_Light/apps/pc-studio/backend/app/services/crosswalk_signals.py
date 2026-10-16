@@ -13,6 +13,7 @@ from typing import Any, Callable
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.crosswalks import CrosswalkService, crosswalk_service
+from app.services.crosswalk_observations import crosswalk_observation
 from app.services.signal_rules import (
     PROJECT_ROOT, SignalRulesService, signal_rules_service,
 )
@@ -37,6 +38,11 @@ class CrosswalkSignalService:
         self._last_tick: float | None = None
         self._elapsed_seconds = 0.0
         self._running = False
+        self._controller_mode: str | None = None
+        self._virtual_preview_enabled = False
+        self._last_virtual_update = 0.0
+        self._frame_signatures: dict[str, tuple[tuple[Any, ...], ...]] = {}
+        self._observation_meta: dict[str, dict[str, Any]] = {}
 
     def _stop_locked(self) -> None:
         self._controllers.clear()
@@ -44,8 +50,12 @@ class CrosswalkSignalService:
         self._last_tick = None
         self._elapsed_seconds = 0.0
         self._running = False
+        self._controller_mode = None
+        self._frame_signatures.clear()
+        self._observation_meta.clear()
 
-    def status(self, *, simulation_enabled: bool, simulation_paused: bool = False) -> dict[str, Any]:
+    def status(self, *, simulation_enabled: bool, simulation_paused: bool = False,
+               virtual_preview: bool | None = None) -> dict[str, Any]:
         """Advance each controller on one simulation clock; never copy another crosswalk's phase."""
         config = self._crosswalks.get()
         crosswalks = config["crosswalks"]
@@ -58,16 +68,25 @@ class CrosswalkSignalService:
                 neighbors[destination].add(source)
 
         with self._lock:
-            if not simulation_enabled:
+            if virtual_preview is not None:
+                self._virtual_preview_enabled = virtual_preview
+                self._last_virtual_update = time.monotonic()
+            if not simulation_enabled and (
+                not self._virtual_preview_enabled
+                or time.monotonic() - self._last_virtual_update > 6.0
+            ):
+                self._virtual_preview_enabled = False
                 self._stop_locked()
-                return self._response(crosswalks, neighbors, False, False, {})
+                return self._response(crosswalks, neighbors, False, False, {}, False)
 
             now = self._clock()
             settings_key = json.dumps(self._rules.get_config(), sort_keys=True)
-            if not self._running or settings_key != self._rules_key:
+            mode = "simulation" if simulation_enabled else "virtual"
+            if not self._running or settings_key != self._rules_key or mode != self._controller_mode:
                 self._stop_locked()
                 self._running = True
                 self._rules_key = settings_key
+                self._controller_mode = mode
             if self._last_tick is not None and not simulation_paused:
                 self._elapsed_seconds += max(0.0, now - self._last_tick)
             self._last_tick = now
@@ -75,6 +94,8 @@ class CrosswalkSignalService:
             valid_ids = {item["id"] for item in crosswalks}
             for stale_id in set(self._controllers) - valid_ids:
                 del self._controllers[stale_id]
+                self._frame_signatures.pop(stale_id, None)
+                self._observation_meta.pop(stale_id, None)
             states: dict[str, dict[str, Any]] = {}
             for item in crosswalks:
                 crosswalk_id = item["id"]
@@ -86,19 +107,21 @@ class CrosswalkSignalService:
                     )
                 state = self._controllers[crosswalk_id].signal_state(self._elapsed_seconds)
                 states[crosswalk_id] = state
-            return self._response(crosswalks, neighbors, True, simulation_paused, states)
+            return self._response(crosswalks, neighbors, True, simulation_paused, states, simulation_enabled)
 
-    @staticmethod
     def _response(
+        self,
         crosswalks: list[dict[str, Any]],
         neighbors: dict[str, set[str]],
         running: bool,
         paused: bool,
         states: dict[str, dict[str, Any]],
+        camera_simulation_enabled: bool,
     ) -> dict[str, Any]:
         return {
             "simulation_only": True,
-            "simulation_enabled": running,
+            "simulation_enabled": camera_simulation_enabled,
+            "virtual_preview_enabled": running and not camera_simulation_enabled,
             "simulation_paused": paused if running else False,
             "coordination_enabled": False,
             "movement_conflicts_configured": False,
@@ -108,14 +131,53 @@ class CrosswalkSignalService:
                     "crosswalk_id": item["id"],
                     "controller_id": item["id"],
                     "signal": states.get(item["id"]),
-                    "status": "paused" if running and paused else "simulated" if running else "unavailable",
+                    "status": "paused" if running and paused else "simulated" if running and camera_simulation_enabled else "virtual" if running else "unavailable",
                     "neighbors": sorted(neighbors[item["id"]]),
-                    "observation_provenance": "unavailable",
+                    **(self._observation_meta.get(item["id"], {
+                        "observation_provenance": "unavailable", "camera_sources": [],
+                        "camera_coverage": "unavailable", "region_class_counts": {},
+                    }) if running else {
+                        "observation_provenance": "unavailable", "camera_sources": [],
+                        "camera_coverage": "unavailable", "region_class_counts": {},
+                    }),
                     "coordination_reason": "Network edges do not specify conflicting movements.",
                 }
                 for item in crosswalks
             },
         }
+
+    def ingest_camera_results(
+        self, results: dict[str, dict[str, Any]], *, simulation_enabled: bool,
+        simulation_paused: bool = False, model_id: str | None = None,
+        virtual_preview: bool = False,
+    ) -> None:
+        """Automatically route fresh camera detections to only their assigned crossing.
+
+        Runs from the inference worker, independent of whether Network is open.
+        No real-world signal output and no crosswalk-to-crosswalk commands.
+        """
+        self.status(simulation_enabled=simulation_enabled, simulation_paused=simulation_paused,
+                    virtual_preview=virtual_preview)
+        if not simulation_enabled and not virtual_preview:
+            return
+        crosswalks = self._crosswalks.get()["crosswalks"]
+        with self._lock:
+            for crosswalk in crosswalks:
+                crosswalk_id = crosswalk["id"]
+                controller = self._controllers.get(crosswalk_id)
+                if controller is None:
+                    continue
+                observation, signature, meta = crosswalk_observation(
+                    crosswalk, results, model_id=model_id,
+                )
+                self._observation_meta[crosswalk_id] = meta
+                if observation is None:
+                    if crosswalk_id in self._frame_signatures:
+                        controller.clear_observation()
+                        self._frame_signatures.pop(crosswalk_id, None)
+                elif self._frame_signatures.get(crosswalk_id) != signature:
+                    controller.observe(observation)
+                    self._frame_signatures[crosswalk_id] = signature
 
     def observe(self, crosswalk_id: str, observation: dict[str, Any]) -> None:
         """Future camera/region adapter: update only one existing simulation controller."""

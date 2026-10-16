@@ -101,3 +101,9 @@ Network's `CrosswalkSignalIndicators` uses only the shared simulation signal sta
 ## V0511 independent crosswalk controller registry
 
 `CrosswalkSignalService` indexes independent `SignalRulesService` runtime instances by stable saved crosswalk ID. The controller instances share the existing persisted rule configuration and protected phase sequence but not phase clocks, decisions, incidents or observation buffers. The read-only API and Network signal indicators consume keyed state. The existing global signal runtime continues to serve legacy camera simulation and traffic endpoints. Future crosswalk-local observation/coordination interfaces must add camera source ownership and verified movement conflicts before active neighbor signal changes. No physical actuation.
+
+## V0512 automatic Crosswalk AI inference bridge
+
+The existing background `MultiCameraInferenceService` feeds its latest per-camera inference snapshot to `CrosswalkSignalService.ingest_camera_results`, independent of active UI page. `crosswalk_observations.py` maps saved Crosswalk camera source IDs to geometry by side, counts each class with the bottom-center object point, combines physical region counts from synchronized cameras by average, and produces crosswalk-qualified region count keys. A per-crosswalk frame signature prevents repeatedly refreshing a frozen frame; missing/stale sources immediately invalidate observations. This feeds class-based scenarios to the isolated **simulation** controllers. No movement-role semantic inference, physical control, or adjacent controller arbitration is introduced.
+
+A virtual-preview mode also accepts real ESP camera AI when global camera simulation is off; it runs only software signal models, resets when switching from simulation, expires when fresh detections stop and labels the resulting signal `virtual` rather than physical. No ESP signal controller command is generated.

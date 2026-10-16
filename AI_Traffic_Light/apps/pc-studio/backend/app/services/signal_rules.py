@@ -430,6 +430,8 @@ class SignalRulesService:
                 "pedestrians_crossing": max(0, int(observation.get("pedestrians_crossing", 0) or 0)),
                 "vehicles_waiting": max(0, int(observation.get("vehicles_waiting", 0) or 0)),
                 "zone_class_counts": deepcopy(zone_class_counts),
+                **({"available_metrics": list(observation["available_metrics"])}
+                   if isinstance(observation.get("available_metrics"), list) else {}),
                 "source_frame_number": observation.get("source_frame_number"),
                 "source_timestamp_ms": observation.get("source_timestamp_ms"),
                 "data_source": observation.get("data_source"),
@@ -438,6 +440,16 @@ class SignalRulesService:
             self._update_memory_locked(self._pedestrian_wait, self._last_observation["pedestrians_waiting"], now)
             self._update_memory_locked(self._vehicle_wait, self._last_observation["vehicles_waiting"], now)
             self._update_memory_locked(self._crossing, self._last_observation["pedestrians_crossing"], now)
+
+    def clear_observation(self) -> None:
+        """Immediately withdraw camera observations after a stream/model becomes invalid."""
+        with self._lock:
+            self._last_observation = {}
+            self._last_observation_monotonic = None
+            self._pedestrian_wait = _DemandMemory()
+            self._vehicle_wait = _DemandMemory()
+            self._crossing = _DemandMemory()
+            self._rule_condition_since.clear()
 
     @staticmethod
     def _update_memory_locked(memory: _DemandMemory, count: int, now: float) -> None:
@@ -722,7 +734,7 @@ class SignalRulesService:
             return {"source": source, "metric": metric, "operator": operator, "threshold": round(threshold, 2)}
         zone_id = str(raw.get("zone_id", "")).strip()
         class_name = str(raw.get("class_name", "")).strip()
-        if not 1 <= len(zone_id) <= 64 or not 1 <= len(class_name) <= 64:
+        if not 1 <= len(zone_id) <= 129 or not 1 <= len(class_name) <= 64:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, f"Scenario {scenario_id} zone/class condition requires zone_id and class_name.", status_code=422)
         return {
             "source": source,
@@ -852,6 +864,10 @@ class SignalRulesService:
     def _condition_value_locked(self, config: dict[str, Any], condition: dict[str, Any], values: dict[str, Any]) -> tuple[bool, float, str]:
         if condition["source"] == "metric":
             metric = condition["metric"]
+            available_metrics = values.get("available_metrics")
+            if (config["mode"] != "test" and isinstance(available_metrics, list)
+                    and metric not in available_metrics and metric != "phase_remaining_seconds"):
+                return False, 0.0, f"{metric} has no calibrated region role"
             if metric in TEST_ONLY_METRICS and config["mode"] != "test":
                 return False, 0.0, "manual/simulation Test-mode source only"
             raw = values.get(metric, 0)
@@ -865,10 +881,10 @@ class SignalRulesService:
             class_counts = {}
         class_name = condition["class_name"]
         if class_name == "*":
-            value = float(sum(max(0, int(item or 0)) for item in class_counts.values()))
+            value = float(sum(max(0.0, float(item or 0)) for item in class_counts.values()))
             label = f"all classes in {condition['zone_id']}"
         else:
-            value = float(max(0, int(class_counts.get(class_name, 0) or 0)))
+            value = float(max(0.0, float(class_counts.get(class_name, 0) or 0)))
             label = f"{class_name} in {condition['zone_id']}"
         return True, value, label
 

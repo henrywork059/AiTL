@@ -1,5 +1,5 @@
-version: 0_5_11
-status: Independent crosswalk simulation controller candidate
-previous_version: 0_5_10
+version: 0_5_12
+status: Automatic crosswalk camera observation integration candidate
+previous_version: 0_5_11
 passed_baseline: 0_5_0
-notes: Independent simulation controllers per saved crosswalk, with separate phase, observation and rule state and read-only per-crosswalk Network status. Existing global simulation/traffic controller retained for compatibility; adjacent phase coordination remains disabled until movement conflicts are defined. Full Windows testing and owner PASS pending.
+notes: Routes fresh multi-camera AI detections through saved Crosswalk region geometry into independent simulated controllers, with single/two-view class counts and stale suppression. Supports a virtual signal preview from real ESP camera AI, without physical actuation or crosswalk coordination. Windows tests and owner PASS pending.

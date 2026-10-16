@@ -63,3 +63,9 @@ AI Models uploads/activates/deletes local YOLO .pt files, blocks deletion of the
 Implemented: editing active-profile default signal durations; disabled-by-default live-adjustment scenario presets; slow clearance near-end metric; read-only current simulator signal/adjustment display on a source-matched Network crosswalk; advisory notification to linked neighbours. Rule execution requires supported current observed detector/zone data and follows the existing safe transition sequence.
 
 Not implemented: independent signal controller per crosswalk, conflict movement definitions and validated adjacent phase arbitration, cross-camera observation fusion into each crossing's controller, hardware emergency priority/identity validation, public-road commands or flashing green. Connected Network edges alone do not authorize signal changes.
+
+## V0512 source-to-crosswalk observation routing
+
+Implemented foundation: automatic fresh per-camera AI inference mapping into saved physical Crosswalk regions and their independent simulated signal-controller class condition observations, including Side A/B per-class average where synchronized and explicit partial/unavailable status. Region classes must be supported by the active model. A generic polygon does not establish pedestrians waiting, slow-moving, or vehicle queue semantics; those signals remain unavailable to crosswalk controllers until roles/tracking are configured. Signal output remains simulation only, and connected Network links do not coordinate phases or actuate physical lights.
+
+Real ESP camera detections can now feed the same independent controllers as explicitly labeled **virtual software previews** without switching on camera simulation. This is not an observed/actuated physical traffic light; virtual previews expire if source frames become invalid.

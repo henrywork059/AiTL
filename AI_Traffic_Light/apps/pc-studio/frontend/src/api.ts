@@ -247,15 +247,20 @@ export type CrosswalkSignalSummary = {
   crosswalk_id: string;
   controller_id: string;
   signal: SignalStatus | null;
-  status: "simulated" | "paused" | "unavailable";
+  status: "simulated" | "virtual" | "paused" | "unavailable";
   neighbors: string[];
   observation_provenance: string;
+  camera_sources?: string[];
+  camera_coverage?: "complete" | "partial" | "unavailable";
+  region_class_counts?: Record<string, Record<string, number>>;
+  source_timestamp_ms?: number;
   coordination_reason: string;
 };
 export type CrosswalkSignalNetwork = {
   simulation_only: boolean;
   simulation_enabled: boolean;
   simulation_paused: boolean;
+  virtual_preview_enabled: boolean;
   coordination_enabled: boolean;
   movement_conflicts_configured: boolean;
   hardware_actuation_enabled: boolean;

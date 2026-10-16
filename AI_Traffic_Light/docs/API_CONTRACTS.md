@@ -1,5 +1,14 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0512 Automatic per-crosswalk camera observation bridge
+
+No new endpoint. `GET /api/traffic/crosswalk-signals` retains the existing envelope and adds/updates each crosswalk's `observation_provenance: camera_ai|unavailable`, `camera_sources`, `camera_coverage: complete|partial|unavailable`, `region_class_counts`, and `source_timestamp_ms` when available. The response also includes `virtual_preview_enabled`; each source status may be `virtual` when real ESP camera AI drives software-only preview signals. No real hardware output occurs.
+
+The running inference service maps each valid camera detection frame to saved Side A/B polygons and the corresponding independent **simulation** controller. It publishes per-class physical-region counts under both `region_id` and qualified `crosswalk_id:region_id` keys for existing scenario zone-class conditions. Counts for two recent synchronized views are averaged. Frames older than 5 seconds, models replaced/unloaded, unregistered/missing sources, and detection errors do not refresh observations. Valid frames with no objects produce zero counts.
+
+`available_metrics` in controller observations explicitly declares calibrated metrics. Camera region-only observations set it empty, so pedestrian waiting, crossing and vehicle queue metrics cannot be inferred from generic polygons. Existing global traffic observation callers without this field retain previous behavior. No change to real traffic actuation or Network conflict coordination.
+
+
 ## V0511 Crosswalk signal controllers
 
 `GET /api/traffic/crosswalk-signals` returns the standard request-ID envelope with `simulation_only`, `simulation_enabled`, `simulation_paused`, `coordination_enabled:false`, `movement_conflicts_configured:false`, `hardware_actuation_enabled:false`, and `crosswalks` keyed by existing saved Crosswalk ID. Each entry includes isolated `signal` (or null when simulation off), `controller_id`, `status`, `neighbors`, `observation_provenance` and `coordination_reason`. Each runtime uses the existing signal phase machinery. Legacy `/api/traffic/signal-status` is unaffected. Separate observation and test-input internal hooks are reserved for later camera mapping and coordination; not exposed as physical controls.

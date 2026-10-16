@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { fetchActiveZones, fetchSignalRules, fetchSignalStatus, saveSignalRules } from "../api";
+import {
+  fetchActiveZones, fetchCrosswalkSignalNetwork, fetchSignalRules, fetchSignalStatus, saveSignalRules,
+} from "../api";
+import type { CrosswalkSignalNetwork } from "../api";
+import { fetchCrosswalks } from "../lib/crosswalksApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import type { Zone } from "../types";
+type RegionChoice = { id: string; label: string };
 import type { ScenarioCondition, ScenarioSignalRulesConfig, SignalScenario, ScenarioSignalStatus } from "../types/signalScenarios";
 import "./signalRules.css";
 
@@ -34,33 +38,53 @@ function newScenario(preset: Preset, zoneId: string): SignalScenario {
       target_phases: preset.phases, request_service: preset.service },
   };
 }
-function withPresets(config: ScenarioSignalRulesConfig, zones: Zone[]): ScenarioSignalRulesConfig {
+function withPresets(config: ScenarioSignalRulesConfig, zones: RegionChoice[]): ScenarioSignalRulesConfig {
   const next = structuredClone(config);
   const profile = next.profiles[next.active_profile];
   const existing = new Set(profile.scenarios.map((scenario) => scenario.id));
-  for (const preset of PRESETS) if (!existing.has(preset.id)) profile.scenarios.push(newScenario(preset, zones[0]?.id ?? "unassigned"));
+  const ranks = new Set(profile.scenarios.map((scenario) => scenario.rank));
+  for (const preset of PRESETS) {
+    if (existing.has(preset.id)) continue;
+    const scenario = newScenario(preset, zones[0]?.id ?? "unassigned");
+    while (ranks.has(scenario.rank)) scenario.rank += 1;
+    ranks.add(scenario.rank);
+    profile.scenarios.push(scenario);
+  }
   return next;
 }
 
 export function LiveSignalAdjustmentsPage() {
   const [saved, setSaved] = useState<ScenarioSignalRulesConfig | null>(null);
   const [draft, setDraft] = useState<ScenarioSignalRulesConfig | null>(null);
-  const [zones, setZones] = useState<Zone[]>([]);
+  const [zones, setZones] = useState<RegionChoice[]>([]);
+  const [crosswalkSignals, setCrosswalkSignals] = useState<CrosswalkSignalNetwork | null>(null);
   const [status, setStatus] = useState<ScenarioSignalStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
-    const [raw, active] = await Promise.all([fetchSignalRules(), fetchActiveZones()]);
+    const [raw, active, crosswalks] = await Promise.all([fetchSignalRules(), fetchActiveZones(), fetchCrosswalks()]);
     const config = raw as unknown as ScenarioSignalRulesConfig;
     setSaved(config);
-    setZones(active.zones.filter((item) => item.type !== "ignore" && item.type !== "counting_line"));
-    setDraft(withPresets(config, active.zones.filter((item) => item.type !== "ignore" && item.type !== "counting_line")));
+    const physicalRegions = crosswalks.crosswalks.flatMap((crosswalk) =>
+      crosswalk.regions.map((region) => ({
+        id: crosswalk.id + ":" + region.id,
+        label: crosswalk.label + " / " + region.label,
+      })));
+    const legacyZones = active.zones.filter((item) =>
+      item.type !== "ignore" && item.type !== "counting_line");
+    const choices = [...physicalRegions, ...legacyZones];
+    setZones(choices);
+    setDraft(withPresets(config, choices));
     setError(null);
   }
   useEffect(() => { void load().catch((reason) => setError(String(reason))); }, []);
-  useSerialPolling(async () => { setStatus(await fetchSignalStatus() as ScenarioSignalStatus); }, 1000, {
+  useSerialPolling(async () => {
+    const [global, crossings] = await Promise.all([fetchSignalStatus(), fetchCrosswalkSignalNetwork()]);
+    setStatus(global as ScenarioSignalStatus);
+    setCrosswalkSignals(crossings);
+  }, 1000, {
     onError: (reason) => setError(reason instanceof Error ? reason.message : "Signal status unavailable"),
   });
 
@@ -114,10 +138,24 @@ export function LiveSignalAdjustmentsPage() {
       </div>
       <div className="live-inference-meta">
         <span>Mode: <strong>{status?.mode ?? "Unavailable"}</strong></span>
-        <span>Active adjustment: <strong>{status?.winning_scenario_label ?? "None"}</strong></span>
+        <span>Legacy controller adjustment: <strong>{status?.winning_scenario_label ?? "None"}</strong></span>
         <span>Observed data: <strong>{status?.data_fresh ? "Fresh" : "Stale / unavailable"}</strong></span>
       </div>
-      <p className="small-note">Rules run only when adaptive/test mode has fresh observations and dry-run is disabled. Emergency priority requests safe phase transitions; it does not immediately switch lights or grant real-world emergency access. Slow clearance uses a crossing-occupancy signal, not inferred walking speed. Class-based rules require a model that actually detects the class in an existing active detection region.</p>
+      {crosswalkSignals && <div className="signal-timing-table-wrap">
+        <table className="signal-timing-table">
+          <thead><tr><th>Crosswalk</th><th>Camera observation</th><th>Active simulation adjustment</th></tr></thead>
+          <tbody>{Object.values(crosswalkSignals.crosswalks).map((item) => (
+            <tr key={item.crosswalk_id}>
+              <td>{item.crosswalk_id}</td>
+              <td>{item.observation_provenance === "camera_ai"
+                ? (item.camera_coverage ?? "camera AI") + " · " + (item.camera_sources ?? []).join(", ")
+                : "Not available"}</td>
+              <td>{(item.signal as ScenarioSignalStatus | null)?.winning_scenario_label ?? "None"}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>}
+      <p className="small-note">Rules run only when adaptive/test mode has fresh observations and dry-run is disabled. Emergency priority requests safe phase transitions; it does not immediately switch lights or grant real-world emergency access. Slow clearance uses a crossing-occupancy signal, not inferred walking speed. Class-based rules require a model that detects the class in a saved Crosswalk region. Legacy zones still affect the legacy global controller; Crosswalk regions feed their corresponding independent controllers. Untyped Crosswalk regions do not imply that objects are waiting, queued or currently crossing.</p>
     </section>
     {draft && PRESETS.map((preset) => {
       const rule = scenarios.find((item) => item.id === preset.id);

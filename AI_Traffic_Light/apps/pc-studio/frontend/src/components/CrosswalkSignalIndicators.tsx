@@ -4,9 +4,10 @@ type Props = {
   signal: ScenarioSignalStatus | null;
   available: boolean;
   adjacentNotice: string | null;
+  virtualPreview?: boolean;
 };
 
-export function CrosswalkSignalIndicators({ signal, available, adjacentNotice }: Props) {
+export function CrosswalkSignalIndicators({ signal, available, adjacentNotice, virtualPreview = false }: Props) {
   const state = available && signal ? signal.phase : null;
   const vehicle = state === "vehicle_green" ? "green" : state === "vehicle_yellow" ? "amber"
     : state ? "red" : "unknown";
@@ -30,7 +31,7 @@ export function CrosswalkSignalIndicators({ signal, available, adjacentNotice }:
     </div>
     <div className="crossing-signal-summary">
       <small>{available && signal
-        ? "Simulation signals: vehicle " + vehicle + " / pedestrian " + pedestrian + " · " +
+        ? (virtualPreview ? "Virtual AI signal (not physical): " : "Simulation signals: ") + "vehicle " + vehicle + " / pedestrian " + pedestrian + " · " +
           Math.ceil(signal.seconds_remaining) + "s remaining"
         : "No verified crosswalk signal (not controlled)"}</small>
       {adjustment && <small>Adjustment request: {adjustment}{signal?.dry_run ? " (dry run)" : ""}</small>}
