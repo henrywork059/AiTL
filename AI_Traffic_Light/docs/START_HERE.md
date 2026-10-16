@@ -1,3 +1,19 @@
+# Start Here — V0514
+
+**Current candidate:** `0_5_14` | **Previous candidate:** `0_5_13` | **Accepted baseline:** `0_5_0`.
+
+**Fix:** The prior preview nullability repair is retained: camera resolution lookup now allows missing camera status. Candidate `0_5_13` could not start because its release bundle had stale/missing documentation and the frontend version label. `0_5_14` completes that bundle without additional runtime changes.
+
+**Test (PowerShell at `D:\AiTL`):**
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\AI_Traffic_Light\scripts\update_test_run.ps1" -ChangedTests
+```
+
+Confirm structure/version validation, TypeScript/Vite build, backend /health, launch, and Camera AI Preview (available/unavailable camera). The signal preview remains simulation/virtual only; neither adjacent-crosswalk conflict coordination nor physical traffic-light actuation is enabled. Owner PASS pending.
+
+---
+
 # Start Here — V0512
 
 **Current candidate:** `0_5_12` | **Previous candidate:** `0_5_11` | **Accepted baseline:** `0_5_0`.
