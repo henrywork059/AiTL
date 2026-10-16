@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_5_13 — Camera AI Preview nullable status fix
+
+- Fix the frontend TypeScript nullability error in CameraDetectionView by reading optional resolution dimensions through `cameraStatus?.resolution` when the selected camera has no status yet.
+- Preserve fallback frame dimensions (1280 × 720), preview rendering, inference/API contracts, and signal-control behavior. No backend or firmware changes.
+- Focused strict TypeScript nullable-status validation passed; full Windows frontend typecheck, runtime smoke test, and owner PASS pending. Previous candidate `0_5_12`; accepted baseline `0_5_0`.
+
 ## 0_5_12 — Automatic camera detections for independent crosswalk controllers
 
 ### Same-candidate follow-up: directional emergency route
