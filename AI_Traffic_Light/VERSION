@@ -1,5 +1,5 @@
 version: 0_5_12
-status: Automatic crosswalk camera observation integration candidate
+status: Camera observation and virtual emergency corridor candidate
 previous_version: 0_5_11
 passed_baseline: 0_5_0
-notes: Routes fresh multi-camera AI detections through saved Crosswalk region geometry into independent simulated controllers, with single/two-view class counts and stale suppression. Supports a virtual signal preview from real ESP camera AI, without physical actuation or crosswalk coordination. Windows tests and owner PASS pending.
+notes: Routes fresh multi-camera AI detections through saved Crosswalk region geometry into independent simulated controllers, with single/two-view class counts and stale suppression. Supports a virtual signal preview from real ESP camera AI, with opt-in directional virtual emergency green extension. No physical actuation or verified cross-intersection conflict control. Windows tests and owner PASS pending.

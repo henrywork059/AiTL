@@ -27,6 +27,7 @@ export type CrosswalkNetworkLink = {
   destination_crosswalk_id: string;
   source_edge: CrosswalkNetworkEdge;
   destination_edge: CrosswalkNetworkEdge;
+  emergency_route?: "off" | "source_to_destination" | "destination_to_source";
 };
 
 export type CrosswalkNetwork = {

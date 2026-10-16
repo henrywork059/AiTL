@@ -2,6 +2,13 @@
 
 ## 0_5_12 — Automatic camera detections for independent crosswalk controllers
 
+### Same-candidate follow-up: directional emergency route
+
+- A saved Network link may specify one opt-in source→destination or destination→source emergency vehicle route; links default Off. Ambiguous multiple outgoing or incoming routes are rejected.
+- Two separate fresh inference frames showing an ambulance class over ≥1 s request virtual vehicle priority at the next crossing. Its own controller may extend vehicle green by up to eight seconds within existing bounds, while retaining mandatory pedestrian, amber and all-red phases.
+- Network displays configured direction and active origin/reason. This uses the existing camera-to-crosswalk observation pipeline for simulated or ESP-video virtual preview. No physical actuation or measured traffic-jam reduction is claimed.
+
+
 - Connect the existing background per-camera AI inference worker to saved Crosswalk Side A/B camera assignments; continuously route fresh detections into the correct independent simulated signal controller even when Network is closed.
 - Count object classes inside camera-specific polygons using the detection's bottom-center point, assigning each detection to at most one region per camera. Combine Side A/B region counts by per-class average when both cameras are recent and synchronized; otherwise use a single available view and mark partial coverage. Defined-only-on-one-side regions remain one-sided.
 - Route each crosswalk's class counts into both physical region ID and crosswalk-qualified scenario keys, making its existing ranked class-based adjustment rules observable without mutating other controllers. Show camera coverage and region class counts on Network and make saved Crosswalk regions selectable in Live Signal Adjustments.

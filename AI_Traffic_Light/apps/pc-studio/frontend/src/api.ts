@@ -254,6 +254,7 @@ export type CrosswalkSignalSummary = {
   camera_coverage?: "complete" | "partial" | "unavailable";
   region_class_counts?: Record<string, Record<string, number>>;
   source_timestamp_ms?: number;
+  emergency_priority?: { source_crosswalk_id: string; reason: string; expires_at: number } | null;
   coordination_reason: string;
 };
 export type CrosswalkSignalNetwork = {

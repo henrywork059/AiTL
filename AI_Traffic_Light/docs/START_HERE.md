@@ -2,6 +2,8 @@
 
 **Current candidate:** `0_5_12` | **Previous candidate:** `0_5_11` | **Accepted baseline:** `0_5_0`.
 
+**Emergency routing:** Traffic → Network → select a connection → choose **Emergency vehicle route: A→B or B→A**. The default is Off. Two new ambulance-class detection frames spanning at least one second can ask the next crossing's software-only controller for a bounded vehicle-green extension. Pedestrian clearances are not skipped. No physical traffic-light outputs are commanded.
+
 **What changed:** The shared AI inference worker automatically forwards each saved camera's latest detections into its assigned Crosswalk's **independent simulation** controller. Assign cameras and draw Side A/B regions in Crosswalks. Live Signal Adjustments now lists those physical regions for class-based rules (including ambulance/wheelchair only if your loaded model recognizes them). Network shows per-crosswalk counts, camera coverage and signal adjustments.
 
 **Two views:** If a physical region has polygons for both cameras and both frames are fresh and synchronized within 2 seconds, counts are averaged per class. A valid single view uses its count; disconnected/stale frames are unavailable, never interpreted as zero. Region data is snapshot occupancy, not throughput or identity matching.

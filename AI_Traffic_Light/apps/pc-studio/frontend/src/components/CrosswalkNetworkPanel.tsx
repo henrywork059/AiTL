@@ -374,8 +374,10 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                   && (active === crosswalk.camera_side_a_id || active === crosswalk.camera_side_b_id));
                 const crosswalkSignal = signalNetwork?.crosswalks[crosswalk.id];
                 const available = Boolean(crosswalkSignal?.signal);
-                const adjacentNotice = crosswalkSignal?.neighbors.length
-                  ? "Linked to " + crosswalkSignal.neighbors.length + " crossing(s) · coordination not configured"
+                const adjacentNotice = crosswalkSignal?.emergency_priority
+                  ? "Priority from " + crosswalkSignal.emergency_priority.source_crosswalk_id + ": " + crosswalkSignal.emergency_priority.reason
+                  : crosswalkSignal?.neighbors.length
+                  ? "Linked to " + crosswalkSignal.neighbors.length + " crossing(s) · route off unless explicitly enabled"
                   : null;
                 return (
                   <article key={crosswalk.id} className={"crossing-network-node" + (selected?.id === crosswalk.id ? " is-selected" : "")}
@@ -441,6 +443,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                 to a numbered edge label on another. The line is added when released on the destination.
                 Keyboard: activate the first edge, then the destination edge.
               </p>
+              <p className="small-note">Enable a route only when its direction matches the actual vehicle path. An ambulance class must be confirmed in multiple fresh frames. All crosswalk outputs here are simulation or software-only.</p>
               <div className="crossing-network-link-list">
                 <h4>Connections</h4>
                 {draft.links.map((link) => {
@@ -448,6 +451,20 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                   const to = crosswalks.find((item) => item.id === link.destination_crosswalk_id);
                   return <div className="crossing-network-link-row" key={link.id}>
                     <span>{from?.label ?? "Missing crossing"} [{link.source_edge}] ↔ {to?.label ?? "Missing crossing"} [{link.destination_edge}]</span>
+                    <label className="crossing-emergency-route">Emergency vehicle route
+                      <select aria-label={"Emergency route for " + link.id}
+                        value={link.emergency_route ?? "off"} disabled={saving}
+                        onChange={(event) => changeDraft({
+                          ...draft,
+                          links: draft.links.map((item) => item.id === link.id ? {
+                            ...item, emergency_route: event.target.value as NonNullable<typeof link.emergency_route>,
+                          } : item),
+                        })}>
+                        <option value="off">Off</option>
+                        <option value="source_to_destination">{from?.label ?? "Source"} → {to?.label ?? "Destination"}</option>
+                        <option value="destination_to_source">{to?.label ?? "Destination"} → {from?.label ?? "Source"}</option>
+                      </select>
+                    </label>
                     <button type="button" className="compact" disabled={saving}
                       onClick={() => changeDraft({ ...draft, links: draft.links.filter((item) => item.id !== link.id) })}>Remove</button>
                   </div>;

@@ -43,6 +43,9 @@ class CrosswalkSignalService:
         self._last_virtual_update = 0.0
         self._frame_signatures: dict[str, tuple[tuple[Any, ...], ...]] = {}
         self._observation_meta: dict[str, dict[str, Any]] = {}
+        self._emergency_evidence: dict[str, tuple[float, int]] = {}
+        self._active_routes: set[str] = set()
+        self._priority_requests: dict[str, dict[str, Any]] = {}
 
     def _stop_locked(self) -> None:
         self._controllers.clear()
@@ -53,6 +56,9 @@ class CrosswalkSignalService:
         self._controller_mode = None
         self._frame_signatures.clear()
         self._observation_meta.clear()
+        self._emergency_evidence.clear()
+        self._active_routes.clear()
+        self._priority_requests.clear()
 
     def status(self, *, simulation_enabled: bool, simulation_paused: bool = False,
                virtual_preview: bool | None = None) -> dict[str, Any]:
@@ -96,6 +102,8 @@ class CrosswalkSignalService:
                 del self._controllers[stale_id]
                 self._frame_signatures.pop(stale_id, None)
                 self._observation_meta.pop(stale_id, None)
+                self._emergency_evidence.pop(stale_id, None)
+                self._priority_requests.pop(stale_id, None)
             states: dict[str, dict[str, Any]] = {}
             for item in crosswalks:
                 crosswalk_id = item["id"]
@@ -107,7 +115,10 @@ class CrosswalkSignalService:
                     )
                 state = self._controllers[crosswalk_id].signal_state(self._elapsed_seconds)
                 states[crosswalk_id] = state
-            return self._response(crosswalks, neighbors, True, simulation_paused, states, simulation_enabled)
+            return self._response(
+                crosswalks, neighbors, True, simulation_paused, states, simulation_enabled,
+                emergency_routes_enabled=any(link.get("emergency_route", "off") != "off" for link in links),
+            )
 
     def _response(
         self,
@@ -117,13 +128,16 @@ class CrosswalkSignalService:
         paused: bool,
         states: dict[str, dict[str, Any]],
         camera_simulation_enabled: bool,
+        *,
+        emergency_routes_enabled: bool = False,
     ) -> dict[str, Any]:
         return {
             "simulation_only": True,
             "simulation_enabled": camera_simulation_enabled,
             "virtual_preview_enabled": running and not camera_simulation_enabled,
             "simulation_paused": paused if running else False,
-            "coordination_enabled": False,
+            "coordination_enabled": running and emergency_routes_enabled,
+            "emergency_routes_enabled": emergency_routes_enabled,
             "movement_conflicts_configured": False,
             "hardware_actuation_enabled": False,
             "crosswalks": {
@@ -140,7 +154,16 @@ class CrosswalkSignalService:
                         "observation_provenance": "unavailable", "camera_sources": [],
                         "camera_coverage": "unavailable", "region_class_counts": {},
                     }),
-                    "coordination_reason": "Network edges do not specify conflicting movements.",
+                    "emergency_priority": (
+                        self._priority_requests[item["id"]]
+                        if running and item["id"] in self._priority_requests
+                        and self._clock() < self._priority_requests[item["id"]]["expires_at"]
+                        else None
+                    ),
+                    "coordination_reason": (
+                        "Configured emergency corridor; virtual protected vehicle service only."
+                        if emergency_routes_enabled else "No emergency routes configured."
+                    ),
                 }
                 for item in crosswalks
             },
@@ -172,12 +195,50 @@ class CrosswalkSignalService:
                 )
                 self._observation_meta[crosswalk_id] = meta
                 if observation is None:
+                    self._emergency_evidence.pop(crosswalk_id, None)
                     if crosswalk_id in self._frame_signatures:
                         controller.clear_observation()
                         self._frame_signatures.pop(crosswalk_id, None)
                 elif self._frame_signatures.get(crosswalk_id) != signature:
                     controller.observe(observation)
                     self._frame_signatures[crosswalk_id] = signature
+                    ambulance_observed = any(
+                        float(classes.get("ambulance", 0)) > 0
+                        for classes in meta["region_class_counts"].values()
+                    )
+                    if ambulance_observed:
+                        first, samples = self._emergency_evidence.get(crosswalk_id, (self._clock(), 0))
+                        self._emergency_evidence[crosswalk_id] = (first, samples + 1)
+                    else:
+                        self._emergency_evidence.pop(crosswalk_id, None)
+
+            # Only a user-specified directed one-hop route can request a neighbour's
+            # virtual vehicle phase. All-red/pedestrian transitions remain local.
+            now = self._clock()
+            eligible: set[str] = set()
+            for link in self._crosswalks.get().get("network", {}).get("links", []):
+                direction = link.get("emergency_route", "off")
+                if direction == "source_to_destination":
+                    source_id, target_id = link["source_crosswalk_id"], link["destination_crosswalk_id"]
+                elif direction == "destination_to_source":
+                    source_id, target_id = link["destination_crosswalk_id"], link["source_crosswalk_id"]
+                else:
+                    continue
+                first, samples = self._emergency_evidence.get(source_id, (now, 0))
+                if samples < 2 or now - first < 1.0:
+                    continue
+                eligible.add(link["id"])
+                if link["id"] in self._active_routes:
+                    continue
+                controller = self._controllers.get(target_id)
+                if controller and controller.request_simulated_emergency_vehicle(self._elapsed_seconds, source_id):
+                    self._active_routes.add(link["id"])
+                    self._priority_requests[target_id] = {
+                        "source_crosswalk_id": source_id,
+                        "reason": "Confirmed ambulance class; bounded protected vehicle green requested.",
+                        "expires_at": now + 30.0,
+                    }
+            self._active_routes.intersection_update(eligible)
 
     def observe(self, crosswalk_id: str, observation: dict[str, Any]) -> None:
         """Future camera/region adapter: update only one existing simulation controller."""

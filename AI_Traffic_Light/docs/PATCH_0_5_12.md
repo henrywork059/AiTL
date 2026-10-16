@@ -14,3 +14,7 @@
 ## Tests and pending acceptance
 
 New `scripts/test_v0512_camera_crosswalk.py` covers crosswalk isolation, same-region averaging, zero, missing/stale and model-switch cases, plus scenario rule integration; `scripts/test_v0512_crosswalk_wiring.py` checks background wiring and UI. Full local Windows Python/TypeScript/Vite, smoke and hardware validations are not available in the GitHub editing environment. Owner must run full repository test runner and confirm PASS. Baseline remains `0_5_0`.
+
+## Same 0_5_12 candidate follow-up: emergency corridors
+
+An optional `emergency_route` field on an existing Network link defaults to Off and supports a single explicit travel direction. A class `ambulance` detected in two different frames over at least one second can request virtual priority at the next crosswalk only on an opted-in link. The target retains its own protected WALK/CLEAR, amber and all-red sequence; an eight-second vehicle-green extension is bounded by its existing timing and cycle caps, or the request expires unserved. Invalid or ambiguous routes are rejected. This is a **software-only simulation/virtual preview**; no ESP actuation, verified ambulance identity, movement-conflict matrix or demonstrated jam reduction. Focused test: `scripts/test_v0512_emergency_corridor.py`. Full Windows and owner validation remain pending.

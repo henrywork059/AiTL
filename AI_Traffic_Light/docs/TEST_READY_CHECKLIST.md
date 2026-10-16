@@ -7,6 +7,9 @@ passed_baseline: 0_5_0
 status: Unaccepted candidate — full Windows and hardware tests pending
 ```
 
+- [ ] Opt-in one-way emergency route defaults Off, confirms ambulance in two distinct frames across ≥1s, and requests only the configured next-crosswalk virtual controller.
+- [ ] Emergency priority is bounded and never bypasses pedestrian clearance or amber/all-red transition.
+- [ ] Ambiguous multiple routes are rejected; no physical LED outputs.
 - [ ] Background inference routes assigned Side A/B frames into the matching independent controller without opening Network.
 - [ ] Multi-camera region average, single-view, zero-objects and missing/stale/model-switched cases.
 - [ ] Class-specific conditions use physical Crosswalk regions; untyped regions do not claim waiting/crossing/queue metrics.

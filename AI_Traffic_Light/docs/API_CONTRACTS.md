@@ -1,5 +1,9 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0512 emergency corridor follow-up
+
+Saved Network links optionally accept `emergency_route` as `source_to_destination` or `destination_to_source`, with omission meaning Off. Multiple conflicting configured priority paths return 422. `GET /api/traffic/crosswalk-signals` may include the source/reason/expiry of a one-shot virtual emergency priority and now reports `coordination_enabled` when explicitly configured. No physical actuation endpoint is added.
+
 ## V0512 Automatic per-crosswalk camera observation bridge
 
 No new endpoint. `GET /api/traffic/crosswalk-signals` retains the existing envelope and adds/updates each crosswalk's `observation_provenance: camera_ai|unavailable`, `camera_sources`, `camera_coverage: complete|partial|unavailable`, `region_class_counts`, and `source_timestamp_ms` when available. The response also includes `virtual_preview_enabled`; each source status may be `virtual` when real ESP camera AI drives software-only preview signals. No real hardware output occurs.

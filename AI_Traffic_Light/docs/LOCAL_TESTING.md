@@ -7,6 +7,13 @@ passed_baseline: 0_5_0
 status: Automatic source-to-independent-crosswalk observation bridge candidate
 ```
 
+## Directional emergency-priority regression
+
+- Run `scripts/test_v0512_emergency_corridor.py` then the full Windows runner.
+- A saved Network link defaults Off. Enable A→B, provide two distinct ambulance-class frames over ≥1 s at A, and confirm B's virtual vehicle green extends within its current protected cap. Reverse the route to check direction.
+- Reject multiple simultaneous outgoing priority routes from a crosswalk or conflicting incoming destinations.
+- Emergency requests must not jump from pedestrian WALK/CLEAR to green; they may expire without service. No real ESP light control or measured jam reduction.
+
 ## Focused and full validation
 
 - Run full `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"`, plus `scripts/test_v0512_camera_crosswalk.py` and `scripts/test_v0512_crosswalk_wiring.py`; check TypeScript build, `/health`, smoke and regression suite.

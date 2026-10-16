@@ -170,6 +170,8 @@ class CrosswalkService:
             links: list[dict[str, str]] = []
             link_ids: set[str] = set()
             connected_edges: set[tuple[str, str, str, str]] = set()
+            emergency_sources: set[str] = set()
+            emergency_destinations: set[str] = set()
             for link in raw_links:
                 if not isinstance(link, dict):
                     invalid("Each crosswalk connection must be an object.")
@@ -188,6 +190,18 @@ class CrosswalkService:
                 opposite = (destination_id, destination_edge, source_id, source_edge)
                 if endpoints in connected_edges or opposite in connected_edges:
                     invalid("Duplicate crosswalk connection.")
+                emergency_route = link.get("emergency_route", "off")
+                if emergency_route not in ("off", "source_to_destination", "destination_to_source"):
+                    invalid("Emergency route must be off or one explicitly selected direction.")
+                if emergency_route != "off":
+                    priority_source, priority_target = (
+                        (source_id, destination_id) if emergency_route == "source_to_destination"
+                        else (destination_id, source_id)
+                    )
+                    if priority_source in emergency_sources or priority_target in emergency_destinations:
+                        invalid("An emergency route needs a unique source and destination to avoid ambiguous priority requests.")
+                    emergency_sources.add(priority_source)
+                    emergency_destinations.add(priority_target)
                 link_ids.add(link_id)
                 connected_edges.add(endpoints)
                 links.append({
@@ -196,6 +210,7 @@ class CrosswalkService:
                     "destination_crosswalk_id": destination_id,
                     "source_edge": source_edge,
                     "destination_edge": destination_edge,
+                    **({"emergency_route": emergency_route} if emergency_route != "off" else {}),
                 })
             result["network"] = {"positions": positions, "links": links}
         return result

@@ -20,7 +20,7 @@ def main() -> None:
     assert "phase_remaining_seconds" in rules
     assert "simulated" not in rules.lower() or "protected" in rules.lower()
     assert "crosswalkSignal?.signal" in network
-    assert "coordination not configured" in network
+    assert "route off unless explicitly enabled" in network
     assert "simulationEnabled" in network and "CrosswalkSignalIndicators" in network
     assert "No verified crosswalk signal (not controlled)" in lamps
     assert "Math.ceil(signal.seconds_remaining)" in lamps

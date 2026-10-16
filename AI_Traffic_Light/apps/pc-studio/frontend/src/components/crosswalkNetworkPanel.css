@@ -154,3 +154,7 @@
   padding: 8px 7px; color: var(--color-text-secondary);
 }
 .crossing-signal-summary small { font-size: 0.68rem; line-height: 1.4; overflow-wrap: anywhere; }
+
+.crossing-emergency-route { display: grid; gap: 4px; min-width: 145px; font-size: .76rem; }
+.crossing-emergency-route select { max-width: 190px; width: 100%; }
+.crossing-network-link-row { flex-wrap: wrap; }

@@ -303,6 +303,9 @@ class SignalRulesService:
         self._winning_scenario_id: str | None = None
         self._winning_scenario_label: str | None = None
         self._pending_request: str | None = None
+        self._emergency_priority_until = 0.0
+        self._emergency_priority_source: str | None = None
+        self._emergency_priority_applied_phase: float | None = None
         self._incident_hold = False
         self._resume_after_incident = False
         self._reinitialize_pending = False
@@ -409,6 +412,9 @@ class SignalRulesService:
         self._winning_scenario_id = None
         self._winning_scenario_label = None
         self._pending_request = None
+        self._emergency_priority_until = 0.0
+        self._emergency_priority_source = None
+        self._emergency_priority_applied_phase = None
         self._incident_hold = False
         self._resume_after_incident = False
         self._reinitialize_pending = False
@@ -418,6 +424,35 @@ class SignalRulesService:
         self._vehicle_wait = _DemandMemory()
         self._crossing = _DemandMemory()
         self._initialize_phase_locked(self._phase_started_clock)
+
+    def request_simulated_emergency_vehicle(self, clock: float, source_crosswalk_id: str) -> bool:
+        """Request bounded vehicle-green service without skipping a protected transition."""
+        with self._lock:
+            config = self._load_config_locked()
+            if self._incident_hold or config["dry_run"]:
+                return False
+            self._advance_phase_locked(clock)
+            self._emergency_priority_source = source_crosswalk_id
+            self._emergency_priority_until = clock + 30.0
+            self._pending_request = "vehicle"
+            self._apply_emergency_extension_locked(clock)
+            self._record_event_locked("emergency_corridor_requested", {
+                "source_crosswalk_id": source_crosswalk_id, "target_phase": "vehicle_green",
+            })
+            return True
+
+    def _apply_emergency_extension_locked(self, clock: float) -> None:
+        if (self._incident_hold or not self._emergency_priority_source
+                or clock > self._emergency_priority_until
+                or PHASE_SEQUENCE[self._phase_index][0] != "vehicle_green"
+                or self._emergency_priority_applied_phase == self._phase_started_clock):
+            return
+        config = self._load_config_locked()
+        profile = self._active_profile_locked(config)
+        phase = profile["phases"]["vehicle_green"]
+        maximum = min(float(phase["max_seconds"]), self._cycle_phase_cap_locked(profile, "vehicle_green"))
+        self._phase_duration_seconds = max(self._phase_duration_seconds, min(maximum, self._phase_base_seconds + 8.0))
+        self._emergency_priority_applied_phase = self._phase_started_clock
 
     def observe(self, observation: dict[str, Any]) -> None:
         now = time.monotonic()
@@ -789,11 +824,14 @@ class SignalRulesService:
         self._last_active_rules = []
         self._winning_scenario_id = None
         self._winning_scenario_label = None
+        self._apply_emergency_extension_locked(clock)
 
     def _advance_phase_locked(self, clock: float) -> None:
         if clock + 1e-9 < self._last_clock_s:
             self._reset_runtime_locked(0.0)
         self._last_clock_s = clock
+        if clock > self._emergency_priority_until:
+            self._emergency_priority_source = None
         if self._reinitialize_pending:
             self._reinitialize_pending = False
             self._cycle_started_clock = clock
@@ -1139,6 +1177,8 @@ class SignalRulesService:
             "fallback_reason": fallback_reason,
             "pending_request": self._pending_request,
             "incident_hold": self._incident_hold,
+            "emergency_priority_source": self._emergency_priority_source if clock <= self._emergency_priority_until else None,
+            "emergency_priority_active": bool(self._emergency_priority_source and clock <= self._emergency_priority_until),
             "winning_scenario_id": self._winning_scenario_id,
             "winning_scenario_label": self._winning_scenario_label,
             "active_rules": list(self._last_active_rules),
