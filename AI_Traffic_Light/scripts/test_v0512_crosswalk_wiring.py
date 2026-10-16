@@ -27,7 +27,7 @@ def main() -> None:
     assert "fetchCrosswalks()" in adjustments
     assert 'crosswalk.id + ":" + region.id' in adjustments
     assert "crosswalkSignal?.observation_provenance" in network
-    assert '"coordination_enabled": running and emergency_routes_enabled' in controllers
+    assert '"coordination_enabled": running and conflicts_configured' in controllers
     assert '"hardware_actuation_enabled": False' in controllers
     print("[PASS] background camera routing, stale guards, safe regional class counts and UI wiring")
 

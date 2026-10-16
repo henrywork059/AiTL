@@ -1,5 +1,5 @@
 version: 0_5_14
-status: Release consistency repair candidate
+status: Network movement conflict and virtual coordination candidate
 previous_version: 0_5_13
 passed_baseline: 0_5_0
-notes: Synchronizes current patch document, candidate guides, changelog and frontend shared version after 0_5_13 structure validation failed. Retains the Camera AI Preview null-safe resolution fix. No further runtime changes. Full Windows structure/typecheck/build/startup and owner PASS pending.
+notes: Synchronizes current patch document, candidate guides, changelog and frontend shared version after 0_5_13 structure validation failed. Retains the Camera AI Preview null-safe resolution fix. Added simulation-only crosswalk movement conflict settings and a protected virtual Network interlock with coordination status, hold countdown and emergency-route arbitration. Full Windows structure/typecheck/build/startup and owner PASS pending.

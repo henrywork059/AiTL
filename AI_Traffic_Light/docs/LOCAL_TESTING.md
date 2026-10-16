@@ -4,7 +4,7 @@
 version: 0_5_14
 previous_version: 0_5_13
 passed_baseline: 0_5_0
-status: Release-metadata repair candidate; owner PASS pending
+status: Network virtual coordination continuation; owner PASS pending
 ```
 
 - The `0_5_13` preview null-safety code fix remains in place; `0_5_14` fixes the missing patch document and stale current-version documents/constant. No new backend, camera, AI, or signal runtime behavior.
@@ -465,3 +465,12 @@ status: Responsive text layout and clear selected-region outline candidate
 6. Run the full Windows `scripts/update_test_run.ps1` for complete regressions, typecheck/build, backend smoke and UI launch.
 
 No physical hardware is needed for mapping itself. Full owner PASS is pending; baseline stays `0_4_0`.
+
+## V0514 Network coordination verification
+
+- From repository root run the full `scripts/update_test_run.ps1` (or `-ChangedTests` for initial diagnostics); verify static structure, Python regressions, frontend TypeScript/Vite, backend `/health` and smoke.
+- Save two Crosswalks, connect them in Network, configure the four conflict checkboxes for the physical movement pairs and enable simulation. With conflicting movements requested, ensure at most one is presented as permitted green. The other node shows a virtual all-red coordinated hold, a paused countdown and the blocking crosswalk.
+- After the granted crosswalk completes its vehicle amber/pedestrian-clearance sequence, confirm the blocked movement cannot become permitted until at least two virtual seconds of clearance. Verify it then resumes safely, with no permanent starvation in the tested two-crosswalk case.
+- Configure a directed A→B emergency route only after movement conflicts are defined. Confirm two fresh ambulance-class detections over ≥1 s request B's protected vehicle phase, and that A/B never show conflicting virtual greens. Stop the simulator, remove the link or let a request expire and verify no stuck priority.
+- Confirm that unconfigured links retain independent behaviour, that saved conflict settings persist, and that legacy simulation, AI camera preview, physical camera connectivity, region counts and Signal Control remain unaffected. No real LED/roadway signals can be commanded.
+- This patch includes deterministic `scripts/test_v0514_network_conflicts.py` but Windows/hardware/UI validation and owner PASS remain required.

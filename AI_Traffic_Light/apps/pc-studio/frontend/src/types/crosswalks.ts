@@ -21,6 +21,12 @@ export type Crosswalk = {
 export type CrosswalkNetworkPosition = { x: number; y: number };
 export type CrosswalkNetworkEdge = "1" | "2" | "3" | "4";
 
+export type CrosswalkMovementConflict =
+  | "vehicle_vehicle"
+  | "vehicle_pedestrian"
+  | "pedestrian_vehicle"
+  | "pedestrian_pedestrian";
+
 export type CrosswalkNetworkLink = {
   id: string;
   source_crosswalk_id: string;
@@ -28,6 +34,7 @@ export type CrosswalkNetworkLink = {
   source_edge: CrosswalkNetworkEdge;
   destination_edge: CrosswalkNetworkEdge;
   emergency_route?: "off" | "source_to_destination" | "destination_to_source";
+  movement_conflicts?: CrosswalkMovementConflict[];
 };
 
 export type CrosswalkNetwork = {

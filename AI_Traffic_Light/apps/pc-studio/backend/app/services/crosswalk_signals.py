@@ -14,6 +14,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.crosswalks import CrosswalkService, crosswalk_service
 from app.services.crosswalk_observations import crosswalk_observation
+from app.services.crosswalk_signal_coordinator import coordinate_crosswalk_signals
 from app.services.signal_rules import (
     PROJECT_ROOT, SignalRulesService, signal_rules_service,
 )
@@ -46,6 +47,10 @@ class CrosswalkSignalService:
         self._emergency_evidence: dict[str, tuple[float, int]] = {}
         self._active_routes: set[str] = set()
         self._priority_requests: dict[str, dict[str, Any]] = {}
+        self._controller_clocks: dict[str, float] = {}
+        self._held_crosswalks: set[str] = set()
+        self._coordination_grants: dict[str, str] = {}
+        self._coordination_released: dict[str, tuple[str, float]] = {}
 
     def _stop_locked(self) -> None:
         self._controllers.clear()
@@ -59,6 +64,10 @@ class CrosswalkSignalService:
         self._emergency_evidence.clear()
         self._active_routes.clear()
         self._priority_requests.clear()
+        self._controller_clocks.clear()
+        self._held_crosswalks.clear()
+        self._coordination_grants.clear()
+        self._coordination_released.clear()
 
     def status(self, *, simulation_enabled: bool, simulation_paused: bool = False,
                virtual_preview: bool | None = None) -> dict[str, Any]:
@@ -93,8 +102,8 @@ class CrosswalkSignalService:
                 self._running = True
                 self._rules_key = settings_key
                 self._controller_mode = mode
-            if self._last_tick is not None and not simulation_paused:
-                self._elapsed_seconds += max(0.0, now - self._last_tick)
+            delta = max(0.0, now - self._last_tick) if self._last_tick is not None and not simulation_paused else 0.0
+            self._elapsed_seconds += delta
             self._last_tick = now
 
             valid_ids = {item["id"] for item in crosswalks}
@@ -104,6 +113,24 @@ class CrosswalkSignalService:
                 self._observation_meta.pop(stale_id, None)
                 self._emergency_evidence.pop(stale_id, None)
                 self._priority_requests.pop(stale_id, None)
+                self._controller_clocks.pop(stale_id, None)
+                self._held_crosswalks.discard(stale_id)
+                self._coordination_grants.pop(stale_id, None)
+                self._coordination_released.pop(stale_id, None)
+            enabled_routes = {
+                (link["source_crosswalk_id"], link["destination_crosswalk_id"])
+                if link.get("emergency_route") == "source_to_destination"
+                else (link["destination_crosswalk_id"], link["source_crosswalk_id"])
+                for link in links
+                if link.get("movement_conflicts") and link.get("emergency_route", "off") != "off"
+            }
+            for target_id, request in list(self._priority_requests.items()):
+                if (now >= request["expires_at"]
+                        or (request["source_crosswalk_id"], target_id) not in enabled_routes):
+                    controller = self._controllers.get(target_id)
+                    if controller:
+                        controller.cancel_simulated_emergency_vehicle()
+                    del self._priority_requests[target_id]
             states: dict[str, dict[str, Any]] = {}
             for item in crosswalks:
                 crosswalk_id = item["id"]
@@ -113,11 +140,28 @@ class CrosswalkSignalService:
                         config_path=self._rules.config_path,
                         history_path=self._history_root / (crosswalk_id + ".jsonl"),
                     )
-                state = self._controllers[crosswalk_id].signal_state(self._elapsed_seconds)
-                states[crosswalk_id] = state
+                local_clock = self._controller_clocks.get(crosswalk_id, 0.0)
+                if crosswalk_id not in self._held_crosswalks:
+                    local_clock += delta
+                self._controller_clocks[crosswalk_id] = local_clock
+                states[crosswalk_id] = self._controllers[crosswalk_id].signal_state(local_clock)
+            coordinated, held, grants, released = coordinate_crosswalk_signals(
+                states, links, now=self._elapsed_seconds,
+                previous_grants=self._coordination_grants,
+                released=self._coordination_released,
+                previous_held=self._held_crosswalks,
+                emergency_targets={
+                    crosswalk_id for crosswalk_id, priority in self._priority_requests.items()
+                    if now < priority["expires_at"]
+                },
+            )
+            self._held_crosswalks = held
+            self._coordination_grants = grants
+            self._coordination_released = released
             return self._response(
-                crosswalks, neighbors, True, simulation_paused, states, simulation_enabled,
+                crosswalks, neighbors, True, simulation_paused, coordinated, simulation_enabled,
                 emergency_routes_enabled=any(link.get("emergency_route", "off") != "off" for link in links),
+                conflicts_configured=any(link.get("movement_conflicts") for link in links),
             )
 
     def _response(
@@ -130,15 +174,16 @@ class CrosswalkSignalService:
         camera_simulation_enabled: bool,
         *,
         emergency_routes_enabled: bool = False,
+        conflicts_configured: bool = False,
     ) -> dict[str, Any]:
         return {
             "simulation_only": True,
             "simulation_enabled": camera_simulation_enabled,
             "virtual_preview_enabled": running and not camera_simulation_enabled,
             "simulation_paused": paused if running else False,
-            "coordination_enabled": running and emergency_routes_enabled,
+            "coordination_enabled": running and conflicts_configured,
             "emergency_routes_enabled": emergency_routes_enabled,
-            "movement_conflicts_configured": False,
+            "movement_conflicts_configured": conflicts_configured,
             "hardware_actuation_enabled": False,
             "crosswalks": {
                 item["id"]: {
@@ -161,9 +206,14 @@ class CrosswalkSignalService:
                         else None
                     ),
                     "coordination_reason": (
-                        "Configured emergency corridor; virtual protected vehicle service only."
-                        if emergency_routes_enabled else "No emergency routes configured."
+                        states[item["id"]].get("coordination_reason", "Independent signal; no conflict interlock")
+                        if item["id"] in states else "Signal unavailable"
                     ),
+                    "coordination_status": (
+                        "held" if states.get(item["id"], {}).get("coordination_hold")
+                        else "permitted" if conflicts_configured else "independent"
+                    ) if running else "unavailable",
+                    "coordination_wait_seconds": states.get(item["id"], {}).get("coordination_wait_seconds"),
                 }
                 for item in crosswalks
             },
@@ -217,6 +267,8 @@ class CrosswalkSignalService:
             now = self._clock()
             eligible: set[str] = set()
             for link in self._crosswalks.get().get("network", {}).get("links", []):
+                if not link.get("movement_conflicts"):
+                    continue  # Never request adjacent priority without explicit movement conflicts.
                 direction = link.get("emergency_route", "off")
                 if direction == "source_to_destination":
                     source_id, target_id = link["source_crosswalk_id"], link["destination_crosswalk_id"]
@@ -231,7 +283,7 @@ class CrosswalkSignalService:
                 if link["id"] in self._active_routes:
                     continue
                 controller = self._controllers.get(target_id)
-                if controller and controller.request_simulated_emergency_vehicle(self._elapsed_seconds, source_id):
+                if controller and controller.request_simulated_emergency_vehicle(self._controller_clocks.get(target_id, 0.0), source_id):
                     self._active_routes.add(link["id"])
                     self._priority_requests[target_id] = {
                         "source_crosswalk_id": source_id,

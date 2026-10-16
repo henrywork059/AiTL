@@ -13,6 +13,7 @@ export function CrosswalkSignalIndicators({ signal, available, adjacentNotice, v
     : state ? "red" : "unknown";
   const pedestrian = state === "pedestrian_green" ? "walk"
     : state === "pedestrian_flashing" ? "clear" : state ? "stop" : "unknown";
+  const held = available && Boolean((signal as ScenarioSignalStatus & { coordination_hold?: boolean } | null)?.coordination_hold);
   const adjustment = available && signal?.winning_scenario_label
     ? signal.winning_scenario_label : null;
   return <>
@@ -32,8 +33,9 @@ export function CrosswalkSignalIndicators({ signal, available, adjacentNotice, v
     <div className="crossing-signal-summary">
       <small>{available && signal
         ? (virtualPreview ? "Virtual AI signal (not physical): " : "Simulation signals: ") + "vehicle " + vehicle + " / pedestrian " + pedestrian + " · " +
-          Math.ceil(signal.seconds_remaining) + "s remaining"
+          (held ? "COORDINATED RED HOLD" : Math.ceil(signal.seconds_remaining) + "s remaining")
         : "No verified crosswalk signal (not controlled)"}</small>
+      {held && <small>Waiting for conflicting movement to clear; countdown resumes when permitted</small>}
       {adjustment && <small>Adjustment request: {adjustment}{signal?.dry_run ? " (dry run)" : ""}</small>}
       {adjacentNotice && <small>{adjacentNotice}</small>}
     </div>

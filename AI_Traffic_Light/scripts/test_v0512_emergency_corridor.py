@@ -73,6 +73,7 @@ def main() -> None:
         assert service.status(simulation_enabled=True)["crosswalks"]["cross_b"]["emergency_priority"] is None
 
         route["emergency_route"] = "source_to_destination"
+        route["movement_conflicts"] = ["vehicle_vehicle"]
         save_links([route])
         clock[0] += 1.1
         service.ingest_camera_results({"sim_a": detected("sim_a", 3, ["ambulance"])},
@@ -81,7 +82,8 @@ def main() -> None:
         priority = status["crosswalks"]["cross_b"]["emergency_priority"]
         assert priority and priority["source_crosswalk_id"] == "cross_a", status
         target = status["crosswalks"]["cross_b"]["signal"]
-        assert target["vehicle_go"] is True and target["emergency_priority_active"], target
+        assert target["emergency_priority_active"], target
+        assert not (target["vehicle_go"] and status["crosswalks"]["cross_a"]["signal"]["vehicle_go"]), status
         assert target["effective_duration_seconds"] <= 30
         assert status["hardware_actuation_enabled"] is False
 

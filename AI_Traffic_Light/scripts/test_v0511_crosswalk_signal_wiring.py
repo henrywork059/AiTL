@@ -9,8 +9,8 @@ def main():
     assert 'crosswalkSignal?.signal' in network
     assert 'fetchCrosswalkSignalNetwork()' in network
     assert '@router.get("/crosswalk-signals")' in routes
-    assert 'coordination_enabled": running and emergency_routes_enabled' in service
-    assert 'movement_conflicts_configured": False' in service
+    assert 'coordination_enabled": running and conflicts_configured' in service
+    assert 'movement_conflicts_configured": conflicts_configured' in service
     print("[PASS] independent signal Network/API wiring")
 if __name__ == "__main__":
     main()

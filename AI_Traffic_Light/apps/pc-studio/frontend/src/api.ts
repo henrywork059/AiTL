@@ -256,6 +256,8 @@ export type CrosswalkSignalSummary = {
   source_timestamp_ms?: number;
   emergency_priority?: { source_crosswalk_id: string; reason: string; expires_at: number } | null;
   coordination_reason: string;
+  coordination_status?: "held" | "permitted" | "independent" | "unavailable";
+  coordination_wait_seconds?: number | null;
 };
 export type CrosswalkSignalNetwork = {
   simulation_only: boolean;

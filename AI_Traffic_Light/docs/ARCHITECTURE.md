@@ -111,3 +111,7 @@ A virtual-preview mode also accepts real ESP camera AI when global camera simula
 ## V0512 simulation-only emergency corridor follow-up
 
 The existing source-aware per-crosswalk observations can confirm an ambulance-class object across distinct inference frames. An explicitly configured one-hop directional Network link then asks the destination's independent virtual signal controller to extend its current/next protected vehicle-green phase. The rule preserves minimum pedestrian WALK/CLEAR and amber/all-red phases and expires if unserved. Without a route it remains inactive. No physical outputs or verified crosswalk movement-conflict matrix.
+
+## V0514 crosswalk Network virtual movement interlock
+
+Existing independent `CrosswalkSignalService` instances receive their assigned camera detections as before. Saved `network.links[].movement_conflicts` explicitly expresses unsafe source/destination movement pairs. A small pure `crosswalk_signal_coordinator` schedules compatible **virtual** movement permissions, pauses the blocked crosswalk's local simulation clock, projects virtual red holds and enforces a 2 s gap after a conflicting virtual grant ends. Emergency route priorities are requested through the existing protected local phase mechanism and require an explicitly configured movement conflict. Network displays projected signal state and hold reason; physical outputs are not implemented. Dynamically introducing conflicts during a running simulation can cause virtual red clamping and must not be treated as certified traffic safety.

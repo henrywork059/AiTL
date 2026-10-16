@@ -2,6 +2,8 @@
 
 **Current candidate:** `0_5_14` | **Previous candidate:** `0_5_13` | **Accepted baseline:** `0_5_0`.
 
+**Network coordination (same candidate):** In Traffic → Network, edit each saved link's **Conflicting movements** checkboxes. Select only movement combinations that physically intersect (source/destination vehicle or pedestrian). Virtual crosswalk controllers pause blocked phase timers and display coordinated red holds/reasons; once the other crossing clears, a 2 s interlock gap applies. Set the optional emergency route direction if an ambulance should request protected vehicle time at the next crossing. No physical lights can be controlled.
+
 **Fix:** The prior preview nullability repair is retained: camera resolution lookup now allows missing camera status. Candidate `0_5_13` could not start because its release bundle had stale/missing documentation and the frontend version label. `0_5_14` completes that bundle without additional runtime changes.
 
 **Test (PowerShell at `D:\AiTL`):**

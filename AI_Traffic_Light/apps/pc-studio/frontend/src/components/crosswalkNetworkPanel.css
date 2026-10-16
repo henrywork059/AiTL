@@ -158,3 +158,8 @@
 .crossing-emergency-route { display: grid; gap: 4px; min-width: 145px; font-size: .76rem; }
 .crossing-emergency-route select { max-width: 190px; width: 100%; }
 .crossing-network-link-row { flex-wrap: wrap; }
+
+.crossing-movement-conflicts { display: grid; gap: 5px; min-width: 0; border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 7px; }
+.crossing-movement-conflicts legend { font-size: .75rem; font-weight: 600; }
+.crossing-movement-conflicts label { display: flex; align-items: flex-start; gap: 6px; font-size: .7rem; line-height: 1.3; }
+.crossing-movement-conflicts input { flex: 0 0 auto; margin-top: 2px; }

@@ -7,7 +7,7 @@ import { useSerialPolling } from "../lib/useSerialPolling";
 import { CrosswalkSignalIndicators } from "./CrosswalkSignalIndicators";
 import type { ScenarioSignalStatus } from "../types/signalScenarios";
 import type {
-  CrosswalkConfig, CrosswalkNetwork, CrosswalkNetworkEdge, CrosswalkNetworkPosition,
+  CrosswalkConfig, CrosswalkNetwork, CrosswalkNetworkEdge, CrosswalkNetworkPosition, CrosswalkMovementConflict,
 } from "../types/crosswalks";
 import type { JunctionCameraView, JunctionNetworkOverview } from "../types/junctionNetwork";
 import "./crosswalkNetworkPanel.css";
@@ -23,6 +23,12 @@ type Props = {
 const EDGES: CrosswalkNetworkEdge[] = ["1", "2", "3", "4"];
 const EMPTY_NETWORK: CrosswalkNetwork = { positions: {}, links: [] };
 const MAX_LINKS = 64;
+const MOVEMENT_CONFLICTS: { id: CrosswalkMovementConflict; label: string }[] = [
+  { id: "vehicle_vehicle", label: "Vehicles at both crossings" },
+  { id: "vehicle_pedestrian", label: "Source vehicles × destination pedestrians" },
+  { id: "pedestrian_vehicle", label: "Source pedestrians × destination vehicles" },
+  { id: "pedestrian_pedestrian", label: "Pedestrians at both crossings" },
+];
 
 function cloneNetwork(network?: CrosswalkNetwork): CrosswalkNetwork {
   return structuredClone(network ?? EMPTY_NETWORK);
@@ -374,7 +380,9 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                   && (active === crosswalk.camera_side_a_id || active === crosswalk.camera_side_b_id));
                 const crosswalkSignal = signalNetwork?.crosswalks[crosswalk.id];
                 const available = Boolean(crosswalkSignal?.signal);
-                const adjacentNotice = crosswalkSignal?.emergency_priority
+                const adjacentNotice = crosswalkSignal?.coordination_status === "held"
+                  ? crosswalkSignal.coordination_reason
+                  : crosswalkSignal?.emergency_priority
                   ? "Priority from " + crosswalkSignal.emergency_priority.source_crosswalk_id + ": " + crosswalkSignal.emergency_priority.reason
                   : crosswalkSignal?.neighbors.length
                   ? "Linked to " + crosswalkSignal.neighbors.length + " crossing(s) · route off unless explicitly enabled"
@@ -443,7 +451,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                 to a numbered edge label on another. The line is added when released on the destination.
                 Keyboard: activate the first edge, then the destination edge.
               </p>
-              <p className="small-note">Enable a route only when its direction matches the actual vehicle path. An ambulance class must be confirmed in multiple fresh frames. All crosswalk outputs here are simulation or software-only.</p>
+              <p className="small-note">Select each pair of movements that physically intersect between these connected crossings. The virtual coordinator will permit only non-conflicting movements, holding others at red until clearance. Routes are optional; an emergency request also requires defined conflicts. Nothing here controls physical signals.</p>
               <div className="crossing-network-link-list">
                 <h4>Connections</h4>
                 {draft.links.map((link) => {
@@ -451,6 +459,25 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                   const to = crosswalks.find((item) => item.id === link.destination_crosswalk_id);
                   return <div className="crossing-network-link-row" key={link.id}>
                     <span>{from?.label ?? "Missing crossing"} [{link.source_edge}] ↔ {to?.label ?? "Missing crossing"} [{link.destination_edge}]</span>
+                    <fieldset className="crossing-movement-conflicts">
+                      <legend>Conflicting movements</legend>
+                      {MOVEMENT_CONFLICTS.map(({ id, label }) => (
+                        <label key={id}>
+                          <input type="checkbox" checked={(link.movement_conflicts ?? []).includes(id)}
+                            disabled={saving}
+                            onChange={(event) => changeDraft({
+                              ...draft,
+                              links: draft.links.map((item) => item.id === link.id ? {
+                                ...item,
+                                movement_conflicts: event.target.checked
+                                  ? [...(item.movement_conflicts ?? []), id]
+                                  : (item.movement_conflicts ?? []).filter((value) => value !== id),
+                              } : item),
+                            })} />
+                          {label}
+                        </label>
+                      ))}
+                    </fieldset>
                     <label className="crossing-emergency-route">Emergency vehicle route
                       <select aria-label={"Emergency route for " + link.id}
                         value={link.emergency_route ?? "off"} disabled={saving}

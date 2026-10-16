@@ -441,6 +441,14 @@ class SignalRulesService:
             })
             return True
 
+    def cancel_simulated_emergency_vehicle(self) -> None:
+        """Withdraw an unserved virtual request after its coordinator timeout."""
+        with self._lock:
+            self._emergency_priority_source = None
+            self._emergency_priority_until = 0.0
+            if self._pending_request == "vehicle":
+                self._pending_request = None
+
     def _apply_emergency_extension_locked(self, clock: float) -> None:
         if (self._incident_hold or not self._emergency_priority_source
                 or clock > self._emergency_priority_until

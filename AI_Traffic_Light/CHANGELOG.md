@@ -2,6 +2,13 @@
 
 ## 0_5_14 — Repair incomplete 0_5_13 release bundle
 
+### Same-candidate continuation: Network movement conflict interlock
+
+- Preserve previously implemented camera-to-crosswalk inference routing; configure explicit per-connection vehicle/pedestrian movement conflicts and persist them with the Network layout.
+- Simulation-only coordinator pauses blocked independent crosswalk phase clocks, projects virtual all-red holds, requires a 2 s conflict-clearance gap, preserves protected local transitions, and prevents simultaneously conflicting published green movements.
+- Network shows coordinated hold/priority reasons and countdowns. Directed emergency-route requests require configured conflicts and expire if unserved. No physical actuation, cross-camera identity tracking, or certification.
+
+
 - Complete the release metadata required by the project structure gate after the previous patch's TypeScript null-safety fix: add `docs/PATCH_0_5_14.md`, synchronize Start Here, Local Testing, Test Ready Checklist and the frontend shared version constant.
 - Keep the `CameraDetectionView` optional-resolution fix from `0_5_13`; no further runtime code, camera inference, controller safety, APIs, or hardware changes.
 - Previous candidate `0_5_13`; accepted baseline `0_5_0`. Full Windows structure/typecheck/build/startup and owner PASS pending.

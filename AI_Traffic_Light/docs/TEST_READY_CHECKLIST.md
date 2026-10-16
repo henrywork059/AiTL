@@ -7,6 +7,11 @@ passed_baseline: 0_5_0
 status: Unaccepted release-bundle correction candidate
 ```
 
+- [ ] Connected Network links allow explicit movement-conflict selection and persist; invalid/duplicate conflicts are rejected.
+- [ ] Coordinated virtual signals never report both conflicting movements green, including vehicle amber and pedestrian clearance.
+- [ ] Blocked crossing shows virtual red hold with reason; phase clock remains paused and resumes after protected 2 s clearance.
+- [ ] Emergency route requires configured conflicts; destination priority is bounded, cancelled on expiry/removal and preserves pedestrian safety.
+- [ ] Camera AI observations still feed their own crosswalk controllers, with stale/partial source safeguards.
 - [ ] Version/structure guard passes and finds current `PATCH_0_5_14.md`, three candidate documents, changelog section and only `0_5_14` in frontend version constant.
 - [ ] `CameraDetectionView` TypeScript typecheck passes with missing `cameraStatus`; preview correctly falls back to frame or 1280×720 dimensions.
 - [ ] Vite build, backend `/health` and startup/smoke pass on Windows.

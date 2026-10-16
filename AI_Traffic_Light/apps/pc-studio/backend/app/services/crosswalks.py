@@ -167,7 +167,7 @@ class CrosswalkService:
             raw_links = raw_network.get("links", [])
             if not isinstance(raw_links, list) or len(raw_links) > MAX_CROSSWALK_LINKS:
                 invalid(f"Crosswalk network links must contain at most {MAX_CROSSWALK_LINKS} entries.")
-            links: list[dict[str, str]] = []
+            links: list[dict[str, Any]] = []
             link_ids: set[str] = set()
             connected_edges: set[tuple[str, str, str, str]] = set()
             emergency_sources: set[str] = set()
@@ -190,6 +190,12 @@ class CrosswalkService:
                 opposite = (destination_id, destination_edge, source_id, source_edge)
                 if endpoints in connected_edges or opposite in connected_edges:
                     invalid("Duplicate crosswalk connection.")
+                raw_conflicts = link.get("movement_conflicts", [])
+                allowed = {"vehicle_vehicle", "vehicle_pedestrian", "pedestrian_vehicle", "pedestrian_pedestrian"}
+                if (not isinstance(raw_conflicts, list) or len(raw_conflicts) > 4
+                        or any(not isinstance(value, str) or value not in allowed for value in raw_conflicts)
+                        or len(set(raw_conflicts)) != len(raw_conflicts)):
+                    invalid("Movement conflicts must list unique supported crossing movement pairs.")
                 emergency_route = link.get("emergency_route", "off")
                 if emergency_route not in ("off", "source_to_destination", "destination_to_source"):
                     invalid("Emergency route must be off or one explicitly selected direction.")
@@ -211,6 +217,7 @@ class CrosswalkService:
                     "source_edge": source_edge,
                     "destination_edge": destination_edge,
                     **({"emergency_route": emergency_route} if emergency_route != "off" else {}),
+                    **({"movement_conflicts": sorted(raw_conflicts)} if raw_conflicts else {}),
                 })
             result["network"] = {"positions": positions, "links": links}
         return result

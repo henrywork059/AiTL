@@ -1,5 +1,11 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0514 Network movement conflicts (simulation-only)
+
+Crosswalk `network.links[]` accepts optional `movement_conflicts`: a unique array of `vehicle_vehicle`, `vehicle_pedestrian`, `pedestrian_vehicle`, `pedestrian_pedestrian` (ordered source/destination link endpoints). Invalid, repeated or unsupported values cause the existing 422 validation error. An omitted/empty array is backward-compatible and means no interlock for that link.
+
+`GET /api/traffic/crosswalk-signals` now returns independent virtual signals projected through the Network interlock when conflicts are configured. Top level `coordination_enabled` and `movement_conflicts_configured` identify active virtual interlocking. Each node reports `coordination_status` (held/permitted/independent/unavailable), `coordination_reason` and optional `coordination_wait_seconds`. During hold, `signal.phase_key="coordination_hold"`, `phase="all_red"`, `vehicle_go=false`, `pedestrian_walk=false`, `seconds_remaining=0`, plus original requested phase and blocking crosswalk. A held node's local virtual clock does not progress until granted. No hardware command or new API route is added.
+
 ## V0512 emergency corridor follow-up
 
 Saved Network links optionally accept `emergency_route` as `source_to_destination` or `destination_to_source`, with omission meaning Off. Multiple conflicting configured priority paths return 422. `GET /api/traffic/crosswalk-signals` may include the source/reason/expiry of a one-shot virtual emergency priority and now reports `coordination_enabled` when explicitly configured. No physical actuation endpoint is added.
