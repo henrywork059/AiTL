@@ -1,5 +1,10 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0511 Crosswalk signal controllers
+
+`GET /api/traffic/crosswalk-signals` returns the standard request-ID envelope with `simulation_only`, `simulation_enabled`, `simulation_paused`, `coordination_enabled:false`, `movement_conflicts_configured:false`, `hardware_actuation_enabled:false`, and `crosswalks` keyed by existing saved Crosswalk ID. Each entry includes isolated `signal` (or null when simulation off), `controller_id`, `status`, `neighbors`, `observation_provenance` and `coordination_reason`. Each runtime uses the existing signal phase machinery. Legacy `/api/traffic/signal-status` is unaffected. Separate observation and test-input internal hooks are reserved for later camera mapping and coordination; not exposed as physical controls.
+
+
 ## V0510 timing and live adjustments
 
 No new signal REST endpoints: `GET/PUT /api/traffic/signal-rules` persists both default timing and the new UI's ranked scenario templates. The backend `ALLOWED_METRICS` now accepts `phase_remaining_seconds` as an evaluated read-only metric, derived from the protected current phase. A rule can combine `pedestrians_crossing >= 1` and `phase_remaining_seconds <= 3` to request bounded clearance hold.

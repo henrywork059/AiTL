@@ -19,8 +19,8 @@ def main() -> None:
     assert "latest.profiles[latest.active_profile].scenarios" in rules and "saveSignalRules" in rules
     assert "phase_remaining_seconds" in rules
     assert "simulated" not in rules.lower() or "protected" in rules.lower()
-    assert "signalOwner?.id === crosswalk.id" in network
-    assert "not applied here" in network
+    assert "crosswalkSignal?.signal" in network
+    assert "coordination not configured" in network
     assert "simulationEnabled" in network and "CrosswalkSignalIndicators" in network
     assert "No verified crosswalk signal (not controlled)" in lamps
     assert "Math.ceil(signal.seconds_remaining)" in lamps

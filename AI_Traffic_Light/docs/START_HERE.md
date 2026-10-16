@@ -1,3 +1,15 @@
+# Start Here — V0511
+
+Current candidate `0_5_11`; previous `0_5_10`; owner-accepted baseline `0_5_0`.
+
+**Network:** Every saved crosswalk now has its own isolated *simulation-only* signal controller and status, readable at `GET /api/traffic/crosswalk-signals`. Signal indicators on crosswalk boxes read these states separately; configured Network links list neighbors only.
+
+**Limits:** Controllers share default timing and scenario definitions but not runtime phase, observations or test inputs. They do not yet automatically receive all per-crosswalk camera detections and do not coordinate movements. Crosswalk topology defines connection, not whether movements conflict. Existing legacy simulation and traffic APIs remain unchanged; no physical signal control.
+
+**Test:** Run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"` from the repository root, then inspect multiple crosswalks in Network and verify no source-state copying. Full Windows/hardware testing and owner PASS pending.
+
+---
+
 # Start Here — V0510
 
 Current **candidate `0_5_10`**, previous candidate `0_5_9`, owner-accepted baseline `0_5_0`.

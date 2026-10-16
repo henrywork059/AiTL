@@ -1,5 +1,13 @@
 # Changelog
 
+## 0_5_11 — Separate crosswalk signal controllers
+
+- Add one independent simulation-only SignalRulesService runtime per saved crosswalk, using existing central timing/rule configuration but isolated controller state and separate history paths.
+- Add read-only GET /api/traffic/crosswalk-signals with keyed crosswalk states, neighbors and coordination capability flags; Network now renders each crosswalk's own simulation signal instead of copying the selected-source controller.
+- Add internal observation and Test-mode input hooks for future camera-to-crosswalk mapping. No automatic camera observation injection, neighbour phase coordination or physical actuation; Network edges currently identify adjacency only.
+- Preserve legacy global signal controller/camera simulation behavior, controller constraints and settings APIs. Current candidate 0_5_11; previous 0_5_10; accepted baseline 0_5_0. Windows verification pending.
+
+
 ## 0_5_10 — Network signals and adjustable timing/rules (partial)
 
 - Add Traffic Light Settings page for default vehicle, amber, pedestrian WALK/CLEAR and protected all-red phase durations, persisting through the existing signal-rules API with maximum/minimum guards.

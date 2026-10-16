@@ -1,3 +1,13 @@
+# V0511 Independent Crosswalk Simulation Controllers
+
+version: 0_5_11; previous_version: 0_5_10; passed_baseline: 0_5_0.
+
+- Run the full Windows update/test runner, backend /health, TypeScript build and focused `scripts/test_v0511_crosswalk_signals.py` plus `scripts/test_v0511_crosswalk_signal_wiring.py`.
+- Create two saved Crosswalks; enable simulation and inspect `GET /api/traffic/crosswalk-signals`. Each must have a separate controller ID/state. Remove one and confirm it disappears; stop simulation and confirm signals unavailable.
+- Confirm the Network lamps show each simulated controller's own status, not selected-camera status. Save/reload connection edges; observe connected-crosswalk neighbor metadata but no coordinated phase command.
+- Test existing global legacy signal/simulation and camera APIs, default signal timing, live adjustment scenarios and protected phase safety. Independent controllers currently do not automatically ingest per-crosswalk camera observations.
+- Accepted baseline 0_5_0; full validation and owner PASS pending.
+
 # V0510 Network signal and live-adjustment candidate (partial)
 
 ```text

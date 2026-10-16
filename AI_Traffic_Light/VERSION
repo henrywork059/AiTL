@@ -1,5 +1,5 @@
-version: 0_5_10
-status: Partial Network signal and AI adjustment candidate
-previous_version: 0_5_9
+version: 0_5_11
+status: Independent crosswalk simulation controller candidate
+previous_version: 0_5_10
 passed_baseline: 0_5_0
-notes: Adds guarded default timing, live scenario templates and source-scoped Network signal indicators. Neighbour signals have advisory notices only; no independent controllers or active coordination. Full tests and owner PASS pending.
+notes: Independent simulation controllers per saved crosswalk, with separate phase, observation and rule state and read-only per-crosswalk Network status. Existing global simulation/traffic controller retained for compatibility; adjacent phase coordination remains disabled until movement conflicts are defined. Full Windows testing and owner PASS pending.

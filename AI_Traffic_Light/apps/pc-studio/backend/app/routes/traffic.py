@@ -9,6 +9,7 @@ from app.services.intersection_network import intersection_network_service
 from app.services.junction_network_overview import junction_network_overview_service
 from app.services.object_tracking import object_tracking_service
 from app.services.signal_rules import signal_rules_service
+from app.services.crosswalk_signals import crosswalk_signal_service
 from app.services.traffic_flow import traffic_flow_service
 from app.services.traffic_history import traffic_history_service
 from app.services.traffic_logic import get_live_traffic_state
@@ -281,6 +282,16 @@ def clear_signal_incident(request: Request) -> dict:
 @router.post("/signal-rules/preview")
 def preview_signal_rules(payload: SignalRulesPreviewRequest, request: Request) -> dict:
     data = signal_rules_service.preview(payload.model_dump())
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/crosswalk-signals")
+def crosswalk_signals(request: Request) -> dict:
+    """Independent simulation-only controller state per saved crosswalk."""
+    data = crosswalk_signal_service.status(
+        simulation_enabled=camera_frame_service.simulation_enabled,
+        simulation_paused=camera_frame_service.status()["simulation_paused"],
+    )
     return ok(data, request_id=request.state.request_id)
 
 

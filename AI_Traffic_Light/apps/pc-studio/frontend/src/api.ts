@@ -243,6 +243,27 @@ export async function resetSignalRules(): Promise<SignalRulesConfig> {
 export async function resetSignalRulesRuntime(): Promise<SignalStatus> {
   return requestJsonStrict<SignalStatus>(`${API_BASE}/api/traffic/signal-rules/runtime/reset`, { method: "POST" });
 }
+export type CrosswalkSignalSummary = {
+  crosswalk_id: string;
+  controller_id: string;
+  signal: SignalStatus | null;
+  status: "simulated" | "paused" | "unavailable";
+  neighbors: string[];
+  observation_provenance: string;
+  coordination_reason: string;
+};
+export type CrosswalkSignalNetwork = {
+  simulation_only: boolean;
+  simulation_enabled: boolean;
+  simulation_paused: boolean;
+  coordination_enabled: boolean;
+  movement_conflicts_configured: boolean;
+  hardware_actuation_enabled: boolean;
+  crosswalks: Record<string, CrosswalkSignalSummary>;
+};
+export async function fetchCrosswalkSignalNetwork(): Promise<CrosswalkSignalNetwork> {
+  return requestJsonStrict<CrosswalkSignalNetwork>(`${API_BASE}/api/traffic/crosswalk-signals`);
+}
 export async function fetchSignalStatus(): Promise<SignalStatus> {
   return requestJsonStrict<SignalStatus>(`${API_BASE}/api/traffic/signal-status`);
 }

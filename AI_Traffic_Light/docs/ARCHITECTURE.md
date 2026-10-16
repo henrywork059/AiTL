@@ -97,3 +97,7 @@ Network cooperation, pedestrian-aware, vehicle-class and emergency-priority beha
 Traffic Light Settings and Live Signal Adjustments both edit the existing persisted `signal_rules` config. The former changes only default phase durations in the active profile; the latter configures disabled-by-default ranked scenarios. The existing protected phase controller handles requests. `phase_remaining_seconds` is derived from the current protected phase and can be used in crossing-clearance scenarios.
 
 Network's `CrosswalkSignalIndicators` uses only the shared simulation signal status associated with the current observed source. Connected neighbours receive a read-only notice, **not** a commanded phase. Crosswalk topology currently lacks conflict relationships and per-crosswalk controller instances; actual connected-crosswalk coordination is not implemented.
+
+## V0511 independent crosswalk controller registry
+
+`CrosswalkSignalService` indexes independent `SignalRulesService` runtime instances by stable saved crosswalk ID. The controller instances share the existing persisted rule configuration and protected phase sequence but not phase clocks, decisions, incidents or observation buffers. The read-only API and Network signal indicators consume keyed state. The existing global signal runtime continues to serve legacy camera simulation and traffic endpoints. Future crosswalk-local observation/coordination interfaces must add camera source ownership and verified movement conflicts before active neighbor signal changes. No physical actuation.

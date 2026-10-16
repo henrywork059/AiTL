@@ -322,6 +322,10 @@ class SignalRulesService:
         }
         self._initialize_phase_locked(0.0)
 
+    @property
+    def config_path(self) -> Path:
+        return self._config_path
+
     def defaults(self) -> dict[str, Any]:
         return deepcopy(DEFAULT_CONFIG)
 

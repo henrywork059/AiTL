@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { fetchCrosswalks, saveCrosswalks } from "../lib/crosswalksApi";
-import { fetchSignalStatus } from "../api";
+import { fetchCrosswalkSignalNetwork } from "../api";
+import type { CrosswalkSignalNetwork } from "../api";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import { CrosswalkSignalIndicators } from "./CrosswalkSignalIndicators";
 import type { ScenarioSignalStatus } from "../types/signalScenarios";
@@ -64,7 +65,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [signal, setSignal] = useState<ScenarioSignalStatus | null>(null);
+  const [signalNetwork, setSignalNetwork] = useState<CrosswalkSignalNetwork | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; pointerId: number; offsetX: number; offsetY: number } | null>(null);
 
@@ -84,18 +85,11 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
   const positions = useMemo(() => new Map(crosswalks.map((crosswalk, index) => [
     crosswalk.id, draft.positions[crosswalk.id] ?? defaultPosition(index, crosswalks.length),
   ] as const)), [crosswalks, draft.positions]);
-  useSerialPolling(async () => { setSignal(await fetchSignalStatus() as ScenarioSignalStatus); }, 1000,
-    { enabled: simulationEnabled, onError: () => setSignal(null) });
+  useSerialPolling(async () => { setSignalNetwork(await fetchCrosswalkSignalNetwork()); }, 1000,
+    { onError: () => setSignalNetwork(null) });
   const cameras = useMemo(() => new Map(
     (overview?.available_cameras ?? []).map((camera) => [camera.source_id, camera]),
   ), [overview]);
-
-  const observedSource = overview?.current_frame_source_id;
-  const signalOwner = simulationEnabled && observedSource && overview?.observation_provenance !== "unavailable"
-    ? crosswalks.find((item) => item.camera_side_a_id === observedSource || item.camera_side_b_id === observedSource)
-    : null;
-  const activeAdjustment = simulationEnabled && signal?.winning_scenario_label
-    ? signal.winning_scenario_label : null;
 
   const countsByCrosswalk = useMemo(() => {
     const result = new Map<string, { label: string; total: number; class_counts: Record<string, number> }[]>();
@@ -348,7 +342,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
           <span><strong>{crosswalks.filter((item) => item.camera_side_a_id || item.camera_side_b_id).length}</strong> with assigned cameras</span>
           <span><strong>{countsByCrosswalk.size}</strong> currently observed</span>
         </div>
-        <p className="small-note">Signal lamps display the existing shared simulation controller only for its observed crossing; other crossings are unverified. A connected neighbour may receive an adjustment notice, but Network links alone do not authorize phase changes, emergency green or independent traffic control.</p>
+        <p className="small-note">Each saved crosswalk has its own simulated signal controller. Network links do not yet define conflicting movements or command adjacent controllers; real signal states remain unavailable.</p>
         {dirty && <p className="small-note" role="status">Unsaved Network changes</p>}
         {notice && <p className="success-message" role="status">{notice}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
@@ -378,11 +372,11 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
                 const active = overview?.current_frame_source_id;
                 const liveHere = Boolean(overview && overview.observation_provenance !== "unavailable" && active
                   && (active === crosswalk.camera_side_a_id || active === crosswalk.camera_side_b_id));
-                const verifiedSignal = Boolean(simulationEnabled && signal && signalOwner?.id === crosswalk.id);
-                const adjacentNotice = activeAdjustment && signalOwner && signalOwner.id !== crosswalk.id && draft.links.some(
-                  (link) => (link.source_crosswalk_id === crosswalk.id && link.destination_crosswalk_id === signalOwner.id)
-                    || (link.destination_crosswalk_id === crosswalk.id && link.source_crosswalk_id === signalOwner.id),
-                ) ? "Adjacent adjustment at " + signalOwner.label + ": " + activeAdjustment + " (not applied here)" : null;
+                const crosswalkSignal = signalNetwork?.crosswalks[crosswalk.id];
+                const available = Boolean(simulationEnabled && crosswalkSignal?.signal);
+                const adjacentNotice = crosswalkSignal?.neighbors.length
+                  ? "Linked to " + crosswalkSignal.neighbors.length + " crossing(s) · coordination not configured"
+                  : null;
                 return (
                   <article key={crosswalk.id} className={"crossing-network-node" + (selected?.id === crosswalk.id ? " is-selected" : "")}
                     style={{ left: (position?.x ?? 50) + "%", top: (position?.y ?? 50) + "%" }}>
@@ -421,7 +415,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh, si
                         {liveHere && observed.length === 0 && <small>No current region counts</small>}
                       </div>
                     </div>
-                    <CrosswalkSignalIndicators signal={signal} available={verifiedSignal} adjacentNotice={adjacentNotice} />
+                    <CrosswalkSignalIndicators signal={(crosswalkSignal?.signal ?? null) as ScenarioSignalStatus | null} available={available} adjacentNotice={adjacentNotice} />
                   </article>
                 );
               })}

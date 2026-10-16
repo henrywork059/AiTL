@@ -1,3 +1,14 @@
+# V0511 Independent Controllers Candidate
+
+version: 0_5_11; previous_version: 0_5_10; passed_baseline: 0_5_0.
+
+- [ ] Each saved Crosswalk has a separate simulated controller with isolated runtime/test state.
+- [ ] Network shows independent states from new read-only API; no fabricated physical signal state.
+- [ ] Crosswalk addition/deletion updates controller registry; simulation off clears simulation states.
+- [ ] Network links report neighbors only. Coordination remains disabled; movement conflicts are not configured.
+- [ ] Existing signal phases/protected transitions, camera, global simulation, Network drag/save and rule settings regressions pass.
+- [ ] Full Windows runner, frontend build, API smoke and owner PASS. Baseline stays 0_5_0.
+
 # V0510 Network Signal and Adjustment Checklist (partial)
 
 ```text
