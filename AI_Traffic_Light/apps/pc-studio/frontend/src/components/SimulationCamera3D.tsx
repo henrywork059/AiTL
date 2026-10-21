@@ -89,11 +89,12 @@ export function SimulationCamera3D({
     setZoom(current => clamp(current - Math.sign(event.deltaY) * 0.08, 0.5, 1.35));
   }
 
-  const sizeX = scene?.width ?? 1280;
-  const sizeY = scene?.height ?? 720;
-  const phase = scene?.signal.phase ?? "waiting";
-  const vehicleLight = scene?.signal.vehicle_go ? "green" : phase === "vehicle_yellow" ? "amber" : "red";
-  const pedestrianLight = scene?.signal.pedestrian_walk ? "green" : "red";
+  const activeScene = scene?.source_id === sourceId ? scene : null;
+  const sizeX = activeScene?.width ?? 1280;
+  const sizeY = activeScene?.height ?? 720;
+  const phase = activeScene?.signal.phase ?? "waiting";
+  const vehicleLight = activeScene?.signal.vehicle_go ? "green" : phase === "vehicle_yellow" ? "amber" : "red";
+  const pedestrianLight = activeScene?.signal.pedestrian_walk ? "green" : "red";
   const isFlippedX = sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d";
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
@@ -120,7 +121,7 @@ export function SimulationCamera3D({
           <div className="sim3d-stop sim3d-stop-right" />
           <div className="sim3d-pole sim3d-vehicle-pole"><span className={vehicleLight} /></div>
           <div className="sim3d-pole sim3d-person-pole"><span className={pedestrianLight} /></div>
-          {scene?.vehicles.map(vehicle => {
+          {activeScene?.vehicles.map(vehicle => {
             const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
             const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
             return <div className="sim3d-car" key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
@@ -135,7 +136,7 @@ export function SimulationCamera3D({
               <div className="sim3d-car-side" />
             </div>;
           })}
-          {scene?.pedestrians.map(pedestrian => {
+          {activeScene?.pedestrians.map(pedestrian => {
             const point = sourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
             return <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
               left: `${point.x / sizeX * 100}%`,
@@ -179,7 +180,7 @@ export function SimulationCamera3D({
       <div className="sim3d-head">
         <span className="sim3d-flag">3D CAMERA</span>
         <span>{CAMERA_LABEL[sourceId] ?? sourceId}</span>
-        {scene?.paused && <span className="sim3d-paused">Paused</span>}
+        {activeScene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       {!editing && <div className="sim3d-actions">
         <button type="button" onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
@@ -190,7 +191,7 @@ export function SimulationCamera3D({
           value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
       </div>}
       <div className="sim3d-status" aria-live="off">
-        {scene ? <>
+        {activeScene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
           <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(scene.signal.seconds_remaining))} s</span>
