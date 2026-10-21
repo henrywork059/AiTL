@@ -1,6 +1,10 @@
-# V0515 — Interactive 3D simulation-camera preview
+# V0515 — All live simulated camera previews in 3D
 
-Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Feature branch `feature/interactive-3d-simulation` (do not replace it with main when testing). Run `python scripts/test_v0515_3d_simulation.py`, camera-frame and two-pair regressions, `scripts/check_structure.py`, frontend `npm run typecheck` and `npm run build` as appropriate, plus normal startup and smoke. In Camera Settings toggle simulation visibility, select simulation cameras A/B/C/D and verify live 3D agent movement, orbit, top view, zoom and reset. Pause/resume and switch density; confirm the 3D scene freezes/resets consistently, and selecting a real ESP returns an ordinary image. Validate 2D Crosswalk Region Editor alignment and AI/capture unchanged. Full Windows/hardware validation and owner PASS pending.
+Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Feature branch `feature/interactive-3d-simulation` only.
+
+Run focused `python scripts/test_v0515_3d_simulation.py`, existing simulation-frame, two-pair and Crosswalk regressions, `scripts/check_structure.py`, TypeScript/Vite build and startup/smoke. Use the normal Windows helper with **`-SkipUpdate`** to keep the feature branch checked out.
+
+Manually verify in both simulation camera pairs: Camera Settings and Camera Sources show only 3D for synthetic feeds, Crosswalk Side A/B show two distinct correctly selected 3D sources, Region Editor shows aligned 3D with draggables that save/reload unchanged coordinates, Camera AI Preview displays 3D boxes/regions with on/off toggles without changing counts, and Dataset Capture shows 3D but stores the original 2D PNG for manual labeling. Check pausing, density changes, source switching, narrow-width layout, simulation Stop, physical ESP previews, live inference, protected signal behavior, legacy 2D training images and Network controllers. Full local Windows/hardware validation and owner PASS pending.
 
 ---
 
