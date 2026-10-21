@@ -238,3 +238,55 @@
   .sim3d-status { font-size: .65rem; padding: 4px; left: 5px; bottom: 4px; }
   .sim3d-head { top: 5px; left: 5px; font-size: .7rem; padding: 4px; }
 }
+
+/* In region-editing mode, world pixels align 1:1 with canonical source-frame
+   polygon coordinates. Camera B/C/D use the corresponding mirrored agents. */
+.sim3d-preview.is-editor .sim3d-world { top: 50%; width: 100%; }
+.sim3d-preview.is-editor .sim3d-viewport { cursor: default; touch-action: auto; }
+.sim3d-preview.is-editor .sim3d-hint { display: block; right: 10px; top: 10px; }
+.sim3d-preview.is-editor .sim3d-head { max-width: 55%; }
+.sim3d-preview.is-editor .sim3d-status { bottom: 5px; font-size: .64rem; }
+
+/* The overlay is in the same transformed world as the 3D road and agents:
+   source-image boxes/regions project onto the ground, never into ESP data. */
+.sim3d-world-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: translateZ(35px);
+  pointer-events: none;
+}
+.sim3d-world-overlay .sim3d-region polygon {
+  stroke: #57ffed;
+  stroke-width: 4px;
+  fill: rgba(87, 255, 237, .10);
+}
+.sim3d-world-overlay .sim3d-region polyline {
+  stroke: #ffd78b;
+  stroke-width: 6px;
+  fill: none;
+}
+.sim3d-world-overlay .sim3d-region text {
+  fill: #f1f9fa;
+  font-size: 18px;
+  font-weight: 650;
+  paint-order: stroke;
+  stroke: #14212c;
+  stroke-width: 4px;
+}
+.sim3d-world-overlay .sim3d-detection rect {
+  fill: rgba(255, 190, 116, .06);
+  stroke: #ffcf87;
+  stroke-width: 5px;
+  stroke-dasharray: 12 7;
+}
+.sim3d-world-overlay .sim3d-detection text {
+  fill: #fff5de;
+  font-size: 20px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #15202b;
+  stroke-width: 5px;
+}
