@@ -1,6 +1,6 @@
-# V0515 — Interactive 3D Simulation Lab (feature branch)
+# V0515 — Interactive 3D simulation-camera preview
 
-Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Select branch `feature/interactive-3d-simulation`; do not fast-forward to main when testing. Run project structure, TypeScript and Vite build, plus focused simulation tab checks. Start the app, reveal Simulation Lab using the existing brand toggle, run/select an experiment, switch Fixed/Adaptive, replay/scrub, orbit/pitch/zoom and confirm signal and queue labels follow the timeline. Check empty state, mobile-width rendering and paused playback when changing runs. Synthetic aggregate samples do not contain per-object positions. Windows tests and owner PASS pending.
+Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Feature branch `feature/interactive-3d-simulation` (do not replace it with main when testing). Run `python scripts/test_v0515_3d_simulation.py`, camera-frame and two-pair regressions, `scripts/check_structure.py`, frontend `npm run typecheck` and `npm run build` as appropriate, plus normal startup and smoke. In Camera Settings toggle simulation visibility, select simulation cameras A/B/C/D and verify live 3D agent movement, orbit, top view, zoom and reset. Pause/resume and switch density; confirm the 3D scene freezes/resets consistently, and selecting a real ESP returns an ordinary image. Validate 2D Crosswalk Region Editor alignment and AI/capture unchanged. Full Windows/hardware validation and owner PASS pending.
 
 ---
 
