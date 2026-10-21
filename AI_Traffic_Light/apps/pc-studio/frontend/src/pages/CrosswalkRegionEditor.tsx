@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { CameraStatus } from "../types";
+import type { CameraStatus, Zone } from "../types";
 import { liveCameraMjpegUrl, refreshCameraAfterRemoteChange, selectRemoteCamera, type RemoteCameraProfile } from "../lib/remoteCameraApi";
 import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import type { Crosswalk, CrosswalkRegion } from "../types/crosswalks";
@@ -48,6 +48,7 @@ export function CrosswalkRegionEditor({
   onSimulationChange, onCameraStatusChange, onRegionsChange, onSave, saving, hasUnsavedChanges, onClose,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(crosswalk.regions[0]?.id ?? null);
+  const [perspectiveView, setPerspectiveView] = useState(true);
   const [side, setSide] = useState<Side>("camera_side_a_id");
   const [drag, setDrag] = useState<{ id: string; index: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,6 +66,10 @@ export function CrosswalkRegionEditor({
   const previewName = sourceId ?? "No camera assigned";
   const polygon = (region: CrosswalkRegion) => verticesForSide(region, sideKey).map(([x, y]) => x + "," + y).join(" ");
   const previewIs3d = Boolean(simulated && selectedCamera?.kind === "simulation" && showSimulationTools && sourceId);
+  const previewZones: Zone[] = visibleRegions.map(region => ({
+    id: region.id, label: region.label, type: "counting_region",
+    polygon: verticesForSide(region, sideKey),
+  }));
 
   function updateRegion(id: string, patch: Partial<CrosswalkRegion>) {
     onRegionsChange(crosswalk.regions.map((region) => region.id === id ? { ...region, ...patch } : region));
@@ -202,12 +207,16 @@ export function CrosswalkRegionEditor({
           {showSimulationTools && <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
             {simulated ? "Stop simulation" : "Use simulation camera"}
           </button>}
-          {showSimulationTools && <p className="small-note">Simulation cameras use one 3D world. Region vertices are edited in a coordinate-aligned top view for accurate AI counting.</p>}
+          {showSimulationTools && <p className="small-note">Simulation cameras share one 3D world. Inspect regions in perspective, then use Edit regions to drag vertices in the coordinate-aligned overhead view.</p>}
           {error && <p role="alert" className="error-message">{error}</p>}
         </aside>
         <section className="panel crosswalk-region-canvas-panel">
           <div className="panel-header">
             <strong>{previewName}</strong>
+            {previewIs3d && <div className="crosswalk-region-view-toggle" role="group" aria-label="3D region view">
+              <button type="button" aria-pressed={perspectiveView} onClick={() => setPerspectiveView(true)}>3D view</button>
+              <button type="button" aria-pressed={!perspectiveView} onClick={() => setPerspectiveView(false)}>Edit regions</button>
+            </div>}
             <span className={previewReady ? "status-pill status-implemented" : "status-pill status-planned"}>
               {previewReady ? "Live preview" : "Preview unavailable"}
             </span>
@@ -215,14 +224,15 @@ export function CrosswalkRegionEditor({
           <div className="crosswalk-region-frame">
             {previewReady
               ? previewIs3d && sourceId
-                ? <SimulationCamera3D key={sourceId} sourceId={sourceId} editing />
+                ? <SimulationCamera3D key={sourceId + (perspectiveView ? "-perspective" : "-edit")}
+                    sourceId={sourceId} editing={!perspectiveView} zones={previewZones} showBoxes={false} />
                 : <img key={previewName} src={liveCameraMjpegUrl()} alt={previewName} className="crosswalk-region-camera" />
               : <p className="crosswalk-region-frame-empty">
                   {simulated
                     ? "Waiting for the shared simulation frame."
                     : "Select a saved streaming side camera to align regions. Regions remain editable without a feed."}
                 </p>}
-            <svg
+            {(!previewIs3d || !perspectiveView) && <svg
               viewBox={"0 0 " + WIDTH + " " + HEIGHT}
               className="crosswalk-region-overlay"
               aria-label="Drag the four numbered vertices to reshape the selected quadrilateral region"
@@ -249,7 +259,7 @@ export function CrosswalkRegionEditor({
                   ))}
                 </g>
               ))}
-            </svg>
+            </svg>}
           </div>
           <p className="small-note">Editing coordinates: {WIDTH} × {HEIGHT}. One region name refers to the same physical area in both cameras; each side has its own polygon. Counting remains separate per camera to prevent double-counting. Select Save regions above to persist changes.</p>
         </section>
