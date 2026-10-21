@@ -1,5 +1,10 @@
 # API Contracts — current camera and junction-network highlights
 
+## V0515 simulated-camera 3D preview (read-only)
+
+`GET /api/camera/simulation/scene?source_id=simulation_camera` supports only the four saved simulation IDs: `simulation_camera`, `simulation_camera_b`, `simulation_camera_c`, `simulation_camera_d`. It returns the existing `{ok:true,data,meta:{request_id}}` envelope. Data includes `source_id`, `frame_number`, `received_at_ms`, `width`, `height`, `simulation_time_seconds`, `paused`, `density`, `signal:{phase,vehicle_go,pedestrian_walk,seconds_remaining}`, `vehicles:[{id,x,y,width,direction,vehicle_type,color}]` and `pedestrians:[{id,x,y,direction,color}]`. Positions are original 1280×720 camera-simulation coordinates; they are never converted to calibrated real-world 3D or physical camera viewpoints. Each A/B/C/D UI view uses a different orbit preset of the one shared scene. Invalid source IDs return 422 `CAMERA_SOURCE_INVALID`; simulation stopped returns 409 `CAMERA_STREAM_NOT_STARTED`. Reads refresh existing simulation state but do not configure/change signal policies. The legacy 2D frame/MJPEG APIs and AI, capture, region and ESP contracts remain unchanged.
+
+
 ## V0514 Network movement conflicts (simulation-only)
 
 Crosswalk `network.links[]` accepts optional `movement_conflicts`: a unique array of `vehicle_vehicle`, `vehicle_pedestrian`, `pedestrian_vehicle`, `pedestrian_pedestrian` (ordered source/destination link endpoints). Invalid, repeated or unsupported values cause the existing 422 validation error. An omitted/empty array is backward-compatible and means no interlock for that link.
