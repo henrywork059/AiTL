@@ -5,6 +5,13 @@ import "./simulationCamera3D.css";
 
 type Props = { sourceId: string };
 
+const CAMERA_LABEL: Record<string, string> = {
+  simulation_camera: "Camera A",
+  simulation_camera_b: "Camera B",
+  simulation_camera_c: "Camera C",
+  simulation_camera_d: "Camera D",
+};
+
 const INITIAL_ORBIT: Record<string, number> = {
   simulation_camera: -25,
   simulation_camera_b: 155,
@@ -110,7 +117,7 @@ export function SimulationCamera3D({ sourceId }: Props) {
       </div>
       <div className="sim3d-head">
         <span className="sim3d-flag">3D CAMERA</span>
-        <span>{sourceId.replace("simulation_camera", "Camera").replace("_", " ").trim() || "Camera A"}</span>
+        <span>{CAMERA_LABEL[sourceId] ?? sourceId}</span>
         {scene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       <div className="sim3d-actions">
@@ -125,7 +132,7 @@ export function SimulationCamera3D({ sourceId }: Props) {
         {scene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
-          <span>{phase.replaceAll("_", " ")} · {Math.ceil(scene.signal.seconds_remaining)} s</span>
+          <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(scene.signal.seconds_remaining))} s</span>
           <span>{scene.vehicles.length} cars · {scene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
