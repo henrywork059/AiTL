@@ -1,3 +1,11 @@
+# V0516 — Crosswalk 3D regression check repair
+
+Candidate `0_5_16`, previous `0_5_15`, accepted baseline `0_5_0`; feature branch `feature/interactive-3d-simulation`. A stale assertion in `scripts/test_crosswalks_frontend_structure.py` expected `source_id=${encodeURIComponent(sourceId)}` inside Crosswalk Region Editor even though simulation uses the 3D component. The test now guards the selected 3D source, aligned edit view, and MJPEG physical-camera fallback.
+
+Static source check: 12/12 focused Crosswalk wiring checks. Full Windows validation still required: use `update_test_run.ps1 -SkipUpdate`, confirm this test and the subsequent suite complete, frontend TypeScript/Vite build and smoke pass, and check all 3D simulation screens with the physical ESP and region editing unaffected. Do not mark PASS until confirmed by the owner.
+
+---
+
 # V0515 — All live simulated camera previews in 3D
 
 Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Feature branch `feature/interactive-3d-simulation` only.
