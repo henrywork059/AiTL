@@ -1,13 +1,14 @@
-# V0515 — Interactive 3D Simulation Lab (candidate)
+# V0515 — Interactive 3D simulated camera preview candidate
 
-- [ ] Feature branch checked out; `main` unchanged.
-- [ ] Project version/structure checks and frontend TypeScript/Vite build pass.
-- [ ] Simulation Lab's 3D Replay tab renders with a saved/new experiment.
-- [ ] Fixed/Adaptive switching resets playback and reflects the selected mode's samples.
-- [ ] Play/Pause, scrub, orbit, pitch, zoom and Reset view work without a backend mutation.
-- [ ] Vehicle and pedestrian queue counts and signal labels match raw sample values; object positions are labeled illustrative.
-- [ ] Empty and narrow-screen layouts remain usable, legacy charts/tabs and simulation controls work.
-- [ ] Owner confirms PASS. Accepted baseline remains `0_5_0`.
+- [ ] Feature branch active; main unchanged; VERSION `0_5_15`, accepted baseline `0_5_0`.
+- [ ] Python live-scene/route and existing camera-frame, two-pair and simulation visibility regressions pass.
+- [ ] Structure gate, frontend TypeScript/Vite build, backend /health and startup/smoke pass.
+- [ ] Camera Settings selected simulation cameras A/B/C/D show the interactive 3D view instead of MJPEG; Camera Sources simulation preview matches.
+- [ ] Viewpoint resets correctly when switching camera; orbit drag, top view, wheel/slider zoom work on desktop and narrow widths.
+- [ ] Vehicles/pedestrians move with actual simulated agent positions and reported signal phase; pause/resume and density are synchronized.
+- [ ] Physical ESP streams, Crosswalk Region Editor 2D canonical images, AI inference and dataset capture remain unchanged.
+- [ ] Stop simulation shows stopped status; no stale 3D frame or false hardware control claim.
+- [ ] Owner confirms PASS; otherwise release the minimal next corrective patch. Accepted baseline remains `0_5_0`.
 
 ---
 
