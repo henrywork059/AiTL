@@ -47,7 +47,10 @@ def main() -> None:
     assert "verticesForSide(region, sideKey)" in editor
     assert "Select camera for preview" in editor and "cameraStatus?.active_source_id === sourceId" in editor
     assert "Simulation pair" in editor
-    assert "source_id=${encodeURIComponent(sourceId)}" in editor
+    # Simulation previews use the live 3D component; physical ESP still uses MJPEG.
+    assert 'previewIs3d && sourceId' in editor
+    assert 'sourceId={sourceId} editing={!perspectiveView}' in editor
+    assert 'src={liveCameraMjpegUrl()}' in editor
     assert "Assign simulation pair" in page and "saveSimulationCamera()" in page
     assert "crosswalk-edge-marker" in page and '["1", 422, 18]' in page
     assert "simulation_camera_b" in page and "crosswalk-simulation-previews" in page
