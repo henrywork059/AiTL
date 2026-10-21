@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchCrosswalks, saveCrosswalks } from "../lib/crosswalksApi";
-import { fetchRemoteCameraStatus, refreshCameraAfterRemoteChange, saveSimulationCamera, liveCameraMjpegUrl, type RemoteCameraProfile } from "../lib/remoteCameraApi";
+import { fetchRemoteCameraStatus, refreshCameraAfterRemoteChange, saveSimulationCamera, type RemoteCameraProfile } from "../lib/remoteCameraApi";
+import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { CrosswalkRegionEditor } from "./CrosswalkRegionEditor";
 import type { CameraStatus } from "../types";
 import { useSerialPolling } from "../lib/useSerialPolling";
@@ -310,8 +311,8 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
               )}
               {showSimulationTools && cameraStatus?.simulation_enabled && sideA?.kind === "simulation" && sideB?.kind === "simulation" && (
                 <div className="crosswalk-simulation-previews">
-                  <div><strong>Side A</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera`} alt="Simulated camera A" /></div>
-                  <div><strong>Side B · vertically mirrored</strong><img src={`${liveCameraMjpegUrl()}?source_id=simulation_camera_b`} alt="Mirrored camera B" /></div>
+                  <div><strong>Side A · 3D</strong><div className="crosswalk-simulation-scene"><SimulationCamera3D key={selected.camera_side_a_id ?? "a"} sourceId={selected.camera_side_a_id!} /></div></div>
+                  <div><strong>Side B · 3D</strong><div className="crosswalk-simulation-scene"><SimulationCamera3D key={selected.camera_side_b_id ?? "b"} sourceId={selected.camera_side_b_id!} /></div></div>
                 </div>
               )}
               <p className="small-note">Both cameras can be assigned. Simultaneous two-camera inference and physical signal control are not enabled.</p>
