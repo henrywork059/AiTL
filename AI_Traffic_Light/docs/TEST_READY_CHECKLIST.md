@@ -5,7 +5,7 @@
 - [ ] Structure gate, TypeScript/Vite build, backend `/health`, startup and smoke pass on Windows.
 - [ ] Camera Settings and Camera Sources replace synthetic images with 3D; all four camera IDs select distinct source-aware views.
 - [ ] Crosswalk Side A/B paired previews use their **assigned source IDs**, not hard-coded Pair 1; both render 3D.
-- [ ] Crosswalk Region Editor uses coordinate-aligned 3D top view and its vertices save/reload correctly on A/B/C/D, even after switching sides.
+- [ ] Crosswalk Region Editor opens 3D perspective with region footprints; Edit regions mode aligns the 3D top view and vertices save/reload correctly on A/B/C/D, even after switching sides.
 - [ ] Camera AI Preview shows synthetic cars, people, configured regions and detector footprints together; visibility toggles and counts remain correct.
 - [ ] Dataset Capture shows 3D synthetic preview and explicitly saves original PNG for real detector labeling/training.
 - [ ] Orbit, Top, Zoom, Reset, pause, resume and density work; no stale source frames or false hardware-control claim.
