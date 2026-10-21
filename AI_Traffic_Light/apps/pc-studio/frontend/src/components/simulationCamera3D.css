@@ -1,0 +1,240 @@
+/* Perspective presentation of the existing 1280 × 720 synthetic camera world. */
+.sim3d-preview {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 55%, #334b59, #151f2b 82%);
+  color: #e8f2f1;
+}
+.sim3d-viewport {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  perspective: 960px;
+}
+.sim3d-viewport:active { cursor: grabbing; }
+.sim3d-world {
+  position: absolute;
+  top: 53%;
+  left: 50%;
+  width: 96%;
+  aspect-ratio: 16 / 9;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.sim3d-world > div { box-sizing: border-box; }
+.sim3d-ground {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, #667975 0%, #55645e 52%, #6e7f75 100%);
+  border: 5px solid #a4b5ac;
+  box-shadow: 2px 16px 30px #081c29bb, 0 0 0 1px #23333a;
+}
+.sim3d-road {
+  position: absolute;
+  top: 24.86%;
+  height: 61.94%;
+  width: 100%;
+  background: #333c48;
+  border-top: 4px solid #d2d7d4;
+  border-bottom: 4px solid #d2d7d4;
+  box-shadow: 0 3px 2px #12182080;
+}
+.sim3d-lane {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-top: 3px dashed #efbd7c;
+  opacity: .84;
+  transform: translateZ(1px);
+}
+.sim3d-lane-upper { top: 43.06%; }
+.sim3d-lane-lower { top: 69.44%; }
+.sim3d-crossing {
+  position: absolute;
+  top: 24.86%;
+  left: 40.625%;
+  height: 61.94%;
+  width: 18.75%;
+  background: #434955;
+  transform: translateZ(2px);
+}
+.sim3d-stripe {
+  position: absolute;
+  height: 3.05%;
+  left: 42%;
+  width: 16%;
+  background: #eff4f0;
+  opacity: .93;
+  transform: translateZ(3px);
+}
+.sim3d-stop {
+  position: absolute;
+  top: 24.86%;
+  height: 61.94%;
+  width: .5%;
+  background: #f1f1ec;
+  transform: translateZ(2px);
+}
+.sim3d-stop-left { left: 38.67%; }
+.sim3d-stop-right { left: 61.33%; }
+.sim3d-pole {
+  position: absolute;
+  width: 13px;
+  height: 18px;
+  padding: 2px;
+  border-radius: 3px;
+  background: #152430;
+  border: 2px solid #c4d3d4;
+  transform: translateZ(55px);
+  box-shadow: 0 3px 9px #111a23aa;
+  display: grid;
+  place-items: center;
+}
+.sim3d-pole::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  width: 4px;
+  height: 55px;
+  background: #b9c9c9;
+  transform-origin: top;
+  transform: rotateX(90deg);
+}
+.sim3d-vehicle-pole { left: 36%; top: 26%; }
+.sim3d-person-pole { left: 61%; top: 88%; }
+.sim3d-pole span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 9px currentColor;
+  background: currentColor;
+}
+.sim3d-pole span.green, .sim3d-status b.green { color: #57ffed; }
+.sim3d-pole span.amber, .sim3d-status b.amber { color: #ffd274; }
+.sim3d-pole span.red, .sim3d-status b.red { color: #ff777c; }
+.sim3d-car {
+  position: absolute;
+  height: 7.2%;
+  border-radius: 9px 9px 4px 4px;
+  border: 2px solid #fff4;
+  box-shadow: 2px 5px 2px #0007;
+  transform-style: preserve-3d;
+  transition: left 430ms linear, top 430ms linear;
+}
+.sim3d-car-roof {
+  position: absolute;
+  top: 12%;
+  left: 25%;
+  width: 48%;
+  height: 76%;
+  background: #263f54;
+  border: 2px solid #bed4d8;
+  border-radius: 5px;
+  box-shadow: 0 0 0 2px #ffffff33;
+  transform: translateZ(11px);
+}
+.sim3d-car-side {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 100%;
+  height: 15px;
+  border-radius: 0 0 3px 3px;
+  background: #182530;
+  transform-origin: top;
+  transform: rotateX(-90deg);
+}
+.sim3d-person {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #eaf4e6;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) translateZ(25px);
+  box-shadow: 1px 3px 4px #0007;
+  transition: left 430ms linear, top 430ms linear;
+}
+.sim3d-person span {
+  display: block;
+  position: absolute;
+  top: 9px;
+  left: 2px;
+  width: 4px;
+  height: 20px;
+  background: inherit;
+  border: 1px solid #dce5dc;
+  transform: rotateX(-75deg);
+  transform-origin: top;
+}
+.sim3d-head,
+.sim3d-actions,
+.sim3d-status,
+.sim3d-hint { position: absolute; z-index: 3; }
+.sim3d-head {
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  font-size: .78rem;
+  border-radius: 8px;
+  background: #14212cd9;
+  border: 1px solid #63827e88;
+  pointer-events: none;
+}
+.sim3d-flag { color: #57ffed; letter-spacing: .08em; font-weight: 700; }
+.sim3d-paused { color: #ffd274; }
+.sim3d-actions {
+  right: 10px;
+  bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+  background: #14212cdb;
+}
+.sim3d-actions button { min-height: 30px; padding: 4px 9px; font-size: .75rem; }
+.sim3d-actions label { display: flex; align-items: center; gap: 6px; font-size: .75rem; }
+.sim3d-actions input { max-width: 86px; accent-color: #57ffed; }
+.sim3d-status {
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  max-width: calc(100% - 20px);
+  border: 1px solid #63827e88;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #14212ce8;
+  font-size: .72rem;
+}
+.sim3d-status b { text-transform: uppercase; font-weight: 700; }
+.sim3d-hint {
+  right: 12px;
+  top: 12px;
+  font-size: .68rem;
+  color: #d7e6e1;
+  text-shadow: 0 1px 3px #16202a;
+  pointer-events: none;
+}
+@media (max-width: 680px) {
+  .sim3d-hint { display: none; }
+  .sim3d-world { width: 110%; }
+  .sim3d-actions { right: 5px; bottom: 38px; gap: 3px; padding: 3px; }
+  .sim3d-actions button { padding: 3px 6px; min-height: 24px; }
+  .sim3d-actions label { font-size: .67rem; }
+  .sim3d-actions input { max-width: 48px; }
+  .sim3d-status { font-size: .65rem; padding: 4px; left: 5px; bottom: 4px; }
+  .sim3d-head { top: 5px; left: 5px; font-size: .7rem; padding: 4px; }
+}
