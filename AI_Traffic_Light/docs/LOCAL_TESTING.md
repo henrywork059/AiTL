@@ -1,3 +1,9 @@
+# V0515 — Interactive 3D Simulation Lab (feature branch)
+
+Candidate `0_5_15`; previous `0_5_14`; accepted baseline `0_5_0`. Select branch `feature/interactive-3d-simulation`; do not fast-forward to main when testing. Run project structure, TypeScript and Vite build, plus focused simulation tab checks. Start the app, reveal Simulation Lab using the existing brand toggle, run/select an experiment, switch Fixed/Adaptive, replay/scrub, orbit/pitch/zoom and confirm signal and queue labels follow the timeline. Check empty state, mobile-width rendering and paused playback when changing runs. Synthetic aggregate samples do not contain per-object positions. Windows tests and owner PASS pending.
+
+---
+
 # V0514 Release Consistency Repair Candidate
 
 ```text
