@@ -1,19 +1,20 @@
-# Patch 0_5_15 — Interactive 3D simulation-camera preview
+# Patch 0_5_15 — Interactive 3D simulation previews
 
 **Branch:** `feature/interactive-3d-simulation` | **Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`.
 
 ## Implemented
 
-- Replace the selected simulated camera's MJPEG display in **Camera Settings → Selected camera live preview** with an interactive 3D perspective of the **same running simulation agents**. The Camera Sources simulation preview also uses this view while simulation tools are visible.
-- A read-only scene projection on the existing CameraFrameService returns current vehicle positions/sizes/directions, pedestrian positions, phase, signal indications, frame number, density and paused status for each of the four saved simulation camera IDs. It does not copy simulation state into a second controller.
-- New `GET /api/camera/simulation/scene?source_id=...` uses the normal request-ID envelope; invalid physical/unknown source IDs yield 422, stopped simulation yields 409.
-- Browser preview uses a self-contained CSS 3D/perspective scene with orbit drag, touch, wheel zoom, zoom slider, top view and reset. Four source IDs get different default vantage angles. It refreshes through the existing single-flight polling utility.
-- Preserve underlying 2D simulation PNG/MJPEG, AI/capture frames, camera AI inference, all real ESP camera previews, signal safety logic, and camera-aligned Crosswalk Region Editor images. No new frontend dependency or data storage.
+- All **live synthetic-camera 2D preview surfaces** now use the existing interactive 3D renderer: Camera Settings, Camera Sources, Crosswalk Side A/B previews, Crosswalk Region Editor, Camera AI Preview, and Dataset Capture.
+- The 3D scene reads the actual running simulated vehicle and pedestrian coordinates plus virtual signal state through the existing read-only scene API. All saved simulation camera IDs (Pair 1 A/B, Pair 2 C/D) use their correct source orientation, with source-frame mirrors applied to agent coordinates.
+- Camera AI Preview projects its existing 2D source-frame detection rectangles and physical-region polygons onto the simulated 3D ground plane. This is a visualization, **not** new 3D recognition or tracking; the actual AI counts and detector output are unchanged.
+- Crosswalk Region Editor uses a 3D scene in a **fixed top-down coordinate-aligned edit mode**. The existing draggable quadrilateral vertices stay in the 1280×720 source-image coordinate system, preserving saved polygon geometry and accurate AI counting for both mirrored sides.
+- Dataset Capture displays the live 3D synthetic scene while continuing to save the canonical synthetic 2D image for real detector training/labeling. The interface states this distinction explicitly.
+- Reuse the same CSS perspective renderer, serial polling utility, backend service and camera registry. No new dependencies, controller, storage, signal-policy changes, or physical hardware outputs.
 
-## Scope/limitations
+## Scope boundaries
 
-This is **interactive 3D presentation of the live 2D-world simulator**. It is not a photorealistic engine or calibrated 3D reconstruction of physical cameras. A/B/C/D are preset viewing angles of the shared simulation world; their rendered pixels are **not** interchangeable with the existing mirrored 2D frame coordinates. Therefore region editing and image-coordinate AI overlays deliberately remain on canonical 2D images. No real hardware light actuation.
+This replaces **live simulated camera pictures**, not unrelated 2D charts/forms, Network topology diagrams, real ESP footage or already-captured training photographs. The latter are genuine source-image artifacts, not 3D model data. The simulated renderer offers interactive orbit, zoom and top view; its editor variant restricts projection to preserve exact polygon coordinates. Camera detection boxes are image-space overlays drawn on the world plane, not 3D bounding boxes. All simulated camera coordinates still originate from the 2D traffic simulation and are rendered in a synthetic 3D presentation, not a measured 3D digital twin.
 
-## Validation
+## Validation / handoff
 
-Run `python scripts/test_v0515_3d_simulation.py`, existing camera frame/multi-camera tests, frontend TypeScript/Vite build and normal Windows owner runner on the feature branch without checking out main. Confirm Camera Settings selects Pair 1 and Pair 2, the 3D view moves/pauses with simulation, scene orientation/reset/zoom works, and ESP & region editor still show normal 2D images. Windows app validation and owner PASS are pending.
+Focused source-level checks can verify every affected view, read-only API wiring, source mirror handling, editor alignment, and preservation of image/ESP paths. Full local Python regression suite, `npm run typecheck`, `npm run build`, Windows startup/smoke and visual region-drag checks must still be executed before owner PASS. Use `-SkipUpdate` when running the existing Windows helper on the feature branch; a normal helper call pulls `main` and will refuse the feature branch.
