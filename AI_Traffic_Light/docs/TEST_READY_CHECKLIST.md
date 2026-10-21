@@ -1,14 +1,16 @@
-# V0515 — Interactive 3D simulated camera preview candidate
+# V0515 — All live synthetic-camera views in 3D (candidate)
 
-- [ ] Feature branch active; main unchanged; VERSION `0_5_15`, accepted baseline `0_5_0`.
-- [ ] Python live-scene/route and existing camera-frame, two-pair and simulation visibility regressions pass.
-- [ ] Structure gate, frontend TypeScript/Vite build, backend /health and startup/smoke pass.
-- [ ] Camera Settings selected simulation cameras A/B/C/D show the interactive 3D view instead of MJPEG; Camera Sources simulation preview matches.
-- [ ] Viewpoint resets correctly when switching camera; orbit drag, top view, wheel/slider zoom work on desktop and narrow widths.
-- [ ] Vehicles/pedestrians move with actual simulated agent positions and reported signal phase; pause/resume and density are synchronized.
-- [ ] Physical ESP streams, Crosswalk Region Editor 2D canonical images, AI inference and dataset capture remain unchanged.
-- [ ] Stop simulation shows stopped status; no stale 3D frame or false hardware control claim.
-- [ ] Owner confirms PASS; otherwise release the minimal next corrective patch. Accepted baseline remains `0_5_0`.
+- [ ] Checked out `feature/interactive-3d-simulation`; `main` unchanged, VERSION `0_5_15`, accepted baseline `0_5_0`.
+- [ ] Backend live simulation scene test and existing camera/frame, second-pair and Crosswalk tests pass.
+- [ ] Structure gate, TypeScript/Vite build, backend `/health`, startup and smoke pass on Windows.
+- [ ] Camera Settings and Camera Sources replace synthetic images with 3D; all four camera IDs select distinct source-aware views.
+- [ ] Crosswalk Side A/B paired previews use their **assigned source IDs**, not hard-coded Pair 1; both render 3D.
+- [ ] Crosswalk Region Editor uses coordinate-aligned 3D top view and its vertices save/reload correctly on A/B/C/D, even after switching sides.
+- [ ] Camera AI Preview shows synthetic cars, people, configured regions and detector footprints together; visibility toggles and counts remain correct.
+- [ ] Dataset Capture shows 3D synthetic preview and explicitly saves original PNG for real detector labeling/training.
+- [ ] Orbit, Top, Zoom, Reset, pause, resume and density work; no stale source frames or false hardware-control claim.
+- [ ] Real ESP previews, saved 2D label review, Network connections and traffic-signal arbitration are unchanged.
+- [ ] Owner confirms PASS; stable baseline stays `0_5_0` until then.
 
 ---
 
