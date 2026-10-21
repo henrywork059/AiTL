@@ -1,3 +1,16 @@
+# V0515 — Interactive 3D Simulation Lab (candidate)
+
+- [ ] Feature branch checked out; `main` unchanged.
+- [ ] Project version/structure checks and frontend TypeScript/Vite build pass.
+- [ ] Simulation Lab's 3D Replay tab renders with a saved/new experiment.
+- [ ] Fixed/Adaptive switching resets playback and reflects the selected mode's samples.
+- [ ] Play/Pause, scrub, orbit, pitch, zoom and Reset view work without a backend mutation.
+- [ ] Vehicle and pedestrian queue counts and signal labels match raw sample values; object positions are labeled illustrative.
+- [ ] Empty and narrow-screen layouts remain usable, legacy charts/tabs and simulation controls work.
+- [ ] Owner confirms PASS. Accepted baseline remains `0_5_0`.
+
+---
+
 # V0514 Release Consistency Repair Candidate
 
 ```text
