@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cameraPreviewUrl, fetchCameraInference, fetchInferenceStatus, inferredFrameUrl } from "../api";
 import { CameraDetectionView } from "../components/CameraDetectionView";
+import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { DetectionTable } from "../components/DetectionTable";
 import { fetchCrosswalks } from "../lib/crosswalksApi";
 import { cameraRegions, regionClassCounts } from "../lib/regionCounts";
@@ -98,7 +99,15 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
           </label>
         </div>
         <div className="live-canvas-shell">
-          {sourceId && hasFeed ? (
+          {sourceId && hasFeed ? camera?.kind === "simulation" && cameraStatus?.simulation_enabled ? (
+            <div className="live-camera-stage" style={{ aspectRatio: "16 / 9" }}>
+              <SimulationCamera3D key={sourceId} sourceId={sourceId}
+                detections={detections} zones={regions}
+                frameWidth={displayedFrame?.image_width ?? 1280}
+                frameHeight={displayedFrame?.image_height ?? 720}
+                showBoxes={showBoxes} showLabels={showLabels} showRegions={showRegions} />
+            </div>
+          ) : (
             <CameraDetectionView
               cameraStatus={cameraStatus}
               frame={displayedFrame}
@@ -117,6 +126,7 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
             </div>
           )}
         </div>
+        {camera?.kind === "simulation" && cameraStatus?.simulation_enabled && <p className="small-note">3D projection shows live simulated positions; detector boxes and regions are mapped from the camera image plane, not independently measured in 3D.</p>}
         <div className="live-inference-meta wrap-row">
           <span>Camera <strong>{sourceId || "none"}</strong></span>
           <span>Status <strong>{hasFeed ? "Connected" : "Unavailable"}</strong></span>
