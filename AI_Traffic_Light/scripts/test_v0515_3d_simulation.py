@@ -80,7 +80,9 @@ def main() -> None:
     assert 'sourceId={selected.camera_side_a_id!}' in crosswalks
     assert 'sourceId={selected.camera_side_b_id!}' in crosswalks
     assert '<SimulationCamera3D' in crosswalks and 'liveCameraMjpegUrl()' not in crosswalks
-    assert 'previewIs3d' in region_editor and 'sourceId={sourceId} editing' in region_editor
+    assert 'previewIs3d' in region_editor and 'editing={!perspectiveView}' in region_editor
+    assert 'zones={previewZones}' in region_editor and 'aria-pressed={perspectiveView}' in region_editor
+    assert '(!previewIs3d || !perspectiveView) && <svg' in region_editor
     assert 'className="crosswalk-region-overlay"' in region_editor
     assert 'camera?.kind === "simulation"' in ai_preview and 'showBoxes={showBoxes}' in ai_preview
     assert 'zones={regions}' in ai_preview and 'showRegions={showRegions}' in ai_preview
@@ -89,6 +91,7 @@ def main() -> None:
     assert 'Capture saves its original 2D synthetic image' in capture
     assert 'className="camera-frame"' in capture, "Physical camera captures must remain visible"
     assert 'sourcePoint(x: number, y: number, sourceId: string' in component
+    assert 'scene?.source_id === sourceId' in component  # Never display a stale source
     assert 'hasOverlay = !editing' in component
     assert 'viewBox={`0 0 ${sizeX} ${sizeY}`}' in component
     assert 'pointer-events: none;' in styles
