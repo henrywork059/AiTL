@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CameraStatus } from "../types";
 import { liveCameraMjpegUrl, refreshCameraAfterRemoteChange, selectRemoteCamera, type RemoteCameraProfile } from "../lib/remoteCameraApi";
+import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import type { Crosswalk, CrosswalkRegion } from "../types/crosswalks";
 import "./crosswalkRegionEditor.css";
 
@@ -63,6 +64,7 @@ export function CrosswalkRegionEditor({
     : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale));
   const previewName = sourceId ?? "No camera assigned";
   const polygon = (region: CrosswalkRegion) => verticesForSide(region, sideKey).map(([x, y]) => x + "," + y).join(" ");
+  const previewIs3d = Boolean(simulated && selectedCamera?.kind === "simulation" && showSimulationTools && sourceId);
 
   function updateRegion(id: string, patch: Partial<CrosswalkRegion>) {
     onRegionsChange(crosswalk.regions.map((region) => region.id === id ? { ...region, ...patch } : region));
@@ -200,7 +202,7 @@ export function CrosswalkRegionEditor({
           {showSimulationTools && <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
             {simulated ? "Stop simulation" : "Use simulation camera"}
           </button>}
-          {showSimulationTools && <p className="small-note">Side A and B are mirrored views of the same simulation.</p>}
+          {showSimulationTools && <p className="small-note">Simulation cameras use one 3D world. Region vertices are edited in a coordinate-aligned top view for accurate AI counting.</p>}
           {error && <p role="alert" className="error-message">{error}</p>}
         </aside>
         <section className="panel crosswalk-region-canvas-panel">
@@ -212,7 +214,9 @@ export function CrosswalkRegionEditor({
           </div>
           <div className="crosswalk-region-frame">
             {previewReady
-              ? <img key={previewName} src={simulated && selectedCamera?.kind === "simulation" && sourceId ? `${liveCameraMjpegUrl()}?source_id=${encodeURIComponent(sourceId)}` : liveCameraMjpegUrl()} alt={previewName} className="crosswalk-region-camera" />
+              ? previewIs3d && sourceId
+                ? <SimulationCamera3D key={sourceId} sourceId={sourceId} editing />
+                : <img key={previewName} src={liveCameraMjpegUrl()} alt={previewName} className="crosswalk-region-camera" />
               : <p className="crosswalk-region-frame-empty">
                   {simulated
                     ? "Waiting for the shared simulation frame."
