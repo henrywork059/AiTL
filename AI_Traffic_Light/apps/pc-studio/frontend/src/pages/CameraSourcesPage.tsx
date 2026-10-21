@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { API_BASE } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { SimulationControls } from "../components/SimulationControls";
+import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import {
   connectRemoteCamera,
   DEFAULT_REMOTE_CAMERA_SETTINGS,
@@ -169,6 +170,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
       : selectedFrameAvailable
         ? `${API_BASE}/api/camera/frame?v=${status?.frame_number ?? 0}`
         : null;
+
+  const use3dPreview = Boolean(showSimulationTools && status?.simulation_enabled && (cameraSettingsView ? selectedSimulation : true));
+  const sceneSourceId = cameraSettingsView ? selectedId : status?.active_source_id ?? "simulation_camera";
 
   const statusLabel = !status
     ? "checking"
@@ -392,7 +396,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
           </div>
 
           <div className="camera-frame-wrapper">
-            {imageUrl ? (
+            {use3dPreview ? (
+              <SimulationCamera3D key={sceneSourceId} sourceId={sceneSourceId} />
+            ) : imageUrl ? (
               <img
                 key={cameraSettingsView ? remote?.active_source_id ?? "none" : status?.simulation_enabled ? "simulation" : status?.active_source_id ?? "input"}
                 className="camera-frame"
