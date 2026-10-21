@@ -341,6 +341,60 @@ class CameraFrameService:
         with self._lock:
             return self._simulation_frame_for_locked(source_id)
 
+    def simulation_scene_for(self, source_id: str) -> dict | None:
+        """Read the running simulator's actual agents for the optional 3D UI.
+
+        This view is read-only with respect to controller policy. Every saved
+        simulated camera observes the same physical scene with a different
+        frontend viewing angle. Original 2D frames remain canonical for AI,
+        capture and image-coordinate region editing.
+        """
+        if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
+            raise ValueError("Unknown simulation camera")
+        with self._lock:
+            frame = self._simulation_frame_for_locked(source_id)
+            if frame is None:
+                return None
+            signal = self._simulation_signal_state_locked()
+            return {
+                "source_id": source_id,
+                "frame_number": frame.frame_number,
+                "received_at_ms": frame.received_at_ms,
+                "width": FRAME_WIDTH,
+                "height": FRAME_HEIGHT,
+                "simulation_time_seconds": round(self._simulation_clock_s, 3),
+                "paused": self._simulation_paused,
+                "density": self._simulation_density,
+                "signal": {
+                    "phase": signal["phase"],
+                    "vehicle_go": signal["vehicle_go"],
+                    "pedestrian_walk": signal["pedestrian_walk"],
+                    "seconds_remaining": signal["seconds_remaining"],
+                },
+                "vehicles": [
+                    {
+                        "id": f"vehicle_{index}",
+                        "x": round(vehicle.x, 2),
+                        "y": vehicle.y,
+                        "width": vehicle.width,
+                        "direction": vehicle.direction,
+                        "vehicle_type": vehicle.vehicle_type,
+                        "color": "#{:02x}{:02x}{:02x}".format(*reversed(vehicle.color)),
+                    }
+                    for index, vehicle in enumerate(self._vehicles)
+                ],
+                "pedestrians": [
+                    {
+                        "id": f"pedestrian_{index}",
+                        "x": pedestrian.x,
+                        "y": round(pedestrian.y, 2),
+                        "direction": pedestrian.direction,
+                        "color": "#{:02x}{:02x}{:02x}".format(*reversed(pedestrian.color)),
+                    }
+                    for index, pedestrian in enumerate(self._pedestrians)
+                ],
+            }
+
     def latest_frame(self) -> CameraFrame | None:
         with self._lock:
             if self._simulation_enabled:
