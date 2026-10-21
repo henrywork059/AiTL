@@ -1,3 +1,13 @@
+# Start Here — V0515 (3D replay branch)
+
+**Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`.
+
+On branch `feature/interactive-3d-simulation`, open hidden Simulation Lab using the existing AI Traffic Light panel toggle, select or run an isolated experiment, and choose **3D Replay**. Use Fixed/Adaptive selection, Play/Pause, timeline, orbit, pitch, zoom or Reset view. Vehicle and pedestrian positions are illustrative arrangements matching reported queue counts, not measured positions. Signal lights reflect stored phase labels. The existing backend simulation and signal safety logic are unchanged.
+
+Test on Windows from repository root after checking out the feature branch: run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests -SkipUpdate` (if supported locally), so the runner does not replace this feature branch with main. Check viewport on desktop and narrow displays; verify the scene tracks the selected experiment and mode and does not issue signal commands. Full owner PASS pending.
+
+---
+
 # Start Here — V0514
 
 **Current candidate:** `0_5_14` | **Previous candidate:** `0_5_13` | **Accepted baseline:** `0_5_0`.
