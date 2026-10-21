@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { fetchSignalRules } from "../api";
+import { SimulationScene3D } from "../components/SimulationScene3D";
 import {
   deleteSimulationExperiment,
   fetchSimulationExperiment,
@@ -11,7 +12,7 @@ import {
 import type { ExperimentDelta, ExperimentModeResult, SimulationExperiment, SimulationExperimentSummary } from "../types/experiments";
 import "./simulationLab.css";
 
-type TabId = "summary" | "waiting" | "throughput" | "signal" | "samples";
+type TabId = "scene" | "summary" | "waiting" | "throughput" | "signal" | "samples";
 type SampleMode = "fixed" | "adaptive";
 
 type ComparisonRow = {
@@ -70,7 +71,7 @@ function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
 }
 
 export function SimulationLabPage() {
-  const [tab, setTab] = useState<TabId>("summary");
+  const [tab, setTab] = useState<TabId>("scene");
   const [sampleMode, setSampleMode] = useState<SampleMode>("adaptive");
   const [duration, setDuration] = useState(300);
   const [density, setDensity] = useState<"light" | "normal" | "busy">("normal");
@@ -238,7 +239,7 @@ export function SimulationLabPage() {
           onKeyDown={(event) => {
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             event.preventDefault();
-            const ids: TabId[] = ["summary", "waiting", "throughput", "signal", "samples"];
+            const ids: TabId[] = ["scene", "summary", "waiting", "throughput", "signal", "samples"];
             const index = ids.indexOf(tab);
             const next = event.key === "Home" ? ids[0] : event.key === "End" ? ids[ids.length - 1]
               : ids[(index + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length];
@@ -246,7 +247,7 @@ export function SimulationLabPage() {
             event.currentTarget.querySelector<HTMLButtonElement>(`#experiment-tab-${next}`)?.focus();
           }}>
           {([
-            ["summary", "Summary"], ["waiting", "Waiting & queues"], ["throughput", "Throughput"], ["signal", "Signal behavior"], ["samples", "Raw samples"],
+            ["scene", "3D Replay"], ["summary", "Summary"], ["waiting", "Waiting & queues"], ["throughput", "Throughput"], ["signal", "Signal behavior"], ["samples", "Raw samples"],
           ] as [TabId, string][]).map(([id, text]) => (
             <button key={id} id={`experiment-tab-${id}`} type="button" role="tab" aria-selected={tab === id}
               aria-controls="experiment-tab-panel" tabIndex={tab === id ? 0 : -1}
@@ -257,6 +258,7 @@ export function SimulationLabPage() {
         <div className="experiment-tab-panel" id="experiment-tab-panel" role="tabpanel" aria-labelledby={`experiment-tab-${tab}`} tabIndex={0}>
           {!result ? <div className="experiment-empty"><strong>No experiment selected.</strong><span>Choose a stored run or start a new comparison.</span></div> : (
             <>
+              {tab === "scene" && <><div className="experiment-toggle" role="group" aria-label="3D replay mode"><button aria-pressed={sampleMode === "fixed"} className={sampleMode === "fixed" ? "active" : ""} onClick={() => setSampleMode("fixed")}>Fixed</button><button aria-pressed={sampleMode === "adaptive"} className={sampleMode === "adaptive" ? "active" : ""} onClick={() => setSampleMode("adaptive")}>Adaptive</button></div><SimulationScene3D samples={sampleSource} mode={sampleMode} /></>}
               {tab === "summary" && <SummaryTab result={result} />}
               {tab === "waiting" && <WaitingTab fixed={result.fixed} adaptive={result.adaptive} />}
               {tab === "throughput" && <ThroughputTab fixed={result.fixed} adaptive={result.adaptive} />}
