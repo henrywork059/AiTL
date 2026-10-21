@@ -279,6 +279,28 @@ def latest_camera_frame(request: Request) -> Response:
     )
 
 
+@router.get("/simulation/scene")
+def read_camera_simulation_scene(
+    request: Request,
+    source_id: str = Query(default="simulation_camera"),
+) -> dict:
+    """Read one saved simulation camera's live 3D presentation state."""
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(
+            ErrorCode.CAMERA_SOURCE_INVALID,
+            "Only saved simulation camera IDs support 3D scene preview.",
+            status_code=422,
+        )
+    scene = camera_frame_service.simulation_scene_for(source_id)
+    if scene is None:
+        raise AppError(
+            ErrorCode.CAMERA_STREAM_NOT_STARTED,
+            "Start simulation to show its 3D camera scene.",
+            status_code=409,
+        )
+    return ok(scene, request_id=request.state.request_id)
+
+
 @router.post("/simulation/start")
 def start_camera_simulation(request: Request) -> dict:
     camera_frame_service.set_simulation(True)
