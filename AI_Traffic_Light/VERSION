@@ -1,5 +1,5 @@
 version: 0_5_15
-status: Interactive 3D Simulation Lab replay (presentation-only; isolated synthetic experiment) candidate
+status: Interactive 3D simulated-camera preview candidate
 previous_version: 0_5_14
 passed_baseline: 0_5_0
-notes: Feature branch only. Adds an interactive CSS perspective 3D replay using existing synthetic experiment queue/phase timeline values, with playback, Fixed/Adaptive mode, orbit, pitch and zoom. Illustrative object positions are not tracked trajectories. No backend/traffic-light controller changes. Full Windows test and owner PASS pending.
+notes: Feature branch replaces simulated camera live previews with perspective 3D views driven by the existing live CameraFrameService agent positions and virtual signal phase. Both saved camera pairs have independent view presets; canonical 2D frames remain for AI, capture and regions. ESP previews and controllers unchanged. Full Windows tests and owner PASS pending.
