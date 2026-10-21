@@ -36,3 +36,6 @@
   border-radius: 50%;
   background: var(--color-primary);
 }
+
+/* Each side has its own interactive perspective without stretching the world. */
+.crosswalk-simulation-scene { position: relative; aspect-ratio: 16 / 9; width: 100%; overflow: hidden; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); }
