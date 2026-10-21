@@ -71,11 +71,35 @@ def main() -> None:
     assert '@router.get("/simulation/scene")' in route
     assert "source_id not in SIMULATION_SOURCE_IDS" in route
     assert "return ok(scene, request_id=request.state.request_id)" in route
+    # Every LIVE synthetic camera image surface displays the shared 3D component.
+    # Unmodified physical ESP frames and persisted image-coordinate editors remain usable.
+    crosswalks = (FRONTEND / "pages/CrosswalksPage.tsx").read_text(encoding="utf-8")
+    region_editor = (FRONTEND / "pages/CrosswalkRegionEditor.tsx").read_text(encoding="utf-8")
+    ai_preview = (FRONTEND / "pages/LiveAiPage.tsx").read_text(encoding="utf-8")
+    capture = (FRONTEND / "pages/DatasetCapturePage.tsx").read_text(encoding="utf-8")
+    assert 'sourceId={selected.camera_side_a_id!}' in crosswalks
+    assert 'sourceId={selected.camera_side_b_id!}' in crosswalks
+    assert '<SimulationCamera3D' in crosswalks and 'liveCameraMjpegUrl()' not in crosswalks
+    assert 'previewIs3d' in region_editor and 'sourceId={sourceId} editing' in region_editor
+    assert 'className="crosswalk-region-overlay"' in region_editor
+    assert 'camera?.kind === "simulation"' in ai_preview and 'showBoxes={showBoxes}' in ai_preview
+    assert 'zones={regions}' in ai_preview and 'showRegions={showRegions}' in ai_preview
+    assert '<CameraDetectionView' in ai_preview, "ESP AI preview must remain available"
+    assert 'cameraStatus?.simulation_enabled && previewUrl' in capture
+    assert 'Capture saves its original 2D synthetic image' in capture
+    assert 'className="camera-frame"' in capture, "Physical camera captures must remain visible"
+    assert 'sourcePoint(x: number, y: number, sourceId: string' in component
+    assert 'hasOverlay = !editing' in component
+    assert 'viewBox={`0 0 ${sizeX} ${sizeY}`}' in component
+    assert 'pointer-events: none;' in styles
+    assert 'sim3d-preview.is-editor .sim3d-world' in styles
+
     assert not (FRONTEND / "components/SimulationScene3D.tsx").exists()
     assert '"3D Replay"' not in (FRONTEND / "pages/SimulationLabPage.tsx").read_text(encoding="utf-8")
 
     print("[PASS] Live agent coordinates, all camera IDs, pause, density and disabled-state 3D scene")
-    print("[PASS] 3D preview wired only for simulation; physical ESP image and AI frame services preserved")
+    print("[PASS] Camera Settings, Crosswalk pair, Region Editor, AI Preview and Capture share 3D simulations")
+    print("[PASS] Physical ESP, source-frame AI coordinates and saved capture image files remain unchanged")
 
 
 if __name__ == "__main__":
