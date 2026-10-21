@@ -1,10 +1,10 @@
-# Start Here — V0515 (3D replay branch)
+# Start Here — V0515 (interactive 3D camera preview branch)
 
 **Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`.
 
-On branch `feature/interactive-3d-simulation`, open hidden Simulation Lab using the existing AI Traffic Light panel toggle, select or run an isolated experiment, and choose **3D Replay**. Use Fixed/Adaptive selection, Play/Pause, timeline, orbit, pitch, zoom or Reset view. Vehicle and pedestrian positions are illustrative arrangements matching reported queue counts, not measured positions. Signal lights reflect stored phase labels. The existing backend simulation and signal safety logic are unchanged.
+On `feature/interactive-3d-simulation`, reveal simulation tools with the **AI Traffic Light** panel toggle, then select/add a saved simulation camera in **Camera Settings**. **Selected camera live preview** now displays a live interactive 3D traffic scene rather than a flat synthetic camera image. Drag to orbit, scroll/slider to zoom, or use Top/Reset. Pause, resume, and density still use existing Simulation Controls. Both simulation camera pairs use their own view angles of the one shared simulation. The Camera Sources simulated input view also displays 3D; ESP streams remain image previews.
 
-Test on Windows from repository root after checking out the feature branch: run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -ChangedTests -SkipUpdate` (if supported locally), so the runner does not replace this feature branch with main. Check viewport on desktop and narrow displays; verify the scene tracks the selected experiment and mode and does not issue signal commands. Full owner PASS pending.
+The 3D objects follow the existing simulated vehicle/pedestrian positions and virtual signal phase. The original PNG camera feed is deliberately retained for AI/capture and precise Crosswalk Region Editor coordinates, which are not calibrated to the 3D perspective. No second simulator, signal-controller changes or hardware actuation. Test the branch without running the default `main`-pulling updater; use the branch's existing runner with `-SkipUpdate` if supported, or run focused tests and frontend typecheck/build directly. Full Windows acceptance and owner PASS pending.
 
 ---
 
