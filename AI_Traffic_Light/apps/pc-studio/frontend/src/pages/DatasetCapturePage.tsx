@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatus } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
+import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import type { CameraStatus, CaptureQualityTag, CaptureRecord, DatasetStatus } from "../types";
 
@@ -74,12 +75,14 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
           <div className="panel-header">
             <div>
               <h2>Frame preview</h2>
-              <p className="placeholder-copy">Capture saves the exact receiver or simulation frame currently shown here.</p>
+              <p className="placeholder-copy">{cameraStatus?.simulation_enabled ? "Preview the live 3D simulation. Capture saves its original 2D synthetic image for AI training and labels." : "Capture saves the receiver image currently shown here."}</p>
             </div>
             <span className="status-pill muted">{cameraStatus?.origin ?? "no frame"}</span>
           </div>
           <div className="camera-frame-wrapper">
-            {previewUrl ? (
+            {cameraStatus?.simulation_enabled && previewUrl ? (
+              <SimulationCamera3D sourceId={cameraStatus.active_source_id?.startsWith("simulation_camera") ? cameraStatus.active_source_id : "simulation_camera"} />
+            ) : previewUrl ? (
               <img className="camera-frame" src={previewUrl} alt="Current frame ready for dataset capture" />
             ) : (
               <div className="camera-empty-state">
