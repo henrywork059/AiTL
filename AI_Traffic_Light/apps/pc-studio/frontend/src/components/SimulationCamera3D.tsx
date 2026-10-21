@@ -1,9 +1,20 @@
 import { useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import "./simulationCamera3D.css";
 
-type Props = { sourceId: string };
+type Props = {
+  sourceId: string;
+  editing?: boolean;
+  detections?: Detection[];
+  zones?: Zone[];
+  showBoxes?: boolean;
+  showLabels?: boolean;
+  showRegions?: boolean;
+  frameWidth?: number;
+  frameHeight?: number;
+};
 
 const CAMERA_LABEL: Record<string, string> = {
   simulation_camera: "Camera A",
@@ -20,8 +31,20 @@ const INITIAL_ORBIT: Record<string, number> = {
 };
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
+/** Source images B/C/D are mirror transforms of the canonical A coordinates. */
+function sourcePoint(x: number, y: number, sourceId: string, width: number, height: number) {
+  return {
+    x: sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d" ? width - x : x,
+    y: sourceId === "simulation_camera_b" || sourceId === "simulation_camera_d" ? height - y : y,
+  };
+}
+
 /** Read-only perspective of the actual live camera simulator; never controls its agents. */
-export function SimulationCamera3D({ sourceId }: Props) {
+export function SimulationCamera3D({
+  sourceId, editing = false, detections = [], zones = [],
+  showBoxes = true, showLabels = true, showRegions = true,
+  frameWidth = 1280, frameHeight = 720,
+}: Props) {
   const initialOrbit = INITIAL_ORBIT[sourceId] ?? -25;
   const [scene, setScene] = useState<SimulationScene | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,13 +94,19 @@ export function SimulationCamera3D({ sourceId }: Props) {
   const phase = scene?.signal.phase ?? "waiting";
   const vehicleLight = scene?.signal.vehicle_go ? "green" : phase === "vehicle_yellow" ? "amber" : "red";
   const pedestrianLight = scene?.signal.pedestrian_walk ? "green" : "red";
+  const isFlippedX = sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d";
+  const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
+  const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
+  const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
 
   return (
-    <section className="sim3d-preview" aria-label={`Interactive 3D preview of ${sourceId}`}>
-      <div className="sim3d-viewport" onPointerDown={beginDrag} onPointerMove={moveDrag}
-        onPointerUp={endDrag} onPointerCancel={endDrag} onWheel={changeZoom}>
+    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`}>
+      <div className="sim3d-viewport" onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
+        onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
         <div className="sim3d-world" aria-hidden="true" style={{
-          transform: `translate(-50%, -50%) scale(${zoom}) rotateX(${pitch}deg) rotateZ(${orbit}deg)`,
+          transform: editing
+            ? "translate(-50%, -50%) scale(1) rotateX(0deg) rotateZ(0deg)"
+            : `translate(-50%, -50%) scale(${zoom}) rotateX(${pitch}deg) rotateZ(${orbit}deg)`,
         }}>
           <div className="sim3d-ground" />
           <div className="sim3d-road" />
@@ -91,28 +120,60 @@ export function SimulationCamera3D({ sourceId }: Props) {
           <div className="sim3d-stop sim3d-stop-right" />
           <div className="sim3d-pole sim3d-vehicle-pole"><span className={vehicleLight} /></div>
           <div className="sim3d-pole sim3d-person-pole"><span className={pedestrianLight} /></div>
-          {scene?.vehicles.map(vehicle => (
-            <div className="sim3d-car" key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
+          {scene?.vehicles.map(vehicle => {
+            const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
+            const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
+            return <div className="sim3d-car" key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
               style={{
-                left: `${(vehicle.x + vehicle.width / 2) / sizeX * 100}%`,
-                top: `${vehicle.y / sizeY * 100}%`,
+                left: `${centerX / sizeX * 100}%`,
+                top: `${leftEdge.y / sizeY * 100}%`,
                 width: `${vehicle.width / sizeX * 100}%`,
                 backgroundColor: vehicle.color,
-                transform: `translate(-50%, -50%) translateZ(15px) rotateZ(${vehicle.direction < 0 ? 180 : 0}deg)`,
+                transform: `translate(-50%, -50%) translateZ(15px) rotateZ(${(isFlippedX ? -vehicle.direction : vehicle.direction) < 0 ? 180 : 0}deg)`,
               }}>
               <div className="sim3d-car-roof" />
               <div className="sim3d-car-side" />
-            </div>
-          ))}
-          {scene?.pedestrians.map(pedestrian => (
-            <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
-              left: `${pedestrian.x / sizeX * 100}%`,
-              top: `${pedestrian.y / sizeY * 100}%`,
+            </div>;
+          })}
+          {scene?.pedestrians.map(pedestrian => {
+            const point = sourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
+            return <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
+              left: `${point.x / sizeX * 100}%`,
+              top: `${point.y / sizeY * 100}%`,
               backgroundColor: pedestrian.color,
             }}>
               <span />
-            </div>
-          ))}
+            </div>;
+          })}
+          {hasOverlay && (
+            <svg className="sim3d-world-overlay" viewBox={`0 0 ${sizeX} ${sizeY}`}
+              preserveAspectRatio="none" aria-hidden="true">
+              {showRegions && zones.map(zone => {
+                const points = zone.polygon.map(([x, y]) => `${x / 1280 * sizeX},${y / 720 * sizeY}`).join(" ");
+                return <g key={zone.id} className="sim3d-region">
+                  {zone.type === "counting_line"
+                    ? <polyline points={points} fill="none" strokeDasharray="12 8" />
+                    : <polygon points={points} />}
+                  {showLabels && zone.polygon[0] && <text
+                    x={zone.polygon[0][0] / 1280 * sizeX + 8}
+                    y={zone.polygon[0][1] / 720 * sizeY + 18}>{zone.label}</text>}
+                </g>;
+              })}
+              {showBoxes && detections.map(detection => {
+                const [x1, y1, x2, y2] = detection.box_xyxy;
+                const x = x1 / normalizedFrameWidth * sizeX;
+                const y = y1 / normalizedFrameHeight * sizeY;
+                const w = (x2 - x1) / normalizedFrameWidth * sizeX;
+                const h = (y2 - y1) / normalizedFrameHeight * sizeY;
+                return <g key={detection.id} className="sim3d-detection">
+                  <rect x={x} y={y} width={w} height={h} />
+                  {showLabels && <text x={x + 6} y={Math.max(18, y - 8)}>
+                    {`${detection.class_name} ${Math.round(detection.confidence * 100)}%`}
+                  </text>}
+                </g>;
+              })}
+            </svg>
+          )}
         </div>
       </div>
       <div className="sim3d-head">
@@ -120,14 +181,14 @@ export function SimulationCamera3D({ sourceId }: Props) {
         <span>{CAMERA_LABEL[sourceId] ?? sourceId}</span>
         {scene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
-      <div className="sim3d-actions">
+      {!editing && <div className="sim3d-actions">
         <button type="button" onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
         <button type="button" onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
           {pitch === 0 ? "Perspective" : "Top"}
         </button>
         <label>Zoom <input aria-label="3D camera zoom" type="range" min="0.5" max="1.35" step="0.05"
           value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
-      </div>
+      </div>}
       <div className="sim3d-status" aria-live="off">
         {scene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
@@ -136,7 +197,8 @@ export function SimulationCamera3D({ sourceId }: Props) {
           <span>{scene.vehicles.length} cars · {scene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
-      <span className="sim3d-hint">Drag to orbit · Scroll to zoom · synthetic scene</span>
+      {!editing && <span className="sim3d-hint">Drag to orbit · Scroll to zoom · synthetic scene</span>}
+      {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );
 }
