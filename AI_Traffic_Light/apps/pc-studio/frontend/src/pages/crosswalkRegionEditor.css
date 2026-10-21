@@ -53,3 +53,21 @@
 @media (max-width: 1300px) { .crosswalk-region-layout { grid-template-columns: minmax(0, 1fr); } }
 
 .crosswalk-region-list button.active { box-shadow: inset 3px 0 0 var(--color-primary); }
+
+.crosswalk-region-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-left: auto;
+}
+.crosswalk-region-view-toggle button { min-height: 30px; padding: 4px 9px; }
+.crosswalk-region-view-toggle button[aria-pressed="true"] {
+  color: var(--color-primary);
+  background: var(--color-primary-surface);
+  border-color: var(--color-primary);
+}
+.crosswalk-region-overlay { z-index: 4; }
+@media (max-width: 720px) {
+  .crosswalk-region-view-toggle { width: 100%; margin: 0; }
+  .crosswalk-region-view-toggle button { flex: 1; }
+}
