@@ -1,3 +1,13 @@
+# Start Here — V0516 (Crosswalk 3D test repair)
+
+**Candidate:** `0_5_16` | **Previous:** `0_5_15` | **Accepted baseline:** `0_5_0` | **Branch:** `feature/interactive-3d-simulation`.
+
+The `0_5_15` Windows run stopped in `test_crosswalks_frontend_structure.py` because a legacy assertion still required the removed simulation MJPEG URL. `0_5_16` changes only that test to recognize 3D simulation previews and the unchanged physical ESP feed; all existing 3D UI, backend simulation and signal logic are retained.
+
+From the AiTL repository root, pull the feature branch (do not switch to main), then run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -SkipUpdate`. Full Windows startup/visual test and owner PASS pending.
+
+---
+
 # Start Here — V0515 (interactive 3D simulation previews)
 
 **Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`. Work is on `feature/interactive-3d-simulation`, not `main`.
