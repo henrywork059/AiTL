@@ -2,4 +2,4 @@ version: 0_5_15
 status: Interactive 3D simulated-camera preview candidate
 previous_version: 0_5_14
 passed_baseline: 0_5_0
-notes: Same feature-branch candidate now displays all live simulated camera previews in 3D across Camera Settings, Camera Sources, Crosswalk pairs, Region Editor, Camera AI Preview and Dataset Capture. Uses the existing simulation agents and protected signal status; source mirrors and editor image coordinates are preserved. Canonical 2D image bytes remain for inference/capture/labels; physical ESP feeds and controllers unchanged. Windows tests and owner PASS pending.
+notes: Same feature-branch candidate now displays all live simulated camera previews in 3D across Camera Settings, Camera Sources, Crosswalk pairs, Region Editor, Camera AI Preview and Dataset Capture. Uses the existing simulation agents and protected signal status; source mirrors and 3D perspective/coordinate-aligned region editing are preserved. Canonical 2D image bytes remain for inference/capture/labels; physical ESP feeds and controllers unchanged. Windows tests and owner PASS pending.
