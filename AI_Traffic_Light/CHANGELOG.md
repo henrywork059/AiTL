@@ -1,5 +1,11 @@
 # Changelog
 
+## 0_5_16 — Update outdated Crosswalk 3D structure assertion
+
+- Repair the legacy Crosswalk Region Editor regression expectation for the removed 2D simulation MJPEG URL: verify selected 3D source, aligned region edit mode and preserved physical ESP MJPEG preview.
+- No application runtime, API, AI inference, region geometry, frontend rendering, dependency or traffic-signal changes. Prior candidate `0_5_15` stopped at this stale test; `0_5_16` remains a feature-branch candidate pending full Windows checks and owner PASS.
+
+
 ## 0_5_15 — All live simulated camera previews in 3D
 
 - In addition to Camera Settings and Camera Sources, replace Crosswalk paired simulation images, Crosswalk Region Editor simulated image, Camera AI Preview synthetic image, and Dataset Capture synthetic image with the same interactive 3D renderer.
