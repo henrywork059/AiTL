@@ -1,10 +1,10 @@
 # Changelog
 
-## 0_5_15 — Interactive 3D simulated camera live preview
+## 0_5_15 — All live simulated camera previews in 3D
 
-- Replace the simulated source image in Camera Settings and Camera Sources with a perspective 3D view of **actual live simulator agents** rather than experiment replay samples. Orbit, Top, Reset and Zoom are presentation-only controls.
-- Add a read-only per-source scene API with the existing request-ID envelope. Both mirrored simulation-camera pairs share their existing physical simulation and controller clock, but open with distinct viewing angles.
-- Preserve existing 2D PNG/MJPEG for camera AI, dataset capture and image-coordinate region editing; physical ESP preview unchanged. No additional dependencies, persistence or controller/traffic safety changes. Candidate on a separate branch, Windows validation and owner PASS pending.
+- In addition to Camera Settings and Camera Sources, replace Crosswalk paired simulation images, Crosswalk Region Editor simulated image, Camera AI Preview synthetic image, and Dataset Capture synthetic image with the same interactive 3D renderer.
+- Use actual current simulation agents, signal phases and source-specific mirror transforms. Project existing detector boxes and regions onto the synthetic world plane; lock the 3D Region Editor to coordinate-aligned top view to retain accurate draggable vertices and saved 2D-frame polygons.
+- Keep real ESP images, canonical 2D PNG/MJPEG, dataset training captures and manual labels, Network controllers and safety logic intact. No additional dependencies or new model capabilities. 0_5_15 remains an unaccepted feature-branch candidate pending Windows tests and owner PASS.
 
 ## 0_5_14 — Repair incomplete 0_5_13 release bundle
 
