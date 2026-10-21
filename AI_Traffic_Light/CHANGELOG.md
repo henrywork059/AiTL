@@ -1,11 +1,10 @@
 # Changelog
 
-## 0_5_15 — Interactive 3D Simulation Lab replay
+## 0_5_15 — Interactive 3D simulated camera live preview
 
-- Adds a perspective 3D junction diagram in Simulation Lab with orbit, pitch, zoom, playback, scrubbing, and Fixed/Adaptive switching.
-- Reuses stored synthetic experiment time samples for queue counts and signal labels. Displayed vehicle/pedestrian placement is schematic, not per-object tracking or inferred trajectory.
-- Leaves the simulation engine, backend APIs, signal arbitration, camera streams, network controllers, and accepted baseline unchanged. Branch candidate awaiting full Windows validation and owner PASS.
-
+- Replace the simulated source image in Camera Settings and Camera Sources with a perspective 3D view of **actual live simulator agents** rather than experiment replay samples. Orbit, Top, Reset and Zoom are presentation-only controls.
+- Add a read-only per-source scene API with the existing request-ID envelope. Both mirrored simulation-camera pairs share their existing physical simulation and controller clock, but open with distinct viewing angles.
+- Preserve existing 2D PNG/MJPEG for camera AI, dataset capture and image-coordinate region editing; physical ESP preview unchanged. No additional dependencies, persistence or controller/traffic safety changes. Candidate on a separate branch, Windows validation and owner PASS pending.
 
 ## 0_5_14 — Repair incomplete 0_5_13 release bundle
 
