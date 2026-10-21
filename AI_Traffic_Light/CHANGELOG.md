@@ -3,7 +3,7 @@
 ## 0_5_15 — All live simulated camera previews in 3D
 
 - In addition to Camera Settings and Camera Sources, replace Crosswalk paired simulation images, Crosswalk Region Editor simulated image, Camera AI Preview synthetic image, and Dataset Capture synthetic image with the same interactive 3D renderer.
-- Use actual current simulation agents, signal phases and source-specific mirror transforms. Project existing detector boxes and regions onto the synthetic world plane; lock the 3D Region Editor to coordinate-aligned top view to retain accurate draggable vertices and saved 2D-frame polygons.
+- Use actual current simulation agents, signal phases and source-specific mirror transforms. Project existing detector boxes and regions onto the synthetic world plane; give the Region Editor a 3D orbit preview plus coordinate-aligned top-view editing to retain accurate draggable vertices and saved 2D-frame polygons.
 - Keep real ESP images, canonical 2D PNG/MJPEG, dataset training captures and manual labels, Network controllers and safety logic intact. No additional dependencies or new model capabilities. 0_5_15 remains an unaccepted feature-branch candidate pending Windows tests and owner PASS.
 
 ## 0_5_14 — Repair incomplete 0_5_13 release bundle
