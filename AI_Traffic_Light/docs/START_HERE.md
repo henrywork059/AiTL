@@ -1,10 +1,10 @@
-# Start Here — V0515 (interactive 3D camera preview branch)
+# Start Here — V0515 (interactive 3D simulation previews)
 
-**Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`.
+**Candidate:** `0_5_15` | **Previous:** `0_5_14` | **Accepted baseline:** `0_5_0`. Work is on `feature/interactive-3d-simulation`, not `main`.
 
-On `feature/interactive-3d-simulation`, reveal simulation tools with the **AI Traffic Light** panel toggle, then select/add a saved simulation camera in **Camera Settings**. **Selected camera live preview** now displays a live interactive 3D traffic scene rather than a flat synthetic camera image. Drag to orbit, scroll/slider to zoom, or use Top/Reset. Pause, resume, and density still use existing Simulation Controls. Both simulation camera pairs use their own view angles of the one shared simulation. The Camera Sources simulated input view also displays 3D; ESP streams remain image previews.
+Enable the existing top-left **AI Traffic Light** simulation visibility toggle, then start the PC simulation. All *live simulated camera previews* are now 3D: Camera Settings, Camera Sources, Crosswalks (Side A/B), Crosswalk Region Editor, Camera AI Preview and Dataset Capture. Use drag-to-orbit, wheel/slider zoom, Top and Reset in normal 3D views. Crosswalk Region Editor uses a fixed coordinate-aligned 3D overhead view to keep the draggable polygon coordinates correct; saved A/B geometries and AI counting stay unchanged. Camera AI Preview overlays existing detection/region coordinates onto its 3D world plane. Real ESP streams are still video, and captured training images stay the original synthetic PNG to avoid corrupting model training and labels.
 
-The 3D objects follow the existing simulated vehicle/pedestrian positions and virtual signal phase. The original PNG camera feed is deliberately retained for AI/capture and precise Crosswalk Region Editor coordinates, which are not calibrated to the 3D perspective. No second simulator, signal-controller changes or hardware actuation. Test the branch without running the default `main`-pulling updater; use the branch's existing runner with `-SkipUpdate` if supported, or run focused tests and frontend typecheck/build directly. Full Windows acceptance and owner PASS pending.
+From your AiTL repository root after switching to the feature branch, use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -SkipUpdate`. Do not run the normal main-pulling updater while on a feature branch. Check the backend regression, TypeScript/Vite build, and simulation visual behavior. Owner PASS pending.
 
 ---
 
