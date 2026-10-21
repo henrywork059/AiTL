@@ -1,5 +1,12 @@
 # Changelog
 
+## 0_5_15 — Interactive 3D Simulation Lab replay
+
+- Adds a perspective 3D junction diagram in Simulation Lab with orbit, pitch, zoom, playback, scrubbing, and Fixed/Adaptive switching.
+- Reuses stored synthetic experiment time samples for queue counts and signal labels. Displayed vehicle/pedestrian placement is schematic, not per-object tracking or inferred trajectory.
+- Leaves the simulation engine, backend APIs, signal arbitration, camera streams, network controllers, and accepted baseline unchanged. Branch candidate awaiting full Windows validation and owner PASS.
+
+
 ## 0_5_14 — Repair incomplete 0_5_13 release bundle
 
 ### Same-candidate continuation: Network movement conflict interlock
