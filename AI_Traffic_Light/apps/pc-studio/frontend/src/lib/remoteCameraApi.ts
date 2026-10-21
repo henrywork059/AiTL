@@ -133,6 +133,43 @@ export function liveCameraMjpegUrl(): string {
   return `${API_BASE}/api/camera/live.mjpeg`;
 }
 
+export type SimulationScene = {
+  source_id: string;
+  frame_number: number;
+  received_at_ms: number;
+  width: number;
+  height: number;
+  simulation_time_seconds: number;
+  paused: boolean;
+  density: "light" | "normal" | "busy";
+  signal: {
+    phase: string;
+    vehicle_go: boolean;
+    pedestrian_walk: boolean;
+    seconds_remaining: number;
+  };
+  vehicles: Array<{
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    direction: number;
+    vehicle_type: string;
+    color: string;
+  }>;
+  pedestrians: Array<{
+    id: string;
+    x: number;
+    y: number;
+    direction: number;
+    color: string;
+  }>;
+};
+
+export async function fetchSimulationScene(sourceId: string): Promise<SimulationScene> {
+  return requestJsonStrict<SimulationScene>(`${API_BASE}/api/camera/simulation/scene?source_id=${encodeURIComponent(sourceId)}`);
+}
+
 export async function fetchRemoteCameraStatus(): Promise<RemoteCameraStatus> {
   return requestJsonStrict<RemoteCameraStatus>(`${API_BASE}/api/camera/remote/status`);
 }
