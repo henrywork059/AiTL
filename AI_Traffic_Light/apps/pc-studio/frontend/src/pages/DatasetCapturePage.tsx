@@ -81,7 +81,7 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
           </div>
           <div className="camera-frame-wrapper">
             {cameraStatus?.simulation_enabled && previewUrl ? (
-              <SimulationCamera3D sourceId={cameraStatus.active_source_id?.startsWith("simulation_camera") ? cameraStatus.active_source_id : "simulation_camera"} />
+              <SimulationCamera3D key={cameraStatus.active_source_id ?? "simulation_camera"} sourceId={cameraStatus.active_source_id?.startsWith("simulation_camera") ? cameraStatus.active_source_id : "simulation_camera"} />
             ) : previewUrl ? (
               <img className="camera-frame" src={previewUrl} alt="Current frame ready for dataset capture" />
             ) : (
