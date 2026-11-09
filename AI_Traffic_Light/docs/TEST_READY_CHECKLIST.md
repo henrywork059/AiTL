@@ -1,8 +1,9 @@
-# V0516 — Crosswalk 3D test repair candidate
+# V0517 — Interactive 3D simulation test repair candidate
 
-- [ ] On `feature/interactive-3d-simulation`, version `0_5_16` after `0_5_15`; accepted baseline stays `0_5_0`.
+- [ ] On `feature/interactive-3d-simulation`, version `0_5_17` after `0_5_16`; accepted baseline stays `0_5_0`.
+- [ ] `scripts/test_v0515_3d_simulation.py` compares the agent snapshot before a subsequent refresh can advance the simulation.
 - [ ] `scripts/test_crosswalks_frontend_structure.py` accepts 3D simulated camera preview source/region editing and still verifies physical MJPEG.
-- [ ] Existing `scripts/test_v0515_3d_simulation.py` and remaining Python regressions pass.
+- [ ] Existing camera-frame, two-pair, and Crosswalk regressions pass.
 - [ ] Frontend typecheck/build, backend `/health`, and application startup/smoke pass on Windows.
 - [ ] Camera Settings, Crosswalks, Region Editor, AI Preview and Dataset Capture show expected 3D simulation behavior; region saves, physical ESP images and signal safety remain unchanged.
 - [ ] Owner confirms PASS; prior candidate `0_5_15` did not pass.

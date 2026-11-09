@@ -33,11 +33,12 @@ def main() -> None:
         assert len(scene["pedestrians"]) == 7
         assert scene["signal"]["vehicle_go"] is True
         assert scene["signal"]["pedestrian_walk"] is False
-        assert service.simulation_frame_for(source_id) is not None
+        # Compare the snapshot before another read refreshes moving agents.
         with service._lock:
             assert scene["vehicles"][0]["x"] == round(service._vehicles[0].x, 2)
             assert scene["vehicles"][0]["width"] == service._vehicles[0].width
             assert scene["pedestrians"][0]["y"] == round(service._pedestrians[0].y, 2)
+        assert service.simulation_frame_for(source_id) is not None
 
     service.configure_simulation(paused=True)
     stopped = service.simulation_scene_for("simulation_camera_b")

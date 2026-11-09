@@ -1,5 +1,5 @@
-version: 0_5_16
-status: Interactive 3D Crosswalk regression repair candidate
-previous_version: 0_5_15
+version: 0_5_17
+status: Interactive 3D simulation regression test repair candidate
+previous_version: 0_5_16
 passed_baseline: 0_5_0
-notes: Repair only an obsolete Crosswalk structure-test assertion expecting the old simulated MJPEG URL. Test now verifies the selected 3D scene, coordinate-aligned region edit mode, and preserved physical ESP MJPEG preview. All application runtime code, controller policies, source images, and 3D rendering are unchanged. Focused static checks pass; full Windows tests, frontend build and owner PASS pending.
+notes: Repair only the 3D regression test's snapshot ordering: compare agent coordinates before requesting another state-refreshing frame. Application runtime code, API, controller policies, source images, and 3D rendering are unchanged. Runtime regressions and frontend checks remain candidates pending Windows startup, visual/hardware checks, and owner PASS.

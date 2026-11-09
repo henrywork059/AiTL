@@ -1,5 +1,10 @@
 # Changelog
 
+## 0_5_17 — Fix 3D scene regression test ordering
+
+- Compare live simulation scene coordinates to the service state immediately after creating the snapshot, before requesting another frame that advances moving agents.
+- Test-only repair. No application runtime, API, signal policy, source image, dataset, or 3D rendering changes. Candidate on `feature/interactive-3d-simulation`; accepted baseline remains `0_5_0` pending Windows/physical preview validation and owner PASS.
+
 ## 0_5_16 — Update outdated Crosswalk 3D structure assertion
 
 - Repair the legacy Crosswalk Region Editor regression expectation for the removed 2D simulation MJPEG URL: verify selected 3D source, aligned region edit mode and preserved physical ESP MJPEG preview.
