@@ -1,5 +1,5 @@
-version: 0_5_20
-status: CI automation candidate
-previous_version: 0_5_19
+version: 0_5_21
+status: Ambulance source confirmation candidate
+previous_version: 0_5_20
 passed_baseline: 0_5_0
-notes: Introduce Windows Actions offline regression and frontend verification; Windows startup, hardware and owner PASS remain pending.
+notes: Emergency evidence must include two distinct valid, positive camera frames at least 1,000 ms apart from the same source. Positive observations from different camera views alone never confirm a route. Existing protected phases and hardware-disabled behavior are unchanged. Windows and owner PASS pending.

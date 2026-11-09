@@ -304,8 +304,14 @@ class CrosswalkSignalService:
                 else:
                     continue
                 evidence = self._emergency_evidence.get(source_id)
-                timestamps = set(evidence["positive"].values()) if evidence else set()
-                if len(timestamps) < 2 or max(timestamps) - min(timestamps) < 1000:
+                # Both positives must be from one source: different views alone
+                # cannot establish longitudinal ambulance persistence.
+                by_source: dict[str, set[int]] = {}
+                if evidence:
+                    for identity, timestamp in evidence["positive"].items():
+                        by_source.setdefault(identity[0], set()).add(timestamp)
+                if not any(len(times) >= 2 and max(times) - min(times) >= 1000
+                           for times in by_source.values()):
                     continue
                 eligible.add(link["id"])
                 if link["id"] in self._active_routes:

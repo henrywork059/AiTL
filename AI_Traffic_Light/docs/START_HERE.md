@@ -1,3 +1,9 @@
+# V0521 — Same-source ambulance confirmation
+
+Candidate `0_5_21`, previous `0_5_20`, accepted baseline `0_5_0`. Emergency evidence must include two distinct valid, positive camera frames at least 1,000 ms apart from the same source. Positive observations from different camera views alone never confirm a route. Existing protected phases and hardware-disabled behavior are unchanged.
+
+---
+
 # V0520 — Candidate CI automation
 
 Candidate `0_5_20`, previous `0_5_19`, accepted baseline `0_5_0`. Windows GitHub Actions runs Python compile, project structure, offline regressions and frontend typecheck/build on the feature branch. Local Windows smoke and ESP checks remain pending; no traffic-signal runtime behavior changes.

@@ -1,3 +1,7 @@
+## 0_5_21 — Same-source emergency confirmation (candidate)
+- Require two time-separated ambulance-positive frames from the same source before a one-hop emergency request. Add adversarial two-camera regression.
+- No change to physical output or protected phase timing. Previous `0_5_20`; baseline `0_5_0`.
+
 ## 0_5_20 — Candidate CI automation
 - Introduce Windows GitHub Actions checks for Python compile, structure, offline regressions, frontend typecheck and build.
 - No physical camera, live server or local Windows acceptance claimed. Previous 0_5_19, baseline 0_5_0.
