@@ -194,8 +194,8 @@ export function SimulationCamera3D({
         {activeScene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
-          <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(scene.signal.seconds_remaining))} s</span>
-          <span>{scene.vehicles.length} cars · {scene.pedestrians.length} people</span>
+          <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(activeScene.signal.seconds_remaining))} s</span>
+          <span>{activeScene.vehicles.length} cars · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
       {!editing && <span className="sim3d-hint">Drag to orbit · Scroll to zoom · synthetic scene</span>}

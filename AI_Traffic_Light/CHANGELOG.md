@@ -1,5 +1,10 @@
 # Changelog
 
+## 0_5_18 — Fix nullable 3D status scene references
+
+- Read the phase countdown and agent totals from `activeScene`, which is already checked for null in the status panel.
+- No changes to rendering, simulation, backend APIs, camera inputs, signal policies, or physical outputs. Candidate on `feature/interactive-3d-simulation`; accepted baseline stays `0_5_0` pending validation and owner PASS.
+
 ## 0_5_17 — Fix 3D scene regression test ordering
 
 - Compare live simulation scene coordinates to the service state immediately after creating the snapshot, before requesting another frame that advances moving agents.

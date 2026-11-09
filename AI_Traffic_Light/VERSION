@@ -1,5 +1,5 @@
-version: 0_5_17
-status: Interactive 3D simulation regression test repair candidate
-previous_version: 0_5_16
+version: 0_5_18
+status: Interactive 3D simulation frontend typecheck repair candidate
+previous_version: 0_5_17
 passed_baseline: 0_5_0
-notes: Repair only the 3D regression test's snapshot ordering: compare agent coordinates before requesting another state-refreshing frame. Application runtime code, API, controller policies, source images, and 3D rendering are unchanged. Runtime regressions and frontend checks remain candidates pending Windows startup, visual/hardware checks, and owner PASS.
+notes: Narrow nullable-state correction in the 3D status panel: use the already null-checked active scene for countdown and object counts. Rendering behavior and all backend/controller policies remain unchanged. Candidate pending frontend typecheck/build, Windows startup and visual/hardware validation, and owner PASS.

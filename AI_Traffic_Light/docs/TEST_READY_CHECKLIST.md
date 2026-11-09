@@ -1,7 +1,9 @@
-# V0517 — Interactive 3D simulation test repair candidate
+# V0518 — Interactive 3D simulation typecheck repair candidate
 
-- [ ] On `feature/interactive-3d-simulation`, version `0_5_17` after `0_5_16`; accepted baseline stays `0_5_0`.
-- [ ] `scripts/test_v0515_3d_simulation.py` compares the agent snapshot before a subsequent refresh can advance the simulation.
+- [ ] On `feature/interactive-3d-simulation`, version `0_5_18` after `0_5_17`; accepted baseline stays `0_5_0`.
+- [ ] Frontend TypeScript typecheck and Vite production build pass.
+- [ ] 3D status phase/count render while a scene is active and switch to the error/loading state when no active scene is available.
+- [ ] Prior `0_5_17` runtime, camera-frame, two-pair, and Crosswalk regressions still pass.
 - [ ] `scripts/test_crosswalks_frontend_structure.py` accepts 3D simulated camera preview source/region editing and still verifies physical MJPEG.
 - [ ] Existing camera-frame, two-pair, and Crosswalk regressions pass.
 - [ ] Frontend typecheck/build, backend `/health`, and application startup/smoke pass on Windows.
