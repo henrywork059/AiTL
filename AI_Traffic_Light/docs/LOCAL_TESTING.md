@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10353)
-Total output lines: 502
-
 # V0519 — Emergency evidence confirmation candidate
 
 Candidate `0_5_19`, previous `0_5_18`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`. Confirmation is based on distinct source-frame identity, active model and frame timestamps, with at least 1,000 ms between two positive observations. Repeated polls and synchronized camera views cannot satisfy the interval; missing/stale coverage, model change and a newer negative frame clear evidence. Route bounds, expiry, protected transitions, conflict interlock and disabled hardware output remain unchanged.
@@ -259,7 +256,38 @@ status: Crosswalk camera-side layout candidate
 - Select a crosswalk. Its Crosswalk layout must show a left Side A and right Side B selector, each directly followed by its current camera status, above the existing schematic.
 - No duplicate Side A/B status rows and no bottom Side B selector remain. Narrow widths should stack Side A then Side B without horizontal overflow.
 - Select cameras and save/reload; confirm both assignments and statuses persist/update normally, missing-camera warnings work, and the existing simulation preview/region controls are unchanged.
-- Candidate V0424 requires …353 tokens truncated…ontend typecheck/build, backend smoke and startup.
+- Candidate V0424 requires Windows visual acceptance; passed baseline remains V0414.
+
+## Historical V0423 and earlier checks (archival)
+
+
+```text
+version: 0_4_23
+previous_version: 0_4_22
+passed_baseline: 0_4_14
+status: Translucent region overlay candidate
+```
+
+## V0423 translucent region appearance acceptance
+
+- Run `scripts/update_test_run.ps1 -ChangedTests`, verify the focused region regressions, frontend typecheck/build, backend smoke and startup.
+- Open Crosswalks → Edit regions with a simulation camera: unselected regions show a light 10% mint tint and the selected region shows a 22% pale cream tint. Both allow the video beneath to remain visible.
+- The selected pale-yellow dashed outline remains 6px and fully opaque; numbered vertices drag, Side A/B toggles work and saving/reloading leaves coordinates unchanged.
+- The hidden legacy editor uses the same fill opacity with its existing 7px selected outline. Live AI/simulation region outlines stay unfilled; dataset boxes stay unchanged.
+- V0423 awaits owner PASS; accepted baseline remains V0414.
+
+## Historical V0422 and earlier acceptance notes (preserved for reference)
+
+```text
+version: 0_4_22
+previous_version: 0_4_21
+passed_baseline: 0_4_14
+status: Responsive text layout and clear selected-region outline candidate
+```
+
+## V0422 responsive text and selection acceptance
+
+- Run the standard single-command updater with `-ChangedTests` and confirm regressions, frontend typecheck/build, backend smoke and startup.
 - Resize the desktop browser to wide, medium and narrow widths; inspect the sidebar, page/panel headers, buttons, Saved cameras, and status pills. Text should wrap without clipping, with consistent alignment and readable font sizes.
 - Inspect Junction Network camera IDs and link names (including long identifiers), Signal Control scenario descriptions, and Simulation Experiment scenarios, tabs and results. Full wording must be readable; on short-height screens, scroll to see all experiment content. Data tables may scroll horizontally.
 - In Crosswalks → Edit regions, selected and unselected polygons must have no interior tint; selection should be indicated by a brighter, fully opaque, thicker dashed pale-yellow border with existing draggable vertices.
