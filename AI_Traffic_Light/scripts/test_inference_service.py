@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -124,6 +125,12 @@ def main() -> int:
         changed_conf = service.detect_frame(frame, confidence_threshold=0.5)
         assert changed_conf == result
         assert created_models[0].predict_calls == 2, "different confidence should trigger a new inference call"
+        # A reconnected camera may reuse a frame number. The newly received
+        # frame must not inherit detections cached for the previous timestamp.
+        refreshed = replace(frame, received_at_ms=frame.received_at_ms + 1100)
+        newer_result = service.detect_frame(refreshed, confidence_threshold=0.5)
+        assert newer_result["timestamp_ms"] == refreshed.received_at_ms
+        assert created_models[0].predict_calls == 3
 
         service.unload()
         try:

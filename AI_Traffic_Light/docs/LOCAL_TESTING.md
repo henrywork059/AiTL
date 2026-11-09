@@ -1,3 +1,11 @@
+# V0524 — Multi-camera source freshness
+
+Candidate `0_5_24`, previous `0_5_23`, accepted baseline `0_5_0`. Harden existing per-source background inference: discard repeated or out-of-order camera samples independently, allow frame-number resets only with newer timestamps, and prevent detection-cache reuse across reconnects. Existing simulation/real frame routing and selected-source traffic state remain distinct.
+
+---
+
+Focused: `python scripts/test_v0524_camera_source_order.py`, `python scripts/test_inference_service.py`, `python scripts/test_remote_camera_multi.py`, `python scripts/test_v0519_emergency_evidence.py`. Windows/ESP live reconnect checks remain pending.
+
 # V0523 — Keyboard-accessible 3D camera
 
 Candidate `0_5_23`, previous `0_5_22`, accepted baseline `0_5_0`. The existing 3D viewport supports keyboard orbit/tilt, zoom and view reset with a visible focus indicator. This is a view-only enhancement: simulator agents, image-coordinate regions, AI detections and ESP camera feeds are untouched.

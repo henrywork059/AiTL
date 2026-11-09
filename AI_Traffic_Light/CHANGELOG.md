@@ -1,3 +1,7 @@
+## 0_5_24 — Multi-camera source freshness (candidate)
+- Reject same/older per-source frame timestamps and avoid inference-cache reuse after camera frame-number reset.
+- Reuse existing global camera registry, inference model and crosswalk mappings. Previous `0_5_23`, baseline `0_5_0`.
+
 ## 0_5_23 — Keyboard-accessible 3D controls (candidate)
 - Add keyboard orbit, tilt, zoom and reset; visible focus indicator; preserve existing 3D region and camera behavior.
 - No changes to signal-control or hardware paths. Previous `0_5_22`, baseline `0_5_0`.

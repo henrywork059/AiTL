@@ -16,6 +16,15 @@ logger = get_logger(__name__)
 STALE_RESULT_MS = 5000
 
 
+def _is_new_source_frame(previous: tuple[Any, ...] | None, current: tuple[Any, ...]) -> bool:
+    """Accept fresh source samples; reconnect frame-number resets are allowed."""
+    if previous is None:
+        return True
+    if previous[:2] != current[:2]:  # Model or confidence was changed.
+        return True
+    return current[3] > previous[3]  # Timestamp beats a potentially reset frame number.
+
+
 class MultiCameraInferenceService:
     def __init__(self) -> None:
         self._stop = Event()
@@ -75,7 +84,7 @@ class MultiCameraInferenceService:
                             break
                         key = (model_id, settings["default_confidence"], frame.frame_number, frame.received_at_ms)
                         with self._lock:
-                            if self._keys.get(frame.source_id) == key:
+                            if not _is_new_source_frame(self._keys.get(frame.source_id), key):
                                 continue
                         try:
                             result = inference_service.detect_frame(frame, confidence_threshold=settings["default_confidence"])

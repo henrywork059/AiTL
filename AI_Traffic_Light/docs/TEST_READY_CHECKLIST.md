@@ -1,3 +1,13 @@
+# V0524 — Multi-camera source freshness
+
+Candidate `0_5_24`, previous `0_5_23`, accepted baseline `0_5_0`. Harden existing per-source background inference: discard repeated or out-of-order camera samples independently, allow frame-number resets only with newer timestamps, and prevent detection-cache reuse across reconnects. Existing simulation/real frame routing and selected-source traffic state remain distinct.
+
+---
+
+- [ ] Source ordering and inference cache reconnect regressions PASS.
+- [ ] Separate camera routing and source selection remain intact.
+- [ ] CI, Windows camera reconnect and owner PASS.
+
 # V0523 — Keyboard-accessible 3D camera
 
 Candidate `0_5_23`, previous `0_5_22`, accepted baseline `0_5_0`. The existing 3D viewport supports keyboard orbit/tilt, zoom and view reset with a visible focus indicator. This is a view-only enhancement: simulator agents, image-coordinate regions, AI detections and ESP camera feeds are untouched.

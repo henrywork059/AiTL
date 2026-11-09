@@ -213,7 +213,7 @@ class InferenceService:
             )
 
         effective_confidence = round(max(MODEL_CONFIDENCE_MIN, min(1.0, confidence_threshold or DEFAULT_MODEL_CONFIDENCE)), 4)
-        detection_key = (frame.source_id, frame.frame_number, effective_confidence)
+        detection_key = (frame.source_id, frame.frame_number, frame.received_at_ms, effective_confidence)
         with self._state_lock:
             if self._model is None:
                 raise AppError(
