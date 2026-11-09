@@ -1,3 +1,13 @@
+# V0523 — Keyboard-accessible 3D camera
+
+Candidate `0_5_23`, previous `0_5_22`, accepted baseline `0_5_0`. The existing 3D viewport supports keyboard orbit/tilt, zoom and view reset with a visible focus indicator. This is a view-only enhancement: simulator agents, image-coordinate regions, AI detections and ESP camera feeds are untouched.
+
+---
+
+- [ ] Keyboard-only 3D camera controls and focus are visible.
+- [ ] Image-aligned region editing remains unchanged.
+- [ ] TypeScript/build, Windows/ESP tests and owner PASS.
+
 # V0522 — Disconnected/conflicting network safety
 
 Candidate `0_5_22`, previous `0_5_21`, accepted baseline `0_5_0`. Virtual network signals now fail closed on contradictory lamp/phase data and hold a connected movement red when a conflict-linked neighbor's signal state disappears. Existing clearance and priority rules are retained; no physical signal output.

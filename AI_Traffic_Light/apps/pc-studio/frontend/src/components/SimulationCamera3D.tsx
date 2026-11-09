@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
@@ -89,6 +89,24 @@ export function SimulationCamera3D({
     setZoom(current => clamp(current - Math.sign(event.deltaY) * 0.08, 0.5, 1.35));
   }
 
+  function keyboardCamera(event: KeyboardEvent<HTMLDivElement>) {
+    if (editing) return;
+    const controls: Record<string, () => void> = {
+      ArrowLeft: () => setOrbit(current => current - 10),
+      ArrowRight: () => setOrbit(current => current + 10),
+      ArrowUp: () => setPitch(current => clamp(current + 5, 0, 75)),
+      ArrowDown: () => setPitch(current => clamp(current - 5, 0, 75)),
+      "+": () => setZoom(current => clamp(current + 0.1, 0.5, 1.35)),
+      "=": () => setZoom(current => clamp(current + 0.1, 0.5, 1.35)),
+      "-": () => setZoom(current => clamp(current - 0.1, 0.5, 1.35)),
+      Home: () => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); },
+    };
+    if (controls[event.key]) {
+      event.preventDefault();
+      controls[event.key]();
+    }
+  }
+
   const activeScene = scene?.source_id === sourceId ? scene : null;
   const sizeX = activeScene?.width ?? 1280;
   const sizeY = activeScene?.height ?? 720;
@@ -102,7 +120,10 @@ export function SimulationCamera3D({
 
   return (
     <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`}>
-      <div className="sim3d-viewport" onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
+      <div className="sim3d-viewport" tabIndex={editing ? undefined : 0}
+        aria-label="3D camera view: arrow keys orbit and tilt, plus or minus zoom, Home resets"
+        onKeyDown={editing ? undefined : keyboardCamera}
+        onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
         onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
         <div className="sim3d-world" aria-hidden="true" style={{
           transform: editing
@@ -198,7 +219,7 @@ export function SimulationCamera3D({
           <span>{activeScene.vehicles.length} cars · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
-      {!editing && <span className="sim3d-hint">Drag to orbit · Scroll to zoom · synthetic scene</span>}
+      {!editing && <span className="sim3d-hint">Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
       {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );

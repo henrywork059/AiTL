@@ -1,5 +1,5 @@
-version: 0_5_22
-status: Network fail-closed interlock candidate
-previous_version: 0_5_21
+version: 0_5_23
+status: Keyboard 3D usability candidate
+previous_version: 0_5_22
 passed_baseline: 0_5_0
-notes: Virtual network signals now fail closed on contradictory lamp/phase data and hold a connected movement red when a conflict-linked neighbor's signal state disappears. Existing clearance and priority rules are retained; no physical signal output. Windows/ESP owner PASS pending.
+notes: The existing 3D viewport supports keyboard orbit/tilt, zoom and view reset with a visible focus indicator. This is a view-only enhancement: simulator agents, image-coordinate regions, AI detections and ESP camera feeds are untouched. Frontend CI, owner Windows visual checks and ESP PASS pending.

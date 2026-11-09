@@ -290,3 +290,6 @@
   stroke: #15202b;
   stroke-width: 5px;
 }
+
+/* Keyboard users can identify the active camera preview without changing overlays. */
+.sim3d-viewport:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }

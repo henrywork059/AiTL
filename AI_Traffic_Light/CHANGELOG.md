@@ -1,3 +1,7 @@
+## 0_5_23 — Keyboard-accessible 3D controls (candidate)
+- Add keyboard orbit, tilt, zoom and reset; visible focus indicator; preserve existing 3D region and camera behavior.
+- No changes to signal-control or hardware paths. Previous `0_5_22`, baseline `0_5_0`.
+
 ## 0_5_22 — Network fail-closed virtual interlock (candidate)
 - Hold conflicting virtual signals red when a connected controller is unavailable; sanitize contradictory phase/lamp states to all red.
 - Add deterministic absent-neighbor and invalid-signal regression. Previous `0_5_21`; baseline `0_5_0`.
