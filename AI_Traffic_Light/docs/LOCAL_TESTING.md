@@ -1,3 +1,9 @@
+# V0520 — Candidate CI automation
+
+Candidate `0_5_20`, previous `0_5_19`, accepted baseline `0_5_0`. Windows GitHub Actions runs Python compile, project structure, offline regressions and frontend typecheck/build on the feature branch. Local Windows smoke and ESP checks remain pending; no traffic-signal runtime behavior changes.
+
+---
+
 # V0519 — Emergency evidence confirmation candidate
 
 Candidate `0_5_19`, previous `0_5_18`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`. Confirmation is based on distinct source-frame identity, active model and frame timestamps, with at least 1,000 ms between two positive observations. Repeated polls and synchronized camera views cannot satisfy the interval; missing/stale coverage, model change and a newer negative frame clear evidence. Route bounds, expiry, protected transitions, conflict interlock and disabled hardware output remain unchanged.

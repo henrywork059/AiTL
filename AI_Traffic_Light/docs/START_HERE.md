@@ -1,3 +1,9 @@
+# V0520 — Candidate CI automation
+
+Candidate `0_5_20`, previous `0_5_19`, accepted baseline `0_5_0`. Windows GitHub Actions runs Python compile, project structure, offline regressions and frontend typecheck/build on the feature branch. Local Windows smoke and ESP checks remain pending; no traffic-signal runtime behavior changes.
+
+---
+
 # Start Here — V0519 (ambulance evidence confirmation candidate)
 
 **Candidate:** `0_5_19` | **Previous:** `0_5_18` | **Accepted baseline:** `0_5_0` | **Branch:** `feature/interactive-3d-simulation`.

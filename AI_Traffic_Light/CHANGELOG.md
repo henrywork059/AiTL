@@ -1,3 +1,7 @@
+## 0_5_20 — Candidate CI automation
+- Introduce Windows GitHub Actions checks for Python compile, structure, offline regressions, frontend typecheck and build.
+- No physical camera, live server or local Windows acceptance claimed. Previous 0_5_19, baseline 0_5_0.
+
 ## 0_5_19 — Confirm emergency priority from distinct fresh frames
 
 - Bind ambulance confirmation to source ID, frame number, frame timestamp and active model; require two unique fresh positive frames separated by at least one second in frame time.

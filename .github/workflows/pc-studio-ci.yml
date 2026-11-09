@@ -1,0 +1,45 @@
+name: PC Studio candidate CI
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend
+        run: python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt
+      - name: Compile
+        working-directory: AI_Traffic_Light
+        run: python -m compileall -q apps/pc-studio/backend/app scripts
+      - name: Structure
+        working-directory: AI_Traffic_Light
+        run: python scripts/check_structure.py
+      - name: Offline regressions
+        working-directory: AI_Traffic_Light
+        shell: pwsh
+        run: |
+          $excluded = @('test_backend_smoke.py','test_camera_transport_benchmark.py','test_camera_transport_isolation.py')
+          Get-ChildItem scripts/test_*.py | Where-Object { $_.Name -notin $excluded } | Sort-Object Name | ForEach-Object {
+            python $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Failed: $($_.Name)" }
+          }
+      - name: npm ci
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: npm run typecheck
+      - name: Build
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: npm run build

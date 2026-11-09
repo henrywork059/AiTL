@@ -1,5 +1,5 @@
-version: 0_5_19
-status: Emergency evidence confirmation candidate
-previous_version: 0_5_18
+version: 0_5_20
+status: CI automation candidate
+previous_version: 0_5_19
 passed_baseline: 0_5_0
-notes: Confirm emergency priority only from distinct, fresh ambulance-positive source frames at least one second apart by frame timestamps. Preserve protected virtual signals and hardware_actuation_enabled false; Windows/hardware validation and owner PASS pending.
+notes: Introduce Windows Actions offline regression and frontend verification; Windows startup, hardware and owner PASS remain pending.
