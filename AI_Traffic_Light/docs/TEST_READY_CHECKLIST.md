@@ -1,3 +1,13 @@
+# V0522 — Disconnected/conflicting network safety
+
+Candidate `0_5_22`, previous `0_5_21`, accepted baseline `0_5_0`. Virtual network signals now fail closed on contradictory lamp/phase data and hold a connected movement red when a conflict-linked neighbor's signal state disappears. Existing clearance and priority rules are retained; no physical signal output.
+
+---
+
+- [ ] Missing-controller and contradictory-lamp regressions PASS.
+- [ ] Existing coordination/emergency tests PASS.
+- [ ] CI, Windows and ESP validation PASS; owner explicitly accepts.
+
 # V0521 — Same-source ambulance confirmation
 
 Candidate `0_5_21`, previous `0_5_20`, accepted baseline `0_5_0`. Emergency evidence must include two distinct valid, positive camera frames at least 1,000 ms apart from the same source. Positive observations from different camera views alone never confirm a route. Existing protected phases and hardware-disabled behavior are unchanged.

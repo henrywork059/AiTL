@@ -1,3 +1,7 @@
+## 0_5_22 — Network fail-closed virtual interlock (candidate)
+- Hold conflicting virtual signals red when a connected controller is unavailable; sanitize contradictory phase/lamp states to all red.
+- Add deterministic absent-neighbor and invalid-signal regression. Previous `0_5_21`; baseline `0_5_0`.
+
 ## 0_5_21 — Same-source emergency confirmation (candidate)
 - Require two time-separated ambulance-positive frames from the same source before a one-hop emergency request. Add adversarial two-camera regression.
 - No change to physical output or protected phase timing. Previous `0_5_20`; baseline `0_5_0`.

@@ -1,3 +1,11 @@
+# V0522 — Disconnected/conflicting network safety
+
+Candidate `0_5_22`, previous `0_5_21`, accepted baseline `0_5_0`. Virtual network signals now fail closed on contradictory lamp/phase data and hold a connected movement red when a conflict-linked neighbor's signal state disappears. Existing clearance and priority rules are retained; no physical signal output.
+
+---
+
+Focused: `python scripts/test_v0522_network_disconnect.py` and `python scripts/test_v0514_network_conflicts.py`. Run owner Windows runner and physical camera validation separately.
+
 # V0521 — Same-source ambulance confirmation
 
 Candidate `0_5_21`, previous `0_5_20`, accepted baseline `0_5_0`. Emergency evidence must include two distinct valid, positive camera frames at least 1,000 ms apart from the same source. Positive observations from different camera views alone never confirm a route. Existing protected phases and hardware-disabled behavior are unchanged.

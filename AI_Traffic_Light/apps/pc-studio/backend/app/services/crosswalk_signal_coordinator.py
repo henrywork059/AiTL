@@ -39,6 +39,20 @@ def movements_conflict(
     return False
 
 
+def _safe_virtual_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Fail closed when a published virtual lamp contradicts its phase."""
+    movement = movement_of(state)
+    vehicle = bool(state.get("vehicle_go"))
+    pedestrian = bool(state.get("pedestrian_walk") or state.get("pedestrian_clear"))
+    if (vehicle and movement != "vehicle") or (pedestrian and movement != "pedestrian") or (vehicle and pedestrian):
+        return {
+            **state, "phase": "all_red", "phase_key": "invalid_signal_hold",
+            "vehicle_go": False, "pedestrian_walk": False, "pedestrian_clear": False,
+            "seconds_remaining": 0.0,
+        }
+    return state
+
+
 def coordinate_crosswalk_signals(
     states: dict[str, dict[str, Any]],
     links: list[dict[str, Any]],
@@ -58,6 +72,13 @@ def coordinate_crosswalk_signals(
     enabled = [link for link in links if link.get("movement_conflicts")]
     if not enabled:
         return states, set(), {}, {}
+    # A source with contradictory phase/lamps must not publish an unsafe green.
+    states = {crossing: _safe_virtual_state(state) for crossing, state in states.items()}
+    unavailable = {
+        endpoint for link in enabled
+        for endpoint in (link["source_crosswalk_id"], link["destination_crosswalk_id"])
+        if endpoint not in states
+    }
     wanted = {crossing: movement_of(state) for crossing, state in states.items()}
     recent = dict(released)
     for crossing, movement in previous_grants.items():
@@ -80,9 +101,13 @@ def coordinate_crosswalk_signals(
     output: dict[str, dict[str, Any]] = {}
     for crossing in sorted(states, key=rank):
         requested = wanted[crossing]
-        blocked_by: str | None = None
+        blocked_by: str | None = next((
+            missing for missing in sorted(unavailable)
+            if movements_conflict(links, crossing, requested, missing, "vehicle")
+            or movements_conflict(links, crossing, requested, missing, "pedestrian")
+        ), None) if requested else None
         wait: float | None = None
-        if requested:
+        if requested and not blocked_by:
             for other, other_movement in reservations.items():
                 if movements_conflict(links, crossing, requested, other, other_movement):
                     blocked_by = other
