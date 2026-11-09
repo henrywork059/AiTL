@@ -1,5 +1,5 @@
-version: 0_5_18
-status: Interactive 3D simulation frontend typecheck repair candidate
-previous_version: 0_5_17
+version: 0_5_19
+status: Emergency evidence confirmation candidate
+previous_version: 0_5_18
 passed_baseline: 0_5_0
-notes: Narrow nullable-state correction in the 3D status panel: use the already null-checked active scene for countdown and object counts. Rendering behavior and all backend/controller policies remain unchanged. Candidate pending frontend typecheck/build, Windows startup and visual/hardware validation, and owner PASS.
+notes: Confirm emergency priority only from distinct, fresh ambulance-positive source frames at least one second apart by frame timestamps. Preserve protected virtual signals and hardware_actuation_enabled false; Windows/hardware validation and owner PASS pending.

@@ -26,6 +26,9 @@ def _valid_frame(
     timestamp = frame.get("timestamp_ms")
     if not isinstance(timestamp, (int, float)) or not 0 <= now_ms - timestamp <= MAX_FRAME_AGE_MS:
         return None
+    frame_number = frame.get("source_frame_number")
+    if not isinstance(frame_number, int) or isinstance(frame_number, bool) or frame_number < 0:
+        return None
     if not isinstance(frame.get("detections"), list):
         return None
     return frame
@@ -97,10 +100,21 @@ def crosswalk_observation(
 
     samples: dict[str, list[dict[str, int]]] = {}
     signature: list[tuple[Any, ...]] = []
+    frame_observations: list[dict[str, Any]] = []
     for side, source, frame, polygons in views:
-        for region_id, classes in _class_counts(frame, polygons).items():
+        frame_counts = _class_counts(frame, polygons)
+        for region_id, classes in frame_counts.items():
             samples.setdefault(region_id, []).append(classes)
-        signature.append((source, frame["source_frame_number"], frame["timestamp_ms"], model_id))
+        frame_number = frame.get("source_frame_number")
+        timestamp = frame.get("timestamp_ms")
+        signature.append((source, frame_number, timestamp, model_id))
+        frame_observations.append({
+            "source_id": source,
+            "source_frame_number": frame_number,
+            "timestamp_ms": timestamp,
+            "model_id": model_id,
+            "ambulance_observed": any(classes.get("ambulance", 0) > 0 for classes in frame_counts.values()),
+        })
 
     combined: dict[str, dict[str, float]] = {}
     for region_id, observations in samples.items():
@@ -117,6 +131,7 @@ def crosswalk_observation(
         "camera_coverage": "complete" if len(sources) == configured else "partial",
         "region_class_counts": combined,
         "source_timestamp_ms": latest,
+        "frame_observations": frame_observations,
     }
     observation = {
         "zone_class_counts": {**combined, **{crosswalk["id"] + ":" + rid: counts for rid, counts in combined.items()}},

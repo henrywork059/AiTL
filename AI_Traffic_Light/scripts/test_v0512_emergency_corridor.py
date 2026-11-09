@@ -26,8 +26,8 @@ def crosswalk(identity: str, camera: str) -> dict:
     }
 
 
-def detected(source: str, frame_number: int, classes: list[str]) -> dict:
-    timestamp = int(time.time() * 1000)
+def detected(source: str, frame_number: int, classes: list[str], timestamp_ms: int | None = None) -> dict:
+    timestamp = int(time.time() * 1000) if timestamp_ms is None else timestamp_ms
     return {
         "source_id": source, "model_id": "demo", "error": None,
         "frame": {
@@ -61,14 +61,15 @@ def main() -> None:
         config["mode"] = "fixed"
         rules.save_config(config)
         clock = [100.0]
+        frame_time = int(time.time() * 1000) - 3000
         service = CrosswalkSignalService(
             crosswalks=crosses, shared_rules=rules,
             clock=lambda: clock[0], history_root=root / "crosswalk_history",
         )
-        service.ingest_camera_results({"sim_a": detected("sim_a", 1, ["ambulance"])},
+        service.ingest_camera_results({"sim_a": detected("sim_a", 1, ["ambulance"], frame_time)},
                                       simulation_enabled=True, model_id="demo")
         clock[0] += 1.1
-        service.ingest_camera_results({"sim_a": detected("sim_a", 2, ["ambulance"])},
+        service.ingest_camera_results({"sim_a": detected("sim_a", 2, ["ambulance"], frame_time + 1100)},
                                       simulation_enabled=True, model_id="demo")
         assert service.status(simulation_enabled=True)["crosswalks"]["cross_b"]["emergency_priority"] is None
 
@@ -76,7 +77,7 @@ def main() -> None:
         route["movement_conflicts"] = ["vehicle_vehicle"]
         save_links([route])
         clock[0] += 1.1
-        service.ingest_camera_results({"sim_a": detected("sim_a", 3, ["ambulance"])},
+        service.ingest_camera_results({"sim_a": detected("sim_a", 3, ["ambulance"], frame_time + 2200)},
                                       simulation_enabled=True, model_id="demo")
         status = service.status(simulation_enabled=True)
         priority = status["crosswalks"]["cross_b"]["emergency_priority"]

@@ -13,7 +13,7 @@ from typing import Any, Callable
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.crosswalks import CrosswalkService, crosswalk_service
-from app.services.crosswalk_observations import crosswalk_observation
+from app.services.crosswalk_observations import MAX_FRAME_AGE_MS, crosswalk_observation
 from app.services.crosswalk_signal_coordinator import coordinate_crosswalk_signals
 from app.services.signal_rules import (
     PROJECT_ROOT, SignalRulesService, signal_rules_service,
@@ -44,7 +44,7 @@ class CrosswalkSignalService:
         self._last_virtual_update = 0.0
         self._frame_signatures: dict[str, tuple[tuple[Any, ...], ...]] = {}
         self._observation_meta: dict[str, dict[str, Any]] = {}
-        self._emergency_evidence: dict[str, tuple[float, int]] = {}
+        self._emergency_evidence: dict[str, dict[str, Any]] = {}
         self._active_routes: set[str] = set()
         self._priority_requests: dict[str, dict[str, Any]] = {}
         self._controller_clocks: dict[str, float] = {}
@@ -243,6 +243,7 @@ class CrosswalkSignalService:
                 observation, signature, meta = crosswalk_observation(
                     crosswalk, results, model_id=model_id,
                 )
+                frame_observations = meta.pop("frame_observations", [])
                 self._observation_meta[crosswalk_id] = meta
                 if observation is None:
                     self._emergency_evidence.pop(crosswalk_id, None)
@@ -252,15 +253,41 @@ class CrosswalkSignalService:
                 elif self._frame_signatures.get(crosswalk_id) != signature:
                     controller.observe(observation)
                     self._frame_signatures[crosswalk_id] = signature
-                    ambulance_observed = any(
-                        float(classes.get("ambulance", 0)) > 0
-                        for classes in meta["region_class_counts"].values()
-                    )
-                    if ambulance_observed:
-                        first, samples = self._emergency_evidence.get(crosswalk_id, (self._clock(), 0))
-                        self._emergency_evidence[crosswalk_id] = (first, samples + 1)
-                    else:
+
+                # Confirmation is based on distinct, fresh source frames, not on
+                # changes to a combined crosswalk signature between worker polls.
+                if observation is not None:
+                    if model_id is None or meta.get("camera_coverage") != "complete":
                         self._emergency_evidence.pop(crosswalk_id, None)
+                        continue
+                    evidence = self._emergency_evidence.get(crosswalk_id)
+                    if evidence is None or evidence["model_id"] != model_id:
+                        evidence = {"model_id": model_id, "latest": {}, "positive": {}}
+                    for frame in frame_observations:
+                        source = frame["source_id"]
+                        frame_number = frame["source_frame_number"]
+                        timestamp = frame["timestamp_ms"]
+                        identity = (source, frame_number, timestamp, frame["model_id"])
+                        previous = evidence["latest"].get(source)
+                        if previous and (frame_number <= previous[0] or timestamp <= previous[1]):
+                            continue
+                        evidence["latest"][source] = (frame_number, timestamp)
+                        if frame["ambulance_observed"]:
+                            evidence["positive"][identity] = timestamp
+                        else:
+                            evidence["positive"] = {
+                                key: value for key, value in evidence["positive"].items()
+                                if key[0] != source
+                            }
+                    newest_timestamp = max(
+                        (frame["timestamp_ms"] for frame in frame_observations),
+                        default=0,
+                    )
+                    evidence["positive"] = {
+                        key: timestamp for key, timestamp in evidence["positive"].items()
+                        if 0 <= newest_timestamp - timestamp <= MAX_FRAME_AGE_MS
+                    }
+                    self._emergency_evidence[crosswalk_id] = evidence
 
             # Only a user-specified directed one-hop route can request a neighbour's
             # virtual vehicle phase. All-red/pedestrian transitions remain local.
@@ -276,8 +303,9 @@ class CrosswalkSignalService:
                     source_id, target_id = link["destination_crosswalk_id"], link["source_crosswalk_id"]
                 else:
                     continue
-                first, samples = self._emergency_evidence.get(source_id, (now, 0))
-                if samples < 2 or now - first < 1.0:
+                evidence = self._emergency_evidence.get(source_id)
+                timestamps = set(evidence["positive"].values()) if evidence else set()
+                if len(timestamps) < 2 or max(timestamps) - min(timestamps) < 1000:
                     continue
                 eligible.add(link["id"])
                 if link["id"] in self._active_routes:

@@ -1,3 +1,16 @@
+# V0519 — Emergency evidence confirmation candidate
+
+- [ ] On `feature/interactive-3d-simulation`, version `0_5_19` follows `0_5_18`; accepted baseline remains `0_5_0`.
+- [ ] Re-reading one positive frame and updating an unrelated camera cannot create a second confirmation.
+- [ ] Synchronized views of one observation do not satisfy the one-second frame-time span; two distinct fresh positive frames can request an explicitly configured route.
+- [ ] Negative, missing, stale and model-switched observations clear invalid evidence.
+- [ ] Unique route validation, conflict interlock, protected pedestrian/amber/all-red transitions, request duration/expiry and hardware-disabled status remain intact.
+- [ ] The emergency safety regressions, 3D/camera/Crosswalk checks, structure guard, and frontend typecheck/build pass.
+- [ ] The feature-branch Windows runner, startup and any connected ESP/camera checks pass.
+- [ ] Owner confirms PASS; do not change `passed_baseline` before confirmation.
+
+---
+
 # V0518 — Interactive 3D simulation typecheck repair candidate
 
 - [ ] On `feature/interactive-3d-simulation`, version `0_5_18` after `0_5_17`; accepted baseline stays `0_5_0`.

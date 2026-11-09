@@ -30,11 +30,11 @@ def crossing(identity: str, camera: str) -> dict:
     }
 
 
-def frame(source: str, n: int, labels: list[str]) -> dict:
+def frame(source: str, n: int, labels: list[str], timestamp_ms: int | None = None) -> dict:
     return {
         "source_id": source, "model_id": "demo", "error": None,
         "frame": {
-            "source_id": source, "timestamp_ms": int(time.time() * 1000),
+            "source_id": source, "timestamp_ms": int(time.time() * 1000) if timestamp_ms is None else timestamp_ms,
             "source_frame_number": n, "image_width": 1280, "image_height": 720,
             "detections": [
                 {"class_name": label, "box_xyxy": [100 + 60 * i, 100, 160 + 60 * i, 200]}
@@ -141,11 +141,12 @@ def main() -> None:
 
         link2["emergency_route"] = "source_to_destination"
         save(link2)
+        frame_time = int(time.time() * 1000) - 3000
         clock[0] += 1.0
-        signals.ingest_camera_results({"sim_a": frame("sim_a", 1, ["ambulance"])},
+        signals.ingest_camera_results({"sim_a": frame("sim_a", 1, ["ambulance"], frame_time)},
                                       simulation_enabled=True, model_id="demo")
         clock[0] += 1.1
-        signals.ingest_camera_results({"sim_a": frame("sim_a", 2, ["ambulance"])},
+        signals.ingest_camera_results({"sim_a": frame("sim_a", 2, ["ambulance"], frame_time + 1100)},
                                       simulation_enabled=True, model_id="demo")
         status = signals.status(simulation_enabled=True)
         assert status["coordination_enabled"] is True

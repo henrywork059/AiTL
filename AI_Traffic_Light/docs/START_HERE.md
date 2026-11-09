@@ -1,3 +1,13 @@
+# Start Here — V0519 (ambulance evidence confirmation candidate)
+
+**Candidate:** `0_5_19` | **Previous:** `0_5_18` | **Accepted baseline:** `0_5_0` | **Branch:** `feature/interactive-3d-simulation`.
+
+Emergency priority now requires two distinct, fresh ambulance-positive source frames at least one second apart by frame timestamps. Re-reading one frame, updating another camera, or using synchronized views of one event cannot count as a second observation. Missing/stale coverage, model changes, and a newer negative frame clear confirming evidence. Signal requests remain opt-in, conflict-checked, bounded to 30 seconds and simulation/virtual only; hardware actuation stays disabled.
+
+Run the deterministic emergency regressions, then from the repository root run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` on the feature branch. Windows startup/camera validation and owner PASS remain pending.
+
+---
+
 # Start Here — V0518 (3D status nullability repair)
 
 **Candidate:** `0_5_18` | **Previous:** `0_5_17` | **Accepted baseline:** `0_5_0` | **Branch:** `feature/interactive-3d-simulation`.
