@@ -1,3 +1,7 @@
+## 0_5_25 — Per-camera inference diagnostics (candidate)
+- Add source-frame age/freshness and measured inference latency to the existing per-camera API and AI Preview.
+- Add deterministic source-isolation/stale diagnostics regression; no changes to hardware actuation or signal decisions. Previous `0_5_24`, baseline `0_5_0`.
+
 ## 0_5_24 — Multi-camera source freshness (candidate)
 - Reject same/older per-source frame timestamps and avoid inference-cache reuse after camera frame-number reset.
 - Reuse existing global camera registry, inference model and crosswalk mappings. Previous `0_5_23`, baseline `0_5_0`.

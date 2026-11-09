@@ -1,3 +1,7 @@
+## V0525 Per-camera AI diagnostics (additive)
+
+`GET /api/inference/cameras/{source_id}` preserves its `{source_id,frame,error}` payload and standard request-ID envelope and adds `diagnostics: {inference_latency_ms?,source_timestamp_ms?,source_frame_number?,source_origin?,frame_age_ms,fresh}`. Latency is measured during the processing attempt; age is computed from the stored source-frame timestamp. `fresh=false` when no usable result, when the model changes or when the frame exceeds the existing 5-second freshness bound. Unavailable measurements remain absent/null; synthetic values are not represented as camera performance measurements. Camera AI Preview displays source-specific age, latency and freshness.
+
 # API Contracts — current camera and junction-network highlights
 
 ## V0515 simulated-camera 3D preview (read-only)

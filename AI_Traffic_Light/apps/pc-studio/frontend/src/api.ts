@@ -378,7 +378,20 @@ export async function uploadInferenceModel(modelId: string, data: File): Promise
     method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: data,
   });
 }
-export type CameraInferenceResult = { source_id: string; frame: DetectionFrame | null; error: string | null };
+export type CameraInferenceDiagnostics = {
+  inference_latency_ms?: number;
+  source_timestamp_ms?: number;
+  source_frame_number?: number;
+  source_origin?: string;
+  frame_age_ms: number | null;
+  fresh: boolean;
+};
+export type CameraInferenceResult = {
+  source_id: string;
+  frame: DetectionFrame | null;
+  error: string | null;
+  diagnostics?: CameraInferenceDiagnostics;
+};
 export async function fetchCameraInference(sourceId: string): Promise<CameraInferenceResult> {
   return requestJsonStrict<CameraInferenceResult>(`${API_BASE}/api/inference/cameras/${encodeURIComponent(sourceId)}`);
 }

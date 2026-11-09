@@ -55,10 +55,21 @@ class MultiCameraInferenceService:
         with self._lock:
             item = self._results.get(source_id)
             payload = dict(item) if item else {"source_id": source_id, "frame": None, "error": None}
-        if payload.get("frame") is not None and payload.get("model_id") != inference_service.status()["active_model_id"]:
-            return {"source_id": source_id, "frame": None, "error": "Model changed"}
-        if payload.get("frame") is not None and int(time.time() * 1000) - payload["frame"]["timestamp_ms"] > STALE_RESULT_MS:
-            return {"source_id": source_id, "frame": None, "error": "Frame is stale"}
+        frame = payload.get("frame")
+        now_ms = int(time.time() * 1000)
+        timestamp = frame.get("timestamp_ms") if isinstance(frame, dict) else None
+        if timestamp is None:
+            timestamp = (payload.get("diagnostics") or {}).get("source_timestamp_ms")
+        age = now_ms - timestamp if isinstance(timestamp, (int, float)) else None
+        if frame is not None and payload.get("model_id") != inference_service.status()["active_model_id"]:
+            payload["frame"], payload["error"] = None, "Model changed"
+        elif frame is not None and (age is None or not 0 <= age <= STALE_RESULT_MS):
+            payload["frame"], payload["error"] = None, "Frame is stale"
+        payload["diagnostics"] = {
+            **(payload.get("diagnostics") or {}),
+            "frame_age_ms": round(age) if age is not None and age >= 0 else None,
+            "fresh": payload.get("frame") is not None and payload.get("error") is None,
+        }
         return payload
 
     def _run(self) -> None:
@@ -86,6 +97,7 @@ class MultiCameraInferenceService:
                         with self._lock:
                             if not _is_new_source_frame(self._keys.get(frame.source_id), key):
                                 continue
+                        started_inference = time.perf_counter()
                         try:
                             result = inference_service.detect_frame(frame, confidence_threshold=settings["default_confidence"])
                             if inference_service.status()["active_model_id"] != model_id:
@@ -94,6 +106,12 @@ class MultiCameraInferenceService:
                         except Exception as exc:  # One failed camera must not stop others.
                             logger.warning("Camera AI inference failed", extra={"source_id": frame.source_id, "error": str(exc)})
                             item = {"source_id": frame.source_id, "frame": None, "error": str(exc)[:200], "model_id": model_id}
+                        item["diagnostics"] = {
+                            "inference_latency_ms": round((time.perf_counter() - started_inference) * 1000, 2),
+                            "source_timestamp_ms": frame.received_at_ms,
+                            "source_frame_number": frame.frame_number,
+                            "source_origin": frame.origin,
+                        }
                         with self._lock:
                             self._results[frame.source_id] = item
                             self._keys[frame.source_id] = key

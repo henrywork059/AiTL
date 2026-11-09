@@ -1,3 +1,13 @@
+# V0525 — Per-camera inference diagnostics
+
+Candidate `0_5_25`, previous `0_5_24`, accepted baseline `0_5_0`. Expose measured per-camera inference latency, source frame age and freshness in the existing inference response and Camera AI Preview. Diagnostics are per-source and never fabricated; stale/mismatched-model frames are unavailable for AI overlay. Existing signal decisions and physical-output restrictions are unchanged.
+
+---
+
+- [ ] Camera A/B diagnostics reflect only their own source.
+- [ ] Stale/missing/model-switched detections remain unavailable.
+- [ ] CI, typecheck/build, local Windows/ESP and explicit owner PASS.
+
 # V0524 — Multi-camera source freshness
 
 Candidate `0_5_24`, previous `0_5_23`, accepted baseline `0_5_0`. Harden existing per-source background inference: discard repeated or out-of-order camera samples independently, allow frame-number resets only with newer timestamps, and prevent detection-cache reuse across reconnects. Existing simulation/real frame routing and selected-source traffic state remain distinct.

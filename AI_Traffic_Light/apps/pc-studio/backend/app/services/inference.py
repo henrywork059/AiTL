@@ -65,7 +65,7 @@ class InferenceService:
         self._loaded_at_ms: int | None = None
         self._last_latency_ms: float | None = None
         self._last_frame_number: int | None = None
-        self._last_detection_key: tuple[str, int, float] | None = None
+        self._last_detection_key: tuple[str, int, int, float] | None = None
         self._last_detection_frame: dict[str, Any] | None = None
         self._last_source_frame: CameraFrame | None = None
         self._source_frame_cache: dict[tuple[str, int], CameraFrame] = {}

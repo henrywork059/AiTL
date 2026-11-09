@@ -1,5 +1,5 @@
-version: 0_5_24
-status: Multi-camera source freshness candidate
-previous_version: 0_5_23
+version: 0_5_25
+status: Camera diagnostics candidate
+previous_version: 0_5_24
 passed_baseline: 0_5_0
-notes: Harden existing per-source background inference: discard repeated or out-of-order camera samples independently, allow frame-number resets only with newer timestamps, and prevent detection-cache reuse across reconnects. Existing simulation/real frame routing and selected-source traffic state remain distinct. Owner Windows and hardware PASS pending.
+notes: Expose measured per-camera inference latency, source frame age and freshness in the existing inference response and Camera AI Preview. Diagnostics are per-source and never fabricated; stale/mismatched-model frames are unavailable for AI overlay. Existing signal decisions and physical-output restrictions are unchanged. CI, Windows/ESP and owner PASS pending.

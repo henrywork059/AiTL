@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { cameraPreviewUrl, fetchCameraInference, fetchInferenceStatus, inferredFrameUrl } from "../api";
+import { cameraPreviewUrl, fetchCameraInference, fetchInferenceStatus, inferredFrameUrl, type CameraInferenceDiagnostics } from "../api";
 import { CameraDetectionView } from "../components/CameraDetectionView";
 import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { DetectionTable } from "../components/DetectionTable";
@@ -28,6 +28,7 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
   const [model, setModel] = useState<InferenceStatus | null>(null);
   const [sourceId, setSourceId] = useState("");
   const [frame, setFrame] = useState<DetectionFrame | null>(null);
+  const [diagnostics, setDiagnostics] = useState<CameraInferenceDiagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
@@ -47,6 +48,7 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
 
   useEffect(() => {
     setFrame(null);
+    setDiagnostics(null);
     setImageTick(0);
     setError(null);
   }, [sourceId, model?.active_model_id]);
@@ -56,10 +58,11 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
     const next = await fetchCameraInference(sourceId);
     if (next.source_id !== sourceId) return;
     setFrame(next.frame);
+    setDiagnostics(next.diagnostics ?? null);
     setError(next.error);
     setImageTick(Date.now());
   }, 500, { enabled: sourceId.length > 0, restartKey: sourceId,
-    onError: (reason) => { setFrame(null); setError(errorMessage(reason)); } });
+    onError: (reason) => { setFrame(null); setDiagnostics(null); setError(errorMessage(reason)); } });
 
   const camera = cameras?.cameras.find((item) => item.source_id === sourceId);
   const hasFeed = Boolean(camera?.stream_connected) || Boolean(
@@ -133,6 +136,9 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
           <span>Model <strong>{model?.active_model_id ?? "Not loaded"}</strong></span>
           <span>Frame <strong>{displayedFrame?.source_frame_number ?? "—"}</strong></span>
           <span>Objects <strong>{detections.length}</strong></span>
+          <span>Frame age <strong>{diagnostics?.frame_age_ms == null ? "n/a" : `${diagnostics.frame_age_ms} ms`}</strong></span>
+          <span>Camera inference <strong>{diagnostics?.inference_latency_ms == null ? "n/a" : `${diagnostics.inference_latency_ms.toFixed(1)} ms`}</strong></span>
+          <span>AI observation <strong>{diagnostics?.fresh ? "Fresh" : "Unavailable"}</strong></span>
         </div>
         <div className="live-visibility-tools">
           <div className="button-row wrap-row">
