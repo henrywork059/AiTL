@@ -1,3 +1,13 @@
+# V0527 — Late inference shutdown guard
+
+Candidate `0_5_27`, previous `0_5_26`, accepted baseline `0_5_0`. Discard late inference results when stop is requested, preventing a model call that finishes after the bounded worker shutdown from repopulating cleared per-camera caches or publishing obsolete Crosswalk observations. The prior duplicate-worker guard, normal inference behavior and disabled physical outputs remain unchanged.
+
+---
+
+- [ ] Block an inference call, stop the worker, then finish detection; its result and Crosswalk publication must be discarded.
+- [ ] Previous worker-lifecycle and camera source-freshness regressions remain passing.
+- [ ] CI compile/structure/regression/frontend checks pass; Windows/ESP and explicit owner PASS pending.
+
 # V0526 — Inference worker shutdown safety
 
 Candidate `0_5_26`, previous `0_5_25`, accepted baseline `0_5_0`. Preserve a live inference worker reference after its 2-second bounded shutdown join expires; subsequent start attempts cannot create parallel inference threads while the prior worker is running. Clear cached observations as before; no changes to inference results, traffic signals or physical outputs.

@@ -116,6 +116,10 @@ class MultiCameraInferenceService:
                             "source_origin": frame.origin,
                         }
                         with self._lock:
+                            # Stop may finish while inference is still blocked; discard
+                            # that late result instead of reviving the cleared cache.
+                            if self._stop.is_set():
+                                return
                             self._results[frame.source_id] = item
                             self._keys[frame.source_id] = key
                 # Publish per-camera detections to the correct simulated crossing
@@ -132,6 +136,9 @@ class MultiCameraInferenceService:
                     and 0 <= now_ms - item["frame"]["timestamp_ms"] <= STALE_RESULT_MS
                     for item in snapshot.values()
                 )
+                # Do not forward completed AI observations during shutdown.
+                if self._stop.is_set():
+                    return
                 crosswalk_signal_service.ingest_camera_results(
                     snapshot,
                     simulation_enabled=simulation_enabled,

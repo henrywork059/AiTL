@@ -1,3 +1,7 @@
+## 0_5_27 — Late inference shutdown guard (candidate)
+- Skip caching a detection that finishes after stop has already been signaled; avoid crosswalk publication on shutdown.
+- Add a deterministic threaded regression for late inference with bounded join and preserve the existing restart guard. Previous `0_5_26`, baseline `0_5_0`; no physical output changes.
+
 ## 0_5_26 — Inference worker lifecycle guard (candidate)
 - Retain the worker reference after a timed-out stop to prevent overlapping inference threads on quick restart.
 - Add deterministic timed-out join, restart and cache-cleanup regressions; no changes to camera API, traffic signals or physical actuation. Previous `0_5_25`, baseline `0_5_0`.
