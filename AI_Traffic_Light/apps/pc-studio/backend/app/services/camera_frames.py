@@ -529,12 +529,13 @@ class CameraFrameService:
         while remaining > 1e-9:
             step = min(0.05, remaining)
             self._simulation_clock_s += step
-            self._advance_vehicles_locked(step)
-            self._advance_pedestrians_locked(step)
+            # Both movement types must obey the same protected phase snapshot.
+            phase = self._simulation_signal_state_locked()["phase"]
+            self._advance_vehicles_locked(step, phase)
+            self._advance_pedestrians_locked(step, phase)
             remaining -= step
 
-    def _advance_vehicles_locked(self, dt: float) -> None:
-        phase = self._simulation_signal_state_locked()["phase"]
+    def _advance_vehicles_locked(self, dt: float, phase: str) -> None:
         vehicle_go = phase == "vehicle_green"
         gap = 22.0
         eastbound = sorted((v for v in self._vehicles if v.direction > 0), key=lambda item: item.x, reverse=True)
@@ -575,8 +576,7 @@ class CameraFrameService:
                     max(peers, default=float(FRAME_WIDTH + 120)) + self._simulation_rng.randint(70, 140),
                 )
 
-    def _advance_pedestrians_locked(self, dt: float) -> None:
-        phase = self._simulation_signal_state_locked()["phase"]
+    def _advance_pedestrians_locked(self, dt: float, phase: str) -> None:
         can_start_crossing = phase == "pedestrian_green"
         for pedestrian in self._pedestrians:
             delta = pedestrian.speed * dt * pedestrian.direction

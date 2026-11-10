@@ -1,3 +1,13 @@
+# V0530 — Shared protected simulation phase snapshot
+
+Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+The 50 ms simulation integrator now evaluates the existing protected signal controller **once** per substep and uses that same phase for both vehicle and pedestrian movement. Previously the same controller was queried separately for each movement type. Existing queue/WALK restrictions, clearance phases, simulated camera frames and 3D viewing behavior are retained. This is a software simulation optimization; physical signal outputs remain disabled.
+
+**Validate the feature branch:** pull `feature/interactive-3d-simulation`, then run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` from the repository root. The default runner targets `main`. See [Patch 0_5_30](PATCH_0_5_30.md) and [Local Testing](LOCAL_TESTING.md). Owner PASS pending.
+
+---
+
 # V0529 — Efficient mirrored simulation camera views
 
 Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`. Simulated camera B/C/D now use the current rendered BGR canvas instead of re-decoding the canonical PNG. Image geometry, 3D scene, AI input, and virtual signal protections are unchanged. No physical control is enabled.

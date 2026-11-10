@@ -71,6 +71,14 @@ def main() -> int:
     stripe_region = image[297:320, 538:742]
     assert float(np.percentile(stripe_region.mean(axis=2), 75)) > 190
 
+    # One stateful controller evaluation per 50 ms substep is shared by
+    # vehicle and pedestrian movement, including during phase transitions.
+    with service._lock:
+        with patch.object(service, "_simulation_signal_state_locked",
+                          wraps=service._simulation_signal_state_locked) as phase_probe:
+            service._advance_simulation_locked(0.2)
+        assert phase_probe.call_count == 4, phase_probe.call_count
+
     # A vehicle approaching the stop line must queue when vehicle traffic is not green.
     with service._lock:
         vehicle = next(item for item in service._vehicles if item.direction > 0)
@@ -179,6 +187,7 @@ def main() -> int:
     else:
         raise AssertionError("Unsupported camera content type was accepted")
 
+    print("[PASS] simulated vehicles and pedestrians share one signal evaluation per 50 ms step")
     print("[PASS] mirrored views reuse the render without PNG decoding")
     print("[PASS] two simulation pairs provide mirrored opposite views on one safe signal clock")
     print("[PASS] camera receiver accepts PNG frames")

@@ -20,6 +20,12 @@
 
 The current quality-preserving camera firmware preserves saved image quality/resolution under transport pressure. New profile defaults remain QVGA / JPEG 24 / 15 FPS; existing persisted profiles are not replaced by source patches.
 
+## Simulation timing and safety
+
+`CameraFrameService` advances synthetic vehicles and pedestrians in up-to-50 ms integration substeps, capped at 2 seconds of catch-up per update. Each substep obtains one stateful protected phase from `SignalRulesService.signal_state` and uses that **same snapshot** for vehicle and pedestrian movement. This avoids duplicating phase/scenario evaluation and prevents mismatched agent movement decisions at the same simulation time. The controller, not the renderer, remains responsible for yellow, all-red, pedestrian WALK/CLEAR and other protected timing rules.
+
+The current render's BGR canvas is also reused for alternate synthetic camera PNGs; no canonical frame or 3D coordinates are changed. These optimizations concern **simulation-only** movement and rendering, not real ESP image transport or physical traffic-light actuation. To verify them, from `AI_Traffic_Light/` run `python scripts/test_camera_frame_service.py` and `python scripts/test_signal_rules_service.py`; full candidate validation and owner Windows tests are documented in `docs/LOCAL_TESTING.md`.
+
 ## Camera diagnostics
 
 `CameraDiagnosticService` owns the one-click diagnostic workflow exposed through `POST /api/camera/diagnostics/run`. It measures the selected saved ESP through direct control probes, direct ATL1/JPEG receiving, direct receiving with concurrent status polling, and the normal manager/service stream path. It returns measured checks plus an evidence-based likely-failure classification and restores the prior selected-camera/simulation state where possible. The diagnostics service does not own traffic-signal logic or physical/public-road authority.

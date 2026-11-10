@@ -1,3 +1,8 @@
+## 0_5_30 — One protected phase snapshot per simulation step (candidate)
+- Advance vehicles and pedestrians from the same signal phase snapshot in each 50 ms simulator substep, eliminating a duplicate stateful controller query per substep.
+- Add an exact call-count regression, preserve existing vehicle queue/pedestrian WALK safety tests, and clarify simulation ownership and acceptance documentation.
+- Previous `0_5_29`, accepted baseline `0_5_0`. No API, settings/data schema, inference, 3D, ESP, virtual conflict-interlock or physical-output changes. Performance improvement is not benchmarked; owner PASS pending.
+
 ## 0_5_29 — Simulation camera mirror-render optimization (candidate)
 - Reuse the existing BGR render for mirrored simulated camera B/C/D views; avoid decoding the same PNG repeatedly per simulation tick.
 - Clear the bounded render cache on simulation reset, stop and resume; add pixel-equivalence and no-decode regression; document feature-branch validation.

@@ -43,6 +43,8 @@ If an ESP stream drops or the device reboots, its session can recover using the 
 
 `CameraFrameService` renders a 1280 × 720 BGR canvas and encodes the canonical simulation PNG once per tick. Mirrored simulation cameras B/C/D flip that same current-tick render and encode their own PNGs; they do not decode the canonical PNG. The bounded canvas cache occupies approximately 2.6 MiB and is discarded when simulation resets, stops or resumes. Existing per-view PNG caching, simulation scene coordinates, camera APIs, and protected virtual signal rules are unchanged. This optimization does not affect the real ESP transport or permit physical traffic-light control.
 
+The simulation integrator advances agents in at most 50 ms substeps (with a maximum 2 s catch-up per update). For each substep it queries the **existing** `SignalRulesService.signal_state` exactly once and passes that same protected phase to the vehicle and pedestrian movement helpers. The query may advance stateful phase/scenario logic; it is not a pure clock lookup. Sharing one snapshot avoids duplicate evaluations at identical simulation times and keeps both agent types on the same signal decision. The signal controller still owns all phase transitions, minimum clearances and scenario rules; no new controller or physical output is added.
+
 ## Junction Network observability path
 
 V0311 adds a configuration/observability layer over the existing source and topology services:

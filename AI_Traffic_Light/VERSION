@@ -1,5 +1,5 @@
-version: 0_5_29
-status: Simulation camera mirror-render optimization candidate
-previous_version: 0_5_28
+version: 0_5_30
+status: Shared simulation phase snapshot optimization candidate
+previous_version: 0_5_29
 passed_baseline: 0_5_0
-notes: Reuse the current simulated BGR canvas for camera mirror views instead of repeatedly decoding the canonical PNG. The bounded render cache clears on reset, stop and resume. Camera APIs, source geometry, virtual signal safety and disabled physical actuation remain unchanged. Candidate CI, Windows/ESP validation and explicit owner PASS govern acceptance.
+notes: Evaluate the protected simulation signal once per 50 ms integration substep, then apply the same phase to vehicle and pedestrian movement. This avoids redundant stateful controller queries without changing phase timing, safety barriers, camera/3D behavior or physical actuation restrictions. GitHub CI and explicit Windows/ESP owner PASS govern acceptance.

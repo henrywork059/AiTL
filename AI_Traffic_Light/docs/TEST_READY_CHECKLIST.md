@@ -1,3 +1,16 @@
+# V0530 — Shared protected simulation phase snapshot
+
+Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] Regression confirms exactly one protected controller query per 50 ms substep (four for 200 ms), used for both vehicle and pedestrian movement.
+- [ ] Vehicle stop-line queuing and release, curb waiting/WALK and yellow/all-red/pedestrian-clear phases remain correct.
+- [ ] Camera simulation API, 3D scene, previous mirror-render optimization and complete candidate CI pass.
+- [ ] Pull the feature branch; run `update_test_run.ps1 -SkipUpdate` from the repository root (default runner updates `main`).
+- [ ] Confirm normal simulated movement, pause/resume, density changes and unaffected ESP preview on Windows.
+- [ ] Owner explicitly confirms PASS before accepting the baseline or merging.
+
+---
+
 # V0529 — Simulation mirror-render optimization
 
 Candidate `0_5_29`, previous `0_5_28`, baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

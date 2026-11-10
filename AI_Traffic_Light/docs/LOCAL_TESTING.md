@@ -1,3 +1,22 @@
+# V0530 — Shared phase snapshot during simulation movement
+
+Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+**Focused tests** (inside `AI_Traffic_Light/`): `python scripts/test_camera_frame_service.py` (one phase evaluation for each of four 50 ms steps, vehicle stop-line, pedestrian curb/WALK, pause/resume and mirrored-frame regressions), `python scripts/test_signal_rules_service.py` (protected phase/scenario behavior), `python scripts/test_camera_simulation_api.py` (request/response semantics), and `python scripts/test_v0515_3d_simulation.py` (3D scene continuity).
+
+**Windows candidate pull/test** from a clean repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Run the full offline regression/structure suite and frontend typecheck/build in candidate CI. Manually verify yellow/all-red/WALK/pedestrian-clear transitions, queued vehicles, pedestrians waiting for WALK, four synthetic 3D views and unchanged ESP camera preview. No quantitative CPU/latency speedup is claimed without a controlled benchmark. Owner PASS required.
+
+---
+
 # V0529 — Simulation mirror-render optimization
 
 Candidate `0_5_29`, previous `0_5_28`, baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
