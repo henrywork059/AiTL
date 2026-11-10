@@ -269,7 +269,9 @@ class CrosswalkSignalService:
                         timestamp = frame["timestamp_ms"]
                         identity = (source, frame_number, timestamp, frame["model_id"])
                         previous = evidence["latest"].get(source)
-                        if previous and (frame_number <= previous[0] or timestamp <= previous[1]):
+                        # Source counters may reset on reconnect; a newer timestamp
+                        # is authoritative, while repeated/older samples stay ignored.
+                        if previous and timestamp <= previous[1]:
                             continue
                         evidence["latest"][source] = (frame_number, timestamp)
                         if frame["ambulance_observed"]:

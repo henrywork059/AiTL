@@ -1,5 +1,5 @@
-version: 0_5_27
-status: Late inference shutdown candidate
-previous_version: 0_5_26
+version: 0_5_28
+status: Emergency evidence reconnect continuity candidate
+previous_version: 0_5_27
 passed_baseline: 0_5_0
-notes: Discard inference results completed after the background worker has been stopped, and avoid publishing an obsolete Crosswalk observation during shutdown. Preserve the prior duplicate-worker guard, existing camera API, protected virtual signals and disabled physical actuation. GitHub CI, Windows/ESP and explicit owner PASS govern acceptance.
+notes: Accept newer timestamped camera evidence after a frame-number reset, preserving same-source ambulance confirmation, fresh negative clearing and rejection of old replays. Virtual safety and physical actuation restrictions remain unchanged. GitHub CI, local Windows/ESP checks and explicit owner PASS govern acceptance.
