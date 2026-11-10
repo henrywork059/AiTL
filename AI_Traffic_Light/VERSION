@@ -1,5 +1,5 @@
-version: 0_5_28
-status: Consolidated main CI candidate
-previous_version: 0_5_27
+version: 0_5_29
+status: Bounded camera upload candidate
+previous_version: 0_5_28
 passed_baseline: 0_5_0
-notes: Following explicit consolidation of existing GitHub branches into main, run the existing Windows CI checks on main pushes. No backend/frontend runtime behavior, traffic signal safety, physical output or acceptance baseline changes. Windows/ESP and owner PASS pending.
+notes: Limit HTTP camera frame upload body accumulation to the existing 8 MiB image limit before buffering the complete payload. Preserve the existing success envelope, image validation, stable 413 error code, simulation/ESP camera routes, network safety and disabled physical actuation. Windows/ESP and owner PASS pending.

@@ -1,3 +1,7 @@
+## 0_5_29 — Bound camera upload memory (candidate)
+- Enforce the existing 8 MiB camera upload limit during HTTP request streaming, avoiding unbounded request-body buffering.
+- Add deterministic multi-chunk, exact-boundary and oversized-body regressions. Retain upload response envelopes and 413 error semantics. Previous `0_5_28`, baseline `0_5_0`; no physical-output changes.
+
 ## 0_5_28 — Main-branch CI after consolidation (candidate)
 - Change the existing Windows CI push trigger to `main` after fast-forward integration of the latest feature branch; preserve the prior CI checks and acceptance baseline.
 - No runtime, hardware or signal-control changes. Previous `0_5_27`, baseline `0_5_0`.

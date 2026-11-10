@@ -1,3 +1,9 @@
+# V0529 — Bounded camera upload body
+
+Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0` on `main`. The HTTP camera-frame receiver now enforces its existing 8 MiB limit incrementally while streaming the request, rather than buffering an unbounded request body before validation. Valid JPEG/PNG upload handling and API envelopes remain unchanged; camera transport, inference, virtual signals and physical outputs are untouched.
+
+---
+
 # V0528 — Main-branch CI after consolidation
 
 Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. The feature branch was fast-forwarded into `main` without altering history. Switch the existing Windows GitHub Actions push trigger from the now-inactive feature branch to `main`, so subsequent main-branch maintenance is validated. No app runtime, signal controller or hardware behavior changes.

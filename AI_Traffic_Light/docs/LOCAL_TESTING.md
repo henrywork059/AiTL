@@ -1,3 +1,11 @@
+# V0529 — Bounded camera upload body
+
+Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0` on `main`. The HTTP camera-frame receiver now enforces its existing 8 MiB limit incrementally while streaming the request, rather than buffering an unbounded request body before validation. Valid JPEG/PNG upload handling and API envelopes remain unchanged; camera transport, inference, virtual signals and physical outputs are untouched.
+
+---
+
+Focused: `python scripts/test_v0529_camera_upload_stream_limit.py`, `python scripts/test_camera_frame_service.py`, and `python scripts/test_camera_simulation_api.py`. Run the existing Python structure check and frontend CI. On Windows confirm a valid camera frame uploads successfully and an oversized request returns the same `CAMERA_FRAME_TOO_LARGE` error (HTTP 413). ESP and owner PASS remain pending.
+
 # V0528 — Main-branch CI after consolidation
 
 Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. The feature branch was fast-forwarded into `main` without altering history. Switch the existing Windows GitHub Actions push trigger from the now-inactive feature branch to `main`, so subsequent main-branch maintenance is validated. No app runtime, signal controller or hardware behavior changes.
