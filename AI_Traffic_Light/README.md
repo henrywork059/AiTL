@@ -48,6 +48,19 @@ First-time backend environment setup/recovery:
 & "W:\Code Project\AiTL Ptoject\AiTL\AI_Traffic_Light\scripts\setup_backend_windows.ps1"
 ```
 
+## Testing an unaccepted feature branch
+
+The normal Windows runner updates `main` and refuses to run with automatic update from a different branch. To test candidate `feature/interactive-3d-simulation`, first ensure the working tree is clean, then execute from the repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+If the branch is not yet present locally, use `git switch --track origin/feature/interactive-3d-simulation`. Read `VERSION` and `docs/PATCH_<version>.md` for the current candidate and its acceptance tests. The `-SkipUpdate` flag avoids pulling `main`; it does not constitute owner PASS.
+
 ## Documentation
 
 Start with:

@@ -1,5 +1,5 @@
-version: 0_5_28
-status: Emergency evidence reconnect continuity candidate
-previous_version: 0_5_27
+version: 0_5_29
+status: Simulation camera mirror-render optimization candidate
+previous_version: 0_5_28
 passed_baseline: 0_5_0
-notes: Accept newer timestamped camera evidence after a frame-number reset, preserving same-source ambulance confirmation, fresh negative clearing and rejection of old replays. Virtual safety and physical actuation restrictions remain unchanged. GitHub CI, local Windows/ESP checks and explicit owner PASS govern acceptance.
+notes: Reuse the current simulated BGR canvas for camera mirror views instead of repeatedly decoding the canonical PNG. The bounded render cache clears on reset, stop and resume. Camera APIs, source geometry, virtual signal safety and disabled physical actuation remain unchanged. Candidate CI, Windows/ESP validation and explicit owner PASS govern acceptance.

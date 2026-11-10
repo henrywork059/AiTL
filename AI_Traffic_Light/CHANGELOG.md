@@ -1,3 +1,8 @@
+## 0_5_29 — Simulation camera mirror-render optimization (candidate)
+- Reuse the existing BGR render for mirrored simulated camera B/C/D views; avoid decoding the same PNG repeatedly per simulation tick.
+- Clear the bounded render cache on simulation reset, stop and resume; add pixel-equivalence and no-decode regression; document feature-branch validation.
+- Previous `0_5_28`, baseline `0_5_0`. APIs, 3D scene, real ESP transport, virtual signal safety and disabled physical actuation unchanged; owner PASS pending.
+
 ## 0_5_28 — Reconnect-safe emergency evidence (candidate)
 - Use strictly increasing per-source frame timestamps for emergency evidence after camera counter resets; reject duplicate or older samples.
 - Extend deterministic emergency-priority regression for reconnect positives, reconnect negatives and replay. Previous `0_5_27`, baseline `0_5_0`; protected virtual transitions and physical actuation unchanged.

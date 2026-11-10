@@ -1,3 +1,11 @@
+# V0529 — Efficient mirrored simulation camera views
+
+Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`. Simulated camera B/C/D now use the current rendered BGR canvas instead of re-decoding the canonical PNG. Image geometry, 3D scene, AI input, and virtual signal protections are unchanged. No physical control is enabled.
+
+**Test this feature branch:** explicitly pull `feature/interactive-3d-simulation` and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` from the repository root. The default runner pulls `main` and refuses a feature branch. See [Patch 0_5_29](PATCH_0_5_29.md) and [Local Testing](LOCAL_TESTING.md); owner PASS pending.
+
+---
+
 # V0528 — Emergency evidence after camera reconnect
 
 Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. Trust strictly newer source timestamps for emergency-evidence freshness even if a camera reconnect resets its frame counter. A negative reconnect frame clears older ambulance evidence, while equal/older timestamp replays remain rejected. Confirmation still requires two distinct positive observations at least one second apart from the same camera; protected virtual traffic signals and disabled physical outputs are unchanged.

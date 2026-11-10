@@ -181,6 +181,8 @@ class CameraFrameService:
         self._lock = Lock()
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
+        # Reuse the current render for mirrored views instead of decoding PNG.
+        self._simulation_canvas: np.ndarray | None = None
         self._simulation_view_frames: dict[str, CameraFrame] = {}
         self._simulation_source_id = "simulation_camera"
         self._simulation_enabled = False
@@ -245,6 +247,7 @@ class CameraFrameService:
 
     def _reset_simulation_locked(self) -> None:
         self._simulation_frame = None
+        self._simulation_canvas = None
         self._simulation_view_frames.clear()
         self._last_simulation_tick = -1
         self._simulation_clock_s = 0.0
@@ -262,6 +265,7 @@ class CameraFrameService:
                 self._reset_simulation_locked()
             else:
                 self._simulation_frame = None
+                self._simulation_canvas = None
                 self._simulation_view_frames.clear()
                 self._last_simulation_tick = -1
                 self._simulation_last_update_monotonic = None
@@ -297,6 +301,7 @@ class CameraFrameService:
                     self._simulation_last_update_monotonic = time.monotonic()
                     if not paused:
                         self._simulation_frame = None
+                        self._simulation_canvas = None
                         self._last_simulation_tick = -1
             if reset_agents and self._simulation_enabled:
                 self._reset_simulation_locked()
@@ -320,9 +325,9 @@ class CameraFrameService:
             return original
         cached = self._simulation_view_frames.get(source_id)
         if cached is None or cached.frame_number != original.frame_number:
-            image = cv2.imdecode(np.frombuffer(original.content, dtype=np.uint8), cv2.IMREAD_COLOR)
+            image = self._simulation_canvas
             if image is None:
-                raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Simulation frame decode failed.", status_code=500)
+                raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Simulation render cache unavailable.", status_code=500)
             # Each pair shows vertically mirrored sides; pair 2 uses a horizontal viewpoint.
             flip = {"simulation_camera_b": 0, "simulation_camera_c": 1, "simulation_camera_d": -1}[source_id]
             success, encoded = cv2.imencode(".png", cv2.flip(image, flip))
@@ -654,6 +659,7 @@ class CameraFrameService:
                 "Failed to encode the synthetic camera frame.",
                 status_code=500,
             )
+        self._simulation_canvas = canvas
         self._simulation_frame = CameraFrame(
             content=encoded.tobytes(),
             content_type="image/png",

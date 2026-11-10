@@ -5,6 +5,7 @@ import base64
 import sys
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -51,11 +52,14 @@ def main() -> int:
     assert simulated_frame.content.startswith(b"\x89PNG\r\n\x1a\n")
     assert (simulated_frame.width, simulated_frame.height) == (1280, 720)
     image = decode_png(simulated_frame.content)
-    mirrored_frame = service.simulation_frame_for("simulation_camera_b")
-    assert mirrored_frame is not None and mirrored_frame.source_id == "simulation_camera_b"
-    assert np.array_equal(decode_png(mirrored_frame.content), cv2.flip(image, 0))
-    for source_id, flip in (("simulation_camera_c", 1), ("simulation_camera_d", -1)):
-        view = service.simulation_frame_for(source_id)
+    # A first request for each alternate view must not decode the canonical PNG.
+    with patch("app.services.camera_frames.cv2.imdecode", side_effect=AssertionError("Redundant simulation PNG decode")):
+        views = {
+            source_id: service.simulation_frame_for(source_id)
+            for source_id in ("simulation_camera_b", "simulation_camera_c", "simulation_camera_d")
+        }
+    for source_id, flip in (("simulation_camera_b", 0), ("simulation_camera_c", 1), ("simulation_camera_d", -1)):
+        view = views[source_id]
         assert view is not None and view.source_id == source_id
         assert np.array_equal(decode_png(view.content), cv2.flip(image, flip))
         assert service.simulation_frame_for(source_id).frame_number == view.frame_number
@@ -154,6 +158,7 @@ def main() -> int:
         raise AssertionError("Invalid simulation density was accepted")
 
     service.set_simulation(False)
+    assert service._simulation_canvas is None
     assert service.status()["frame_available"] is False
     assert service.status()["simulation_signal_phase"] is None
     try:
@@ -174,6 +179,7 @@ def main() -> int:
     else:
         raise AssertionError("Unsupported camera content type was accepted")
 
+    print("[PASS] mirrored views reuse the render without PNG decoding")
     print("[PASS] two simulation pairs provide mirrored opposite views on one safe signal clock")
     print("[PASS] camera receiver accepts PNG frames")
     print("[PASS] simulation renders road, crosswalk, cars and pedestrians while signal state remains available separately")

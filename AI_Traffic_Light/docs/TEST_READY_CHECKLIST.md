@@ -1,3 +1,15 @@
+# V0529 — Simulation mirror-render optimization
+
+Candidate `0_5_29`, previous `0_5_28`, baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Mirror B/C/D frames are pixel-identical to the expected flips without re-decoding canonical PNG.
+- [ ] Simulation API and 3D scene regressions pass; full candidate CI passes.
+- [ ] Pull the feature branch and run `update_test_run.ps1 -SkipUpdate` (default runner targets `main`).
+- [ ] Inspect four virtual camera orientations, pause/resume, density change, capture and real ESP camera preview on Windows.
+- [ ] Explicit owner PASS before changing the baseline or merging into `main`.
+
+---
+
 # V0528 — Emergency evidence after camera reconnect
 
 Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. Trust strictly newer source timestamps for emergency-evidence freshness even if a camera reconnect resets its frame counter. A negative reconnect frame clears older ambulance evidence, while equal/older timestamp replays remain rejected. Confirmation still requires two distinct positive observations at least one second apart from the same camera; protected virtual traffic signals and disabled physical outputs are unchanged.

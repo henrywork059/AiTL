@@ -1,3 +1,22 @@
+# V0529 — Simulation mirror-render optimization
+
+Candidate `0_5_29`, previous `0_5_28`, baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+**Focused offline regressions** (from `AI_Traffic_Light/`): `python scripts/test_camera_frame_service.py`, `python scripts/test_camera_simulation_api.py`, `python scripts/test_v0515_3d_simulation.py`. The service test verifies original/mirrored pixel equivalence without PNG decoding and release of the canvas cache on stop.
+
+**Windows feature-branch validation** (from a clean repository root):
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+The default runner pulls `main`, so use `-SkipUpdate` on this branch. Verify all four synthetic views, pause/resume, density/reset behavior, captured images and unchanged real ESP preview. Full candidate CI and explicit owner PASS are required. No benchmarked speedup is claimed.
+
+---
+
 # V0528 — Emergency evidence after camera reconnect
 
 Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. Trust strictly newer source timestamps for emergency-evidence freshness even if a camera reconnect resets its frame counter. A negative reconnect frame clears older ambulance evidence, while equal/older timestamp replays remain rejected. Confirmation still requires two distinct positive observations at least one second apart from the same camera; protected virtual traffic signals and disabled physical outputs are unchanged.

@@ -39,6 +39,10 @@ Multiple saved ESP sessions may stream concurrently. Each session has an indepen
 
 If an ESP stream drops or the device reboots, its session can recover using the retained configuration. Simulation temporarily suspends physical image transfer while retaining saved profiles/session intent, and physical streams resume afterward.
 
+## Synthetic camera render caching
+
+`CameraFrameService` renders a 1280 × 720 BGR canvas and encodes the canonical simulation PNG once per tick. Mirrored simulation cameras B/C/D flip that same current-tick render and encode their own PNGs; they do not decode the canonical PNG. The bounded canvas cache occupies approximately 2.6 MiB and is discarded when simulation resets, stops or resumes. Existing per-view PNG caching, simulation scene coordinates, camera APIs, and protected virtual signal rules are unchanged. This optimization does not affect the real ESP transport or permit physical traffic-light control.
+
 ## Junction Network observability path
 
 V0311 adds a configuration/observability layer over the existing source and topology services:
