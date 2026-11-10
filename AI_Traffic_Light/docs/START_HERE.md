@@ -1,3 +1,9 @@
+# V0526 — Inference worker shutdown safety
+
+Candidate `0_5_26`, previous `0_5_25`, accepted baseline `0_5_0`. Preserve a live inference worker reference after its 2-second bounded shutdown join expires; subsequent start attempts cannot create parallel inference threads while the prior worker is running. Clear cached observations as before; no changes to inference results, traffic signals or physical outputs.
+
+---
+
 # V0525 — Per-camera inference diagnostics
 
 Candidate `0_5_25`, previous `0_5_24`, accepted baseline `0_5_0`. Expose measured per-camera inference latency, source frame age and freshness in the existing inference response and Camera AI Preview. Diagnostics are per-source and never fabricated; stale/mismatched-model frames are unavailable for AI overlay. Existing signal decisions and physical-output restrictions are unchanged.

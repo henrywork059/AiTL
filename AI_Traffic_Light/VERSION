@@ -1,5 +1,5 @@
-version: 0_5_25
-status: Camera diagnostics candidate
-previous_version: 0_5_24
+version: 0_5_26
+status: Inference worker lifecycle candidate
+previous_version: 0_5_25
 passed_baseline: 0_5_0
-notes: Expose measured per-camera inference latency, source frame age and freshness in the existing inference response and Camera AI Preview. Diagnostics are per-source and never fabricated; stale/mismatched-model frames are unavailable for AI overlay. Existing signal decisions and physical-output restrictions are unchanged. CI, Windows/ESP and owner PASS pending.
+notes: Preserve ownership of an AI inference worker when a bounded shutdown join times out, preventing a rapid restart from spawning a duplicate worker. Existing per-camera detection logic, cached-result clearing, signal safety and physical-output restrictions remain unchanged. Windows/ESP and owner PASS pending.

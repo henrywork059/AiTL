@@ -47,7 +47,10 @@ class MultiCameraInferenceService:
         if thread and thread.is_alive():
             thread.join(timeout=2.0)
         with self._lock:
-            self._thread = None
+            # A slow inference may outlive the bounded join. Keep its reference so
+            # start() cannot clear the stop flag and launch a second worker.
+            if thread is self._thread and not (thread and thread.is_alive()):
+                self._thread = None
             self._results.clear()
             self._keys.clear()
 

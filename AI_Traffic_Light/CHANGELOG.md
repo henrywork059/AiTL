@@ -1,3 +1,7 @@
+## 0_5_26 — Inference worker lifecycle guard (candidate)
+- Retain the worker reference after a timed-out stop to prevent overlapping inference threads on quick restart.
+- Add deterministic timed-out join, restart and cache-cleanup regressions; no changes to camera API, traffic signals or physical actuation. Previous `0_5_25`, baseline `0_5_0`.
+
 ## 0_5_25 — Per-camera inference diagnostics (candidate)
 - Add source-frame age/freshness and measured inference latency to the existing per-camera API and AI Preview.
 - Add deterministic source-isolation/stale diagnostics regression; no changes to hardware actuation or signal decisions. Previous `0_5_24`, baseline `0_5_0`.
