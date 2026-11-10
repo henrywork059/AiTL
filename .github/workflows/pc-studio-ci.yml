@@ -1,7 +1,7 @@
 name: PC Studio candidate CI
 on:
   push:
-    branches: [feature/interactive-3d-simulation]
+    branches: [main]
   pull_request:
     branches: [main]
 permissions:

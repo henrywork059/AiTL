@@ -1,3 +1,14 @@
+# V0528 — Main-branch CI after consolidation
+
+Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. The feature branch was fast-forwarded into `main` without altering history. Switch the existing Windows GitHub Actions push trigger from the now-inactive feature branch to `main`, so subsequent main-branch maintenance is validated. No app runtime, signal controller or hardware behavior changes.
+
+---
+
+- [ ] Main-branch GitHub Actions run succeeds on the candidate commit.
+- [ ] All previous feature-branch commits remain reachable from main.
+- [ ] Existing code, safety behavior and baseline are unchanged.
+- [ ] Windows/ESP owner validation and explicit PASS still pending.
+
 # V0527 — Late inference shutdown guard
 
 Candidate `0_5_27`, previous `0_5_26`, accepted baseline `0_5_0`. Discard late inference results when stop is requested, preventing a model call that finishes after the bounded worker shutdown from repopulating cleared per-camera caches or publishing obsolete Crosswalk observations. The prior duplicate-worker guard, normal inference behavior and disabled physical outputs remain unchanged.

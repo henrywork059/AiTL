@@ -1,5 +1,5 @@
-version: 0_5_27
-status: Late inference shutdown candidate
-previous_version: 0_5_26
+version: 0_5_28
+status: Consolidated main CI candidate
+previous_version: 0_5_27
 passed_baseline: 0_5_0
-notes: Discard inference results completed after the background worker has been stopped, and avoid publishing an obsolete Crosswalk observation during shutdown. Preserve the prior duplicate-worker guard, existing camera API, protected virtual signals and disabled physical actuation. GitHub CI, Windows/ESP and explicit owner PASS govern acceptance.
+notes: Following explicit consolidation of existing GitHub branches into main, run the existing Windows CI checks on main pushes. No backend/frontend runtime behavior, traffic signal safety, physical output or acceptance baseline changes. Windows/ESP and owner PASS pending.

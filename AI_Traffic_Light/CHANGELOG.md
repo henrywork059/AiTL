@@ -1,3 +1,7 @@
+## 0_5_28 — Main-branch CI after consolidation (candidate)
+- Change the existing Windows CI push trigger to `main` after fast-forward integration of the latest feature branch; preserve the prior CI checks and acceptance baseline.
+- No runtime, hardware or signal-control changes. Previous `0_5_27`, baseline `0_5_0`.
+
 ## 0_5_27 — Late inference shutdown guard (candidate)
 - Skip caching a detection that finishes after stop has already been signaled; avoid crosswalk publication on shutdown.
 - Add a deterministic threaded regression for late inference with bounded join and preserve the existing restart guard. Previous `0_5_26`, baseline `0_5_0`; no physical output changes.
