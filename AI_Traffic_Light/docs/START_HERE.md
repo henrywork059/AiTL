@@ -1,3 +1,13 @@
+# V0531 — Align legacy simulation structure regression
+
+Candidate `0_5_31`, previous `0_5_30`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+The V0418 camera/region structure regression expected old one-argument vehicle/pedestrian movement calls. After `0_5_30` introduced one shared protected signal phase per simulation step, that old assertion failed CI even though the simulation behavior was intentionally updated. The test now checks the **shared phase lookup and both phase-aware movement calls**. No application runtime or API code changed in this repair; the optimization and physical-output restrictions remain intact.
+
+**Feature-branch owner validation:** pull `feature/interactive-3d-simulation`, then run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` from repository root. Default runner is `main`-only. See [Patch 0_5_31](PATCH_0_5_31.md) and [Local Testing](LOCAL_TESTING.md). Explicit owner PASS pending.
+
+---
+
 # V0530 — Shared protected simulation phase snapshot
 
 Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

@@ -1,5 +1,5 @@
-version: 0_5_30
-status: Shared simulation phase snapshot optimization candidate
-previous_version: 0_5_29
+version: 0_5_31
+status: Legacy camera region regression alignment candidate
+previous_version: 0_5_30
 passed_baseline: 0_5_0
-notes: Evaluate the protected simulation signal once per 50 ms integration substep, then apply the same phase to vehicle and pedestrian movement. This avoids redundant stateful controller queries without changing phase timing, safety barriers, camera/3D behavior or physical actuation restrictions. GitHub CI and explicit Windows/ESP owner PASS govern acceptance.
+notes: Keep the 0_5_30 shared protected signal snapshot optimization and correct the V0418 camera/region source-structure regression to recognize shared phase arguments. No runtime, API, camera, signal or physical actuation changes in this follow-up test fix. Full candidate CI, Windows/ESP validation and explicit owner PASS govern acceptance.

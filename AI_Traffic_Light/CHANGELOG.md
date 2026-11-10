@@ -1,3 +1,7 @@
+## 0_5_31 — Align legacy simulation structure regression (candidate)
+- Update the V0418 camera/region source-structure test to assert that one protected signal phase is shared by vehicle and pedestrian movement, replacing obsolete one-argument helper call checks.
+- Repair the offline CI failure in `0_5_30`; retain its runtime optimization without modification. Previous `0_5_30`, accepted baseline `0_5_0`; owner PASS pending.
+
 ## 0_5_30 — One protected phase snapshot per simulation step (candidate)
 - Advance vehicles and pedestrians from the same signal phase snapshot in each 50 ms simulator substep, eliminating a duplicate stateful controller query per substep.
 - Add an exact call-count regression, preserve existing vehicle queue/pedestrian WALK safety tests, and clarify simulation ownership and acceptance documentation.

@@ -1,3 +1,24 @@
+# V0531 — Camera-region structure regression compatibility
+
+Candidate `0_5_31`, previous `0_5_30`, baseline `0_5_0`, on `feature/interactive-3d-simulation`.
+
+Prior `0_5_30` CI failed in `scripts/test_v0418_camera_region_ui.py` because its source-text assertion still expected the old `_advance_vehicles_locked(step)` and `_advance_pedestrians_locked(step)` calls. This test now verifies the one shared protected phase evaluation in `_advance_simulation_locked` and the phase-aware movement calls; runtime code was not changed.
+
+**Focused regressions:** `python scripts/test_v0418_camera_region_ui.py`, `python scripts/test_camera_frame_service.py`, `python scripts/test_signal_rules_service.py`, `python scripts/test_camera_simulation_api.py`, `python scripts/test_v0515_3d_simulation.py`. Run full candidate CI (compile, structure, all offline regressions, frontend typecheck/build).
+
+**Owner Windows validation** from a clean repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Check stop-line vehicle queues, WALK-only pedestrian entry, yellow/all-red/CLEAR phases, four simulated views and unchanged ESP preview. The default runner updates `main`; it must be invoked with `-SkipUpdate` on this feature branch. Explicit owner PASS required.
+
+---
+
 # V0530 — Shared phase snapshot during simulation movement
 
 Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

@@ -1,3 +1,15 @@
+# V0531 — Align legacy camera-region structure regression
+
+Candidate `0_5_31`, previous `0_5_30`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] V0418 camera/region test checks the shared phase lookup and both phase-aware movement calls.
+- [ ] The `0_5_30` runtime optimization remains unchanged: one controller evaluation per 50 ms simulator substep, with protected vehicle/pedestrian phase behavior.
+- [ ] Full candidate CI passes, including all offline regressions and frontend typecheck/build.
+- [ ] Pull feature branch, run `update_test_run.ps1 -SkipUpdate`, verify synthetic movement/camera views and unchanged ESP preview on Windows.
+- [ ] Explicit owner PASS before accepting a baseline or merging to `main`.
+
+---
+
 # V0530 — Shared protected simulation phase snapshot
 
 Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

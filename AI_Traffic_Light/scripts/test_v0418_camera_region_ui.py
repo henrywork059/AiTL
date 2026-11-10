@@ -70,9 +70,11 @@ def main() -> None:
     assert 'vehicle_type = "bus"' not in agents
     assert "cv2.putText(" not in render
     assert "_draw_signal_heads(" not in render
-    assert "self._simulation_signal_state_locked()" in source  # real signal policy still runs
-    assert "_advance_pedestrians_locked(step)" in source
-    assert "_advance_vehicles_locked(step)" in source
+    # Both agent types receive the same controller phase per integration step.
+    integrator = source.split("def _advance_simulation_locked(", 1)[1].split("def _advance_vehicles_locked(", 1)[0]
+    assert 'phase = self._simulation_signal_state_locked()["phase"]' in integrator
+    assert "self._advance_vehicles_locked(step, phase)" in integrator
+    assert "self._advance_pedestrians_locked(step, phase)" in integrator
 
     backup = ROOT / "docs" / "backups" / "V0417_PRE_V0418_CODE.md"
     assert backup.is_file()
