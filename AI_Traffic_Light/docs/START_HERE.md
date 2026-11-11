@@ -1,3 +1,13 @@
+# V0534 — More dimensional 3D simulator
+
+Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.
+
+Cars now have cabins, body walls and wheels; pedestrians stand upright with heads and limbs. Vehicles reentering from off-screen no longer appear to race backwards along the roadway. Simulation safety, 2D capture/editor coordinates and physical cameras are unchanged.
+
+Test the feature branch with `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`; check all four camera viewpoints, orbit, zoom, pause and reentry. See [Patch 0_5_34](PATCH_0_5_34.md). Explicit owner PASS pending.
+
+---
+
 # V0533 — Validate explicit simulation tools control
 
 Candidate `0_5_33`, previous `0_5_32`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

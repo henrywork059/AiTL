@@ -1,5 +1,7 @@
 """Focused test: the simulated camera's 3D preview mirrors live agent state."""
 from pathlib import Path
+import json
+import subprocess
 import sys
 import time
 
@@ -68,6 +70,24 @@ def main() -> None:
     assert "setScene(null)" in component, "Old source must not remain visible after failed polling"
     assert "setOrbit" in component and "setPitch" in component and "setZoom" in component
     assert "sim3d-world" in styles and "transform-style: preserve-3d" in styles
+    assert "sim3d-car-roof" in styles and "sim3d-car-wheel" in styles and "sim3d-car-end" in styles
+    assert "sim3d-person-figure" in styles and "rotateX(-90deg)" in styles
+    assert "sim3d-person-head" in component and "sim3d-person-leg" in component
+    assert ".sim3d-car.is-reentering { transition: none; }" in styles
+    assert "isVehicleReentry(previousX, vehicle.x, sizeX)" in component
+    motion = FRONTEND / "components/simulation3dMotion.ts"
+    assert motion.is_file()
+    script = """
+import assert from "node:assert/strict";
+import { isVehicleReentry } from MOTION_URI;
+assert.equal(isVehicleReentry(undefined, -260, 1280), false);
+assert.equal(isVehicleReentry(100, 140, 1280), false);
+assert.equal(isVehicleReentry(1100, 1070, 1280), false);
+assert.equal(isVehicleReentry(1420, -260, 1280), true);
+assert.equal(isVehicleReentry(-280, 1420, 1280), true);
+assert.equal(isVehicleReentry(500, 510, 1280), false);
+""".replace("MOTION_URI", json.dumps(motion.as_uri()))
+    subprocess.run(["node", "--experimental-strip-types", "--input-type=module", "-e", script], check=True, cwd=ROOT)
     assert "requestJsonStrict<SimulationScene>" in api
     assert '@router.get("/simulation/scene")' in route
     assert "source_id not in SIMULATION_SOURCE_IDS" in route
@@ -104,6 +124,7 @@ def main() -> None:
     print("[PASS] Live agent coordinates, all camera IDs, pause, density and disabled-state 3D scene")
     print("[PASS] Camera Settings, Crosswalk pair, Region Editor, AI Preview and Capture share 3D simulations")
     print("[PASS] Physical ESP, source-frame AI coordinates and saved capture image files remain unchanged")
+    print("[PASS] 3D vehicles, upright pedestrians and non-teleporting vehicle reentry")
 
 
 if __name__ == "__main__":

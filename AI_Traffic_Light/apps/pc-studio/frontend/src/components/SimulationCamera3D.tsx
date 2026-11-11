@@ -1,7 +1,8 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import { isVehicleReentry } from "./simulation3dMotion";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -52,6 +53,16 @@ export function SimulationCamera3D({
   const [pitch, setPitch] = useState(48);
   const [zoom, setZoom] = useState(0.85);
   const drag = useRef<{ x: number; y: number; orbit: number; pitch: number } | null>(null);
+  const lastVehicleX = useRef<{ sourceId: string; positions: Record<string, number> }>({ sourceId: "", positions: {} });
+
+  useEffect(() => {
+    lastVehicleX.current = {
+      sourceId,
+      positions: Object.fromEntries(
+        (scene?.source_id === sourceId ? scene.vehicles : []).map(vehicle => [vehicle.id, vehicle.x]),
+      ),
+    };
+  }, [scene, sourceId]);
 
   useSerialPolling(async () => {
     const next = await fetchSimulationScene(sourceId);
@@ -145,7 +156,9 @@ export function SimulationCamera3D({
           {activeScene?.vehicles.map(vehicle => {
             const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
             const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
-            return <div className="sim3d-car" key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
+            const previousX = lastVehicleX.current.sourceId === sourceId
+              ? lastVehicleX.current.positions[vehicle.id] : undefined;
+            return <div className={`sim3d-car${isVehicleReentry(previousX, vehicle.x, sizeX) ? " is-reentering" : ""}`} key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
               style={{
                 left: `${centerX / sizeX * 100}%`,
                 top: `${leftEdge.y / sizeY * 100}%`,
@@ -154,7 +167,14 @@ export function SimulationCamera3D({
                 transform: `translate(-50%, -50%) translateZ(15px) rotateZ(${(isFlippedX ? -vehicle.direction : vehicle.direction) < 0 ? 180 : 0}deg)`,
               }}>
               <div className="sim3d-car-roof" />
-              <div className="sim3d-car-side" />
+              <div className="sim3d-car-side sim3d-car-side-near" />
+              <div className="sim3d-car-side sim3d-car-side-far" />
+              <div className="sim3d-car-end sim3d-car-end-front" />
+              <div className="sim3d-car-end sim3d-car-end-rear" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-front sim3d-car-wheel-near" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-rear sim3d-car-wheel-near" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-front sim3d-car-wheel-far" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-rear sim3d-car-wheel-far" />
             </div>;
           })}
           {activeScene?.pedestrians.map(pedestrian => {
@@ -162,9 +182,16 @@ export function SimulationCamera3D({
             return <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
               left: `${point.x / sizeX * 100}%`,
               top: `${point.y / sizeY * 100}%`,
-              backgroundColor: pedestrian.color,
+              color: pedestrian.color,
             }}>
-              <span />
+              <div className="sim3d-person-figure">
+                <span className="sim3d-person-head" />
+                <span className="sim3d-person-torso" />
+                <span className="sim3d-person-arm sim3d-person-arm-left" />
+                <span className="sim3d-person-arm sim3d-person-arm-right" />
+                <span className="sim3d-person-leg sim3d-person-leg-left" />
+                <span className="sim3d-person-leg sim3d-person-leg-right" />
+              </div>
             </div>;
           })}
           {hasOverlay && (

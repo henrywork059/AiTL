@@ -1,3 +1,15 @@
+# V0534 — Volumetric 3D preview
+
+Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.
+
+- [ ] Cars have raised cabins/body walls/wheels; pedestrians stand upright with heads and limbs on all four cameras.
+- [ ] Eastbound/westbound cars respawn off-screen without backwards animation; regular motion interpolates smoothly.
+- [ ] Orbit, zoom, top/editor view, overlays, pause/resume, signals, source-image coordinates, capture and ESP views still work.
+- [ ] Run focused `test_v0515_3d_simulation.py`, structure, offline regressions, TypeScript typecheck, build and Windows `update_test_run.ps1 -SkipUpdate`.
+- [ ] Explicit owner PASS before baseline promotion or any merge to `main`.
+
+---
+
 # V0533 — Correct Hallmark shell test
 
 Candidate `0_5_33`, previous `0_5_32`, baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

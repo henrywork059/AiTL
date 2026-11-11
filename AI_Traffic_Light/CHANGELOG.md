@@ -1,3 +1,8 @@
+## 0_5_34 — Volumetric 3D agents and seamless reentry (candidate)
+- Render synthetic cars with elevated cabins, body sides, ends and wheels; render pedestrians upright with head, torso, arms and legs.
+- Stop cross-road animation when existing simulator agents recycle off-screen while retaining smooth interpolation during ordinary motion.
+- Add deterministic motion regression cases, preserve selected-source simulation, signal policy, ESP, capture and image-coordinate editing. Previous `0_5_33`, accepted baseline `0_5_0`; owner PASS pending.
+
 ## 0_5_33 — Hallmark shell regression correction (candidate)
 - Fix the V0532 test's overly broad navigation expectation: dashboard redirection occurs only when hiding simulation tools from Simulation Experiments.
 - Preserve the V0532 accessible button, styling, backend and simulation logic unchanged. Previous `0_5_32`, accepted baseline `0_5_0`; full CI and owner PASS pending.

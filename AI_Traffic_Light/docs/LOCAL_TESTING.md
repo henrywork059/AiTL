@@ -1,3 +1,22 @@
+# V0534 — 3D agents and reentry validation
+
+Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.
+
+Run `python scripts/test_v0515_3d_simulation.py` for the existing simulator/3D integration plus six pure Node reentry assertions. Execute structure checks, offline regressions, frontend typecheck/build and full candidate CI.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Check all four 3D cameras, top and perspective views, pause/resume, signal behavior, and that cars disappear off-screen then reappear without crossing the road backwards. Verify overlays/region editing, captures and physical camera views. Owner PASS required.
+
+---
+
 # V0533 — Correct conditional simulation toggle regression
 
 Candidate `0_5_33`, previous `0_5_32`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
