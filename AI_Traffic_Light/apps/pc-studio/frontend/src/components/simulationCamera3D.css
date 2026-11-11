@@ -106,8 +106,6 @@
   transform-origin: top;
   transform: rotateX(90deg);
 }
-.sim3d-vehicle-pole { left: 36%; top: 26%; }
-.sim3d-person-pole { left: 61%; top: 88%; }
 .sim3d-pole span {
   width: 8px;
   height: 8px;

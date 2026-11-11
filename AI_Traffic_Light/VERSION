@@ -1,5 +1,5 @@
-version: 0_5_36
-status: Simulation layout regression compatibility candidate
-previous_version: 0_5_35
+version: 0_5_37
+status: Mirrored 3D signal post placement candidate
+previous_version: 0_5_36
 passed_baseline: 0_5_0
-notes: Align the legacy source-image layout regression with 0_5_35 car/SUV/van/bus simulator diversity; preserve 3D, pedestrian reentry, signal, API and physical hardware runtime unchanged. Full feature-branch CI and explicit Windows/browser owner PASS required.
+notes: Place both 3D signal posts using the same horizontal/vertical camera transforms as simulated agents. No backend, signal policy, API, camera image, capture, region editor or physical hardware behavior changes. Candidate pending focused regressions, frontend build, full Windows validation and owner PASS.

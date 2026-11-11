@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import { isPedestrianReentry, isVehicleReentry } from "./simulation3dMotion";
+import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from "./simulation3dMotion";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -31,14 +31,6 @@ const INITIAL_ORBIT: Record<string, number> = {
   simulation_camera_d: -155,
 };
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
-
-/** Source images B/C/D are mirror transforms of the canonical A coordinates. */
-function sourcePoint(x: number, y: number, sourceId: string, width: number, height: number) {
-  return {
-    x: sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d" ? width - x : x,
-    y: sourceId === "simulation_camera_b" || sourceId === "simulation_camera_d" ? height - y : y,
-  };
-}
 
 /** Read-only perspective of the actual live camera simulator; never controls its agents. */
 export function SimulationCamera3D({
@@ -132,6 +124,8 @@ export function SimulationCamera3D({
   const vehicleLight = activeScene?.signal.vehicle_go ? "green" : phase === "vehicle_yellow" ? "amber" : "red";
   const pedestrianLight = activeScene?.signal.pedestrian_walk ? "green" : "red";
   const isFlippedX = sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d";
+  const vehicleSignalPoint = simulationSourcePoint(sizeX * 0.36, sizeY * 0.26, sourceId, sizeX, sizeY);
+  const pedestrianSignalPoint = simulationSourcePoint(sizeX * 0.61, sizeY * 0.88, sourceId, sizeX, sizeY);
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
   const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
@@ -158,10 +152,14 @@ export function SimulationCamera3D({
           ))}
           <div className="sim3d-stop sim3d-stop-left" />
           <div className="sim3d-stop sim3d-stop-right" />
-          <div className="sim3d-pole sim3d-vehicle-pole"><span className={vehicleLight} /></div>
-          <div className="sim3d-pole sim3d-person-pole"><span className={pedestrianLight} /></div>
+          <div className="sim3d-pole sim3d-vehicle-pole" style={{
+            left: `${vehicleSignalPoint.x / sizeX * 100}%`, top: `${vehicleSignalPoint.y / sizeY * 100}%`,
+          }}><span className={vehicleLight} /></div>
+          <div className="sim3d-pole sim3d-person-pole" style={{
+            left: `${pedestrianSignalPoint.x / sizeX * 100}%`, top: `${pedestrianSignalPoint.y / sizeY * 100}%`,
+          }}><span className={pedestrianLight} /></div>
           {activeScene?.vehicles.map(vehicle => {
-            const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
+            const leftEdge = simulationSourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
             const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
             const previousX = previousPositions.current.sourceId === sourceId
               ? previousPositions.current.vehicles[vehicle.id] : undefined;
@@ -188,7 +186,7 @@ export function SimulationCamera3D({
             </div>;
           })}
           {activeScene?.pedestrians.map((pedestrian, index) => {
-            const point = sourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
+            const point = simulationSourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
             const previousY = previousPositions.current.sourceId === sourceId
               ? previousPositions.current.pedestrians[pedestrian.id] : undefined;
             return <div className={`sim3d-person sim3d-person--${index % 3}${isPedestrianReentry(previousY, pedestrian.y, sizeY) ? " is-reentering" : ""}`} key={pedestrian.id} title="Simulated pedestrian" style={{

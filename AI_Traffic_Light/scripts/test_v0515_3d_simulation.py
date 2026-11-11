@@ -84,7 +84,7 @@ def main() -> None:
     assert motion.is_file()
     script = """
 import assert from "node:assert/strict";
-import { isPedestrianReentry, isVehicleReentry } from MOTION_URI;
+import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from MOTION_URI;
 assert.equal(isVehicleReentry(undefined, -260, 1280), false);
 assert.equal(isVehicleReentry(100, 140, 1280), false);
 assert.equal(isVehicleReentry(1100, 1070, 1280), false);
@@ -96,6 +96,10 @@ assert.equal(isPedestrianReentry(130, 170, 720), false);
 assert.equal(isPedestrianReentry(750, 40, 720), true);
 assert.equal(isPedestrianReentry(20, 745, 720), true);
 assert.equal(isPedestrianReentry(674, 674, 720), false);
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera", 1280, 720), { x: 460, y: 190 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_b", 1280, 720), { x: 460, y: 530 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_c", 1280, 720), { x: 820, y: 190 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_d", 1280, 720), { x: 820, y: 530 });
 """.replace("MOTION_URI", json.dumps(motion.as_uri()))
     subprocess.run(["node", "--experimental-strip-types", "--input-type=module", "-e", script], check=True, cwd=ROOT)
     assert "requestJsonStrict<SimulationScene>" in api
@@ -121,7 +125,10 @@ assert.equal(isPedestrianReentry(674, 674, 720), false);
     assert 'cameraStatus?.simulation_enabled && previewUrl' in capture
     assert 'Capture saves its original 2D synthetic image' in capture
     assert 'className="camera-frame"' in capture, "Physical camera captures must remain visible"
-    assert 'sourcePoint(x: number, y: number, sourceId: string' in component
+    assert 'simulationSourcePoint(sizeX * 0.36, sizeY * 0.26, sourceId, sizeX, sizeY)' in component
+    assert 'simulationSourcePoint(sizeX * 0.61, sizeY * 0.88, sourceId, sizeX, sizeY)' in component
+    assert 'left: `${vehicleSignalPoint.x / sizeX * 100}%`' in component
+    assert 'top: `${pedestrianSignalPoint.y / sizeY * 100}%`' in component
     assert 'scene?.source_id === sourceId' in component  # Never display a stale source
     assert 'hasOverlay = !editing' in component
     assert 'viewBox={`0 0 ${sizeX} ${sizeY}`}' in component

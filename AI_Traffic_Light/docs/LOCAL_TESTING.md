@@ -1,3 +1,14 @@
+Warning: truncated output (original token count: 14056)
+Total output lines: 734
+
+# V0537 — Mirrored 3D signal post fix
+
+Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Focused regression: `python scripts/test_v0515_3d_simulation.py` verifies canonical, vertical, horizontal and combined source transforms and that both signal posts use the transform. Also run frontend typecheck/build, structure and offline regressions. Windows owner validation: `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`; check all four 3D views and confirm PASS. The patch does not modify live signal policy, source images, region editing or physical camera handling.
+
+---
+
 # V0536 — Simulation layout test update
 
 Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
@@ -320,113 +331,7 @@ status: Partially implemented signal controls and Network indicators candidate
 - Run `& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1"` without `-ChangedTests` from the repo root. Check structural gate, focused `test_v0510_signal_adjustments.py` and `test_v0510_signal_navigation.py`, all regression tests, TypeScript/Vite, health/smoke and startup.
 - Under Traffic, open Traffic Light Settings; change the active profile's vehicle green, pedestrian WALK and amber default times within displayed minimum/maximum constraints, Save, reload and verify persistence. Check invalid changes are blocked; original all-red protected phases remain enforced.
 - Open Live Signal Adjustments: templates are disabled until enabled. Configure a compatible active legacy zone for ambulance/wheelchair classes and verify active detector support, or use a controlled preview/test scenario. Test crowd thresholds and a crossing still occupied with 3 seconds of clearance remaining, verify protected extension and no conflicting green. Confirm dry-run and stale-data behavior and no emergency flashing-green command.
-- Network: select simulator and assign a saved matching simulation camera to Crosswalk A, confirm vehicle and pedestrian bulbs match the active phase and countdown. Other Crosswalk B without independent signal must show unavailable. Trigger a rule at A while A↔B is connected; B displays `not applied here` advisory, **not** a changed signal. Confirm dragging edge labels and crosswalk titles still works, and Save/reload retains links.
-- Test with simulation off: indicators display unavailable and do not depict hardware light state. Check existing Signal Control pages, Crosswalk Region Editor, camera preview, network topology and basic signal controller remain unchanged.
-- **Explicitly pending:** verified movement conflict topology, independent per-crosswalk controllers and actual adjacent signal coordination; this candidate cannot alter neighbour phase times and cannot command physical traffic signals.
-- Full local/Windows validation and owner PASS required. Accepted baseline remains `0_5_0`.
-
-## Previous V059 Global AI and Preview Candidate
-
-```text
-version: 0_5_9
-previous_version: 0_5_8
-passed_baseline: 0_5_0
-status: Global AI Models and multi-camera preview candidate
-```
-
-## V059 Windows validation
-
-- From repository root run the full `scripts/update_test_run.ps1` (without `-ChangedTests`). Check Python/structure regressions, TypeScript/Vite build, backend startup `/health`, smoke, and app launch.
-- Confirm sidebar Traffic precedes AI, AI Models precedes Camera AI Preview, and Settings page is absent. Other navigation/Camera Settings and Traffic behaviors should be unchanged.
-- AI Models: upload a small valid `.pt` model with a unique ID; confirm list, load/activate, default, and persist. Refuse duplicate IDs, invalid IDs, empty/oversized files; refuse deletion of the active model. Delete an inactive model and confirm only its run directory is removed. Invalid model weights may upload but must show an activation error.
-- Set global confidence and inference interval slider (100–2000 ms), save, refresh app and verify settings remain. Preview should not offer a confidence slider.
-- With saved simulated pairs and a valid loaded model, select A, B, C and D independently in Camera AI Preview. Verify frame matches source, class/confidence boxes align, each region uses the correct Side A/B saved polygon, counts appear in the separate region table (not drawn over camera image), and switching preview does not change the selected camera in Camera Settings.
-- Connect and stream 2+ ESP cameras; verify inference on both while one is selected, the inactive saved stream still contributes preview detections, disconnected/stale streams show unavailable and do not inherit detections from other cameras. Target frequency depends on CPU/GPU and total camera count. With no model loaded, show no detection boxes; do not fabricate counts.
-- Check legacy selected-source `/api/inference/detections`, `/api/traffic/state`, Network, dataset capture, manual camera switching, signal transitions and crosswalk region save/reload. No multi-camera identity fusion or physical signal authorization is introduced.
-- Owner PASS pending; accepted baseline stays `0_5_0`.
-
-## Previous V058 AI Group and Network Drag Candidate
-
-```text
-version: 0_5_8
-previous_version: 0_5_7
-passed_baseline: 0_5_0
-status: AI workspace and Network drag connections candidate
-```
-
-## V058 Windows validation
-
-- Run the full `scripts/update_test_run.ps1` without `-ChangedTests`; check structure and version gate, all Python tests, TypeScript, Vite build, backend health and smoke.
-- Confirm Operate lists Camera Settings/Camera Diagnostics before the new AI sidebar group, which contains exactly Camera AI Preview and AI Models. The old AI Detection and Model Registry sidebar entries must not appear elsewhere.
-- Camera AI Preview: with a real or connected simulation camera and a loaded model, show the selected camera frame, detection boxes and class filtering. Without a frame, show a clear camera-unavailable message with no fake detections; no model deletion/load controls or automatic model loading on the preview.
-- AI Models: list existing trained models, load/set default/unload, change default confidence 0.01–1.00, save it and verify it persists after refresh; backend errors should appear without losing UI state.
-- Network: press on Crossing A numbered edge 2, drag until the preview line reaches Crossing B edge 4, release and confirm the link appears at the edge label endpoints. Save network, reload, verify persistence. Drag a crossing title separately; canceled release or same-crossing release must add no connection. Test duplicate rejection and keyboard source/destination activation.
-- Existing Crosswalk creation, Region Save, camera assignments, simulation hiding toggle, junction advanced configuration and signal safety must remain unchanged. Owner PASS pending, accepted baseline `0_5_0`.
-
-## Previous V057 Crossing-first Network Candidate
-
-```text
-version: 0_5_7
-previous_version: 0_5_6
-passed_baseline: 0_5_0
-status: Crossing-first Network workspace candidate
-```
-
-## V057 Windows validation
-
-- Run the full `scripts/update_test_run.ps1` (no `-ChangedTests`) including structural guards, all offline regressions, frontend typecheck/build, backend startup and live smoke.
-- Confirm Crosswalks appears above Network and the sidebar no longer labels the page Junction Network.
-- In Crosswalks, add and **Save** A and B. Open Network: both boxes must appear automatically. Save another crossing; after the Network page refresh, the new box appears.
-- Select A and edge 2, connect to B and edge 4. Drag both boxes, Save network, reload and verify links/positions persist. Remove a link and verify its removal. Delete a crossing in Crosswalks, save and confirm its Network links/position are cleaned.
-- Verify active-source-only region observations, correct camera stream/offline state, narrow-viewport map scrolling, and existing advanced junction controls. Connections are metadata, not traffic commands.
-- Owner PASS pending; baseline remains `0_5_0`.
-
-## Previous V056 Shared Physical Region Candidate
-
-```text
-version: 0_5_6
-previous_version: 0_5_5
-passed_baseline: 0_5_0
-status: Two-view region geometry candidate
-```
-
-## V056 validation
-
-- Run the full updater without `-ChangedTests` to check **all** offline regressions, release consistency, frontend TypeScript/build, live smoke and startup.
-- Crosswalks → Edit regions: Add Region 1 on Side A and move its vertices to the top; switch to Side B, keep Region 1 selected, move the same region's vertices to the bottom. Return to Side A: its polygon must remain at the top. Change the name and confirm it is the same on both sides.
-- Select Save regions, navigate away/reload, confirm the shared name and both independent polygons persist. No backend ID input should appear.
-- With a trained model and an assigned active camera, inspect `GET /api/traffic/state` → `crosswalk_region_counts`. The A or B observation should carry the same `physical_region_id` but distinct `camera_region_id`, and only the active source produces counts. Do not add the counts to infer unique objects.
-- Confirm old shared and side-scoped regions still load, source switching does not leak counts, and simulator toggles stay hidden by default.
-- Owner PASS and hardware validation pending; stable baseline `0_5_0`.
-
-## Previous V055 Regression Alignment Candidate
-
-```text
-version: 0_5_5
-previous_version: 0_5_4
-passed_baseline: 0_5_0
-status: Camera/region regression alignment candidate
-```
-
-## V055 validation
-
-- Run the full updater (no `-ChangedTests`) once to verify all existing offline tests, in particular `test_camera_settings_page_structure.py` and `test_v0418_camera_region_ui.py`.
-- Confirm TypeScript, frontend build, backend `/health`, live smoke and PC Studio startup.
-- Manually verify Simulation Camera Pair 1/2 choices behind the brand toggle and independent Crosswalk Side A/B region editing and Save regions.
-- No application runtime changes; awaiting owner PASS.
-
-## Previous V054 Camera-Scoped Regions Candidate
-
-```text
-version: 0_5_4
-previous_version: 0_5_3
-passed_baseline: 0_5_0
-status: Camera-scoped counting candidate
-```
-
-Test Side A/B independent polygons, rename IDs and Save regions; verify GET /api/traffic/state crosswalk_region_counts under trained inference for active camera. Run frontend typecheck/build and smoke. Owner PASS pending.
-
-## V053 Release Consistency Candidate
+- Network: select simulator and assign a saved matching simulation camera to Crosswalk A, confirm vehicle and pedestrian bulbs match the active phase and countdown. Other Crosswalk B without independent signal must show unavailable. Trigger …2056 tokens truncated…ency Candidate
 
 ```text
 version: 0_5_3

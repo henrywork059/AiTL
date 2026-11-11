@@ -1,3 +1,13 @@
+# V0537 — Correct 3D signal placement across mirrored cameras
+
+Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The live 3D signal posts now follow the same horizontal/vertical camera mirror transform as the simulated vehicles and pedestrians. This fixes misplaced posts in Camera B/C/D. The earlier car/SUV/van/bus models and smooth off-screen reentry remain.
+
+Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. Inspect all four camera views, then confirm PASS before baseline promotion. See [Patch 0_5_37](PATCH_0_5_37.md).
+
+---
+
 # V0536 — Simulation layout regression compatibility
 
 Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
