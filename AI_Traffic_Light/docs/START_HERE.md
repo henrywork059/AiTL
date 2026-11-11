@@ -1,3 +1,13 @@
+# V0539 — Shared 3D helper regression correction
+
+Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Repair the outdated V0523 keyboard-regression assertion following the V0537 extraction of camera coordinate mirroring into `simulation3dMotion.ts`. The keyboard controls, four-view 3D presentation and simulator stay unchanged.
+
+Update this feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. See [Patch 0_5_39](PATCH_0_5_39.md). Owner PASS pending.
+
+---
+
 # V0538 — Restore complete documentation
 
 Candidate `0_5_38`, previous `0_5_37`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

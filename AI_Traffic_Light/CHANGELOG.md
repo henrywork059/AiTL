@@ -1,3 +1,7 @@
+## 0_5_39 — Align keyboard regression with shared 3D mirror utility (candidate)
+- Repair `test_v0523_3d_keyboard.py`: verify `simulationSourcePoint` is exported by `simulation3dMotion.ts` and used by the 3D scene instead of checking for its obsolete inline declaration.
+- Keep existing keyboard/focus, region editor and source-mirror checks; no application runtime, hardware, API or signal-control changes. Previous `0_5_38`, accepted baseline `0_5_0`; owner PASS pending.
+
 ## 0_5_38 — Restore complete patch documentation (candidate)
 - Restore the complete `CHANGELOG.md` and `docs/LOCAL_TESTING.md` after the `0_5_37` write truncated their prior history. Retain the `0_5_37` mirrored 3D signal post fix and all earlier release notes.
 - No application behavior changes. Previous `0_5_37`, accepted baseline remains `0_5_0`; candidate awaits normal validation and owner PASS.

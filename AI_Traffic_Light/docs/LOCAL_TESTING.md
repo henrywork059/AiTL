@@ -1,3 +1,22 @@
+# V0539 — 3D keyboard regression compatibility
+
+Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Focused test: `python scripts/test_v0523_3d_keyboard.py`; confirm the test checks the exported shared camera-mirror helper and scene wiring while keeping keyboard, zoom and editor-guard checks. Also run `python scripts/test_v0515_3d_simulation.py`, structure, the offline suite, frontend typecheck and build.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify keyboard orbit/tilt/zoom/Home, edit-mode protection, signal-post positions in all four simulation camera views, and unchanged ESP camera handling. Windows/browser owner PASS remains required.
+
+---
+
 # V0538 — Documentation restoration
 
 Candidate `0_5_38`, previous `0_5_37`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

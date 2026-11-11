@@ -1,3 +1,14 @@
+# V0539 — Shared 3D keyboard/mirror regression
+
+Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] V0523 regression checks the exported `simulationSourcePoint` helper and preview wiring, not the removed inline declaration.
+- [ ] Keyboard orbit/tilt/zoom/Home, editor safety, four 3D camera views and signal-post mirroring remain unchanged.
+- [ ] Focused V0523 and V0515 regressions, structure, offline suite, frontend typecheck/build and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Explicit owner PASS before acceptance, baseline promotion or merging to `main`.
+
+---
+
 # V0537 — Mirrored 3D signal post placement
 
 Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
