@@ -1,3 +1,15 @@
+# V0541 — Decodable camera frames
+
+Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Complete JPEG/PNG uploads pass with correct metadata; truncated and MIME-mismatched uploads return stable 422 without mutating the latest frame or counter.
+- [ ] More than 16,777,216 declared pixels are rejected before image decoding; the existing 8 MiB upload-body cap is preserved.
+- [ ] Camera inference, 3D simulation, signal interlocks and ESP transport/preview remain unaffected.
+- [ ] Focused V0541/V0540/camera service/API regressions, structure, offline suite, TypeScript typecheck/build, Windows `update_test_run.ps1 -SkipUpdate`.
+- [ ] Owner explicitly confirms PASS before baseline change or merge.
+
+---
+
 # V0540 — Bounded camera-frame upload
 
 Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

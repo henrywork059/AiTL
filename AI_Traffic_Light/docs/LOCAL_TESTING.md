@@ -1,3 +1,22 @@
+# V0541 — Upload validity and frame preservation
+
+Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/test_v0541_camera_upload_integrity.py`, `python scripts/test_v0540_camera_upload_stream_limit.py`, `python scripts/test_camera_frame_service.py`, `python scripts/test_camera_simulation_api.py`, structure, offline regressions and frontend typecheck/build.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Check valid PNG/JPEG uploads and confirm malformed or mismatched images return 422 `CAMERA_FRAME_INVALID` without replacing the last valid frame. Verify simulation, camera preview, 3D views and physical ESP remain unaffected. Explicit owner PASS required.
+
+---
+
 # V0540 — Camera upload memory bound
 
 Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

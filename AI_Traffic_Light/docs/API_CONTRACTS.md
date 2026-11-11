@@ -1,3 +1,7 @@
+## V0541 Camera frame upload decoding integrity
+
+`POST /api/camera/frame` retains the existing PNG/JPEG content types, 8 MiB body limit, standard request-ID envelopes and existing error codes. A frame must now decode successfully and match its declared PNG/JPEG type and header dimensions; truncated or mislabeled payloads return 422 `CAMERA_FRAME_INVALID` without replacing the prior valid frame. Before decoding, images declaring more than 16,777,216 pixels also return 422 `CAMERA_FRAME_INVALID`. The existing 413 `CAMERA_FRAME_TOO_LARGE` byte-limit behavior remains unchanged. This affects only raw legacy frame uploads, not ESP TCP transport, simulation agents or physical signals.
+
 ## V0525 Per-camera AI diagnostics (additive)
 
 `GET /api/inference/cameras/{source_id}` preserves its `{source_id,frame,error}` payload and standard request-ID envelope and adds `diagnostics: {inference_latency_ms?,source_timestamp_ms?,source_frame_number?,source_origin?,frame_age_ms,fresh}`. Latency is measured during the processing attempt; age is computed from the stored source-frame timestamp. `fresh=false` when no usable result, when the model changes or when the frame exceeds the existing 5-second freshness bound. Unavailable measurements remain absent/null; synthetic values are not represented as camera performance measurements. Camera AI Preview displays source-specific age, latency and freshness.

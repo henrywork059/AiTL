@@ -1,3 +1,8 @@
+## 0_5_41 — Reject undecodable camera uploads (candidate)
+- Require full OpenCV decoding after the existing MIME/header/dimension validation and before updating the latest uploaded frame. Truncated or mislabeled PNG/JPEG bytes can no longer overwrite valid camera data.
+- Reject declarations exceeding 16,777,216 pixels before decoding to avoid large memory allocations from small compressed uploads. Keep the existing 8 MiB encoded-byte cap, stable 422 `CAMERA_FRAME_INVALID` envelope and camera/signal/ESP boundaries unchanged.
+- Add deterministic valid PNG/JPEG and invalid/truncated/oversized pixel regressions. Previous `0_5_40`, baseline `0_5_0`; CI and explicit owner PASS required.
+
 ## 0_5_40 — Bound camera frame upload buffering (candidate)
 - Port the tested 0_5_29 `main` streaming limit to this 3D feature branch: accumulate `/api/camera/frame` data only up to the pre-existing 8 MiB size cap instead of calling unbounded `request.body()`.
 - Preserve the stable `CAMERA_FRAME_TOO_LARGE` error (413), request IDs, successful upload envelope and existing camera service validation. Add hardware-free streaming/boundary/early-abort regression; leave traffic signal, simulation and physical ESP actuation untouched.

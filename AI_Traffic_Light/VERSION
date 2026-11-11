@@ -1,5 +1,5 @@
-version: 0_5_40
-status: Bounded camera upload memory integrity candidate
-previous_version: 0_5_39
+version: 0_5_41
+status: Decodable camera uploads and image-size integrity candidate
+previous_version: 0_5_40
 passed_baseline: 0_5_0
-notes: Reuse the proven 0_5_29 main implementation to bound HTTP camera frame upload buffering at the existing 8 MiB limit. Preserve the 413 CAMERA_FRAME_TOO_LARGE error, response envelope and simulation/ESP routes; validate early abort and exact limit with a deterministic regression. No physical signal control. Feature-branch CI and owner Windows/browser acceptance pending.
+notes: Reject truncated or MIME-mismatched PNG/JPEG uploads before changing stored frame state; guard images above 16,777,216 pixels before decoding. Retain stable CAMERA_FRAME_INVALID 422, camera APIs, signal/3D simulation, ESP separation and disabled physical actuation. Full CI and explicit Windows owner PASS required.

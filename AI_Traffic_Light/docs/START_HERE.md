@@ -1,3 +1,13 @@
+# V0541 — Camera frame decoding integrity
+
+Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The legacy HTTP camera receiver now rejects truncated or mislabeled PNG/JPEG uploads before they can replace the latest valid frame. An additional pixel-count bound prevents oversized decompression attempts. Existing 3D previews, signal policies and ESP transport are unaffected.
+
+Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. See [Patch 0_5_41](PATCH_0_5_41.md). Windows/browser owner PASS pending.
+
+---
+
 # V0540 — Bounded HTTP camera uploads
 
 Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

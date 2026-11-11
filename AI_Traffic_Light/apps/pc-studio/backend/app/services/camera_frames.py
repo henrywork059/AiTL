@@ -14,6 +14,7 @@ from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
+MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 SUPPORTED_UPLOAD_TYPES = {"image/jpeg", "image/png"}
 SIMULATION_DENSITIES = {"light", "normal", "busy"}
@@ -117,11 +118,22 @@ def _jpeg_dimensions(content: bytes) -> tuple[int, int] | None:
 
 
 def _image_dimensions(content: bytes, content_type: str) -> tuple[int, int] | None:
+    # Check declared MIME/header and dimensions before asking OpenCV to decode untrusted data.
     if content_type == "image/png":
-        return _png_dimensions(content)
-    if content_type == "image/jpeg":
-        return _jpeg_dimensions(content)
-    return None
+        dimensions = _png_dimensions(content)
+    elif content_type == "image/jpeg":
+        dimensions = _jpeg_dimensions(content)
+    else:
+        return None
+    if dimensions is None or dimensions[0] * dimensions[1] > MAX_FRAME_PIXELS:
+        return None
+    try:
+        decoded = cv2.imdecode(np.frombuffer(content, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+    except cv2.error:
+        return None
+    if decoded is None or (decoded.shape[1], decoded.shape[0]) != dimensions:
+        return None
+    return dimensions
 
 
 def _draw_pedestrian(canvas: np.ndarray, x: int, y: int, color: tuple[int, int, int], stride: int) -> None:
