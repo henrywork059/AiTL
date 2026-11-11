@@ -1,3 +1,15 @@
+# V0542 — Separate HTTP image validity from ESP TCP transport
+
+Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Legacy HTTP uploads require fully decodable MIME-matched images and ≤16,777,216 pixels, while preserving the 8 MiB streaming byte limit.
+- [ ] ESP TCP frame path uses existing lightweight header validation, with no redundant OpenCV decode or changed camera transport framing.
+- [ ] Old remote-camera TCP fixture regressions, V0540/V0541 upload tests and unchanged signal/3D tests pass.
+- [ ] Structure, offline regressions, frontend TypeScript/build, Windows `update_test_run.ps1 -SkipUpdate`, actual ESP hardware and owner acceptance.
+- [ ] No baseline promotion or merge without explicit owner PASS.
+
+---
+
 # V0541 — Decodable camera frames
 
 Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

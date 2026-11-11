@@ -265,6 +265,7 @@ async def upload_camera_frame(
         source_id=source_id,
         content_type=request.headers.get("content-type", ""),
         content=b"".join(chunks),
+        validate_decode=True,
     )
     return ok(frame.metadata(), request_id=request.state.request_id)
 

@@ -1,5 +1,5 @@
-version: 0_5_41
-status: Decodable camera uploads and image-size integrity candidate
-previous_version: 0_5_40
+version: 0_5_42
+status: HTTP-only decoding preserves ESP TCP camera throughput candidate
+previous_version: 0_5_41
 passed_baseline: 0_5_0
-notes: Reject truncated or MIME-mismatched PNG/JPEG uploads before changing stored frame state; guard images above 16,777,216 pixels before decoding. Retain stable CAMERA_FRAME_INVALID 422, camera APIs, signal/3D simulation, ESP separation and disabled physical actuation. Full CI and explicit Windows owner PASS required.
+notes: Restrict V0541 complete-image and 16,777,216-pixel validation to the legacy HTTP /api/camera/frame endpoint; preserve original lightweight ESP TCP frame ingestion and header-only tests without redundant decoding. Maintain stable API errors, 8 MiB limit, simulation safety and physical actuation restrictions. Full feature-branch CI and owner Windows/ESP PASS required.

@@ -33,7 +33,8 @@ class ChunkedRequest:
 def main() -> None:
     received: list[tuple[str, str, bytes]] = []
 
-    def fake_upload(*, source_id: str, content_type: str, content: bytes):
+    def fake_upload(*, source_id: str, content_type: str, content: bytes, validate_decode: bool):
+        assert validate_decode is True, "Legacy HTTP uploads must validate complete image decoding"
         received.append((source_id, content_type, content))
         return SimpleNamespace(metadata=lambda: {"size_bytes": len(content)})
 

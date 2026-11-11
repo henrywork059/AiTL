@@ -25,13 +25,13 @@ TRUNCATED_JPEG = bytes.fromhex("ffd8ffc00011080001000103011100021100031100")
 
 def main() -> None:
     service = CameraFrameService()
-    original = service.store_upload(source_id="integrity_camera", content_type="image/png", content=ONE_PIXEL_PNG)
+    original = service.store_upload(source_id="integrity_camera", content_type="image/png", content=ONE_PIXEL_PNG, validate_decode=True)
     assert (original.width, original.height) == (1, 1)
 
     success, encoded_jpeg = cv2.imencode(".jpg", np.zeros((2, 3, 3), dtype=np.uint8))
     assert success
     jpeg = encoded_jpeg.tobytes()
-    frame = service.store_upload(source_id="integrity_camera", content_type="image/jpeg", content=jpeg)
+    frame = service.store_upload(source_id="integrity_camera", content_type="image/jpeg", content=jpeg, validate_decode=True)
     assert (frame.width, frame.height) == (3, 2)
     assert service.latest_frame() is frame
 
@@ -39,7 +39,7 @@ def main() -> None:
         before = service.latest_frame()
         counter = service._frame_counter
         try:
-            service.store_upload(source_id="integrity_camera", content_type=content_type, content=content)
+            service.store_upload(source_id="integrity_camera", content_type=content_type, content=content, validate_decode=True)
         except AppError as exc:
             assert exc.code == ErrorCode.CAMERA_FRAME_INVALID
             assert exc.status_code == 422
@@ -61,8 +61,14 @@ def main() -> None:
     with patch("app.services.camera_frames.cv2.imdecode", side_effect=AssertionError("Decoded oversized pixels")):
         rejects("image/png", bytes(huge_png))
 
-    print("[PASS] fully decodable PNG/JPEG and matching MIME required")
-    print("[PASS] truncated, mislabeled and over-pixel-limit frames cannot replace valid state")
+    # The dedicated ESP TCP receiver retains its original header-only fast path.
+    with patch("app.services.camera_frames.cv2.imdecode", side_effect=AssertionError("Redundant ESP JPEG decode")):
+        fast_frame = service.store_upload(source_id="esp32_camera", content_type="image/jpeg", content=jpeg)
+    assert (fast_frame.width, fast_frame.height) == (3, 2)
+
+    print("[PASS] complete MIME-matched PNG/JPEG required for legacy HTTP uploads")
+    print("[PASS] malformed or oversized HTTP frames preserve the last good frame")
+    print("[PASS] ESP TCP ingestion preserves header-only low-latency fast path")
 
 
 if __name__ == "__main__":

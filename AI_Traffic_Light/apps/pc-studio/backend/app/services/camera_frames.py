@@ -118,22 +118,20 @@ def _jpeg_dimensions(content: bytes) -> tuple[int, int] | None:
 
 
 def _image_dimensions(content: bytes, content_type: str) -> tuple[int, int] | None:
-    # Check declared MIME/header and dimensions before asking OpenCV to decode untrusted data.
     if content_type == "image/png":
-        dimensions = _png_dimensions(content)
-    elif content_type == "image/jpeg":
-        dimensions = _jpeg_dimensions(content)
-    else:
-        return None
-    if dimensions is None or dimensions[0] * dimensions[1] > MAX_FRAME_PIXELS:
-        return None
+        return _png_dimensions(content)
+    if content_type == "image/jpeg":
+        return _jpeg_dimensions(content)
+    return None
+
+
+def _is_decodable_image(content: bytes, dimensions: tuple[int, int]) -> bool:
+    """Validate legacy HTTP uploads without slowing the ESP TCP frame hot path."""
     try:
         decoded = cv2.imdecode(np.frombuffer(content, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
     except cv2.error:
-        return None
-    if decoded is None or (decoded.shape[1], decoded.shape[0]) != dimensions:
-        return None
-    return dimensions
+        return False
+    return decoded is not None and (decoded.shape[1], decoded.shape[0]) == dimensions
 
 
 def _draw_pedestrian(canvas: np.ndarray, x: int, y: int, color: tuple[int, int, int], stride: int) -> None:
@@ -210,7 +208,7 @@ class CameraFrameService:
         self._pedestrians: list[_SimPedestrian] = []
         self._simulation_rng = random.Random(self._simulation_seed)
 
-    def store_upload(self, *, source_id: str, content_type: str, content: bytes) -> CameraFrame:
+    def store_upload(self, *, source_id: str, content_type: str, content: bytes, validate_decode: bool = False) -> CameraFrame:
         normalized_type = content_type.split(";", maxsplit=1)[0].strip().lower()
         if not SOURCE_ID_PATTERN.fullmatch(source_id):
             raise AppError(
@@ -236,6 +234,9 @@ class CameraFrameService:
                 details={"size_bytes": len(content), "max_size_bytes": MAX_FRAME_BYTES},
             )
         dimensions = _image_dimensions(content, normalized_type)
+        if validate_decode and dimensions is not None:
+            if dimensions[0] * dimensions[1] > MAX_FRAME_PIXELS or not _is_decodable_image(content, dimensions):
+                dimensions = None
         if dimensions is None:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_INVALID,

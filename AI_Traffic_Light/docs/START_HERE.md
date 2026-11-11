@@ -1,3 +1,13 @@
+# V0542 — Preserve ESP TCP performance while validating HTTP uploads
+
+Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The prior image-decoding candidate affected the shared ESP camera hot path. This correction keeps complete image validation on legacy HTTP uploads while leaving ESP TCP JPEG ingestion at its previously tested low-overhead header check. Camera API errors, 3D simulation and signal safety remain unchanged.
+
+Pull this feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. See [Patch 0_5_42](PATCH_0_5_42.md). Windows/ESP owner PASS pending.
+
+---
+
 # V0541 — Camera frame decoding integrity
 
 Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

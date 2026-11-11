@@ -1,3 +1,22 @@
+# V0542 — HTTP-versus-ESP camera ingestion boundary
+
+Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/test_v0541_camera_upload_integrity.py`, `python scripts/test_v0540_camera_upload_stream_limit.py`, `python scripts/test_remote_camera_pull.py`, `python scripts/test_remote_camera_session.py` and existing camera service/API tests. The image-validation regression now verifies HTTP strict decode and TCP fast path separately. Run full offline tests, structure and frontend typecheck/build.
+
+Windows owner validation from the repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Confirm large/malformed HTTP uploads reject correctly, valid ESP TCP preview remains responsive, no physical signals are driven, and 3D simulation/editor remain unchanged. Explicit owner PASS remains required.
+
+---
+
 # V0541 — Upload validity and frame preservation
 
 Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

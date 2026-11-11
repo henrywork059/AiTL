@@ -1,3 +1,8 @@
+## 0_5_42 — Keep ESP TCP camera ingestion free of redundant decoding (candidate)
+- The V0541 full-image validation also reached the high-frequency ESP TCP frame path through the shared `CameraFrameService.store_upload`, rejecting lightweight transport fixtures and adding unnecessary per-frame decoding.
+- Restrict full decodability and pixel-limit checks to `POST /api/camera/frame` using a backward-compatible optional validation flag; retain header-only parsing on the physical TCP stream. Preserve V0541 strict HTTP validation, state-preservation tests and V0540 streaming byte limit.
+- Update focused regressions for both pathways; no signal controller, inference API, hardware or 3D changes. Previous `0_5_41`, baseline `0_5_0`, owner PASS pending.
+
 ## 0_5_41 — Reject undecodable camera uploads (candidate)
 - Require full OpenCV decoding after the existing MIME/header/dimension validation and before updating the latest uploaded frame. Truncated or mislabeled PNG/JPEG bytes can no longer overwrite valid camera data.
 - Reject declarations exceeding 16,777,216 pixels before decoding to avoid large memory allocations from small compressed uploads. Keep the existing 8 MiB encoded-byte cap, stable 422 `CAMERA_FRAME_INVALID` envelope and camera/signal/ESP boundaries unchanged.
