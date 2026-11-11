@@ -1,5 +1,5 @@
-version: 0_5_39
-status: Shared 3D mirror helper regression compatibility candidate
-previous_version: 0_5_38
+version: 0_5_40
+status: Bounded camera upload memory integrity candidate
+previous_version: 0_5_39
 passed_baseline: 0_5_0
-notes: Correct the V0523 keyboard structure regression after the canonical 3D camera mirror helper moved into simulation3dMotion.ts. Verify the helper is exported and used while retaining keyboard/editor guards. No runtime, 3D model, signal or physical ESP changes. Candidate CI and explicit Windows/browser owner PASS required.
+notes: Reuse the proven 0_5_29 main implementation to bound HTTP camera frame upload buffering at the existing 8 MiB limit. Preserve the 413 CAMERA_FRAME_TOO_LARGE error, response envelope and simulation/ESP routes; validate early abort and exact limit with a deterministic regression. No physical signal control. Feature-branch CI and owner Windows/browser acceptance pending.

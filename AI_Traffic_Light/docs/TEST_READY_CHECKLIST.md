@@ -1,3 +1,15 @@
+# V0540 — Bounded camera-frame upload
+
+Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] `POST /api/camera/frame` consumes an 8 MiB stream but immediately rejects bytes above the limit without reading the rest.
+- [ ] Oversized requests retain `CAMERA_FRAME_TOO_LARGE`, HTTP 413, request ID and error metadata; no invalid frame reaches service storage.
+- [ ] Existing 3D simulation, vehicle/pedestrian signals, physical camera previews, uploads and image-coordinate editor remain unchanged.
+- [ ] Focused streaming, camera service/API, structure, full offline regressions, frontend typecheck/build and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Explicit owner PASS before baseline promotion or any merge to `main`.
+
+---
+
 # V0539 — Shared 3D keyboard/mirror regression
 
 Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

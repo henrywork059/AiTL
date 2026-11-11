@@ -1,3 +1,8 @@
+## 0_5_40 — Bound camera frame upload buffering (candidate)
+- Port the tested 0_5_29 `main` streaming limit to this 3D feature branch: accumulate `/api/camera/frame` data only up to the pre-existing 8 MiB size cap instead of calling unbounded `request.body()`.
+- Preserve the stable `CAMERA_FRAME_TOO_LARGE` error (413), request IDs, successful upload envelope and existing camera service validation. Add hardware-free streaming/boundary/early-abort regression; leave traffic signal, simulation and physical ESP actuation untouched.
+- Previous `0_5_39`, baseline `0_5_0`; feature CI and explicit Windows/owner PASS required.
+
 ## 0_5_39 — Align keyboard regression with shared 3D mirror utility (candidate)
 - Repair `test_v0523_3d_keyboard.py`: verify `simulationSourcePoint` is exported by `simulation3dMotion.ts` and used by the 3D scene instead of checking for its obsolete inline declaration.
 - Keep existing keyboard/focus, region editor and source-mirror checks; no application runtime, hardware, API or signal-control changes. Previous `0_5_38`, accepted baseline `0_5_0`; owner PASS pending.

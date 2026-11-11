@@ -10,7 +10,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.models import CameraSimulationSettingsRequest
-from app.services.camera_frames import camera_frame_service
+from app.services.camera_frames import MAX_FRAME_BYTES, camera_frame_service
 from app.services.remote_camera_manager import SIMULATION_SOURCE_IDS, remote_camera_manager as remote_camera_service
 
 router = APIRouter()
@@ -249,11 +249,22 @@ async def upload_camera_frame(
     request: Request,
     source_id: str = Query(default="device_camera", min_length=1, max_length=64),
 ) -> dict:
-    content = await request.body()
+    chunks: list[bytes] = []
+    size_bytes = 0
+    async for chunk in request.stream():
+        size_bytes += len(chunk)
+        if size_bytes > MAX_FRAME_BYTES:
+            raise AppError(
+                ErrorCode.CAMERA_FRAME_TOO_LARGE,
+                "The camera frame is larger than the 8 MiB limit.",
+                status_code=413,
+                details={"size_bytes": size_bytes, "max_size_bytes": MAX_FRAME_BYTES},
+            )
+        chunks.append(chunk)
     frame = camera_frame_service.store_upload(
         source_id=source_id,
         content_type=request.headers.get("content-type", ""),
-        content=content,
+        content=b"".join(chunks),
     )
     return ok(frame.metadata(), request_id=request.state.request_id)
 

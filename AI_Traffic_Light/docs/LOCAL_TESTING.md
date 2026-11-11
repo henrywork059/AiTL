@@ -1,3 +1,22 @@
+# V0540 — Camera upload memory bound
+
+Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Focused regression: `python scripts/test_v0540_camera_upload_stream_limit.py`, verifying chunk order, exact 8 MiB success, 8 MiB + 1 byte rejection, no consumption of later chunks, and no call to image processing on oversized uploads. Verify `test_camera_frame_service.py`, `test_camera_simulation_api.py`, structure, offline suite, frontend typecheck/build.
+
+Windows owner test from the repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Confirm normal PNG/JPEG camera uploads, the existing 413 envelope, live simulation, 3D views and physical ESP preview remain unchanged. Hardware and owner PASS remain separate from CI.
+
+---
+
 # V0539 — 3D keyboard regression compatibility
 
 Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

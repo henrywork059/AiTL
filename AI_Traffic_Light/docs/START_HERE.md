@@ -1,3 +1,13 @@
+# V0540 — Bounded HTTP camera uploads
+
+Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The camera frame upload endpoint now stops consuming an oversized stream as soon as the existing 8 MiB image limit is exceeded. This prevents avoidable server memory use on oversized requests and retains existing status codes, response envelopes and source validation. This is an incremental camera-ingestion fix, not a change to the ESP camera transport or signal controller.
+
+Run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` after pulling the feature branch. See [Patch 0_5_40](PATCH_0_5_40.md). Windows/browser owner PASS pending.
+
+---
+
 # V0539 — Shared 3D helper regression correction
 
 Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
