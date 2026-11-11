@@ -1,3 +1,15 @@
+# V0543 — Bounded fragmented camera upload buffering
+
+Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] HTTP upload body aggregation uses one bounded bytearray; no per-chunk list and join remain.
+- [ ] Valid fragmented JPEG/PNG bytes survive exactly, including empty chunks.
+- [ ] 8 MiB boundary accepted; first oversized chunk rejected immediately with existing 413 envelope and exact size details.
+- [ ] Strict HTTP decode, ESP TCP fast path, simulation signals, 3D scene and original-image coordinates are unchanged.
+- [ ] V0540/V0541/remote camera regressions, structure, full offline suite, frontend typecheck/build and Windows owner runner pass; explicit owner PASS before baseline changes.
+
+---
+
 # V0542 — Separate HTTP image validity from ESP TCP transport
 
 Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

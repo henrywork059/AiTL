@@ -1,3 +1,13 @@
+# V0543 — Efficient bounded HTTP camera uploads
+
+Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The legacy camera-upload endpoint now buffers accepted image bytes in one bounded bytearray rather than a list of network chunks. The 8 MiB limit, rejection details and strict MIME/image decoding are unchanged; ESP TCP streaming is unaffected.
+
+Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`; see [Patch 0_5_43](PATCH_0_5_43.md). Confirm valid HTTP uploads and normal ESP/3D simulation behavior. Owner PASS pending.
+
+---
+
 # V0542 — Preserve ESP TCP performance while validating HTTP uploads
 
 Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

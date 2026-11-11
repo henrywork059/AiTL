@@ -1,3 +1,7 @@
+## 0_5_43 — Reduce fragmented HTTP camera upload buffering overhead (candidate)
+- Aggregate bounded HTTP frame uploads in one `bytearray` instead of accumulating one Python list entry per incoming network chunk, removing redundant per-chunk retention and joining.
+- Preserve exactly the 8 MiB limit, 413 error details, JPEG/PNG validation and existing camera API envelope. Add deterministic 4,098-chunk assembly regression; keep ESP TCP fast path untouched. Previous `0_5_42`, accepted baseline `0_5_0`, owner PASS pending.
+
 ## 0_5_42 — Keep ESP TCP camera ingestion free of redundant decoding (candidate)
 - The V0541 full-image validation also reached the high-frequency ESP TCP frame path through the shared `CameraFrameService.store_upload`, rejecting lightweight transport fixtures and adding unnecessary per-frame decoding.
 - Restrict full decodability and pixel-limit checks to `POST /api/camera/frame` using a backward-compatible optional validation flag; retain header-only parsing on the physical TCP stream. Preserve V0541 strict HTTP validation, state-preservation tests and V0540 streaming byte limit.

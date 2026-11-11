@@ -1,3 +1,22 @@
+# V0543 — Fragmented upload memory regression
+
+Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Focused tests: `python scripts/test_v0540_camera_upload_stream_limit.py`, `python scripts/test_v0541_camera_upload_integrity.py`, and `python scripts/test_remote_camera_pull.py`. The V0540 test now submits 4,098 streamed chunks including an empty chunk, verifies assembled bytes, and retains exact-boundary and immediate-oversize rejection checks.
+
+On Windows, from repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Run structure validation, all offline regressions, frontend typecheck/build and browser checks. Verify camera preview/uploads, existing ESP TCP session and 3D scene. Explicit owner PASS required.
+
+---
+
 # V0542 — HTTP-versus-ESP camera ingestion boundary
 
 Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

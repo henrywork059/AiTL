@@ -1,5 +1,5 @@
-version: 0_5_42
-status: HTTP-only decoding preserves ESP TCP camera throughput candidate
-previous_version: 0_5_41
+version: 0_5_43
+status: Bounded camera upload memory aggregation candidate
+previous_version: 0_5_42
 passed_baseline: 0_5_0
-notes: Restrict V0541 complete-image and 16,777,216-pixel validation to the legacy HTTP /api/camera/frame endpoint; preserve original lightweight ESP TCP frame ingestion and header-only tests without redundant decoding. Maintain stable API errors, 8 MiB limit, simulation safety and physical actuation restrictions. Full feature-branch CI and owner Windows/ESP PASS required.
+notes: Replace per-chunk list accumulation in legacy HTTP camera upload with one bounded bytearray, preserving 8 MiB threshold, 413 size metadata and strict full-image validation. Add fragmented-body regression. No ESP TCP transport, camera source, API contract, 3D simulation or physical signal behavior changes. Full CI and owner Windows/ESP PASS required.

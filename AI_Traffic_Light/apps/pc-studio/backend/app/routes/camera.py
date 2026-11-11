@@ -249,22 +249,21 @@ async def upload_camera_frame(
     request: Request,
     source_id: str = Query(default="device_camera", min_length=1, max_length=64),
 ) -> dict:
-    chunks: list[bytes] = []
-    size_bytes = 0
+    content = bytearray()
     async for chunk in request.stream():
-        size_bytes += len(chunk)
-        if size_bytes > MAX_FRAME_BYTES:
+        next_size = len(content) + len(chunk)
+        if next_size > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
                 "The camera frame is larger than the 8 MiB limit.",
                 status_code=413,
-                details={"size_bytes": size_bytes, "max_size_bytes": MAX_FRAME_BYTES},
+                details={"size_bytes": next_size, "max_size_bytes": MAX_FRAME_BYTES},
             )
-        chunks.append(chunk)
+        content.extend(chunk)
     frame = camera_frame_service.store_upload(
         source_id=source_id,
         content_type=request.headers.get("content-type", ""),
-        content=b"".join(chunks),
+        content=bytes(content),
         validate_decode=True,
     )
     return ok(frame.metadata(), request_id=request.state.request_id)

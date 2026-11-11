@@ -45,6 +45,14 @@ def main() -> None:
         assert received[-1] == ("camera_a", "image/png", b"abcde")
         assert small.received == 2
 
+        # An HTTP body may arrive as thousands of tiny chunks. Aggregation
+        # must preserve bytes without retaining a separate object per chunk.
+        fragments = ChunkedRequest([b"a"] * 4096 + [b"", b"b"])
+        response = asyncio.run(camera_route.upload_camera_frame(fragments, source_id="camera_fragments"))
+        assert response["data"]["size_bytes"] == 4097
+        assert received[-1] == ("camera_fragments", "image/png", b"a" * 4096 + b"b")
+        assert fragments.received == 4098
+
         boundary = ChunkedRequest([b"x" * (MAX_FRAME_BYTES - 1), b"z"])
         response = asyncio.run(camera_route.upload_camera_frame(boundary, source_id="camera_b"))
         assert response["data"]["size_bytes"] == MAX_FRAME_BYTES
@@ -64,7 +72,7 @@ def main() -> None:
         assert oversize.received == 2, "Stopped reading immediately after size limit"
         assert len(received) == before, "Oversized frame reached the image validator"
 
-    print("[PASS] camera streaming body bounded at 8 MiB; existing upload contract retained")
+    print("[PASS] bounded 8 MiB camera uploads preserve fragmented bodies without per-chunk buffering")
 
 
 if __name__ == "__main__":
