@@ -1,3 +1,22 @@
+# V0533 — Correct conditional simulation toggle regression
+
+Candidate `0_5_33`, previous `0_5_32`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+The previously added `test_v0532_hallmark_shell.py` now asserts the original `showSimulationTools && activePage === "simulation_lab"` condition. Runtime code is untouched. Re-run that regression, full offline suite, frontend typecheck/build and structure guard.
+
+From the repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify brand panel remains inert, labeled button changes visibility with keyboard/mouse, and hiding from Simulation Experiments returns to Dashboard. Explicit Windows acceptance required.
+
+---
+
 # V0532 — Hallmark sidebar design regression
 
 Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

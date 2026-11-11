@@ -1,3 +1,14 @@
+# V0533 — Correct Hallmark shell test
+
+Candidate `0_5_33`, previous `0_5_32`, baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] The V0532 regression verifies dashboard redirection only when tools are being hidden from Simulation Experiments.
+- [ ] Existing V0532 UI remains unchanged and the full offline CI suite, structure and frontend typecheck/build pass.
+- [ ] Run `update_test_run.ps1 -SkipUpdate` after pulling the feature branch on Windows; verify pointer/keyboard, light/dark and narrow layouts.
+- [ ] Confirm explicit owner PASS before baseline or `main` changes.
+
+---
+
 # V0532 — Hallmark sidebar clarity
 
 Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`; feature branch `feature/interactive-3d-simulation`.

@@ -1,5 +1,5 @@
-version: 0_5_32
-status: Hallmark sidebar accessibility and clarity candidate
-previous_version: 0_5_31
+version: 0_5_33
+status: Hallmark shell regression correction candidate
+previous_version: 0_5_32
 passed_baseline: 0_5_0
-notes: Replace the hidden brand-panel simulation toggle with an explicit labeled accessible button using existing state. Remove redundant sidebar/legacy labels, preserve routing, APIs and simulation/hardware safety. Windows owner validation and explicit PASS remain required.
+notes: Repair the V0532 regression to assert conditional dashboard navigation only when hiding simulation tools. Retain the 0_5_32 UI unchanged. Full CI, Windows/browser validation and explicit owner PASS remain required.

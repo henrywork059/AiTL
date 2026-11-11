@@ -1,3 +1,11 @@
+# V0533 — Validate explicit simulation tools control
+
+Candidate `0_5_33`, previous `0_5_32`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The V0532 UI remains unchanged; only a regression assertion is corrected to recognize that the dashboard redirect occurs when tools are hidden, not when shown. See [Patch 0_5_33](PATCH_0_5_33.md). Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` from the repository root; default runner targets `main`. Windows owner PASS pending.
+
+---
+
 # V0532 — Hallmark sidebar accessibility and clarity
 
 Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

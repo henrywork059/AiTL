@@ -32,7 +32,7 @@ def main() -> None:
     assert 'aria-current={activePage === navPage.id ? "page" : undefined}' in shell
 
     assert "onSimulationToolsToggle={toggleSimulationTools}" in app
-    assert 'if (activePage === "simulation_lab") setActivePage("dashboard");' in app
+    assert 'if (showSimulationTools && activePage === "simulation_lab") setActivePage("dashboard");' in app
     assert "setShowSimulationTools((current) => !current);" in app
     button = re.search(r"\.simulation-tools-toggle\s*\{([^{}]+)\}", layout)
     assert button and "width: 100%;" in button.group(1)

@@ -1,3 +1,7 @@
+## 0_5_33 — Hallmark shell regression correction (candidate)
+- Fix the V0532 test's overly broad navigation expectation: dashboard redirection occurs only when hiding simulation tools from Simulation Experiments.
+- Preserve the V0532 accessible button, styling, backend and simulation logic unchanged. Previous `0_5_32`, accepted baseline `0_5_0`; full CI and owner PASS pending.
+
 ## 0_5_32 — Hallmark sidebar control clarity (candidate)
 - Replace the implicit clickable brand panel with a native, labeled Simulation tools toggle, preserving the existing navigation handler and pressed state.
 - Remove duplicate sidebar version/tagline and repeated legacy eyebrow; keep page descriptions and persistent status/version display. Add a focused shell regression.
