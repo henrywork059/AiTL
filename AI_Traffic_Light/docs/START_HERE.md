@@ -1,3 +1,13 @@
+# V0536 — Simulation layout regression compatibility
+
+Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+The V0535 application is unchanged. The legacy layout test now accepts cars, SUVs, vans and buses, while retaining no-banner/no-signal-overlay checks.
+
+Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. Check the 3D vehicles and pedestrian reentry. See [Patch 0_5_36](PATCH_0_5_36.md). Owner PASS pending.
+
+---
+
 # V0535 — More realistic 3D agents
 
 Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

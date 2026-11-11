@@ -1,3 +1,7 @@
+## 0_5_36 — Align legacy simulation layout regression (candidate)
+- Update `scripts/test_simulation_frame_layout.py` to expect four synthetic vehicle variants introduced in `0_5_35` instead of obsolete car-only.
+- Retain source-image background/no-metadata/no-signal drawing assertions; no runtime, styling, camera, signal, API or hardware changes. Previous `0_5_35`, baseline `0_5_0`; CI/owner PASS pending.
+
 ## 0_5_35 — Vehicle variety, improved people and pedestrian reentry (candidate)
 - Display distinct car, SUV, van and bus models with appropriate proportions, windows, sides, body height and 2D source-image outlines.
 - Improve simulated pedestrian skin/hair/clothing details and disable visible CSS backward tweening when they recycle off-screen, as already done for cars.

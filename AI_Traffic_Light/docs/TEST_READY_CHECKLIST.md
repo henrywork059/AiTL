@@ -1,3 +1,14 @@
+# V0536 — Correct vehicle-type layout regression
+
+Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Legacy source-frame test accepts all four synthetic vehicle types and still rejects metadata banners/signal lamps.
+- [ ] V0535 3D visuals, pedestrian reentry, phases, image-coordinate editor and ESP preview remain unchanged.
+- [ ] Focused layout/3D/legacy tests, structure, offline regressions and frontend typecheck/build pass.
+- [ ] Run Windows `update_test_run.ps1 -SkipUpdate` and explicitly confirm PASS before baseline promotion.
+
+---
+
 # V0535 — Diverse vehicles, better people and safe respawn presentation
 
 Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

@@ -33,13 +33,13 @@ def main() -> int:
     # The old signal housing (upper right) is gone.
     assert float(image[240, 1095].mean()) > 40
 
-    # Only car and pedestrian actors; signal logic remains separate from rendering.
-    assert all(vehicle.vehicle_type == "car" for vehicle in service._vehicles)
+    # Varied synthetic vehicles use the same protected simulator lanes.
+    assert {vehicle.vehicle_type for vehicle in service._vehicles} == {"car", "suv", "van", "bus"}
     renderer = (BACKEND_ROOT / "app" / "services" / "camera_frames.py").read_text(encoding="utf-8")
     frame_render = renderer.split("def _refresh_simulation_locked(", 1)[1].split("encoded_ok, encoded =", 1)[0]
     assert "cv2.putText(" not in frame_render
     assert "_draw_signal_heads(" not in frame_render
-    print("[PASS] camera simulation contains cars/pedestrians without metadata text or traffic lamps")
+    print("[PASS] camera simulation contains varied vehicles/pedestrians without metadata text or traffic lamps")
     return 0
 
 

@@ -1,3 +1,22 @@
+# V0536 — Simulation layout test update
+
+Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Focus: `python scripts/test_simulation_frame_layout.py`, `python scripts/test_v0515_3d_simulation.py`, `python scripts/test_v0418_camera_region_ui.py`, plus full offline regressions, structure, frontend typecheck/build.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify distinct car/SUV/van/bus models, improved pedestrians, seamless reentry, intact overlays/region editing/physical cameras. Owner PASS required.
+
+---
+
 # V0535 — Varied 3D traffic and pedestrian reentry
 
 Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

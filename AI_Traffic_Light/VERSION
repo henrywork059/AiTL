@@ -1,5 +1,5 @@
-version: 0_5_35
-status: Improved 3D vehicle variety and pedestrian reentry candidate
-previous_version: 0_5_34
+version: 0_5_36
+status: Simulation layout regression compatibility candidate
+previous_version: 0_5_35
 passed_baseline: 0_5_0
-notes: Render separate car/SUV/van/bus vehicle types with varied dimensions and 3D cabins/windows, improve pedestrian faces/clothing and prevent off-screen pedestrian respawn tweening. Preserve all signal phases, existing camera APIs, safety, physical camera and image-coordinate behavior. Candidate CI, Windows/browser validation and owner PASS required.
+notes: Align the legacy source-image layout regression with 0_5_35 car/SUV/van/bus simulator diversity; preserve 3D, pedestrian reentry, signal, API and physical hardware runtime unchanged. Full feature-branch CI and explicit Windows/browser owner PASS required.
