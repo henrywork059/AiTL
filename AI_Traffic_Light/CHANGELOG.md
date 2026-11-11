@@ -1,3 +1,8 @@
+## 0_5_32 — Hallmark sidebar control clarity (candidate)
+- Replace the implicit clickable brand panel with a native, labeled Simulation tools toggle, preserving the existing navigation handler and pressed state.
+- Remove duplicate sidebar version/tagline and repeated legacy eyebrow; keep page descriptions and persistent status/version display. Add a focused shell regression.
+- Previous `0_5_31`, accepted baseline `0_5_0`. No API, data, traffic signal, simulation control or physical output changes. Windows/browser validation and owner PASS pending.
+
 ## 0_5_31 — Align legacy simulation structure regression (candidate)
 - Update the V0418 camera/region source-structure test to assert that one protected signal phase is shared by vehicle and pedestrian movement, replacing obsolete one-argument helper call checks.
 - Repair the offline CI failure in `0_5_30`; retain its runtime optimization without modification. Previous `0_5_30`, accepted baseline `0_5_0`; owner PASS pending.

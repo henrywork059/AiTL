@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { APP_SECTIONS, APP_VERSION_LABEL, PAGE_DETAILS } from "../constants/appNavigation";
+import { APP_SECTIONS, PAGE_DETAILS } from "../constants/appNavigation";
 import type { AppPageId } from "../types/app";
 
 type Props = {
@@ -16,12 +16,16 @@ export function AppShell({ activePage, onPageChange, showSimulationTools, onSimu
   return (
     <div className="app-frame">
       <aside className="sidebar">
-        <div className="brand-block" role="button" tabIndex={0} aria-label="Toggle simulation tools" aria-pressed={showSimulationTools} onClick={onSimulationToolsToggle} onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSimulationToolsToggle(); }
-        }}>
-          <div className="eyebrow">{APP_VERSION_LABEL}</div>
+        <div className="brand-block">
           <h1>AI Traffic Light</h1>
-          <p>{showSimulationTools ? "Simulation & vision workbench" : "Vision workbench"}</p>
+          <button
+            type="button"
+            className="simulation-tools-toggle"
+            aria-pressed={showSimulationTools}
+            onClick={onSimulationToolsToggle}
+          >
+            Simulation tools
+          </button>
         </div>
 
         <nav className="side-nav" aria-label="PC Studio pages">
@@ -47,7 +51,6 @@ export function AppShell({ activePage, onPageChange, showSimulationTools, onSimu
       <div className="content-frame">
         <header className="page-header">
           <div className="section-intro">
-            {page.status === "legacy" && <div className="eyebrow">Legacy</div>}
             <h1>{page.label}</h1>
             <p>{page.description}</p>
           </div>

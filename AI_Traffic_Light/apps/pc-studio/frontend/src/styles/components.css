@@ -1,4 +1,3 @@
-.brand-block p,
 .page-header p,
 .placeholder-copy,
 .function-item p,
@@ -19,10 +18,6 @@
 .brand-block h1 {
   font-size: 19px;
   line-height: 1.25;
-}
-
-.brand-block p {
-  font-size: 12px;
 }
 
 .nav-section h2 {

@@ -1,3 +1,13 @@
+# V0532 — Hallmark sidebar accessibility and clarity
+
+Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Simulation tools now use an explicit sidebar button with a pressed state rather than making the whole branding area clickable. Redundant version/tagline and legacy eyebrow copy are removed; version remains in the status bar and navigation behavior is unchanged.
+
+**Test feature branch:** pull `feature/interactive-3d-simulation`, then run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate` from the repository root. The default runner targets `main`. Inspect both light and dark appearance, narrow widths and simulation-toggle click/keyboard behavior. See [Patch 0_5_32](PATCH_0_5_32.md). Explicit owner PASS pending.
+
+---
+
 # V0531 — Align legacy simulation structure regression
 
 Candidate `0_5_31`, previous `0_5_30`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

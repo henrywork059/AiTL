@@ -1,3 +1,15 @@
+# V0532 — Hallmark sidebar clarity
+
+Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`; feature branch `feature/interactive-3d-simulation`.
+
+- [ ] Brand panel is not interactive; a labeled native Simulation tools button responds to mouse and keyboard and indicates `aria-pressed`.
+- [ ] When tools are hidden from Simulation Experiments, existing navigation returns to Dashboard; no other page/state behavior changes.
+- [ ] Light/dark theme, visible focus, narrow layout, legacy descriptions and persistent version/status still work.
+- [ ] `test_v0532_hallmark_shell.py`, related navigation/style regressions, structure, full offline CI and frontend typecheck/build pass.
+- [ ] Pull the feature branch and run `update_test_run.ps1 -SkipUpdate` on Windows; explicitly confirm PASS before baseline promotion.
+
+---
+
 # V0531 — Align legacy camera-region structure regression
 
 Candidate `0_5_31`, previous `0_5_30`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.

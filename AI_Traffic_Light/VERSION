@@ -1,5 +1,5 @@
-version: 0_5_31
-status: Legacy camera region regression alignment candidate
-previous_version: 0_5_30
+version: 0_5_32
+status: Hallmark sidebar accessibility and clarity candidate
+previous_version: 0_5_31
 passed_baseline: 0_5_0
-notes: Keep the 0_5_30 shared protected signal snapshot optimization and correct the V0418 camera/region source-structure regression to recognize shared phase arguments. No runtime, API, camera, signal or physical actuation changes in this follow-up test fix. Full candidate CI, Windows/ESP validation and explicit owner PASS govern acceptance.
+notes: Replace the hidden brand-panel simulation toggle with an explicit labeled accessible button using existing state. Remove redundant sidebar/legacy labels, preserve routing, APIs and simulation/hardware safety. Windows owner validation and explicit PASS remain required.

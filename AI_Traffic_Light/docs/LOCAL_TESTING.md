@@ -1,3 +1,22 @@
+# V0532 — Hallmark sidebar design regression
+
+Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+**Focus:** `python scripts/test_v0532_hallmark_shell.py` plus existing navigation, palette, responsive and structure regressions. Full candidate CI should also typecheck/build the frontend.
+
+**Windows pull/test from repository root:**
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Confirm brand title no longer triggers simulation visibility; the labeled button does so with pointer and keyboard, including navigating away from the Simulation Experiments page when hidden. Inspect narrow screens and light/dark variants; verify unchanged existing pages, mock/live labels and physical-output restrictions. Explicit owner PASS pending.
+
+---
+
 # V0531 — Camera-region structure regression compatibility
 
 Candidate `0_5_31`, previous `0_5_30`, baseline `0_5_0`, on `feature/interactive-3d-simulation`.
