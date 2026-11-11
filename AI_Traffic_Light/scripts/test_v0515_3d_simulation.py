@@ -32,6 +32,7 @@ def main() -> None:
         assert scene["frame_number"] > 0
         assert scene["density"] == "normal"
         assert len(scene["vehicles"]) == 8
+        assert {vehicle["vehicle_type"] for vehicle in scene["vehicles"]} == {"car", "suv", "van", "bus"}
         assert len(scene["pedestrians"]) == 7
         assert scene["signal"]["vehicle_go"] is True
         assert scene["signal"]["pedestrian_walk"] is False
@@ -73,19 +74,28 @@ def main() -> None:
     assert "sim3d-car-roof" in styles and "sim3d-car-wheel" in styles and "sim3d-car-end" in styles
     assert "sim3d-person-figure" in styles and "rotateX(-90deg)" in styles
     assert "sim3d-person-head" in component and "sim3d-person-leg" in component
+    assert "sim3d-car--bus" in styles and "sim3d-car--van" in styles and "sim3d-car--suv" in styles
+    assert "sim3d-car-window-band" in styles and "sim3d-person-head::before" in styles
+    assert "sim3d-person.is-reentering { transition: none; }" in styles
+    assert "isPedestrianReentry(previousY, pedestrian.y, sizeY)" in component
     assert ".sim3d-car.is-reentering { transition: none; }" in styles
     assert "isVehicleReentry(previousX, vehicle.x, sizeX)" in component
     motion = FRONTEND / "components/simulation3dMotion.ts"
     assert motion.is_file()
     script = """
 import assert from "node:assert/strict";
-import { isVehicleReentry } from MOTION_URI;
+import { isPedestrianReentry, isVehicleReentry } from MOTION_URI;
 assert.equal(isVehicleReentry(undefined, -260, 1280), false);
 assert.equal(isVehicleReentry(100, 140, 1280), false);
 assert.equal(isVehicleReentry(1100, 1070, 1280), false);
 assert.equal(isVehicleReentry(1420, -260, 1280), true);
 assert.equal(isVehicleReentry(-280, 1420, 1280), true);
 assert.equal(isVehicleReentry(500, 510, 1280), false);
+assert.equal(isPedestrianReentry(undefined, 50, 720), false);
+assert.equal(isPedestrianReentry(130, 170, 720), false);
+assert.equal(isPedestrianReentry(750, 40, 720), true);
+assert.equal(isPedestrianReentry(20, 745, 720), true);
+assert.equal(isPedestrianReentry(674, 674, 720), false);
 """.replace("MOTION_URI", json.dumps(motion.as_uri()))
     subprocess.run(["node", "--experimental-strip-types", "--input-type=module", "-e", script], check=True, cwd=ROOT)
     assert "requestJsonStrict<SimulationScene>" in api
@@ -124,7 +134,7 @@ assert.equal(isVehicleReentry(500, 510, 1280), false);
     print("[PASS] Live agent coordinates, all camera IDs, pause, density and disabled-state 3D scene")
     print("[PASS] Camera Settings, Crosswalk pair, Region Editor, AI Preview and Capture share 3D simulations")
     print("[PASS] Physical ESP, source-frame AI coordinates and saved capture image files remain unchanged")
-    print("[PASS] 3D vehicles, upright pedestrians and non-teleporting vehicle reentry")
+    print("[PASS] Distinct 3D vehicle models and human figures; off-screen vehicle and pedestrian respawn")
 
 
 if __name__ == "__main__":

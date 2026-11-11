@@ -1,3 +1,8 @@
+## 0_5_35 — Vehicle variety, improved people and pedestrian reentry (candidate)
+- Display distinct car, SUV, van and bus models with appropriate proportions, windows, sides, body height and 2D source-image outlines.
+- Improve simulated pedestrian skin/hair/clothing details and disable visible CSS backward tweening when they recycle off-screen, as already done for cars.
+- Expand deterministic reentry regression and update the legacy car-only source assertion. Keep protected signal policy, camera/API data structure, AI capture, editing and ESP boundaries unchanged. Previous `0_5_34`; accepted baseline `0_5_0`. Owner PASS pending.
+
 ## 0_5_34 — Volumetric 3D agents and seamless reentry (candidate)
 - Render synthetic cars with elevated cabins, body sides, ends and wheels; render pedestrians upright with head, torso, arms and legs.
 - Stop cross-road animation when existing simulator agents recycle off-screen while retaining smooth interpolation during ordinary motion.

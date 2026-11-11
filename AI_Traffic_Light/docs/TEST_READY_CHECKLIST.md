@@ -1,3 +1,15 @@
+# V0535 — Diverse vehicles, better people and safe respawn presentation
+
+Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] Car, SUV, van and bus are visibly distinct from all four simulated camera viewpoints.
+- [ ] Pedestrians show head/hair, clothing, arms, legs and feet, and do not slide backwards when recycled after exiting.
+- [ ] Ordinary movement remains smooth; pause/resume, orbit, zoom, overlays and camera editing/capture remain unchanged.
+- [ ] Focused agent/legacy tests, structure, offline regressions, frontend typecheck/build, and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Owner confirms PASS before any baseline change or merge to `main`.
+
+---
+
 # V0534 — Volumetric 3D preview
 
 Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.

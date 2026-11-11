@@ -142,21 +142,22 @@ def _draw_vehicle(
     color: tuple[int, int, int],
     vehicle_type: str,
 ) -> None:
-    height = 58 if vehicle_type == "car" else 72
+    height = {"car": 58, "suv": 64, "van": 70, "bus": 78}[vehicle_type]
     body_top = y - height // 2
     body_bottom = y + height // 2
     cv2.rectangle(canvas, (x, body_top), (x + width, body_bottom), color, thickness=-1)
-    if vehicle_type == "car":
-        roof_left = x + width // 4
-        roof_right = x + (width * 3) // 4
+    if vehicle_type in {"car", "suv"}:
+        roof_left = x + width // (4 if vehicle_type == "car" else 6)
+        roof_right = x + (width * (3 if vehicle_type == "car" else 5)) // (4 if vehicle_type == "car" else 6)
         cv2.rectangle(canvas, (roof_left, body_top - 22), (roof_right, body_top + 4), color, thickness=-1)
         cv2.rectangle(canvas, (roof_left + 7, body_top - 17), (roof_right - 7, body_top - 2), (77, 93, 110), thickness=-1)
     else:
-        for window_x in range(x + 18, x + width - 20, 44):
+        window_step = 35 if vehicle_type == "bus" else 50
+        for window_x in range(x + 16, x + width - 20, window_step):
             cv2.rectangle(
                 canvas,
                 (window_x, body_top + 10),
-                (min(window_x + 28, x + width - 12), body_top + 31),
+                (min(window_x + window_step - 10, x + width - 12), body_top + 31),
                 (77, 93, 110),
                 thickness=-1,
             )
@@ -483,8 +484,9 @@ class CameraFrameService:
         for index in range(vehicle_count):
             direction = 1 if index % 2 == 0 else -1
             lane_index = index // 2
-            vehicle_type = "car"
-            width = self._simulation_rng.randint(125, 170)
+            vehicle_type = ("car", "suv", "van", "bus")[index % 4]
+            width_ranges = {"car": (125, 155), "suv": (145, 175), "van": (170, 205), "bus": (220, 255)}
+            width = self._simulation_rng.randint(*width_ranges[vehicle_type])
             spacing = 300
             if direction > 0:
                 x = -240.0 + lane_index * spacing

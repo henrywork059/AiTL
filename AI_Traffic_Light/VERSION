@@ -1,5 +1,5 @@
-version: 0_5_34
-status: Volumetric 3D agents and seamless simulator vehicle reentry candidate
-previous_version: 0_5_33
+version: 0_5_35
+status: Improved 3D vehicle variety and pedestrian reentry candidate
+previous_version: 0_5_34
 passed_baseline: 0_5_0
-notes: Add raised car roofs, sides and wheels and upright pedestrian figures in the read-only CSS 3D preview. Suppress reverse-looking motion during off-screen vehicle reentry without changing simulator, signals, camera APIs, editors, captures or physical hardware. Full candidate CI, Windows/browser validation and owner PASS required.
+notes: Render separate car/SUV/van/bus vehicle types with varied dimensions and 3D cabins/windows, improve pedestrian faces/clothing and prevent off-screen pedestrian respawn tweening. Preserve all signal phases, existing camera APIs, safety, physical camera and image-coordinate behavior. Candidate CI, Windows/browser validation and owner PASS required.

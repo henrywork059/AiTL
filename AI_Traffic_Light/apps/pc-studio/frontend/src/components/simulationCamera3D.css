@@ -120,25 +120,47 @@
 .sim3d-pole span.red, .sim3d-status b.red { color: #ff777c; }
 
 .sim3d-car {
+  --cabin-left: 28%;
+  --cabin-width: 47%;
+  --cabin-top: 14%;
+  --cabin-height: 72%;
+  --cabin-lift: 16px;
   position: absolute;
   height: 7.2%;
   border-radius: 6px;
-  box-shadow: 0 0 0 2px #ffffff33 inset;
+  box-shadow: inset 0 2px 0 #ffffff55, 1px 4px 6px #0008;
   transform-style: preserve-3d;
   transition: left 430ms linear, top 430ms linear;
+}
+.sim3d-car--suv {
+  --cabin-left: 20%; --cabin-width: 68%; --cabin-top: 10%;
+  --cabin-height: 80%; --cabin-lift: 23px;
+  height: 8.2%;
+}
+.sim3d-car--van {
+  --cabin-left: 12%; --cabin-width: 80%; --cabin-top: 8%;
+  --cabin-height: 84%; --cabin-lift: 27px;
+  height: 9.2%;
+  border-radius: 3px;
+}
+.sim3d-car--bus {
+  --cabin-left: 7%; --cabin-width: 88%; --cabin-top: 8%;
+  --cabin-height: 84%; --cabin-lift: 34px;
+  height: 10%;
+  border-radius: 3px;
 }
 /* Suppress cross-road interpolation when a recycled vehicle reenters off-screen. */
 .sim3d-car.is-reentering { transition: none; }
 .sim3d-car-roof {
   position: absolute;
-  top: 14%;
-  left: 28%;
-  width: 47%;
-  height: 72%;
+  top: var(--cabin-top);
+  left: var(--cabin-left);
+  width: var(--cabin-width);
+  height: var(--cabin-height);
   border: 2px solid #bcd1db;
   border-radius: 6px;
   background: linear-gradient(110deg, #334f61, #78a3b6 44%, #213748 45%, #203748 83%, #759aad 84%);
-  transform: translateZ(16px);
+  transform: translateZ(var(--cabin-lift));
   box-shadow: inset 0 0 0 2px #e8f6ff28;
   transform-style: preserve-3d;
 }
@@ -153,6 +175,24 @@
   transform: rotateX(-90deg);
 }
 .sim3d-car-roof::before { top: 0; }
+.sim3d-car--van .sim3d-car-roof,
+.sim3d-car--bus .sim3d-car-roof {
+  background: linear-gradient(110deg, #344e5d, #9eb9c6 47%, #354c5b 48%);
+  border-radius: 3px;
+}
+.sim3d-car-window-band {
+  position: absolute;
+  top: 0;
+  left: var(--cabin-left);
+  width: var(--cabin-width);
+  height: 14px;
+  border: 1px solid #a9beca;
+  background: repeating-linear-gradient(90deg, #183749 0 20%, #90b3c5 21% 24%, #183749 25% 43%);
+  transform-origin: top;
+  transform: translateZ(calc(var(--cabin-lift) - 4px)) rotateX(-90deg);
+}
+.sim3d-car--car .sim3d-car-window-band { background: linear-gradient(90deg, #163346 5%, #7399ad 44%, #1d3446 48%); }
+.sim3d-car--suv .sim3d-car-window-band { background: linear-gradient(90deg, #1c4359 0 43%, #88a7b9 45% 49%, #1c4359 52%); }
 .sim3d-car-roof::after { top: 100%; }
 .sim3d-car-side {
   position: absolute;
@@ -177,6 +217,14 @@
 }
 .sim3d-car-end-front { left: 100%; }
 .sim3d-car-end-rear { left: 0; }
+.sim3d-car-end-front::after, .sim3d-car-end-rear::after {
+  content: "";
+  position: absolute;
+  inset: 6px 3px;
+  border-top: 4px solid #f8ecd0;
+  border-bottom: 4px solid #d44e56;
+  box-shadow: 0 1px 3px #1118;
+}
 .sim3d-car-wheel {
   position: absolute;
   width: 18px;
@@ -193,11 +241,27 @@
 .sim3d-car-wheel-far { top: 0; }
 /* Upright people stand along the Z axis, with dimensional head and torso. */
 .sim3d-person {
+  --skin-light: #ffe5c9;
+  --skin-shadow: #c98f64;
+  --hair: #26323b;
+  --trousers: #263a49;
   position: absolute;
   width: 0;
   height: 0;
   transform-style: preserve-3d;
   transition: left 430ms linear, top 430ms linear;
+}
+.sim3d-person--1 { --skin-light: #bd845b; --skin-shadow: #82583d; --hair: #171d24; --trousers: #47586a; }
+.sim3d-person--2 { --skin-light: #f0bd94; --skin-shadow: #b37957; --hair: #62442d; --trousers: #334c66; }
+.sim3d-person.is-reentering { transition: none; }
+.sim3d-person::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 10px;
+  background: #15222a77;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) translateZ(1px);
 }
 .sim3d-person-figure {
   position: absolute;
@@ -216,9 +280,27 @@
   left: 6.5px;
   top: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, #ffe5c9, #c98f64 67%, #795138);
+  background: radial-gradient(circle at 30% 25%, var(--skin-light), var(--skin-shadow) 75%);
   box-shadow: inset -2px -2px 3px #0006, 0 1px 4px #0006;
   transform: translateZ(3px);
+}
+.sim3d-person-head::before {
+  content: "";
+  position: absolute;
+  inset: -2px -2px 8px;
+  background: var(--hair);
+  border-radius: 50% 50% 35% 35%;
+}
+.sim3d-person-head::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  top: 8px;
+  left: 4px;
+  border-radius: 50%;
+  background: #2a2525;
+  box-shadow: 5px 0 0 #2a2525;
 }
 .sim3d-person-torso {
   left: 5px;
@@ -253,12 +335,22 @@
   top: 38px;
   width: 8px;
   height: 27px;
-  background: #263a49;
+  background: var(--trousers);
   border-radius: 4px;
   box-shadow: inset -2px 0 3px #0007;
 }
 .sim3d-person-leg-left { left: 5px; transform: rotate(6deg) translateZ(3px); }
 .sim3d-person-leg-right { right: 5px; transform: rotate(-6deg) translateZ(3px); }
+.sim3d-person-leg::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 12px;
+  height: 6px;
+  background: #141c25;
+  border-radius: 3px 3px 2px 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   .sim3d-car, .sim3d-person { transition: none; }
 }

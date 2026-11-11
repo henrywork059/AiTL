@@ -1,3 +1,13 @@
+# V0535 — More realistic 3D agents
+
+Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+Synthetic traffic now includes car, SUV, van and bus forms. Pedestrians have improved face, hair and clothing details, and no longer slide backwards across the 3D scene when recycled. Protected signals, physical cameras and source-image coordinates are unchanged.
+
+Test the feature branch with `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. Check all four camera viewpoints, pedestrian reentry and different vehicle shapes. See [Patch 0_5_35](PATCH_0_5_35.md). Owner PASS pending.
+
+---
+
 # V0534 — More dimensional 3D simulator
 
 Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.

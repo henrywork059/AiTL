@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import { isVehicleReentry } from "./simulation3dMotion";
+import { isPedestrianReentry, isVehicleReentry } from "./simulation3dMotion";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -53,13 +53,20 @@ export function SimulationCamera3D({
   const [pitch, setPitch] = useState(48);
   const [zoom, setZoom] = useState(0.85);
   const drag = useRef<{ x: number; y: number; orbit: number; pitch: number } | null>(null);
-  const lastVehicleX = useRef<{ sourceId: string; positions: Record<string, number> }>({ sourceId: "", positions: {} });
+  const previousPositions = useRef<{
+    sourceId: string;
+    vehicles: Record<string, number>;
+    pedestrians: Record<string, number>;
+  }>({ sourceId: "", vehicles: {}, pedestrians: {} });
 
   useEffect(() => {
-    lastVehicleX.current = {
+    previousPositions.current = {
       sourceId,
-      positions: Object.fromEntries(
+      vehicles: Object.fromEntries(
         (scene?.source_id === sourceId ? scene.vehicles : []).map(vehicle => [vehicle.id, vehicle.x]),
+      ),
+      pedestrians: Object.fromEntries(
+        (scene?.source_id === sourceId ? scene.pedestrians : []).map(person => [person.id, person.y]),
       ),
     };
   }, [scene, sourceId]);
@@ -156,9 +163,11 @@ export function SimulationCamera3D({
           {activeScene?.vehicles.map(vehicle => {
             const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
             const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
-            const previousX = lastVehicleX.current.sourceId === sourceId
-              ? lastVehicleX.current.positions[vehicle.id] : undefined;
-            return <div className={`sim3d-car${isVehicleReentry(previousX, vehicle.x, sizeX) ? " is-reentering" : ""}`} key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
+            const previousX = previousPositions.current.sourceId === sourceId
+              ? previousPositions.current.vehicles[vehicle.id] : undefined;
+            const variant = ["car", "suv", "van", "bus"].includes(vehicle.vehicle_type)
+              ? vehicle.vehicle_type : "car";
+            return <div className={`sim3d-car sim3d-car--${variant}${isVehicleReentry(previousX, vehicle.x, sizeX) ? " is-reentering" : ""}`} key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
               style={{
                 left: `${centerX / sizeX * 100}%`,
                 top: `${leftEdge.y / sizeY * 100}%`,
@@ -167,6 +176,7 @@ export function SimulationCamera3D({
                 transform: `translate(-50%, -50%) translateZ(15px) rotateZ(${(isFlippedX ? -vehicle.direction : vehicle.direction) < 0 ? 180 : 0}deg)`,
               }}>
               <div className="sim3d-car-roof" />
+              <div className="sim3d-car-window-band" />
               <div className="sim3d-car-side sim3d-car-side-near" />
               <div className="sim3d-car-side sim3d-car-side-far" />
               <div className="sim3d-car-end sim3d-car-end-front" />
@@ -177,9 +187,11 @@ export function SimulationCamera3D({
               <div className="sim3d-car-wheel sim3d-car-wheel-rear sim3d-car-wheel-far" />
             </div>;
           })}
-          {activeScene?.pedestrians.map(pedestrian => {
+          {activeScene?.pedestrians.map((pedestrian, index) => {
             const point = sourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
-            return <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
+            const previousY = previousPositions.current.sourceId === sourceId
+              ? previousPositions.current.pedestrians[pedestrian.id] : undefined;
+            return <div className={`sim3d-person sim3d-person--${index % 3}${isPedestrianReentry(previousY, pedestrian.y, sizeY) ? " is-reentering" : ""}`} key={pedestrian.id} title="Simulated pedestrian" style={{
               left: `${point.x / sizeX * 100}%`,
               top: `${point.y / sizeY * 100}%`,
               color: pedestrian.color,
@@ -243,7 +255,7 @@ export function SimulationCamera3D({
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
           <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(activeScene.signal.seconds_remaining))} s</span>
-          <span>{activeScene.vehicles.length} cars · {activeScene.pedestrians.length} people</span>
+          <span>{activeScene.vehicles.length} vehicles · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
       {!editing && <span className="sim3d-hint">Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}

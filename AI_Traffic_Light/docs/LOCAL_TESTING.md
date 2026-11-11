@@ -1,3 +1,22 @@
+# V0535 — Varied 3D traffic and pedestrian reentry
+
+Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+Focused regressions: `python scripts/test_v0515_3d_simulation.py` and `python scripts/test_v0418_camera_region_ui.py`. The first checks all vehicle types, 3D styling and pure Node tests for pedestrian/vehicle reentry. Run structure, offline regressions and frontend typecheck/build.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Validate four vehicle silhouettes, different pedestrian appearances, both walking directions and smooth reentry after leaving either edge. Confirm pause/resume, orbit/zoom, 2D capture/regions, green/clearance safety and ESP camera pages are unaffected. Explicit owner PASS required.
+
+---
+
 # V0534 — 3D agents and reentry validation
 
 Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.

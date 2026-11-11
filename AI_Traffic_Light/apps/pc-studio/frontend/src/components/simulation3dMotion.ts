@@ -1,4 +1,7 @@
-/** A recycled simulator agent must reappear off-screen, not animate back across the road. */
-export function isVehicleReentry(previousX: number | undefined, nextX: number, worldWidth: number): boolean {
-  return previousX !== undefined && Math.abs(nextX - previousX) > worldWidth / 2;
+/** Recycled agents must not interpolate backwards across the scene. */
+function isReentry(previous: number | undefined, next: number, extent: number): boolean {
+  return previous !== undefined && Math.abs(next - previous) > extent / 2;
 }
+
+export const isVehicleReentry = isReentry;
+export const isPedestrianReentry = isReentry;
