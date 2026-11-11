@@ -1,5 +1,5 @@
-version: 0_5_37
-status: Mirrored 3D signal post placement candidate
-previous_version: 0_5_36
+version: 0_5_38
+status: Release documentation restoration candidate
+previous_version: 0_5_37
 passed_baseline: 0_5_0
-notes: Place both 3D signal posts using the same horizontal/vertical camera transforms as simulated agents. No backend, signal policy, API, camera image, capture, region editor or physical hardware behavior changes. Candidate pending focused regressions, frontend build, full Windows validation and owner PASS.
+notes: Restore full CHANGELOG.md and docs/LOCAL_TESTING.md after the 0_5_37 GitHub write truncated their histories. Retain the mirrored 3D signal post fix and all prior release notes. No runtime behavior changes. Candidate pending repository checks, frontend build, full Windows validation and owner PASS.

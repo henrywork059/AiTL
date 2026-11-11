@@ -1,3 +1,13 @@
+# V0538 — Restore complete documentation
+
+Candidate `0_5_38`, previous `0_5_37`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+This documentation repair restores the complete release history and local-testing guide. It retains the `0_5_37` fix that mirrors both 3D signal posts with Camera B/C/D and the prior volumetric vehicles, people and smooth reentry work. No runtime behavior changes.
+
+Pull the feature branch and run `& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate`. See [Patch 0_5_38](PATCH_0_5_38.md). Owner PASS remains required before baseline promotion.
+
+---
+
 # V0537 — Correct 3D signal placement across mirrored cameras
 
 Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

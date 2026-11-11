@@ -8,6 +8,26 @@ Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `featur
 
 ---
 
+# V0538 — Documentation restoration
+
+Candidate `0_5_38`, previous `0_5_37`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Full changelog and local-testing history are retained.
+- [ ] `0_5_37` mirrored signal-post code remains unchanged.
+- [ ] Run the Windows owner test and confirm PASS before baseline promotion.
+
+---
+
+# V0537 — Mirrored 3D signal post placement
+
+Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Both 3D signal posts mirror with Camera B/C/D along with agents.
+- [ ] `test_v0515_3d_simulation.py`, structure, offline regressions and frontend typecheck/build pass.
+- [ ] Run Windows `update_test_run.ps1 -SkipUpdate`; inspect four views and confirm PASS before baseline promotion.
+
+---
+
 # V0536 — Correct vehicle-type layout regression
 
 Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
