@@ -3,7 +3,6 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 import sys
-from threading import Event, RLock
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -20,11 +19,10 @@ def main() -> int:
         sequence=1, source_uptime_ms=10, content=b"\xff\xd8\xff\xd9"
     )
     for mode in ("stop", "simulation", "normal", "eof", "stop_eof", "simulation_eof"):
-        service = remote_camera.RemoteCameraService.__new__(remote_camera.RemoteCameraService)
-        service._lock = RLock()
-        service._stream_bytes_received = 0
+        service = remote_camera.RemoteCameraService()
+        service._streaming_requested = True
         service._store_packet = Mock()
-        stop = Event()
+        stop = service._stop_event
         frames = SimpleNamespace(simulation_enabled=False)
         calls = 0
 
@@ -53,7 +51,7 @@ def main() -> int:
         )
         assert outcome == expected, (mode, outcome)
         if mode == "normal":
-            service._store_packet.assert_called_once_with(source_id="esp32_test", packet=packet)
+            service._store_packet.assert_called_once_with(source_id="esp32_test", packet=packet, stop_event=stop)
             assert service._stream_bytes_received == remote_camera.FRAME_HEADER.size + len(packet.content)
         else:
             service._store_packet.assert_not_called()

@@ -1,5 +1,5 @@
-version: 0_5_45
-status: ESP TCP socket-open cancellation candidate (roadmap Update 01)
-previous_version: 0_5_44
+version: 0_5_46
+status: ESP worker retirement and recovery candidate (roadmap Update 02)
+previous_version: 0_5_45
 passed_baseline: 0_5_0
-notes: Guard socket and connection-state publication after a blocking ESP TCP open; close cancelled sockets and clear only the owned active stream. Isolated worker-method regression: original 2/5, patched 5/5. Full CI and owner Windows/ESP PASS required. Broader old-worker failure and recovery handling remains Update 02.
+notes: Guard retired-worker failure, join, frame metadata and recovery publication; serialize recovery control with replacement session control. 11/11 isolated behavioral checks passed; focused repository regression added; full CI and owner Windows/ESP PASS required.

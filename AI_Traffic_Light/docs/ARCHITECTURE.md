@@ -37,7 +37,7 @@ The production V0310 tuning keeps one framebuffer. On the normal PSRAM path it u
 
 Multiple saved ESP sessions may stream concurrently. Each session has an independent worker and newest-frame cache, but exactly one saved ESP is selected to feed the existing shared capture/tracking/traffic pipeline. Switching source clears the previous physical frame first and promotes a cached frame only when it is recent; an old cache is never re-stamped as a fresh AI input. Replacing a saved IP retires the previous session generation, so a late frame from that worker is ignored even if the source ID is reused.
 
-If an ESP stream drops or the device reboots, its session can recover using the retained configuration. Simulation temporarily suspends physical image transfer while retaining saved profiles/session intent, and physical streams resume afterward.
+If an ESP stream drops or the device reboots, its session can recover using the retained configuration. Recovery serializes status/config/start with replacement session control and checks worker event ownership before publishing state; a request already issued can finish before replacement control. Retired workers cannot publish subsequent failure/frame metadata to a replacement session. The stop helper retains its bounded join. An in-progress external frame-sink callback is not rolled back. Simulation temporarily suspends physical image transfer while retaining saved profiles/session intent, and physical streams resume afterward.
 
 ## Synthetic camera render caching
 

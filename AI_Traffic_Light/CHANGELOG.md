@@ -1,3 +1,7 @@
+## 0_5_46 — Guard retired ESP workers (candidate; roadmap Update 02 / H02)
+- Guard retired-worker failure, join completion, receive counters/frame metadata and recovery using the worker stop-event identity. Serialize recovery with replacement ESP control commands and recheck ownership around each HTTP stage. Already-issued HTTP calls may finish before replacement control; their stale responses cannot publish state. A frame sink already in progress is not rolled back; cache/source provenance remains Update 03/04.
+- Add 11 deterministic worker-retirement cases; previous `0_5_45`, accepted baseline `0_5_0`, owner PASS pending. No firmware, API or signal changes.
+
 ## 0_5_45 — Guard cancelled ESP TCP opens (candidate; roadmap Update 01 / H02)
 - After a blocking TCP open returns, recheck cancellation, worker event identity, streaming intent and simulation mode before publishing the socket or connection status. The existing finally block closes the returned socket and clears connection status only when it owns the active socket. This prevents a cancelled opener from replacing a new connection. Ordinary open, read and reconnect behavior, firmware, TCP framing, API shapes and signal behavior remain unchanged.
 - Add deterministic five-case socket-open regression. Previous `0_5_44`, accepted baseline `0_5_0`; broader retired-worker failure/recovery audit remains Update 02.

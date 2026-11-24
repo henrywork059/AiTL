@@ -475,12 +475,23 @@ class RemoteCameraService:
         query["stream_fps"] = str(target_fps)
         return query
 
+    def _worker_current_locked(self, stop_event: Event) -> bool:
+        """Check session ownership while holding the state lock."""
+        return (
+            self._stop_event is stop_event
+            and not stop_event.is_set()
+            and self._streaming_requested
+        )
+
     def _stop_worker(self) -> None:
         with self._lock:
             thread = self._thread
             stop_event = self._stop_event
             active_stream = self._active_stream
             stop_event.set()
+            # Retire the captured socket immediately; never clear a later worker's state.
+            self._active_stream = None
+            self._stream_connected = False
             self._frame_condition.notify_all()
 
         if active_stream is not None:
@@ -493,12 +504,9 @@ class RemoteCameraService:
             thread.join(timeout=2.5)
 
         with self._lock:
-            if self._thread is thread:
+            if self._stop_event is stop_event and self._thread is thread:
                 self._thread = None
-            if self._active_stream is active_stream:
-                self._active_stream = None
-            self._stream_connected = False
-            self._frame_condition.notify_all()
+                self._frame_condition.notify_all()
 
     @staticmethod
     def _sequence_gap(previous: int | None, current: int) -> int:
@@ -509,9 +517,11 @@ class RemoteCameraService:
             return 0
         return delta - 1
 
-    def _record_frame(self, packet: _FramePacket, frame_number: int) -> None:
+    def _record_frame(self, packet: _FramePacket, frame_number: int, *, stop_event: Event | None = None) -> None:
         now_ms = int(time.time() * 1000)
         with self._frame_condition:
+            if stop_event is not None and not self._worker_current_locked(stop_event):
+                return
             previous_success = self._last_success_at_ms
             self._source_sequence_gaps += self._sequence_gap(self._last_remote_sequence, packet.sequence)
             self._last_remote_sequence = packet.sequence
@@ -538,17 +548,22 @@ class RemoteCameraService:
 
             self._frame_condition.notify_all()
 
-    def _record_stream_failure(self, message: str, http_status: int | None = None) -> None:
+    def _record_stream_failure(
+        self, message: str, http_status: int | None = None, *, stop_event: Event | None = None
+    ) -> bool:
         now_ms = int(time.time() * 1000)
         with self._lock:
+            if stop_event is not None and not self._worker_current_locked(stop_event):
+                return False
             self._last_attempt_at_ms = now_ms
             self._last_http_status = http_status
             self._failed_fetches += 1
             self._consecutive_failures += 1
             self._stream_connected = False
             self._last_error = message
+            return True
 
-    def _store_packet(self, *, source_id: str, packet: _FramePacket) -> None:
+    def _store_packet(self, *, source_id: str, packet: _FramePacket, stop_event: Event | None = None) -> None:
         if len(packet.content) > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
@@ -566,7 +581,7 @@ class RemoteCameraService:
                 content=packet.content,
             )
             frame_number = frame.frame_number
-        self._record_frame(packet, frame_number)
+        self._record_frame(packet, frame_number, stop_event=stop_event)
 
     def _consume_tcp_stream(
         self,
@@ -589,9 +604,11 @@ class RemoteCameraService:
                 return "stream_ended"
 
             with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return "stopped"
                 self._stream_bytes_received += FRAME_HEADER.size + len(packet.content)
 
-            self._store_packet(source_id=source_id, packet=packet)
+            self._store_packet(source_id=source_id, packet=packet, stop_event=stop_event)
 
         return "stopped"
 
@@ -671,63 +688,93 @@ class RemoteCameraService:
         )
         return self.status()
 
-    def _arm_esp_session(self, host: str, settings: dict, fps: int) -> dict:
-        # Keep config -> start atomic relative to background status polling.
+    def _recovery_allowed_locked(self, host: str, stop_event: Event) -> bool:
+        return (
+            self._worker_current_locked(stop_event)
+            and self._host == host
+            and not camera_frame_service.simulation_enabled
+        )
+
+    def _arm_esp_session(
+        self, host: str, settings: dict, fps: int, *, stop_event: Event | None = None
+    ) -> dict | None:
+        # Keep config -> start atomic relative to status polling and replacement control.
+        # Never hold the state lock across blocking HTTP.
         with self._control_lock:
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
             applied = self._request_control(host, "/config", "POST", self._settings_query(settings, fps))
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
             started = self._request_control(host, "/start", "POST", None)
-        self._assert_matching_firmware(started, host)
-        if started.get("session_active") is not True:
-            raise AppError(
-                ErrorCode.CAMERA_STREAM_NOT_STARTED,
-                "ESP32-CAM did not confirm an active camera session.",
-                status_code=502,
-                details={"host": host},
-            )
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
+                self._assert_matching_firmware(started, host)
+                if started.get("session_active") is not True:
+                    raise AppError(
+                        ErrorCode.CAMERA_STREAM_NOT_STARTED,
+                        "ESP32-CAM did not confirm an active camera session.",
+                        status_code=502,
+                        details={"host": host},
+                    )
+                self._settings = applied.get("settings") if isinstance(applied.get("settings"), dict) else dict(settings)
+                self._device_status = started
+                self._device_reachable = True
+            return started
 
-        with self._lock:
-            self._settings = applied.get("settings") if isinstance(applied.get("settings"), dict) else dict(settings)
-            self._device_status = started
-            self._device_reachable = True
-        return started
+    def _recover_esp_session_if_needed(self, host: str, *, stop_event: Event | None = None) -> bool:
+        # Serialize the entire recovery with replacement stop/config/start. An already
+        # issued HTTP request may finish, but cannot run after replacement control
+        # commands or publish its response into the replacement's local state.
+        with self._control_lock:
+            with self._lock:
+                if stop_event is None:
+                    stop_event = self._stop_event
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                settings = dict(self._settings) if isinstance(self._settings, dict) else None
+                fps = self._target_fps
 
-    def _recover_esp_session_if_needed(self, host: str) -> bool:
-        with self._lock:
-            settings = dict(self._settings) if isinstance(self._settings, dict) else None
-            fps = self._target_fps
-            requested = self._streaming_requested
+            if settings is None:
+                return False
 
-        if not requested or settings is None:
-            return False
+            device = self._request_control(host, "/status", "GET", None)
+            now_ms = int(time.time() * 1000)
+            with self._lock:
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                self._assert_matching_firmware(device, host)
+                self._device_status = device
+                self._device_reachable = True
+                self._last_probe_at_ms = now_ms
+                self._last_probe_monotonic = time.monotonic()
 
-        device = self._request_control(host, "/status", "GET", None)
-        self._assert_matching_firmware(device, host)
-        now_ms = int(time.time() * 1000)
-        with self._lock:
-            self._device_status = device
-            self._device_reachable = True
-            self._last_probe_at_ms = now_ms
-            self._last_probe_monotonic = time.monotonic()
+            if device.get("camera_ready") is False:
+                raise AppError(
+                    ErrorCode.CAMERA_NOT_CONNECTED,
+                    "ESP32-CAM came back online but reports that the camera sensor is not ready.",
+                    status_code=502,
+                    details={"host": host},
+                )
 
-        if device.get("camera_ready") is False:
-            raise AppError(
-                ErrorCode.CAMERA_NOT_CONNECTED,
-                "ESP32-CAM came back online but reports that the camera sensor is not ready.",
-                status_code=502,
-                details={"host": host},
-            )
+            if device.get("session_active") is True:
+                return False
 
-        if device.get("session_active") is True:
-            return False
-
-        self._arm_esp_session(host, settings, fps)
-        with self._lock:
-            self._session_recoveries += 1
-            self._last_recovery_at_ms = int(time.time() * 1000)
+            if self._arm_esp_session(host, settings, fps, stop_event=stop_event) is None:
+                return False
+            with self._lock:
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                self._session_recoveries += 1
+                self._last_recovery_at_ms = int(time.time() * 1000)
+                source_id = self._source_id
 
         logger.warning(
             "Recovered ESP camera session after transport/session loss",
-            extra={"host": host, "source_id": self._source_id, "target_fps": fps},
+            extra={"host": host, "source_id": source_id, "target_fps": fps},
         )
         return True
 
@@ -875,11 +922,12 @@ class RemoteCameraService:
     def _run(self, stop_event: Event) -> None:
         while not stop_event.is_set():
             with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return
                 host = self._host
                 source_id = self._source_id
-                requested = self._streaming_requested
 
-            if host is None or not requested:
+            if host is None:
                 return
 
             if camera_frame_service.simulation_enabled:
@@ -892,8 +940,7 @@ class RemoteCameraService:
                 stream = self._stream_opener(host)
                 with self._lock:
                     # Opening can finish after a stop or replacement worker starts.
-                    if (stop_event.is_set() or self._stop_event is not stop_event
-                            or not self._streaming_requested):
+                    if not self._worker_current_locked(stop_event):
                         return
                     if camera_frame_service.simulation_enabled:
                         continue
@@ -912,18 +959,19 @@ class RemoteCameraService:
                 if outcome in {"stopped", "paused_for_simulation"}:
                     continue
 
-                failed = True
-                self._record_stream_failure("ESP TCP JPEG stream ended unexpectedly.")
+                failed = self._record_stream_failure(
+                    "ESP TCP JPEG stream ended unexpectedly.", stop_event=stop_event
+                )
             except AppError as exc:
-                failed = True
-                self._record_stream_failure(
+                failed = self._record_stream_failure(
                     exc.message,
                     exc.details.get("http_status") if exc.details else None,
+                    stop_event=stop_event,
                 )
             except (OSError, TimeoutError, EOFError, ValueError) as exc:
-                if not stop_event.is_set():
-                    failed = True
-                    self._record_stream_failure(f"ESP TCP JPEG transport error: {exc}")
+                failed = self._record_stream_failure(
+                    f"ESP TCP JPEG transport error: {exc}", stop_event=stop_event
+                )
             finally:
                 if stream is not None:
                     try:
@@ -931,28 +979,38 @@ class RemoteCameraService:
                     except Exception:
                         pass
                 with self._lock:
-                    if stream is not None and self._active_stream is stream:
+                    if (self._stop_event is stop_event and stream is not None
+                            and self._active_stream is stream):
                         self._active_stream = None
                         self._stream_connected = False
 
-            if stop_event.is_set() or camera_frame_service.simulation_enabled:
-                continue
-
-            if failed:
-                with self._lock:
+            with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return
+                if camera_frame_service.simulation_enabled:
+                    continue
+                if failed:
                     self._stream_reconnects += 1
 
+            if failed:
                 try:
-                    self._recover_esp_session_if_needed(host)
+                    self._recover_esp_session_if_needed(host, stop_event=stop_event)
                 except AppError as exc:
                     with self._lock:
+                        if not self._worker_current_locked(stop_event):
+                            return
                         self._device_reachable = False
-                    self._record_stream_failure(
-                        exc.message,
-                        exc.details.get("http_status") if exc.details else None,
-                    )
+                        self._record_stream_failure(
+                            exc.message,
+                            exc.details.get("http_status") if exc.details else None,
+                            stop_event=stop_event,
+                        )
 
-                stop_event.wait(self._reconnect_backoff_seconds())
+                with self._lock:
+                    if not self._worker_current_locked(stop_event):
+                        return
+                    delay = self._reconnect_backoff_seconds()
+                stop_event.wait(delay)
 
     def _refresh_device_status_if_due(self) -> None:
         with self._lock:

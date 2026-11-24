@@ -1,3 +1,14 @@
+# V0546 — ESP worker retirement and recovery
+
+Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Retired-worker errors, cleanup and recovery do not change replacement socket, status, settings or counters.
+- [ ] Join remains bounded; normal transport/reconnect and V0544/V0545 regressions pass.
+- [ ] V0546 deterministic cases, remote-camera integrations, structure, full offline tests and frontend typecheck/build pass.
+- [ ] Windows/ESP reboot, start/stop and mode switching verified; owner PASS before promotion. No physical signal actuation.
+
+---
+
 # V0545 — ESP TCP socket-open cancellation
 
 Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

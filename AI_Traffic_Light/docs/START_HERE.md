@@ -1,3 +1,13 @@
+# V0546 — ESP worker retirement and recovery
+
+Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Guard retired-worker failure, join completion, receive counters/frame metadata and recovery using the worker stop-event identity. Serialize recovery with replacement ESP control commands and recheck ownership around each HTTP stage. Already-issued HTTP calls may finish before replacement control; their stale responses cannot publish state. A frame sink already in progress is not rolled back; cache/source provenance remains Update 03/04.
+
+See [Patch 0_5_46](PATCH_0_5_46.md). Pull the feature branch and run the Windows runner with `-SkipUpdate`. Verify repeated start/stop, ESP reboot/recovery, simulation switching and normal preview. Owner PASS pending.
+
+---
+
 # V0545 — ESP TCP socket-open cancellation
 
 Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

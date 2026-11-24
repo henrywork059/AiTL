@@ -1,3 +1,22 @@
+# V0546 — ESP worker retirement and recovery
+
+Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Roadmap Update 02 / H02. Run `python scripts/test_v0546_worker_retirement.py`, `python scripts/test_v0545_tcp_open_cancellation.py`, `python scripts/test_v0544_tcp_read_cancellation.py`, `python scripts/test_remote_camera_pull.py`, `python scripts/test_remote_camera_session.py`, structure, offline regressions and frontend typecheck/build.
+
+From repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -SkipUpdate
+```
+
+Verify repeated stream restart, recovery after ESP reboot or Wi-Fi loss, simulation entry/exit, no stale disconnected status and normal frame delivery. Original isolated method probes reproduced stale join status and stale recovery publication/rearm, and confirmed failure recording lacks a worker guard. The patched methods passed 11/11 isolated behavioral checks with injected dependencies (four transport cases, one join, five recovery cases and one late frame sink); the copied method blocks were hash-matched to the staged source. Direct clone blocked by DNS. Full-module tests, CI for this candidate and owner Windows/ESP acceptance are not yet verified.
+
+---
+
 # V0545 — ESP TCP socket-open cancellation
 
 Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
