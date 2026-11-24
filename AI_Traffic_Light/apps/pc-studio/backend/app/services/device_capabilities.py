@@ -39,7 +39,7 @@ def project_camera_device(status: Mapping[str, Any]) -> dict[str, Any]:
     if simulation:
         state = "simulated" if fresh else "idle"
     elif not configured:
-        state = "not_connected"
+        state = "error" if last_error else "not_connected"
     elif paused:
         state = "paused"
     elif streaming and not transport_connected:

@@ -8,6 +8,10 @@ The standalone `scripts/camera_endurance_benchmark.py` polls the already-exposed
 
 A versioned, read-only per-camera capability/health descriptor is projected from the existing saved camera manager. It reports supported PC camera input and simulation-only input separately from current availability, and marks lighting/speaker outputs unavailable. The descriptor is not a hardware module registry, discovery system, authenticated module protocol, physical output interface or safety certification. Existing saved profiles remain V1; no new persistence or device command is introduced.
 
+## V0555 setup and connection workflow
+
+The existing saved-camera setup UI validates private-LAN input and settings, reports source-specific connection errors and retry guidance, and distinguishes transport connectivity from fresh image availability. Failed Connect retains the saved profile; explicit retry does not start the stream. The manager status refresh preserves selection identity across asynchronous device probes. No new output or physical actuation capability.
+
 ## Physical camera input
 
 AiTL implements a local PC-controlled ESP32-CAM input path with:

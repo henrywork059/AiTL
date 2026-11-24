@@ -1,3 +1,15 @@
+# V0555 — Camera setup and connection workflow
+
+Candidate `0_5_55`; previous `0_5_54`; accepted baseline `0_5_0`.
+
+- [x] Source-coherent selected status; network probe outside manager lock.
+- [x] Validated camera form, source-qualified error/stale/waiting labels, retry and saved profile retention; stale poll/preview guards.
+- [ ] Focused backend and UI regression, full offline suite, structure, TypeScript typecheck and frontend build pass in CI.
+- [ ] Windows application validation, two-camera selection, unplug/retry, restart and explicit owner PASS.
+- [ ] Preserve disabled physical/public-road outputs.
+
+---
+
 # V0554 — Derived device capability contract
 
 Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`.

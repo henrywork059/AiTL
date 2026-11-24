@@ -43,6 +43,10 @@ If an ESP stream drops or the device reboots, its session can recover using the 
 
 `RemoteCameraManager` remains the sole saved-camera registry and runtime session owner. Its existing `status()` operation collects current per-source ESP/simulation summaries and uses pure `device_capabilities.project_camera_device()` to derive an additive, read-only contract for each saved source and the selected source. The versioned descriptor exposes software input support, current freshness/health, and explicitly unavailable lighting/speaker outputs. It is not stored in `remote_cameras.json` or copied into inference/traffic state. It does not probe ESP hardware, create sessions or permit physical outputs. Existing PC-owned control, original-frame timestamps and source-generation guards remain unchanged; the full selected top-level legacy status is not an atomic camera-switch snapshot.
 
+## V0555 camera setup status coherence
+
+The manager performs the existing optional network probe without holding the registry lock, then derives the returned selected profile, current session status, cached frame and capability contract under one selection snapshot. The UI ignores obsolete poll results during/after an action, validates drafts before sending a request, and gates preview/selected-source controls on current source identity and fresh observations. Existing registry and transport ownership remain unchanged. This is not a multi-client command lock or synchronized sampling of all cameras.
+
 ## Synthetic camera render caching
 
 `CameraFrameService` renders a 1280 × 720 BGR canvas and encodes the canonical simulation PNG once per tick. Mirrored simulation cameras B/C/D flip that same current-tick render and encode their own PNGs; they do not decode the canonical PNG. The bounded canvas cache occupies approximately 2.6 MiB and is discarded when simulation resets, stops or resumes. Existing per-view PNG caching, simulation scene coordinates, camera APIs, and protected virtual signal rules are unchanged. This optimization does not affect the real ESP transport or permit physical traffic-light control.

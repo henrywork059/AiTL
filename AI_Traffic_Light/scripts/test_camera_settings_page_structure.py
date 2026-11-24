@@ -57,7 +57,20 @@ def main() -> int:
     assert 'const effectiveCameraType = showSimulationTools ? newCameraType : "esp32"' in page
     esp_form = page.split('effectiveCameraType === "esp32" && <details className="camera-fold">', 1)[1].split("</details>", 1)[0]
     assert 'effectiveCameraType === "simulation"' not in esp_form
-    assert 'disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}' in esp_form
+    assert esp_form.count('disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}') == 2
+    assert 'disabled={busy || !readyToStart}' in page
+    assert 'disabled={busy || !selectedActive || !selectedStreaming}' in page
+    assert 'remote?.active_source_id === selectedId' in page
+    assert 'epoch !== actionEpochRef.current' in page
+    assert 'loadSelectedProfile(savedStatus)' in page
+    assert page.index('loadSelectedProfile(savedStatus)') < page.index('const next = await connectRemoteCamera(')
+    assert 'Retry connection' in page and 'Saved profile retained' in page
+    assert 'label: "Stale"' in page and 'label: "Waiting for frame"' in page
+    assert 'selectedProfile?.device_contract?.health.frame_fresh === true' in page
+    assert 'Number.isInteger(value)' in page and 'Use a private LAN IP address' in page
+    assert 'That IP address is already assigned to another saved camera.' in page
+    assert 'Camera status unavailable. Check PC Studio backend.' in page
+    assert 'Camera action completed, but preview status refresh failed' in page
     assert "Detailed camera & stream status" in page
     assert "Each saved ESP keeps its own OV2640 settings" not in page
     assert "V037 R6" not in page

@@ -862,65 +862,70 @@ class RemoteCameraManager:
         return next((frame for frame in self.frames_for_inference() if frame.source_id == source_id), None)
 
     def status(self, *, refresh_device: bool = False) -> dict:
+        # The potentially slow network probe must stay outside the registry lock.
+        with self._lock:
+            probe_session = self._sessions.get(self._active_source_id)
+        if refresh_device and probe_session is not None:
+            probe_session.status(refresh_device=True)
+
+        # Take one coherent selection/session/profile snapshot after probing.
+        # Local session status never sends device requests.
         with self._lock:
             active_id = self._active_source_id
             profile = self._profiles.get(active_id) if active_id else None
             session = self._sessions.get(active_id) if active_id else None
-
-        if session is not None:
-            active_status = session.status(refresh_device=refresh_device)
-        else:
-            active_status = {
-                "configured": False,
-                "device_reachable": False,
-                "worker_running": False,
-                "streaming": False,
-                "stream_connected": False,
-                "paused_for_simulation": False,
-                "transport": "idle",
-                "stream_protocol": None,
-                "host": profile["host"] if profile else None,
-                "source_id": profile["source_id"] if profile else None,
-                "status_url": f"http://{profile['host']}/status" if profile and profile["kind"] == "esp32" else None,
-                "capture_url": f"http://{profile['host']}/capture" if profile and profile["kind"] == "esp32" else None,
-                "stream_url": f"tcp://{profile['host']}:81" if profile and profile["kind"] == "esp32" else None,
-                "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
-                "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
-                "measured_fps": 0.0,
-                "frame_age_ms": None,
-                "frame_stale": False,
-                "last_frame_interval_ms": None,
-                "stream_reconnects": 0,
-                "session_recoveries": 0,
-                "consecutive_failures": 0,
-                "reconnect_backoff_ms": 0,
-                "stream_bytes_received": 0,
-                "dropped_stale_frames": 0,
-                "source_sequence_gaps": 0,
-                "repeated_source_frames": 0,
-                "source_sequence_resets": 0,
-                "last_remote_sequence": None,
-                "last_source_uptime_ms": None,
-                "connected_at_ms": None,
-                "stream_started_at_ms": None,
-                "last_stream_connected_at_ms": None,
-                "last_recovery_at_ms": None,
-                "last_probe_at_ms": None,
-                "last_attempt_at_ms": None,
-                "last_success_at_ms": None,
-                "last_http_status": None,
-                "last_frame_number": None,
-                "last_frame_bytes": 0,
-                "successful_fetches": 0,
-                "failed_fetches": 0,
-                "last_error": None,
-                "settings": dict(profile["settings"]) if profile else dict(DEFAULT_CAMERA_SETTINGS),
-                "device": {},
-                "control_sequence": ["select", "connect", "config", "start", "persistent_tcp_jpeg", "stop"],
-                "prototype_only": True,
-            }
-
-        with self._lock:
+            if session is not None:
+                active_status = session.status(refresh_device=False)
+            else:
+                active_status = {
+                    "configured": False,
+                    "device_reachable": False,
+                    "worker_running": False,
+                    "streaming": False,
+                    "stream_connected": False,
+                    "paused_for_simulation": False,
+                    "transport": "idle",
+                    "stream_protocol": None,
+                    "host": profile["host"] if profile else None,
+                    "source_id": profile["source_id"] if profile else None,
+                    "status_url": f"http://{profile['host']}/status" if profile and profile["kind"] == "esp32" else None,
+                    "capture_url": f"http://{profile['host']}/capture" if profile and profile["kind"] == "esp32" else None,
+                    "stream_url": f"tcp://{profile['host']}:81" if profile and profile["kind"] == "esp32" else None,
+                    "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
+                    "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
+                    "measured_fps": 0.0,
+                    "frame_age_ms": None,
+                    "frame_stale": False,
+                    "last_frame_interval_ms": None,
+                    "stream_reconnects": 0,
+                    "session_recoveries": 0,
+                    "consecutive_failures": 0,
+                    "reconnect_backoff_ms": 0,
+                    "stream_bytes_received": 0,
+                    "dropped_stale_frames": 0,
+                    "source_sequence_gaps": 0,
+                    "repeated_source_frames": 0,
+                    "source_sequence_resets": 0,
+                    "last_remote_sequence": None,
+                    "last_source_uptime_ms": None,
+                    "connected_at_ms": None,
+                    "stream_started_at_ms": None,
+                    "last_stream_connected_at_ms": None,
+                    "last_recovery_at_ms": None,
+                    "last_probe_at_ms": None,
+                    "last_attempt_at_ms": None,
+                    "last_success_at_ms": None,
+                    "last_http_status": None,
+                    "last_frame_number": None,
+                    "last_frame_bytes": 0,
+                    "successful_fetches": 0,
+                    "failed_fetches": 0,
+                    "last_error": None,
+                    "settings": dict(profile["settings"]) if profile else dict(DEFAULT_CAMERA_SETTINGS),
+                    "device": {},
+                    "control_sequence": ["select", "connect", "config", "start", "persistent_tcp_jpeg", "stop"],
+                    "prototype_only": True,
+                }
             # The manager cache retains the original frame timestamp across selection.
             # Do not derive selected-frame age from status poll time or cache promotion.
             selected_frame = self._latest_frames.get(active_id) if active_id else None
@@ -937,9 +942,7 @@ class RemoteCameraManager:
                 )
                 if active_status["frame_stale"]:
                     active_status["measured_fps"] = 0.0
-            # Re-read after optional status refresh in case another request changed selection.
-            active_id = self._active_source_id
-            profile = self._profiles.get(active_id) if active_id else None
+            # Selection remains stable throughout the local snapshot.
             if profile is not None:
                 active_status["host"] = profile["host"]
                 active_status["source_id"] = profile["source_id"]
@@ -962,8 +965,7 @@ class RemoteCameraManager:
                 )
             ]
             # Additive, read-only projection; the registry and sessions retain ownership.
-            # Use source-qualified summaries rather than the potentially refreshed
-            # top-level selected session to avoid mixing A's metrics with B's ID.
+            # Use the source-qualified summaries for the selected capability.
             for camera in summaries:
                 camera["device_contract"] = project_camera_device(camera)
             selected_contract = next(

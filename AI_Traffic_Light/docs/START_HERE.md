@@ -1,3 +1,11 @@
+# V0555 — Camera setup and connection workflow
+
+Candidate `0_5_55`, previous `0_5_54`, accepted baseline `0_5_0`, roadmap Update 11 / H06.
+
+Validate setup fields before requests, retain saved profiles on failed ESP probes, show source-qualified stale/error/retry status, discard outdated polls and ensure selected-camera status does not combine different devices during refresh. No new endpoints, firmware, registry schema or output commands. See [Patch 0_5_55](PATCH_0_5_55.md). CI and owner Windows/ESP acceptance pending.
+
+---
+
 # V0554 — Derived device capability contract
 
 Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`. Roadmap Update 10 / H06.

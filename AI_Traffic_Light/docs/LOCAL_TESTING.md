@@ -1,3 +1,28 @@
+# V0555 — Device setup and connection workflow
+
+Candidate `0_5_55`; previous `0_5_54`; accepted baseline `0_5_0`.
+
+Focused tests from `AI_Traffic_Light`:
+
+```powershell
+python scripts/run_offline_tests.py --focused test_v0555_camera_setup.py test_camera_settings_page_structure.py test_remote_camera_control_resilience.py test_remote_camera_multi.py test_v0554_device_registry.py test_v0554_device_capabilities.py
+python scripts/check_structure.py
+```
+
+The new regression exercises fake ESP status failures, explicit retry, invalid settings and IP, persistence, selection changes during refresh and removal. UI structure guards verify validation, action epoch, source-identity guards and fresh-frame preview gating. Full suite/typecheck/build via GitHub CI, actual Windows application and ESP checks remain separate.
+
+From repo root:
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Use one or two authorized bench ESPs: confirm invalid input rejection; unplug, connect and retry after restoring network; verify distinct camera states, no stale preview, stop before reconnect, profile reload and no unexpected output. Do not equate CI with owner PASS.
+
+---
+
 # V0554 — Device capability contract
 
 Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, roadmap Update 10 / H06.

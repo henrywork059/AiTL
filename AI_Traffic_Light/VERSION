@@ -1,5 +1,5 @@
-version: 0_5_54
-status: Read-only device capability and health contract candidate (roadmap Update 10)
-previous_version: 0_5_53
+version: 0_5_55
+status: Camera setup and connection workflow candidate (roadmap Update 11)
+previous_version: 0_5_54
 passed_baseline: 0_5_0
-notes: Additive per-camera input/health projection; CI run 45425380717 passed full offline suite, structure and frontend checks at 1840f9bc; owner Windows/ESP PASS pending.
+notes: Source-coherent status, failed probe diagnostics, validated setup and explicit retry; regression added; CI and owner Windows/ESP PASS pending.

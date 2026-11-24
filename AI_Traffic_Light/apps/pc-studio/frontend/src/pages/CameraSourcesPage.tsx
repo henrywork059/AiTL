@@ -54,11 +54,51 @@ function formatAge(ageMs: number | null): string {
 }
 
 function numberValue(value: string): number {
-  return Number.parseInt(value, 10);
+  return value.trim() === "" ? Number.NaN : Number(value);
+}
+
+function validateSetup(host: string, sourceId: string, targetFps: number, settings: RemoteCameraSettings, cameras: RemoteCameraProfile[], editingId: string | null): string | null {
+  const address = host.trim();
+  const id = sourceId.trim();
+  const octets = address.split(".");
+  if (octets.length !== 4 || octets.some((part) => !/^(0|[1-9][0-9]{0,2})$/.test(part) || Number(part) > 255)) {
+    return "Enter a literal private IPv4 address, for example 192.168.1.87.";
+  }
+  const [a, b] = octets.map(Number);
+  if (!(a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168))) {
+    return "Use a private LAN IP address (10/8, 172.16/12 or 192.168/16).";
+  }
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(id) || id === NEW_CAMERA ||
+      ["simulation_camera", "simulation_camera_b", "simulation_camera_c", "simulation_camera_d"].includes(id)) {
+    return "Use a unique source ID (1–64 letters, digits, dots, dashes or underscores).";
+  }
+  if (cameras.some((camera) => camera.source_id !== editingId && camera.source_id === id)) {
+    return "That source ID is already saved. Select its existing profile instead.";
+  }
+  if (cameras.some((camera) => camera.source_id !== editingId && camera.host === address)) {
+    return "That IP address is already assigned to another saved camera.";
+  }
+  if (!FRAME_SIZES.includes(settings.frame_size)) return "Select a supported frame size.";
+  const ranges: Array<[string, number, number, number]> = [
+    ["Target FPS", targetFps, 1, 30], ["JPEG quality", settings.jpeg_quality, 4, 63],
+    ["Brightness", settings.brightness, -2, 2], ["Contrast", settings.contrast, -2, 2],
+    ["Saturation", settings.saturation, -2, 2], ["Special effect", settings.special_effect, 0, 6],
+    ["White balance mode", settings.wb_mode, 0, 4], ["AE level", settings.ae_level, -2, 2],
+    ["AEC value", settings.aec_value, 0, 1200], ["AGC gain", settings.agc_gain, 0, 30],
+    ["Gain ceiling", settings.gainceiling, 0, 6],
+  ];
+  for (const [label, value, min, max] of ranges) {
+    if (!Number.isInteger(value) || value < min || value > max) return `${label} must be an integer from ${min} to ${max}.`;
+  }
+  return null;
 }
 
 function cameraIndicator(camera: RemoteCameraProfile): { label: string; tone: string } {
   if (camera.kind === "simulation") return camera.streaming ? { label: "Simulating", tone: "status-implemented" } : { label: "Saved", tone: "muted" };
+  const health = camera.device_contract?.health.state;
+  if (health === "stale") return { label: "Stale", tone: "status-error" };
+  if (health === "waiting_for_frame") return { label: "Waiting for frame", tone: "status-planned" };
+  if (health === "error") return { label: "Error", tone: "status-error" };
   if (camera.streaming) {
     if (camera.paused_for_simulation) return { label: "Paused", tone: "status-planned" };
     return camera.stream_connected
@@ -88,8 +128,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   const [remoteMessage, setRemoteMessage] = useState<string | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const busyRef = useRef(false);
+  const actionEpochRef = useRef(0);
+  const [pollError, setPollError] = useState<string | null>(null);
 
   function loadSelectedProfile(next: RemoteCameraStatus) {
+    setPollError(null);
     setRemote(next);
     const profile = next.cameras.find((camera) => camera.source_id === next.active_source_id);
     if (!profile) {
@@ -105,7 +149,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   }
 
   function resetNewCamera(nextNumber?: number) {
-    const suffix = Math.max(1, nextNumber ?? ((remote?.camera_count ?? 0) + 1));
+    let suffix = Math.max(1, nextNumber ?? 1);
+    const usedIds = new Set(remote?.cameras.map((camera) => camera.source_id) ?? []);
+    while (usedIds.has(`esp32_cam_${String(suffix).padStart(2, "0")}`)) suffix += 1;
     setSelectedId(NEW_CAMERA);
     setNewCameraType("esp32");
     setHost("");
@@ -118,12 +164,22 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
 
   useSerialPolling(
     async () => {
-      const next = await fetchRemoteCameraStatus();
-      if (!initializedRef.current) {
-        loadSelectedProfile(next);
-        initializedRef.current = true;
-      } else {
-        setRemote(next);
+      if (busyRef.current) return;
+      const epoch = actionEpochRef.current;
+      try {
+        const next = await fetchRemoteCameraStatus();
+        if (busyRef.current || epoch !== actionEpochRef.current) return;
+        setPollError(null);
+        if (!initializedRef.current) {
+          loadSelectedProfile(next);
+          initializedRef.current = true;
+        } else {
+          setRemote(next);
+        }
+      } catch (error) {
+        if (!busyRef.current && epoch === actionEpochRef.current) {
+          setPollError(error instanceof Error ? error.message : "Camera status unavailable.");
+        }
       }
     },
     1000,
@@ -141,6 +197,30 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   const secondSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_d") ?? false;
   const nextSimulationPair: 1 | 2 = firstSimulationPairSaved ? 2 : 1;
   const selectedStreaming = Boolean(selectedProfile?.streaming);
+  const selectedActive = Boolean(!pollError && selectedProfile && remote?.active_source_id === selectedId);
+  const setupError = effectiveCameraType === "esp32" && !selectedSimulation
+    ? validateSetup(host, sourceId, targetFps, settings, remote?.cameras ?? [], selectedSaved ? selectedId : null)
+    : null;
+  const addressChanged = Boolean(selectedProfile && host.trim() !== selectedProfile.host);
+  const readyToStart = Boolean(selectedActive && selectedProfile?.connected && selectedProfile.device_reachable
+    && !selectedStreaming && !setupError && !addressChanged);
+  const health = selectedProfile?.device_contract?.health;
+  const selectedIndicator = selectedProfile ? cameraIndicator(selectedProfile) : null;
+  const connectionHint = selectedSimulation ? null : !selectedSaved
+    ? "Save or connect a valid private-LAN camera profile."
+    : !selectedActive
+      ? "Select this saved camera again to make it the active source."
+      : health?.state === "error" || health?.state === "unreachable"
+        ? selectedStreaming
+          ? "Automatic transport recovery is active. Stop Stream before retrying the control connection."
+          : "Check ESP power, its current IP and the PC's Wi-Fi/LAN, then Retry connection."
+        : health?.state === "stale" || health?.state === "reconnecting" || health?.state === "waiting_for_frame"
+          ? "No fresh frames yet. Check the ESP stream and network; stop the stream before reconnecting."
+          : health?.state === "paused"
+            ? "Physical image transfer is paused during simulation."
+            : addressChanged ? "Save or connect the changed IP before starting a stream."
+            : health?.state === "connected" ? "Control connected. Start Stream to receive images."
+            : health?.state === "not_connected" ? "Connect to the saved ESP first." : null;
   const backgroundStreams = remote?.cameras.filter((camera) => camera.streaming && camera.source_id !== remote.active_source_id).length ?? 0;
   const deviceEffectiveQuality = typeof remote?.device?.effective_jpeg_quality === "number" ? remote.device.effective_jpeg_quality : null;
   const deviceConfiguredQuality = typeof remote?.device?.configured_jpeg_quality === "number" ? remote.device.configured_jpeg_quality : null;
@@ -160,9 +240,10 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   );
   // The Settings preview must never display a simulation or stale frame as the selected ESP.
   const imageUrl = selectedSimulation && !showSimulationTools ? null : cameraSettingsView
-    ? selectedSimulation && status?.simulation_enabled
+    ? selectedSimulation && status?.simulation_enabled && selectedActive
       ? liveCameraMjpegUrl()
-      : selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled && !remote?.paused_for_simulation
+      : selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled && selectedActive
+        && !selectedProfile?.paused_for_simulation && selectedProfile?.device_contract?.health.frame_fresh === true
         ? liveCameraMjpegUrl()
         : null
     : status?.simulation_enabled
@@ -171,10 +252,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         ? `${API_BASE}/api/camera/frame?v=${status?.frame_number ?? 0}`
         : null;
 
-  const use3dPreview = Boolean(showSimulationTools && status?.simulation_enabled && (cameraSettingsView ? selectedSimulation : true));
+  const use3dPreview = Boolean(showSimulationTools && status?.simulation_enabled && (cameraSettingsView ? selectedSimulation && selectedActive : true));
   const sceneSourceId = cameraSettingsView ? selectedId : status?.active_source_id ?? "simulation_camera";
 
-  const statusLabel = !status
+  const statusLabel = cameraSettingsView
+    ? pollError ? "status unavailable" : !selectedSaved ? "new camera draft" : !selectedActive ? "select saved camera" : selectedIndicator?.label ?? "checking"
+    : !status
     ? "checking"
     : status.simulation_enabled
       ? status.simulation_paused ? "simulation paused" : "simulation running"
@@ -192,6 +275,29 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               ? "ESP saved"
               : "waiting for device";
 
+  function beginAction(): boolean {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    actionEpochRef.current += 1;
+    setBusy(true);
+    return true;
+  }
+
+  function endAction() {
+    busyRef.current = false;
+    setBusy(false);
+  }
+
+  // The action API is authoritative. A later pipeline-status refresh failure
+  // must not make a successful save/connect/start appear to have failed.
+  async function refreshPipelineStatus() {
+    try {
+      onStatusChange(await refreshCameraAfterRemoteChange());
+    } catch (error) {
+      setRemoteError(`Camera action completed, but preview status refresh failed: ${error instanceof Error ? error.message : "backend unavailable"}`);
+    }
+  }
+
   function setSetting<K extends keyof RemoteCameraSettings>(key: K, value: RemoteCameraSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }));
   }
@@ -201,13 +307,13 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
       resetNewCamera();
       return;
     }
-    setBusy(true);
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
       const next = await selectRemoteCamera(nextSourceId);
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       const selected = next.cameras.find((camera) => camera.source_id === nextSourceId);
       setRemoteMessage(
         selected?.kind === "simulation"
@@ -219,12 +325,13 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM selection failed.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function saveEspProfile() {
-    setBusy(true);
+    if (setupError) { setRemoteError(setupError); return; }
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
@@ -237,42 +344,50 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         settings,
       });
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       setRemoteMessage(effectiveCameraType === "simulation" && !selectedSaved ? `Simulation camera pair ${nextSimulationPair} saved and started.` : `Saved ${next.source_id} at ${next.host}. These values will be restored after PC Studio restarts.`);
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM profile could not be saved.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function connectEsp() {
-    setBusy(true);
+    if (setupError) { setRemoteError(setupError); return; }
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
+    let saved = false;
     try {
-      await saveRemoteCamera({
+      const savedStatus = await saveRemoteCamera({
         host: host.trim(),
         source_id: sourceId.trim() || "esp32_cam_01",
         target_fps: targetFps,
         settings,
       });
+      // Keep the saved profile visible even if the subsequent ESP probe fails.
+      saved = true;
+      loadSelectedProfile(savedStatus);
+      initializedRef.current = true;
       const next = await connectRemoteCamera({
         host: host.trim(),
         source_id: sourceId.trim() || "esp32_cam_01",
       });
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       setRemoteMessage(`ESP32-CAM ${next.host} is ready. Other ESP streams can remain connected while this camera is selected.`);
     } catch (error) {
-      setRemoteError(error instanceof Error ? error.message : "ESP32-CAM connection failed.");
+      const reason = error instanceof Error ? error.message : "ESP32-CAM connection failed.";
+      setRemoteError(saved ? `${reason} Saved profile retained; check power, IP and LAN, then retry connection.` : reason);
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function startEsp() {
-    setBusy(true);
+    if (!readyToStart) return;
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
@@ -281,50 +396,52 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         settings,
       });
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
-      setRemoteMessage("Settings saved and applied. Low-latency TCP JPEG streaming started for the selected ESP.");
+      await refreshPipelineStatus();
+      setRemoteMessage("Settings saved and stream requested. Waiting for fresh TCP JPEG frames.");
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM stream could not start.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function stopEsp() {
-    setBusy(true);
+    if (!selectedActive || !selectedStreaming) return;
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
       const next = await stopRemoteCamera();
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       setRemoteMessage("Selected ESP stream stopped. Other ESP streams are unchanged.");
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM stream could not stop.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function disconnectEsp() {
-    setBusy(true);
+    if (!selectedActive || !selectedProfile?.connected) return;
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
       const next = await disconnectRemoteCamera();
       loadSelectedProfile(next);
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       setRemoteMessage("Selected ESP disconnected. Its saved IP and settings were kept.");
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "ESP32-CAM could not be disconnected.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
   async function deleteEspProfile() {
     if (!selectedSaved) return;
-    setBusy(true);
+    if (!beginAction()) return;
     setRemoteError(null);
     setRemoteMessage(null);
     try {
@@ -337,12 +454,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
       } else {
         resetNewCamera(1);
       }
-      onStatusChange(await refreshCameraAfterRemoteChange());
+      await refreshPipelineStatus();
       setRemoteMessage(`Removed saved camera ${deletedId}.`);
     } catch (error) {
       setRemoteError(error instanceof Error ? error.message : "Saved ESP camera could not be removed.");
     } finally {
-      setBusy(false);
+      endAction();
     }
   }
 
@@ -352,7 +469,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         <section className="panel compact-panel camera-status-strip" aria-label="Saved camera connection status">
           <div className="camera-status-strip-header">
             <strong>Saved cameras</strong>
-            <span>{remote ? visibleCameras.length : "—"} shown · {visibleCameras.filter((camera) => camera.stream_connected).length} live</span>
+            <span>{remote ? visibleCameras.length : "—"} shown · {pollError ? "status unavailable" : `${visibleCameras.filter((camera) => camera.device_contract?.health.frame_fresh === true).length} live`}</span>
           </div>
           <div className="camera-status-strip-items" role="list">
             {visibleCameras.map((camera) => {
@@ -390,7 +507,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
                 <p className="placeholder-copy">Preview the current frame input or run the built-in traffic simulation.</p>
               )}
             </div>
-            <span className={`status-pill ${status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
+            <span className={`status-pill ${cameraSettingsView ? (selectedActive ? selectedIndicator?.tone ?? "muted" : "muted") : status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
               {statusLabel}
             </span>
           </div>
@@ -444,9 +561,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             <div className="camera-status-list">
               <div><span>Preview camera</span><strong>{selectedSaved ? selectedId : "Select a saved camera"}</strong></div>
               <div><span>IP address</span><strong>{selectedSimulation ? "Not required" : selectedSaved ? selectedProfile?.host ?? "—" : "—"}</strong></div>
-              <div><span>Live connection</span><strong>{selectedSaved && remote?.stream_connected && !status?.simulation_enabled ? "Connected" : selectedStreaming ? "Waiting / paused" : "Offline"}</strong></div>
-              <div><span>Measured stream FPS</span><strong>{selectedSaved && remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
-              <div><span>Frame age</span><strong>{selectedSaved && selectedFrameAvailable ? formatAge(status?.age_ms ?? null) : "No live frame"}</strong></div>
+              <div><span>Live connection</span><strong>{selectedActive ? selectedIndicator?.label ?? "—" : "Not active"}</strong></div>
+              <div><span>Measured stream FPS</span><strong>{selectedActive && health?.frame_fresh && selectedProfile?.measured_fps ? selectedProfile.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>Frame age</span><strong>{selectedActive ? formatAge(health?.frame_age_ms ?? null) : "No active frame"}</strong></div>
             </div>
           )}
         </section>
@@ -503,11 +620,11 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
 
             <div className="button-row">
               <button type="button" onClick={() => resetNewCamera()} disabled={busy}>New camera</button>
-              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}>Save</button>
-              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming}>
-                {busy ? "Working..." : remote?.configured && selectedSaved ? "Reconnect" : "Connect"}
+              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>Save</button>
+              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>
+                {busy ? "Working..." : health?.state === "error" || health?.state === "unreachable" || remoteError ? "Retry connection" : selectedProfile?.connected ? "Reconnect" : "Connect"}
               </button>
-              <button type="button" onClick={() => void disconnectEsp()} disabled={busy || !selectedSaved || !remote?.configured}>
+              <button type="button" onClick={() => void disconnectEsp()} disabled={busy || !selectedActive || !selectedProfile?.connected}>
                 Disconnect
               </button>
               <button type="button" onClick={() => void deleteEspProfile()} disabled={busy || !selectedSaved}>
@@ -517,10 +634,10 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             </details>}
 
             {!selectedSimulation && <div className="button-row">
-              <button className="primary" type="button" onClick={() => void startEsp()} disabled={busy || !selectedSaved || !remote?.configured || !remote.device_reachable || remote.streaming}>
+              <button className="primary" type="button" onClick={() => void startEsp()} disabled={busy || !readyToStart}>
                 Start Stream
               </button>
-              <button type="button" onClick={() => void stopEsp()} disabled={busy || !selectedSaved || !remote?.streaming}>
+              <button type="button" onClick={() => void stopEsp()} disabled={busy || !selectedActive || !selectedStreaming}>
                 Stop Stream
               </button>
             </div>}
@@ -530,9 +647,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             </div>}
             {showSimulationTools && selectedSimulation && <SimulationControls status={status} onStatusChange={onStatusChange} />}
 
+            {setupError && <p className="small-note" role="status">{setupError}</p>}
+            {connectionHint && <p className="small-note">{connectionHint}</p>}
+            {pollError && <p className="error-message" role="alert">Camera status unavailable. Check PC Studio backend. {pollError}</p>}
             {remoteMessage && <p className="success-message">{remoteMessage}</p>}
-            {remoteError && <p className="error-message">{remoteError}</p>}
-            {remote?.last_error && selectedSaved && <p className="small-note">Last selected-ESP error: {remote.last_error}</p>}
+            {remoteError && <p className="error-message" role="alert">{remoteError}</p>}
+            {selectedProfile?.last_error && <p className="small-note">Last selected-ESP error: {selectedProfile.last_error}</p>}
 
             {backgroundStreams > 0 && (
               <p className="small-note">{backgroundStreams} other ESP stream{backgroundStreams === 1 ? " is" : "s are"} still running in the background for faster switching.</p>
@@ -555,35 +675,35 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               </label>
               <label>
                 JPEG quality (4 best – 63 smallest)
-                <input type="number" min={4} max={63} value={settings.jpeg_quality} onChange={(event) => setSetting("jpeg_quality", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
+                <input type="number" min={4} max={63} value={Number.isNaN(settings.jpeg_quality) ? "" : settings.jpeg_quality} onChange={(event) => setSetting("jpeg_quality", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
               </label>
               <label>
                 Target stream FPS
-                <input type="number" min={1} max={30} step={1} value={targetFps} onChange={(event) => setTargetFps(numberValue(event.target.value))} disabled={busy || selectedStreaming} />
+                <input type="number" min={1} max={30} step={1} value={Number.isNaN(targetFps) ? "" : targetFps} onChange={(event) => setTargetFps(numberValue(event.target.value))} disabled={busy || selectedStreaming} />
               </label>
               <label>
                 Brightness (-2 to 2)
-                <input type="number" min={-2} max={2} value={settings.brightness} onChange={(event) => setSetting("brightness", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
+                <input type="number" min={-2} max={2} value={Number.isNaN(settings.brightness) ? "" : settings.brightness} onChange={(event) => setSetting("brightness", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
               </label>
               <label>
                 Contrast (-2 to 2)
-                <input type="number" min={-2} max={2} value={settings.contrast} onChange={(event) => setSetting("contrast", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
+                <input type="number" min={-2} max={2} value={Number.isNaN(settings.contrast) ? "" : settings.contrast} onChange={(event) => setSetting("contrast", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
               </label>
               <label>
                 Saturation (-2 to 2)
-                <input type="number" min={-2} max={2} value={settings.saturation} onChange={(event) => setSetting("saturation", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
+                <input type="number" min={-2} max={2} value={Number.isNaN(settings.saturation) ? "" : settings.saturation} onChange={(event) => setSetting("saturation", numberValue(event.target.value))} disabled={busy || selectedStreaming} />
               </label>
             </div>
 
             <details>
               <summary>Advanced OV2640 settings</summary>
               <div className="form-grid">
-                <label>Special effect (0–6)<input type="number" min={0} max={6} value={settings.special_effect} onChange={(event) => setSetting("special_effect", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
-                <label>White balance mode (0–4)<input type="number" min={0} max={4} value={settings.wb_mode} onChange={(event) => setSetting("wb_mode", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
-                <label>AE level (-2 to 2)<input type="number" min={-2} max={2} value={settings.ae_level} onChange={(event) => setSetting("ae_level", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
-                <label>AEC value (0–1200)<input type="number" min={0} max={1200} value={settings.aec_value} onChange={(event) => setSetting("aec_value", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
-                <label>AGC gain (0–30)<input type="number" min={0} max={30} value={settings.agc_gain} onChange={(event) => setSetting("agc_gain", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
-                <label>Gain ceiling (0–6)<input type="number" min={0} max={6} value={settings.gainceiling} onChange={(event) => setSetting("gainceiling", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>Special effect (0–6)<input type="number" min={0} max={6} value={Number.isNaN(settings.special_effect) ? "" : settings.special_effect} onChange={(event) => setSetting("special_effect", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>White balance mode (0–4)<input type="number" min={0} max={4} value={Number.isNaN(settings.wb_mode) ? "" : settings.wb_mode} onChange={(event) => setSetting("wb_mode", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>AE level (-2 to 2)<input type="number" min={-2} max={2} value={Number.isNaN(settings.ae_level) ? "" : settings.ae_level} onChange={(event) => setSetting("ae_level", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>AEC value (0–1200)<input type="number" min={0} max={1200} value={Number.isNaN(settings.aec_value) ? "" : settings.aec_value} onChange={(event) => setSetting("aec_value", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>AGC gain (0–30)<input type="number" min={0} max={30} value={Number.isNaN(settings.agc_gain) ? "" : settings.agc_gain} onChange={(event) => setSetting("agc_gain", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
+                <label>Gain ceiling (0–6)<input type="number" min={0} max={6} value={Number.isNaN(settings.gainceiling) ? "" : settings.gainceiling} onChange={(event) => setSetting("gainceiling", numberValue(event.target.value))} disabled={busy || selectedStreaming} /></label>
               </div>
 
               <div className="checklist">
@@ -612,6 +732,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
 
           {!selectedSimulation && <details className="panel compact-panel camera-fold">
             <summary>Detailed camera & stream status</summary>
+            {!selectedActive ? <p className="small-note">Select the saved ESP to see current diagnostics.</p> : (
             <div className="camera-status-list">
               <div><span>Saved cameras</span><strong>{remote?.camera_count ?? 0}</strong></div>
               <div><span>Selected ESP</span><strong>{remote?.active_source_id ?? "none"}</strong></div>
@@ -644,7 +765,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               <div><span>Resolution</span><strong>{selectedFrameAvailable && status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : FRAME_SIZE_DIMENSIONS[settings.frame_size]}</strong></div>
               <div><span>Frame age</span><strong>{selectedFrameAvailable ? formatAge(status?.age_ms ?? null) : "No selected frame"}</strong></div>
               <div><span>Frames received</span><strong>{remote?.successful_fetches ?? 0}</strong></div>
-            </div>
+            </div>)}
           </details>}
         </aside>
         )}

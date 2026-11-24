@@ -1,3 +1,7 @@
+## V0555 camera setup status consistency
+
+No endpoint or response-schema change. `GET /api/camera/remote/status` performs its existing optional selected ESP status probe outside the manager lock, then takes a coherent local selection/profile/session/cache snapshot. If the active camera changes during the probe, returned active identity, selected session fields and selected contract all describe the newly selected profile; no stale cross-source metadata is mixed. An unsuccessful initial Connect preserves its per-session error while leaving `configured: false`; a saved profile's `device_contract.health.state` is `error` when an attempted connection failed, rather than `not_connected` without any diagnostic. Explicit retry uses existing Connect route and a successful verified connection clears the error. No output or automatic image transfer occurs on Connect. Runtime error is not persisted. Existing selected-source mutation APIs retain their prior semantics; no multi-client command lease is introduced.
+
 ## V0554 device capability/health projection (additive)
 
 The existing `GET /api/camera/remote/status` envelope remains unchanged and retains all previous fields. Each saved camera in `data.cameras[]` adds a read-only `device_contract`. The top-level `data.device_contract` represents the selected camera using that camera's source-qualified summary and is `null` without a saved selection; it does **not** imply the other legacy top-level selected-status fields are guaranteed atomic under concurrent selection changes.

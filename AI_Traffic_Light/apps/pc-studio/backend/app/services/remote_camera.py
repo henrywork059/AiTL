@@ -683,15 +683,25 @@ class RemoteCameraService:
     def connect(self, *, host: str, source_id: str) -> dict:
         """Connect to status/control only; zero image transfer is preserved."""
         normalized_host = normalize_private_lan_ipv4(host)
-        device = self._request_control(normalized_host, "/status", "GET", None)
-        if device.get("camera_ready") is False:
-            raise AppError(
-                ErrorCode.CAMERA_NOT_CONNECTED,
-                "ESP32-CAM reports that its camera sensor is not ready.",
-                status_code=502,
-                details={"host": normalized_host},
-            )
-        self._assert_matching_firmware(device, normalized_host)
+        try:
+            device = self._request_control(normalized_host, "/status", "GET", None)
+            if device.get("camera_ready") is False:
+                raise AppError(
+                    ErrorCode.CAMERA_NOT_CONNECTED,
+                    "ESP32-CAM reports that its camera sensor is not ready.",
+                    status_code=502,
+                    details={"host": normalized_host},
+                )
+            self._assert_matching_firmware(device, normalized_host)
+        except AppError as exc:
+            # Preserve a failed initial connection for the saved profile's
+            # diagnostics without marking an unverified host configured.
+            with self._lock:
+                if self._host is None or self._host == normalized_host:
+                    self._device_reachable = False
+                    self._last_error = exc.message
+                    self._last_probe_at_ms = int(time.time() * 1000)
+            raise
 
         self.disconnect()
         now_ms = int(time.time() * 1000)
