@@ -1,3 +1,13 @@
+# V0549 — Reproducible offline regression execution
+
+Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Use one Python offline regression runner in Windows and CI, with deterministic discovery, shared live/hardware exclusions and fail-fast subprocess exit handling. Focused changes to camera/inference/model or camera firmware conservatively run the full suite; missing/deleted tests or empty regression families also fall back to all. Fresh Windows setup targets Python 3.11 and checks native exit codes without replacing an existing venv.
+
+See [Patch 0_5_49](PATCH_0_5_49.md). Full Windows runner still required for owner acceptance; shared offline checks do not start PC Studio.
+
+---
+
 # V0548 — Invalidate disconnected camera observations
 
 Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

@@ -8,14 +8,19 @@ TESTS = [
     "test_dataset_capture_service.py", "test_frontend_polling_structure.py",
     "test_junction_network_frontend_structure.py", "test_update_test_run_script.py",
     "test_select_changed_tests.py", "test_backend_smoke.py",
+    "test_v0545_tcp_open_cancellation.py", "test_v0546_worker_retirement.py",
+    "test_v0547_cached_frame_identity.py", "test_v0548_observation_invalidation.py",
 ]
 
 
 def main() -> int:
     camera = select([P + "apps/pc-studio/backend/app/services/remote_camera_manager.py"], TESTS)
-    assert not camera["all"] and "test_remote_camera_multi.py" in camera["tests"]
-    assert "test_signal_rules_service.py" not in camera["tests"]
-    assert not camera["frontend"]
+    assert camera["all"] and not camera["frontend"]
+    for stem in ("remote_camera", "camera_frames", "inference", "multi_camera_inference", "model_registry"):
+        assert select([P + f"apps/pc-studio/backend/app/services/{stem}.py"], TESTS)["all"]
+    assert select([P + "apps/device-camera/src/main.cpp"], TESTS)["all"]
+    assert select([P + "scripts/test_deleted.py"], TESTS)["all"]
+    assert select([P + "apps/pc-studio/backend/app/services/training.py"], ["test_unrelated.py"])["all"]
 
     frontend = select([P + "apps/pc-studio/frontend/src/pages/LiveAiPage.tsx"], TESTS)
     assert frontend["frontend"] and not frontend["all"]

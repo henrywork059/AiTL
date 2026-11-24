@@ -72,6 +72,8 @@ REQUIRED_PATHS = (
     "scripts/update_test_run.ps1",
     "scripts/test_update_test_run_script.py",
     "scripts/select_changed_tests.py",
+    "scripts/run_offline_tests.py",
+    "scripts/test_offline_test_discovery.py",
     "scripts/test_select_changed_tests.py",
     "scripts/test_object_tracking_flow.py",
     "scripts/test_signal_rules_service.py",

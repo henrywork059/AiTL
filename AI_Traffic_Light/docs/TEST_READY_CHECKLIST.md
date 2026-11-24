@@ -1,3 +1,14 @@
+# V0549 — Reproducible offline regression execution
+
+Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Shared offline discovery lists the same suite in Windows and CI; hardware and live smoke remain excluded from offline tests.
+- [ ] Focused camera/inference/model/firmware changes select full offline suite; unknown/deleted tests fall back safely.
+- [ ] Runner and selector regressions, structure, full offline suite, frontend typecheck/build and live smoke pass in owner environment.
+- [ ] Owner Windows/ESP acceptance pending; explicit owner PASS before baseline promotion. No physical actuation.
+
+---
+
 # V0548 — Invalidate disconnected camera observations
 
 Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

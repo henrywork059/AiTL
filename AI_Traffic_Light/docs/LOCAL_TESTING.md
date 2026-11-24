@@ -1,3 +1,29 @@
+# V0549 — Reproducible offline regression execution
+
+Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+From `AI_Traffic_Light/` using a Python environment with backend requirements installed:
+
+```text
+python scripts/run_offline_tests.py --list
+python scripts/run_offline_tests.py
+```
+
+Use `python scripts/run_offline_tests.py --focused test_v0548_observation_invalidation.py` for a specific offline regression. On Windows, use the backend venv interpreter if it is not active.
+
+Fresh Windows backend setup: `scripts/setup_backend_windows.ps1` (Python 3.11 via py launcher); existing venv retained. Then from repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Executed original camera filename selection expression with five fixture names: only 1/5 selected, four numbered lifecycle regressions omitted. Executed patched test_offline_test_discovery.py and test_select_changed_tests.py on local Python 3.13.5: both passed, including actual child process execution/fail-fast exit 7; compileall of the four Python files passed. FNV-1a source checks: runner 8d76d515, runner test 351b1672, selector bd6c3d59, selector test 2fb1332b. Direct GitHub ls-remote failed DNS resolution; PowerShell not installed locally. Full repository checkout, Windows runner, CI and hardware acceptance remain pending.
+
+---
+
 # V0548 — Invalidate disconnected camera observations
 
 Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

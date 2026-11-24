@@ -1,3 +1,7 @@
+## 0_5_49 — Reproducible offline regression execution (candidate; roadmap Update 05 / H04)
+- Use one Python offline regression runner in Windows and CI, with deterministic discovery, shared live/hardware exclusions and fail-fast subprocess exit handling. Focused changes to camera/inference/model or camera firmware conservatively run the full suite; missing/deleted tests or empty regression families also fall back to all. Fresh Windows setup targets Python 3.11 and checks native exit codes without replacing an existing venv.
+- Local offline-runner and selector regression scripts passed; previous `0_5_48`, accepted baseline `0_5_0`; full CI/Windows owner PASS pending.
+
 ## 0_5_48 — Invalidate disconnected camera observations (candidate; roadmap Update 04 / H03)
 - Retire camera delivery before explicit stop, disconnect, reconnect, restart or session replacement. Clear only that source's latest image and increment its observation epoch. Background inference snapshots carry source/mode tokens; invalid or expired predictions are suppressed at completion, API read and virtual-observation forwarding. A mode-generation change invalidates pre-transition predictions, while fresh cached images may still be promoted with their original identity.
 - Add lifecycle/inference regression; previous `0_5_47`, accepted baseline `0_5_0`; owner PASS pending.

@@ -27,13 +27,7 @@ jobs:
         run: python scripts/check_structure.py
       - name: Offline regressions
         working-directory: AI_Traffic_Light
-        shell: pwsh
-        run: |
-          $excluded = @('test_backend_smoke.py','test_camera_transport_benchmark.py','test_camera_transport_isolation.py')
-          Get-ChildItem scripts/test_*.py | Where-Object { $_.Name -notin $excluded } | Sort-Object Name | ForEach-Object {
-            python $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Failed: $($_.Name)" }
-          }
+        run: python scripts/run_offline_tests.py
       - name: npm ci
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm ci

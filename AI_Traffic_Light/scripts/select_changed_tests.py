@@ -5,6 +5,8 @@ import argparse
 import json
 from pathlib import Path
 
+from run_offline_tests import discover_tests
+
 P = "AI_Traffic_Light/"
 BACKEND = P + "apps/pc-studio/backend/"
 FRONTEND = P + "apps/pc-studio/frontend/"
@@ -81,14 +83,22 @@ def select(paths: list[str], available_tests: list[str]) -> dict[str, object]:
                 all_tests = True
                 continue
             group = backend_group(path)
-            if group is None:
+            if group is None or group in {"camera", "inference", "model"}:
+                # Numbered lifecycle regressions and cross-consumer dependencies
+                # are not reliably discoverable by filename. Run the full suite.
                 all_tests = True
             else:
-                chosen.update(t for t in available_tests if any(x in t for x in GROUPS[group]))
+                related = {t for t in available_tests if any(x in t for x in GROUPS[group])}
+                if not related:
+                    all_tests = True
+                chosen.update(related)
         elif path.startswith(SCRIPTS):
             name = Path(path).name
             if name.startswith("test_") and name.endswith(".py"):
-                chosen.add(name)
+                if name not in available_tests:
+                    all_tests = True  # deleted, renamed or manual-only test
+                else:
+                    chosen.add(name)
             elif name == "select_changed_tests.py":
                 chosen.add("test_select_changed_tests.py")
             elif name == "update_test_run.ps1":
@@ -96,7 +106,7 @@ def select(paths: list[str], available_tests: list[str]) -> dict[str, object]:
             elif name != "check_structure.py":
                 all_tests = True
         elif path.startswith(P + "apps/device-camera/"):
-            chosen.update(t for t in available_tests if any(x in t for x in GROUPS["camera"]))
+            all_tests = True
         elif path.startswith(P + "docs/") or path in {
             P + "VERSION", P + "CHANGELOG.md", P + "README.md", P + "AGENTS.md", "README.md",
         }:
@@ -116,7 +126,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
-    available = [p.name for p in Path(__file__).parent.glob("test_*.py")]
+    available = discover_tests(Path(__file__).parent)
     print(json.dumps(select(args.paths, available), sort_keys=True))
     return 0
 
