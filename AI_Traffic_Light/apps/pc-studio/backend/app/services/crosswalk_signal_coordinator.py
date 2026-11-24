@@ -70,20 +70,27 @@ def coordinate_crosswalk_signals(
     minimum gap after the other movement loses its permission.
     """
     enabled = [link for link in links if link.get("movement_conflicts")]
-    if not enabled:
-        return states, set(), {}, {}
     # A source with contradictory phase/lamps must not publish an unsafe green.
     states = {crossing: _safe_virtual_state(state) for crossing, state in states.items()}
+    if not enabled:
+        return states, set(), {}, {}
     unavailable = {
         endpoint for link in enabled
         for endpoint in (link["source_crosswalk_id"], link["destination_crosswalk_id"])
         if endpoint not in states
     }
     wanted = {crossing: movement_of(state) for crossing, state in states.items()}
-    recent = dict(released)
+    recent = {crossing: entry for crossing, entry in released.items()
+              if now - entry[1] < CLEARANCE_SECONDS}
+
+    def record_release(crossing: str, movement: str) -> None:
+        old = recent.get(crossing)
+        # If two movements end within one gap, conservatively protect both.
+        recent[crossing] = ("both" if old and old[0] != movement else movement, now)
+
     for crossing, movement in previous_grants.items():
         if wanted.get(crossing) != movement:
-            recent[crossing] = (movement, now)
+            record_release(crossing, movement)
     emergency_targets = emergency_targets or set()
     previous_held = previous_held or set()
 
@@ -120,8 +127,9 @@ def coordinate_crosswalk_signals(
                     break
             if not blocked_by:
                 for other, (movement, ended_at) in recent.items():
-                    if other != crossing and now - ended_at < CLEARANCE_SECONDS and movements_conflict(
-                        links, crossing, requested, other, movement
+                    if other != crossing and now - ended_at < CLEARANCE_SECONDS and any(
+                        movements_conflict(links, crossing, requested, other, prior)
+                        for prior in (("vehicle", "pedestrian") if movement == "both" else (movement,))
                     ):
                         blocked_by = other
                         wait = round(max(0.0, CLEARANCE_SECONDS - (now - ended_at)), 1)
@@ -151,7 +159,6 @@ def coordinate_crosswalk_signals(
         else:
             if requested:
                 grants[crossing] = requested
-                recent.pop(crossing, None)
             output[crossing] = {
                 **states[crossing],
                 "coordination_hold": False,
@@ -167,5 +174,5 @@ def coordinate_crosswalk_signals(
     # force a virtual red now and require clearance before future conflicting grants.
     for crossing, movement in previous_grants.items():
         if crossing not in grants and wanted.get(crossing) == movement:
-            recent[crossing] = (movement, now)
+            record_release(crossing, movement)
     return output, held, grants, recent

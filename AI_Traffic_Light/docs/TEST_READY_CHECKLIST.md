@@ -1,3 +1,14 @@
+# V0551 — Emergency evidence and virtual network clearance
+
+Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Compatible grant preserves prior conflict clearance; overlapping release histories and standalone invalid lamps safe.
+- [ ] Distinct fresh same-source frames required; negative/missing/expired evidence and route removal withdraw pending priority.
+- [ ] Protected clearance and configured conflict regression; V0551 and prior emergency/network tests, full structure/offline/typecheck/build and live smoke pass.
+- [ ] Explicit owner PASS required. No physical actuation.
+
+---
+
 # V0550 — Stale-input virtual signal fallback
 
 Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

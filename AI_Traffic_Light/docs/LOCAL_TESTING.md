@@ -1,3 +1,20 @@
+# V0551 — Emergency evidence and virtual network clearance
+
+Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/run_offline_tests.py --focused test_v0551_emergency_interlocks.py test_v0512_emergency_corridor.py test_v0514_network_conflicts.py test_v0519_emergency_evidence.py test_v0521_ambulance_single_source.py test_v0522_network_disconnect.py` and the full runner.
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Local Python 3.13.5: original coordinator source matched GitHub FNV-1a f9c8e054; reproduced two defects (compatible grant erased clearance and standalone invalid lamp passed through). Patched coordinator whole module df44e28b and new evidence helper 6152a7b8 executed locally: six targeted coordinator checks plus 64 configured movement/conflict pairs and seven emergency evidence cases all passed. No service integration or physical testing claimed. Added test_v0551_emergency_interlocks.py including pending-priority withdrawal integration cases; full regression not executed. Direct GitHub ls-remote failed DNS resolution; CI and owner Windows/ESP PASS pending.
+
+---
+
 # V0550 — Stale-input virtual signal fallback
 
 Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

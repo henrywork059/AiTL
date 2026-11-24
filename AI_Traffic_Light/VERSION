@@ -1,5 +1,5 @@
-version: 0_5_50
-status: Stale-input virtual signal fallback candidate (roadmap Update 06)
-previous_version: 0_5_49
+version: 0_5_51
+status: Emergency evidence and virtual network clearance candidate (roadmap Update 07)
+previous_version: 0_5_50
 passed_baseline: 0_5_0
-notes: Preserve source freshness, reset interrupted persistence and suppress unverified class evidence; 10 isolated checks and selector regression passed; full CI and owner PASS pending.
+notes: Retain clearance records and require fresh distinct emergency evidence; local pure coordinator/evidence checks passed; full CI and owner PASS pending.

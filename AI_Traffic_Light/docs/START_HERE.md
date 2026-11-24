@@ -1,3 +1,13 @@
+# V0551 — Emergency evidence and virtual network clearance
+
+Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Preserve a released movement's two-second virtual clearance record even when the crossing receives a compatible new grant; overlapping release histories conservatively protect both movement types. Sanitize contradictory lamps even without configured links. Emergency confirmation requires two distinct fresh frame IDs from one source at least one second apart, correct model identity and current wall-clock freshness. Withdraw pending priority on lost confirmation, stale evidence, route removal or timeout; retain already committed phase durations and protected local transitions.
+
+See [Patch 0_5_51](PATCH_0_5_51.md). Full Windows owner runner required; no physical output.
+
+---
+
 # V0550 — Stale-input virtual signal fallback
 
 Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
