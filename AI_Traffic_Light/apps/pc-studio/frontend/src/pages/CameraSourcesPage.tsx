@@ -620,7 +620,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               <div><span>ESP session</span><strong>{remote?.streaming ? "active" : "idle"}</strong></div>
               <div><span>Transport</span><strong>{remote?.paused_for_simulation ? "TCP JPEG paused" : remote?.stream_connected ? "TCP JPEG connected" : remote?.streaming ? "reconnecting" : "idle"}</strong></div>
               <div><span>Target FPS</span><strong>{remote?.target_fps ?? targetFps}</strong></div>
-              <div><span>Measured FPS</span><strong>{remote?.measured_fps ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>Measured FPS</span><strong>{remote?.measured_fps && !remote.frame_stale ? remote.measured_fps.toFixed(1) : "—"}</strong></div>
+              <div><span>Receive interval</span><strong>{remote?.stream_connected && !remote.frame_stale && remote.last_frame_interval_ms != null ? `${remote.last_frame_interval_ms.toFixed(1)} ms` : "—"}</strong></div>
+              <div><span>Last ESP frame age</span><strong>{remote?.frame_age_ms != null ? `${remote.frame_age_ms} ms${remote.frame_stale ? " (stale/disconnected)" : ""}` : "No received frame"}</strong></div>
               <div><span>JPEG quality</span><strong>{deviceEffectiveQuality !== null ? `${deviceEffectiveQuality} effective / ${deviceConfiguredQuality ?? settings.jpeg_quality} saved` : settings.jpeg_quality}</strong></div>
               <div><span>Image policy</span><strong>{deviceQualityPreserving ? "fixed saved quality / resolution" : "legacy adaptive firmware"}</strong></div>
               <div><span>ESP effective size</span><strong>{deviceEffectiveFrameSize ? `${deviceEffectiveFrameSize} effective / ${deviceConfiguredFrameSize ?? settings.frame_size} saved` : FRAME_SIZE_DIMENSIONS[settings.frame_size]}</strong></div>
@@ -635,6 +637,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               <div><span>Failure streak</span><strong>{remote?.consecutive_failures ?? 0}</strong></div>
               <div><span>Reconnect backoff</span><strong>{remote?.reconnect_backoff_ms ? `${remote.reconnect_backoff_ms} ms` : "—"}</strong></div>
               <div><span>Source sequence gaps</span><strong>{remote?.source_sequence_gaps ?? 0}</strong></div>
+              <div><span>Repeated source frames</span><strong>{remote?.repeated_source_frames ?? 0}</strong></div>
+              <div><span>Sequence resets</span><strong>{remote?.source_sequence_resets ?? 0}</strong></div>
+              <div><span>Last transport error</span><strong>{remote?.last_error ?? "—"}</strong></div>
               <div><span>Pipeline source</span><strong>{status?.active_source_id ?? "none"}</strong></div>
               <div><span>Resolution</span><strong>{selectedFrameAvailable && status?.resolution ? `${status.resolution.width} × ${status.resolution.height}` : FRAME_SIZE_DIMENSIONS[settings.frame_size]}</strong></div>
               <div><span>Frame age</span><strong>{selectedFrameAvailable ? formatAge(status?.age_ms ?? null) : "No selected frame"}</strong></div>

@@ -270,6 +270,9 @@ class RemoteCameraService:
         self._stream_bytes_received = 0
         self._dropped_stale_frames = 0
         self._source_sequence_gaps = 0
+        self._repeated_source_frames = 0
+        self._source_sequence_resets = 0
+        self._last_frame_monotonic: float | None = None
         self._last_remote_sequence: int | None = None
         self._last_source_uptime_ms: int | None = None
         self._last_frame_interval_ms: float | None = None
@@ -529,10 +532,12 @@ class RemoteCameraService:
 
     def _record_frame(self, packet: _FramePacket, frame_number: int, *, stop_event: Event | None = None) -> None:
         now_ms = int(time.time() * 1000)
+        received_monotonic = time.monotonic()
         with self._frame_condition:
             if stop_event is not None and not self._worker_current_locked(stop_event):
                 return
-            previous_success = self._last_success_at_ms
+            previous_monotonic = self._last_frame_monotonic
+            self._last_frame_monotonic = received_monotonic
             self._source_sequence_gaps += self._sequence_gap(self._last_remote_sequence, packet.sequence)
             self._last_remote_sequence = packet.sequence
             self._last_source_uptime_ms = packet.source_uptime_ms
@@ -547,8 +552,9 @@ class RemoteCameraService:
             self._current_backoff_ms = 0
             self._last_error = None
 
-            if previous_success is not None:
-                interval_ms = max(1.0, float(now_ms - previous_success))
+            # A monotonic receive clock avoids wall-clock adjustments and 1 ms rounding.
+            if previous_monotonic is not None and received_monotonic > previous_monotonic:
+                interval_ms = (received_monotonic - previous_monotonic) * 1000.0
                 instantaneous_fps = 1000.0 / interval_ms
                 self._last_frame_interval_ms = interval_ms
                 if self._measured_fps <= 0:
@@ -617,6 +623,17 @@ class RemoteCameraService:
                 if not self._worker_current_locked(stop_event):
                     return "stopped"
                 self._stream_bytes_received += FRAME_HEADER.size + len(packet.content)
+                # A repeated wire packet is not a new observation or FPS sample.
+                if (self._last_remote_sequence == packet.sequence
+                        and self._last_source_uptime_ms == packet.source_uptime_ms):
+                    self._repeated_source_frames += 1
+                    continue
+                if (self._last_remote_sequence is not None
+                        and self._last_source_uptime_ms is not None
+                        and packet.sequence < self._last_remote_sequence
+                        and packet.source_uptime_ms < self._last_source_uptime_ms):
+                    self._source_sequence_resets += 1
+                    self._last_remote_sequence = None
 
             self._store_packet(source_id=source_id, packet=packet, stop_event=stop_event)
 
@@ -847,6 +864,9 @@ class RemoteCameraService:
             self._stream_bytes_received = 0
             self._dropped_stale_frames = 0
             self._source_sequence_gaps = 0
+            self._repeated_source_frames = 0
+            self._source_sequence_resets = 0
+            self._last_frame_monotonic = None
             self._last_remote_sequence = None
             self._last_source_uptime_ms = None
             self._last_http_status = None
@@ -958,6 +978,12 @@ class RemoteCameraService:
                     self._stream_connected = True
                     self._device_reachable = True
                     self._last_stream_connected_at_ms = int(time.time() * 1000)
+                    # TCP reopening starts a new sequence and FPS sampling epoch.
+                    self._last_remote_sequence = None
+                    self._last_source_uptime_ms = None
+                    self._last_frame_monotonic = None
+                    self._last_frame_interval_ms = None
+                    self._measured_fps = 0.0
                     self._last_error = None
 
                 outcome = self._consume_tcp_stream(
@@ -1060,6 +1086,14 @@ class RemoteCameraService:
             device_status = dict(self._device_status)
             settings = dict(self._settings) if isinstance(self._settings, dict) else None
             target_fps = self._target_fps
+            now_ms = int(time.time() * 1000)
+            frame_age_ms = (max(0, now_ms - self._last_success_at_ms)
+                            if self._last_success_at_ms is not None else None)
+            frame_stale = bool(
+                (requested and frame_age_ms is None)
+                or (frame_age_ms is not None
+                    and (not requested or not self._stream_connected or frame_age_ms > 5000))
+            )
 
             return {
                 "configured": host is not None,
@@ -1079,7 +1113,9 @@ class RemoteCameraService:
                 "stream_url": self._stream_url(host) if host else None,
                 "target_fps": target_fps,
                 "fetch_interval_ms": round(1000 / max(1, target_fps)),
-                "measured_fps": round(self._measured_fps, 2),
+                "measured_fps": round(self._measured_fps, 2) if requested and self._stream_connected and not frame_stale else 0.0,
+                "frame_age_ms": frame_age_ms,
+                "frame_stale": frame_stale,
                 "last_frame_interval_ms": (
                     round(self._last_frame_interval_ms, 1)
                     if self._last_frame_interval_ms is not None
@@ -1092,6 +1128,8 @@ class RemoteCameraService:
                 "stream_bytes_received": self._stream_bytes_received,
                 "dropped_stale_frames": self._dropped_stale_frames,
                 "source_sequence_gaps": self._source_sequence_gaps,
+                "repeated_source_frames": self._repeated_source_frames,
+                "source_sequence_resets": self._source_sequence_resets,
                 "last_remote_sequence": self._last_remote_sequence,
                 "last_source_uptime_ms": self._last_source_uptime_ms,
                 "connected_at_ms": self._connected_at_ms,

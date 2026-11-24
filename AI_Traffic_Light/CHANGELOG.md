@@ -1,3 +1,7 @@
+## 0_5_52 — Camera transport diagnostics (candidate; roadmap Update 08 / H05)
+- Use monotonic receive timing for FPS and interval statistics, reset measurement/sequence baselines on TCP socket reopening, suppress repeated source packets and count detectable in-stream sequence resets. Preserve original cached-frame age and expose passive per-camera diagnostics, connection state, errors and counters in the existing status/UI contract; no JPEG re-decode.
+- Add focused deterministic regression for packets, monotonic clocks, stale state, retired workers and independent sessions. Full local suite, CI and owner Windows/ESP PASS remain unverified. Previous `0_5_51`, accepted baseline `0_5_0`.
+
 ## 0_5_51 — Emergency evidence and virtual network clearance (candidate; roadmap Update 07 / A01)
 - Preserve a released movement's two-second virtual clearance record even when the crossing receives a compatible new grant; overlapping release histories conservatively protect both movement types. Sanitize contradictory lamps even without configured links. Emergency confirmation requires two distinct fresh frame IDs from one source at least one second apart, correct model identity and current wall-clock freshness. Withdraw pending priority on lost confirmation, stale evidence, route removal or timeout; retain already committed phase durations and protected local transitions.
 - Local pure coordinator and evidence checks passed; full integration/CI/owner PASS pending. Previous `0_5_50`, accepted baseline `0_5_0`.

@@ -1,5 +1,5 @@
-version: 0_5_51
-status: Emergency evidence and virtual network clearance candidate (roadmap Update 07)
-previous_version: 0_5_50
+version: 0_5_52
+status: Camera transport diagnostics candidate (roadmap Update 08)
+previous_version: 0_5_51
 passed_baseline: 0_5_0
-notes: Retain clearance records and require fresh distinct emergency evidence; local pure coordinator/evidence checks passed; full CI and owner PASS pending.
+notes: Monotonic FPS intervals, source sequence duplicate/reset diagnostics and original cached frame age; focused repository test added; full CI/Windows/ESP owner PASS pending.

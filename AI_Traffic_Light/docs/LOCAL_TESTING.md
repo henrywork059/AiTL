@@ -1,3 +1,19 @@
+# V0552 — Camera transport diagnostics
+
+Candidate `0_5_52`, previous `0_5_51`, baseline `0_5_0`, Update 08 / H05.
+
+Focused test: `python scripts/run_offline_tests.py --focused test_v0552_camera_transport_diagnostics.py test_remote_camera_session.py test_remote_camera_pull.py test_v0544_tcp_read_cancellation.py test_v0545_tcp_open_cancellation.py test_v0546_worker_retirement.py test_v0547_camera_frame_identity.py test_v0548_camera_observation_invalidation.py`. If a named prior test does not exist, use actual discovered names rather than interpreting a missing test as success. Then run full suite, structure guard, frontend build and Windows runner.
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify repeated/gap/reset/wrap sequences, monotonically measured intervals, original cache timestamp, disconnected FPS, two cameras, worker retirement and reconnect. Real ESP frame throughput, weak-Wi-Fi and reboot recovery require separate hardware evidence. Local Git checkout failed due DNS resolution; full repo/Windows/ESP/CI validation was not performed here. No owner PASS.
+
+---
+
 # V0551 — Emergency evidence and virtual network clearance
 
 Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

@@ -74,6 +74,14 @@ export type RemoteCameraProfile = {
   paused_for_simulation: boolean;
   measured_fps: number;
   last_success_at_ms: number | null;
+  frame_age_ms?: number | null;
+  frame_stale?: boolean;
+  last_frame_interval_ms?: number | null;
+  source_sequence_gaps?: number;
+  repeated_source_frames?: number;
+  source_sequence_resets?: number;
+  stream_reconnects?: number;
+  session_recoveries?: number;
   last_error: string | null;
 };
 
@@ -100,6 +108,10 @@ export type RemoteCameraStatus = {
   target_fps: number;
   fetch_interval_ms: number;
   measured_fps: number;
+  frame_age_ms?: number | null;
+  frame_stale?: boolean;
+  repeated_source_frames?: number;
+  source_sequence_resets?: number;
   last_frame_interval_ms: number | null;
   stream_reconnects: number;
   session_recoveries: number;

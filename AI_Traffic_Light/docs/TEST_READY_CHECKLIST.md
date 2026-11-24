@@ -1,3 +1,15 @@
+# V0552 — Camera transport diagnostics
+
+Candidate `0_5_52`, previous `0_5_51`, accepted baseline `0_5_0`.
+
+- [ ] Repeated sequence packets do not publish duplicate observations; gaps, resets and TCP reopens are counted/baselined correctly.
+- [ ] Measured FPS/interval use monotonic receive timing; original per-source cache age and disconnected/stale state are correct.
+- [ ] Multi-camera isolation, retired worker, source selection and existing response fields remain compatible.
+- [ ] Run V0552 and existing camera lifecycle regressions, full offline suite, structure, frontend typecheck/build, Windows smoke.
+- [ ] Run actual ESP/reboot/weak Wi-Fi verification separately. Explicit owner PASS required; no hardware signal output.
+
+---
+
 # V0551 — Emergency evidence and virtual network clearance
 
 Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

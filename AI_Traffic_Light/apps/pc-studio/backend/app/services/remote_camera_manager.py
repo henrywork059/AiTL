@@ -760,6 +760,9 @@ class RemoteCameraManager:
             }
         session = self._sessions.get(source_id)
         session_status = session.status(refresh_device=refresh_device) if session is not None else None
+        cached_frame = self._latest_frames.get(source_id)
+        cached_age_ms = (max(0, self._now_ms() - cached_frame.received_at_ms)
+                         if cached_frame is not None else None)
         return {
             "kind": "esp32",
             "source_id": source_id,
@@ -775,6 +778,18 @@ class RemoteCameraManager:
             "paused_for_simulation": bool(session_status and session_status.get("paused_for_simulation")),
             "measured_fps": float(session_status.get("measured_fps", 0.0)) if session_status else 0.0,
             "last_success_at_ms": session_status.get("last_success_at_ms") if session_status else None,
+            "frame_age_ms": cached_age_ms,
+            "frame_stale": bool(session_status and
+                                ((session_status.get("streaming") and cached_age_ms is None)
+                                 or (cached_age_ms is not None and
+                                     (not session_status.get("stream_connected")
+                                      or cached_age_ms > 5000)))),
+            "last_frame_interval_ms": session_status.get("last_frame_interval_ms") if session_status else None,
+            "source_sequence_gaps": session_status.get("source_sequence_gaps", 0) if session_status else 0,
+            "repeated_source_frames": session_status.get("repeated_source_frames", 0) if session_status else 0,
+            "source_sequence_resets": session_status.get("source_sequence_resets", 0) if session_status else 0,
+            "stream_reconnects": session_status.get("stream_reconnects", 0) if session_status else 0,
+            "session_recoveries": session_status.get("session_recoveries", 0) if session_status else 0,
             "last_error": session_status.get("last_error") if session_status else None,
         }
 
@@ -870,6 +885,8 @@ class RemoteCameraManager:
                 "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
                 "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
                 "measured_fps": 0.0,
+                "frame_age_ms": None,
+                "frame_stale": False,
                 "last_frame_interval_ms": None,
                 "stream_reconnects": 0,
                 "session_recoveries": 0,
@@ -878,6 +895,8 @@ class RemoteCameraManager:
                 "stream_bytes_received": 0,
                 "dropped_stale_frames": 0,
                 "source_sequence_gaps": 0,
+                "repeated_source_frames": 0,
+                "source_sequence_resets": 0,
                 "last_remote_sequence": None,
                 "last_source_uptime_ms": None,
                 "connected_at_ms": None,
@@ -900,6 +919,22 @@ class RemoteCameraManager:
             }
 
         with self._lock:
+            # The manager cache retains the original frame timestamp across selection.
+            # Do not derive selected-frame age from status poll time or cache promotion.
+            selected_frame = self._latest_frames.get(active_id) if active_id else None
+            if session is not None:
+                active_status["frame_age_ms"] = (
+                    max(0, self._now_ms() - selected_frame.received_at_ms)
+                    if selected_frame is not None else None
+                )
+                active_status["frame_stale"] = bool(
+                    (active_status.get("streaming") and selected_frame is None)
+                    or (selected_frame is not None and
+                        (not active_status.get("stream_connected")
+                         or active_status["frame_age_ms"] > 5000))
+                )
+                if active_status["frame_stale"]:
+                    active_status["measured_fps"] = 0.0
             # Re-read after optional status refresh in case another request changed selection.
             active_id = self._active_source_id
             profile = self._profiles.get(active_id) if active_id else None
