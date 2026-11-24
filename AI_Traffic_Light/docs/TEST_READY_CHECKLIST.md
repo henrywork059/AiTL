@@ -1,3 +1,15 @@
+# V0556 — Fake-only bench output abstraction
+
+Candidate `0_5_56`; previous `0_5_55`; baseline `0_5_0`.
+
+- [x] Disabled-by-default, explicit local test authorization, fake adapter only.
+- [x] Bounded commands, matched acknowledgment, timeout, disconnect, explicit off and monotonic expiry; eight local deterministic tests and compilation passed.
+- [x] No public route, live controller integration, GPIO, network transport or physical output.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Before any future physical lighting adapter: verify actual hardware/interface, authorization, electrical safety and independent fail-safe design.
+
+---
+
 # V0555 — Camera setup and connection workflow
 
 Candidate `0_5_55`; previous `0_5_54`; accepted baseline `0_5_0`.

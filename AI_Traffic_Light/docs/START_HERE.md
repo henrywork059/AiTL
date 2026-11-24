@@ -1,3 +1,11 @@
+# V0556 — Fake-only bench output abstraction
+
+Candidate `0_5_56`, previous `0_5_55`, accepted baseline `0_5_0`, roadmap Update 12 / H07.
+
+The isolated bench output module is disabled by default, supports only an in-memory demo indicator and requires explicit test-harness arming. Bounded command leases, matched acknowledgment, timeout checks, disconnect and expiry fail closed. No physical output driver, endpoint, firmware or integration with live traffic control. Local 8/8 deterministic tests passed. Full CI/owner acceptance pending. See [Patch 0_5_56](PATCH_0_5_56.md).
+
+---
+
 # V0555 — Camera setup and connection workflow
 
 Candidate `0_5_55`, previous `0_5_54`, accepted baseline `0_5_0`, roadmap Update 11 / H06.

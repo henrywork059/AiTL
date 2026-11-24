@@ -1,3 +1,19 @@
+# V0556 — Fake-only bench output regression
+
+Candidate `0_5_56`; previous `0_5_55`; baseline `0_5_0`.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0556_bench_output.py
+python scripts/run_offline_tests.py --focused test_v0556_bench_output.py test_v0554_device_capabilities.py test_v0554_device_registry.py
+python scripts/check_structure.py
+```
+
+Eight deterministic fake-adapter tests passed locally, including timeout/ack faults, duration bounds, unsupported commands, unauthorized arming, overlap, disconnect, off and monotonic expiry. No electrical or hardware test is part of this update. Watchdog tick and active-state reads enforce a fake lease, not an autonomous physical watchdog. Use the normal owner runner with `-SkipUpdate` from the repository root; no physical actuation.
+
+---
+
 # V0555 — Device setup and connection workflow
 
 Candidate `0_5_55`; previous `0_5_54`; accepted baseline `0_5_0`.

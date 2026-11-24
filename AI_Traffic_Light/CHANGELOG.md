@@ -1,3 +1,7 @@
+## 0_5_56 — Fake-only bench output abstraction (candidate; roadmap Update 12 / H07)
+- Added disabled-by-default fake adapter/controller with explicit test arming, bounded leases, matched acknowledgment, timeout checks, disconnect, off and watchdog expiry. No physical output or live application integration.
+- Eight deterministic local tests and compilation passed. Previous candidate 0_5_55 CI passed; current CI and owner acceptance pending. Accepted baseline `0_5_0`.
+
 ## 0_5_55 — Device setup and connection workflow (candidate; roadmap Update 11 / H06)
 - Prevent cross-camera status mixing when selection changes during a refresh. Preserve per-source failed initial probe diagnostics without claiming a configured connection. Validate saved camera IP, identity and settings before requests; show explicit retry, waiting/stale/error states, and guard current-source controls and preview from stale polls.
 - Added fake-HTTP setup/retry/persistence/selection regression and extended UI wiring regression. Full CI and Windows/ESP owner PASS pending. Previous `0_5_54`, accepted baseline `0_5_0`.

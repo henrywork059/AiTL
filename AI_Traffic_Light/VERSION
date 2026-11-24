@@ -1,5 +1,5 @@
-version: 0_5_55
-status: Camera setup and connection workflow candidate (roadmap Update 11)
-previous_version: 0_5_54
+version: 0_5_56
+status: Fake-only bench output abstraction candidate (roadmap Update 12)
+previous_version: 0_5_55
 passed_baseline: 0_5_0
-notes: Source-coherent status, failed probe diagnostics, validated setup and explicit retry; regression added; CI and owner Windows/ESP PASS pending.
+notes: Disabled by default; fake-only bounded leases and acknowledgments; 8 local tests passed; CI and owner PASS pending.

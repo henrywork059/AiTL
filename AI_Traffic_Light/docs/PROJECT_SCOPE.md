@@ -12,6 +12,10 @@ A versioned, read-only per-camera capability/health descriptor is projected from
 
 The existing saved-camera setup UI validates private-LAN input and settings, reports source-specific connection errors and retry guidance, and distinguishes transport connectivity from fresh image availability. Failed Connect retains the saved profile; explicit retry does not start the stream. The manager status refresh preserves selection identity across asynchronous device probes. No new output or physical actuation capability.
 
+## V0556 fake-only bench abstraction
+
+Only a synthetic demo indicator is supported by an isolated, disabled-by-default in-memory adapter. Tests exercise bounded command leases, acknowledgment faults, explicit off, disconnect and monotonic expiry. Physical lighting, speakers, traffic signals and other real outputs remain unavailable; no hardware authorization, real electrical testing or physical watchdog is implied.
+
 ## Physical camera input
 
 AiTL implements a local PC-controlled ESP32-CAM input path with:
