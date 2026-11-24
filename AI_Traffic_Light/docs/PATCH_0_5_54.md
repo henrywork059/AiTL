@@ -39,3 +39,7 @@ Push workflow [45424883577](https://github.com/henrywork059/AiTL/actions/runs/45
 Corrective follow-up on `0_5_54`: update **only** that regression fixture with explicit source/mode tokens and a controlled source-validity mock for diagnostics formatting, plus an assertion that removing a token makes even a recently timestamped result unavailable. The real `MultiCameraInferenceService` and `RemoteCameraManager.observation_is_current` remain unchanged. The tests in the other V0548 lifecycle scripts continue to cover actual source retirement.
 
 The corrective code needs a new CI run; full Windows/ESP and owner acceptance remain pending. The older workflow failure is not recorded as PASS.
+
+## Verified corrective CI outcome
+
+[GitHub Actions run 45425380717](https://github.com/henrywork059/AiTL/actions/runs/45425380717) completed **successfully** for runtime/test commit `1840f9bc79ed27e8bfcd32d50aa7a3b1671615de` (24 November 2026). Verified steps: backend install, Python compile, `scripts/check_structure.py`, complete offline test runner, frontend `npm ci`, TypeScript typecheck, and production build. Logs explicitly show PASS for V0525 diagnostics, V0552 transport diagnostics, V0553 endurance fixture, V0554 pure capability cases and V0554 legacy registry round-trip. This is CI evidence, **not** a Windows application/hardware acceptance or owner PASS. Follow-up documentation commits do not change tested application behavior.

@@ -4,10 +4,10 @@ Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`.
 
 - [x] Source-qualified capability/health projector passes 3/3 isolated pytest cases, 11 physical states, simulated mode and unknown/unsupported module guards.
 - [x] Unsupported lighting/speaker output always unavailable and physical output explicitly disabled; existing saved profile fields unchanged by implementation.
-- [ ] Execute new V0554 registry round-trip and existing saved-camera lifecycle tests within full repository.
-- [ ] Confirm the V0525 token-aware diagnostics fixture correction resolves CI run 45424883577 without relaxing retired-source invalidation.
-- [ ] Verify additive API shape, source-selection transitions, multi-camera freshness and TypeScript build.
-- [ ] Complete structure guard/full offline suite, Windows owner runner, real ESP failure/recovery checks and obtain explicit owner PASS.
+- [x] New V0554 registry round-trip and existing saved-camera lifecycle tests passed in CI run 45425380717.
+- [x] V0525 token-aware diagnostics fixture correction resolved CI run 45424883577's failure, preserving retired-source invalidation.
+- [x] CI structure, targeted API/source tests, full offline suite, TypeScript typecheck and frontend build passed (run 45425380717, commit 1840f9bc).
+- [ ] Complete Windows owner runner, real ESP failure/recovery checks and obtain explicit owner PASS.
 - [ ] Do not promote baseline or activate any public-road signal output.
 
 ---

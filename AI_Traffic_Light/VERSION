@@ -2,4 +2,4 @@ version: 0_5_54
 status: Read-only device capability and health contract candidate (roadmap Update 10)
 previous_version: 0_5_53
 passed_baseline: 0_5_0
-notes: Additive per-camera input/health capability projection; pure 3/3 tests passed; registry integration and full CI/Windows/ESP owner PASS pending.
+notes: Additive per-camera input/health projection; CI run 45425380717 passed full offline suite, structure and frontend checks at 1840f9bc; owner Windows/ESP PASS pending.

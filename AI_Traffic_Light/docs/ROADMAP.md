@@ -151,7 +151,7 @@ For every experiment record code SHA, settings, seeds, sample size, units, basel
 
 | 2026-11-24 | 09 / H05 | [0_5_53](PATCH_0_5_53.md): read-only per-source endurance evidence recorder, 3/3 synthetic pytest regressions passed locally; no actual ESP/Windows/CI acceptance. | Update 10: device capability contract; owner PASS pending. |
 
-| 2026-11-24 | 10 / H06 | [0_5_54](PATCH_0_5_54.md): read-only source-qualified capability/health contract and typed API; 3/3 local pure tests passed. Push CI run 45424883577 exposed legacy V0525 fixture missing a V0548 lifetime token; corrective regression patch added without altering runtime. Full rerun/Windows/ESP owner PASS pending. | Resolve CI acceptance blocker before Update 11: camera setup and connection workflow. |
+| 2026-11-24 | 10 / H06 | [0_5_54](PATCH_0_5_54.md): read-only source-qualified capability/health contract and typed API; 3/3 local pure tests passed. Push CI run 45424883577 exposed legacy V0525 fixture missing a V0548 lifetime token; corrective regression patch added without altering runtime. [CI run 45425380717](https://github.com/henrywork059/AiTL/actions/runs/45425380717) passed full offline/structure/typecheck/build at 1840f9bc; Windows/ESP owner PASS pending. | Update 11: camera setup and connection workflow, subject to owner acceptance gate. |
 
 ## Historical V035 milestones retained as hardware test requirements
 

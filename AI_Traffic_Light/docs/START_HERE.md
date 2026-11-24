@@ -4,7 +4,7 @@ Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, branch `featur
 
 Add a source-qualified, read-only `device_contract` for each saved ESP and simulation camera, reporting camera input availability, health, and explicitly unavailable lighting/speaker outputs. No new device registry, profile migration, output control or physical actuation. The selected camera's contract is derived from the current source-qualified summary. Existing API and file schemas are preserved.
 
-Pure Python projection: 3/3 local pytest tests passed; legacy registry integration test added but not executed. Full CI, Windows/ESP, structure, offline suite and frontend build remain pending. See [Patch 0_5_54](PATCH_0_5_54.md).
+Pure Python projection: 3/3 local pytest tests passed. CI [run 45425380717](https://github.com/henrywork059/AiTL/actions/runs/45425380717) passed the legacy registry integration, full offline tests, structure, TypeScript and build at commit 1840f9bc. Windows PC Studio/ESP hardware owner acceptance remains pending. See [Patch 0_5_54](PATCH_0_5_54.md).
 
 ---
 
