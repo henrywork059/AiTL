@@ -1,3 +1,16 @@
+# V0553 — Camera endurance benchmarking
+
+Candidate `0_5_53`, previous `0_5_52`, accepted baseline `0_5_0`.
+
+- [x] Read-only, hardware-free recorder using existing `/api/camera/remote/status` per-camera projection; no stream control or decoding.
+- [x] Deterministic, locally executed synthetic two-camera/counter/reset/outage/CSV/JSON/privacy tests (3/3 passed); compiled local Python sources.
+- [ ] Full repository offline regressions and `scripts/check_structure.py`, Windows UI/backend runner, frontend build.
+- [ ] Actual ESP test records firmware, settings, power/Wi-Fi conditions, duration, frame age/FPS, missing frames and observed recovery.
+- [ ] Process CPU/memory separately measured with an identified backend PID and optional psutil, or explicitly reported unavailable.
+- [ ] Explicit owner PASS before baseline promotion; no physical/public-road signal output.
+
+---
+
 # V0552 — Camera transport diagnostics
 
 Candidate `0_5_52`, previous `0_5_51`, accepted baseline `0_5_0`.

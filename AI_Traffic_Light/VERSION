@@ -1,5 +1,5 @@
-version: 0_5_52
-status: Camera transport diagnostics candidate (roadmap Update 08)
-previous_version: 0_5_51
+version: 0_5_53
+status: Camera endurance evidence recorder candidate (roadmap Update 09)
+previous_version: 0_5_52
 passed_baseline: 0_5_0
-notes: Monotonic FPS intervals, source sequence duplicate/reset diagnostics and original cached frame age; focused repository test added; full CI/Windows/ESP owner PASS pending.
+notes: Passive per-camera endurance CSV/JSON logger and synthetic regression; local 3/3 focused tests passed; full CI/Windows/ESP owner PASS pending.

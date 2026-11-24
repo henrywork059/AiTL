@@ -1,3 +1,36 @@
+# V0553 — Camera endurance evidence
+
+Candidate `0_5_53`, previous `0_5_52`, baseline `0_5_0`.
+
+Focused offline test (zero arguments):
+
+```powershell
+cd .\AI_Traffic_Light
+python scripts/run_offline_tests.py --focused test_v0553_camera_endurance.py test_v0552_camera_transport_diagnostics.py test_remote_camera_session.py test_remote_camera_multi.py
+```
+
+The new synthetic fixture independently verifies 2 saved cameras, reconnect timing, counter resets, stale frames, CSV and JSON schema and privacy; it does **not** demonstrate real ESP frame rate or weak-network recovery. Locally executed standalone regression: PASS; pytest: 3 passed; recorder/test compile: PASS. Full repository suite and structural checker not run in agent environment.
+
+To measure real camera transport while PC Studio and the ESP(s) are already streaming, execute from `AI_Traffic_Light`:
+
+```powershell
+python scripts/camera_endurance_benchmark.py --duration-seconds 600 --sample-seconds 1 --environment "Record board, firmware, power, AP, Wi-Fi distance and conditions"
+```
+
+Default output: `$HOME\MESH_camera_endurance\<UTC-run-id>\samples.csv` and `summary.json`. Optional `--source-id esp32_cam_01`, `--backend-pid <actual-backend-pid>` with optional `psutil`, and `--output-dir <new-directory>`. Repeated source IDs select multiple cameras. Record actual firmware/version and use Git HEAD in summary (null if unavailable); review missing values before reporting results. CPU is percent of one logical core and memory is backend-process MiB; values are null without process access.
+
+For owner full acceptance, from repo root:
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Full offline suite, frontend build, UI/end-to-end checks and actual ESP/wireless-duration experiments remain outstanding; no owner PASS.
+
+---
+
 # V0552 — Camera transport diagnostics
 
 Candidate `0_5_52`, previous `0_5_51`, baseline `0_5_0`, Update 08 / H05.

@@ -1,3 +1,7 @@
+## 0_5_53 — Read-only camera endurance recorder (candidate; roadmap Update 09 / H05)
+- Added a standalone status-sampling recorder with streaming per-camera CSV samples and bounded-memory JSON aggregates for frame age, receiver FPS/interval, inferred wire sequence gaps, duplicated packets, reconnect/session counters, observed outages, saved settings and change markers. Optional backend PID/psutil captures CPU and memory; no stream-control change, image decoding, or hardware output. Outputs default outside checkout.
+- Synthetic zero-argument regression passed locally (3/3 via pytest and direct main); complete suite, structural checker, CI and owner Windows/ESP acceptance unverified. Previous `0_5_52`, accepted baseline `0_5_0`.
+
 ## 0_5_52 — Camera transport diagnostics (candidate; roadmap Update 08 / H05)
 - Use monotonic receive timing for FPS and interval statistics, reset measurement/sequence baselines on TCP socket reopening, suppress repeated source packets and count detectable in-stream sequence resets. Preserve original cached-frame age and expose passive per-camera diagnostics, connection state, errors and counters in the existing status/UI contract; no JPEG re-decode.
 - Add focused deterministic regression for packets, monotonic clocks, stale state, retired workers and independent sessions. Full local suite, CI and owner Windows/ESP PASS remain unverified. Previous `0_5_51`, accepted baseline `0_5_0`.

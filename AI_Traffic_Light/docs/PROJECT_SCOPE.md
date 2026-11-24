@@ -1,5 +1,9 @@
 # Project Scope
 
+## V0553 read-only endurance recorder
+
+The standalone `scripts/camera_endurance_benchmark.py` polls the already-exposed multi-camera status API and exports per-source CSV samples and a JSON summary, including saved capture settings, receiver frame age/FPS, sequence diagnostics and observed reconnection timing. It does not initiate or control ESP streams, decode captured image payloads, infer traffic behavior or actuate any signal. Optional process CPU/memory requires an explicitly identified backend PID and optional psutil. Status-poll and synthetic fixture evidence are not equivalent to a validated hardware endurance run. Only individually keyed `cameras[]` observations are consumed; the existing selected-status concurrency race is not repaired by this benchmark.
+
 ## Physical camera input
 
 AiTL implements a local PC-controlled ESP32-CAM input path with:

@@ -1,3 +1,13 @@
+# V0553 — Read-only camera endurance recorder
+
+Candidate `0_5_53`, previous `0_5_52`, accepted baseline `0_5_0`, roadmap Update 09 / H05.
+
+Added a standalone recorder using the existing per-source camera status API. CSV samples and a JSON evidence summary report settings, receiver FPS/age, sequence/reconnect counters and observed outage recovery. CPU/memory require an explicitly identified backend PID and optional psutil; absent data remain null. Exports default outside the Git checkout. No stream control or image decoding.
+
+Local synthetic deterministic regression passed (3/3 tests); complete repository, Windows, frontend and physical ESP acceptance pending. [Patch 0_5_53](PATCH_0_5_53.md).
+
+---
+
 # V0552 — Camera transport diagnostics
 
 Candidate `0_5_52`, previous `0_5_51`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`. Roadmap Update 08 / H05.
