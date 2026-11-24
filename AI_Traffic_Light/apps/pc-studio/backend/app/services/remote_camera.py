@@ -580,9 +580,12 @@ class RemoteCameraService:
                 return "paused_for_simulation"
 
             packet = _read_frame_packet(stream)
+            # The blocking read may finish after stop or a simulation switch.
+            if stop_event.is_set():
+                return "stopped"
+            if camera_frame_service.simulation_enabled:
+                return "paused_for_simulation"
             if packet is None:
-                if stop_event.is_set():
-                    return "stopped"
                 return "stream_ended"
 
             with self._lock:

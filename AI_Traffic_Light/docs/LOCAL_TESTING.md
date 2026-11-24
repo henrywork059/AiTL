@@ -1,3 +1,22 @@
+# V0544 — ESP TCP post-read cancellation boundary
+
+Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/test_v0544_tcp_read_cancellation.py`, `python scripts/test_remote_camera_pull.py`, `python scripts/test_remote_camera_session.py`, structure validation, offline regressions and frontend typecheck/build. The focused regression verifies stop, simulation switch, normal packet, normal EOF, stop during EOF and simulation switch during EOF. No physical signals are driven.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\\AI_Traffic_Light\\scripts\\update_test_run.ps1" -SkipUpdate
+```
+
+Confirm normal preview, repeated stop/start, simulation entry/exit and resumed physical preview. Explicit owner PASS required.
+
+---
+
 # V0543 — Fragmented upload memory regression
 
 Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

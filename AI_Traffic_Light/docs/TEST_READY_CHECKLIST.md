@@ -1,3 +1,14 @@
+# V0544 — ESP TCP post-read cancellation boundary
+
+Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Late packet completed after stop or simulation entry is not counted or published by the receive loop.
+- [ ] Ordinary packet delivery and EOF remain unchanged; stop/simulation EOF outcomes are not misclassified as unexpected stream endings.
+- [ ] Focused TCP cancellation and existing remote camera regressions, structure, full offline checks, frontend typecheck/build pass.
+- [ ] Windows/ESP repeated stop/start and simulation switching pass; no physical signal actuation; explicit owner PASS before baseline changes.
+
+---
+
 # V0543 — Bounded fragmented camera upload buffering
 
 Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

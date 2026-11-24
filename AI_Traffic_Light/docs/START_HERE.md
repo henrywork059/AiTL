@@ -1,3 +1,13 @@
+# V0544 — ESP TCP post-read cancellation boundary
+
+Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Recheck the worker stop event and current simulation mode immediately after a blocking TCP packet read, before counting or publishing the returned packet. A normal complete packet and ordinary EOF retain their existing behavior. This is a narrow receive-loop boundary fix, not a guarantee of atomic cancellation across every worker or mode-transition path.
+
+See [Patch 0_5_44](PATCH_0_5_44.md). Run the feature-branch Windows runner with `-SkipUpdate`; verify ESP stream start/stop, simulation switching, normal preview and recovery. Owner PASS pending.
+
+---
+
 # V0543 — Efficient bounded HTTP camera uploads
 
 Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
