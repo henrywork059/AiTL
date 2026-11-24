@@ -31,3 +31,11 @@ git pull --ff-only origin feature/interactive-3d-simulation
 ```
 
 Check two saved cameras with different runtime states, saved profiles after restart, physical disconnect/reconnect, simulation mode, no lighting/speaker capability and no physical output. Owner PASS is required before changing the baseline. Next: roadmap Update 11 / H06 — improve device setup, connection/error workflow and retry behavior.
+
+## CI regression triage — same candidate, no runtime safety relaxation
+
+Push workflow [45424883577](https://github.com/henrywork059/AiTL/actions/runs/45424883577) failed at `test_v0525_camera_diagnostics.py`. The existing test manually injected cached results but did not install the source-lifetime tokens now required by V0548's stale/retired-source guard. Three consecutive candidate push runs exhibited the same legacy test-fixture failure. This does **not** establish a production inference defect.
+
+Corrective follow-up on `0_5_54`: update **only** that regression fixture with explicit source/mode tokens and a controlled source-validity mock for diagnostics formatting, plus an assertion that removing a token makes even a recently timestamped result unavailable. The real `MultiCameraInferenceService` and `RemoteCameraManager.observation_is_current` remain unchanged. The tests in the other V0548 lifecycle scripts continue to cover actual source retirement.
+
+The corrective code needs a new CI run; full Windows/ESP and owner acceptance remain pending. The older workflow failure is not recorded as PASS.

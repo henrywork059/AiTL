@@ -5,11 +5,11 @@ Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, roadmap Update
 Run these from `AI_Traffic_Light`:
 
 ```powershell
-python scripts/run_offline_tests.py --focused test_v0554_device_capabilities.py test_v0554_device_registry.py test_remote_camera_multi.py test_remote_camera_session.py test_v0552_camera_transport_diagnostics.py
+python scripts/run_offline_tests.py --focused test_v0554_device_capabilities.py test_v0554_device_registry.py test_remote_camera_multi.py test_remote_camera_session.py test_v0552_camera_transport_diagnostics.py test_v0525_camera_diagnostics.py
 python scripts/check_structure.py
 ```
 
-Pure isolated contract test passed locally: 3/3 pytest functions, direct execution and Python compilation. The integration test `test_v0554_device_registry.py` was added but not executed locally because the full source checkout could not be retrieved via DNS; no real ESP hardware was used. Verify legacy V1 profile reload, new contracts on all physical/simulation sources, source matching after selection, unavailable outputs, no unexpected writes/commands, and stale/stream state.
+Pure isolated contract test passed locally: 3/3 pytest functions, direct execution and Python compilation. CI run 45424883577 failed because the older V0525 diagnostics fixture omitted the V0548 source-lifetime token. The fixture is corrected without changing the production freshness guard; CI rerun and full repository suite must verify the correction. The integration test `test_v0554_device_registry.py` was added but not executed locally because the full source checkout could not be retrieved via DNS; no real ESP hardware was used. Verify legacy V1 profile reload, new contracts on all physical/simulation sources, source matching after selection, unavailable outputs, no unexpected writes/commands, and stale/stream state.
 
 From repository root, owner acceptance:
 
