@@ -1,5 +1,5 @@
-version: 0_5_47
-status: ESP cached-frame identity candidate (roadmap Update 03)
-previous_version: 0_5_46
+version: 0_5_48
+status: ESP observation invalidation candidate (roadmap Update 04)
+previous_version: 0_5_47
 passed_baseline: 0_5_0
-notes: Preserve original PC receive timestamp and frame identity across cache promotion and background inference. 9/9 isolated behavioral checks passed; focused repository regression added; full CI and owner Windows/ESP PASS required.
+notes: Clear retired source observations and guard inference lifetime with source/mode tokens; original stop/disconnect defects reproduced; 9/9 isolated behavioral checks passed; focused regressions added; CI and owner PASS pending.

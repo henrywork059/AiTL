@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import ipaddress
 import json
 import socket
@@ -98,6 +98,8 @@ class _FramePacket:
     sequence: int
     source_uptime_ms: int
     content: bytes
+    # Local cancellation identity; not part of ATL1 wire data.
+    worker_stop: Event | None = None
 
 
 class _TcpFrameStream:
@@ -483,6 +485,14 @@ class RemoteCameraService:
             and self._streaming_requested
         )
 
+    def cancel_pending_frames(self) -> None:
+        """Retire delivery immediately; the normal stop/start path joins the worker."""
+        with self._lock:
+            self._stop_event.set()
+            self._streaming_requested = False
+            self._stream_connected = False
+            self._frame_condition.notify_all()
+
     def _stop_worker(self) -> None:
         with self._lock:
             thread = self._thread
@@ -573,7 +583,7 @@ class RemoteCameraService:
             )
 
         if self._frame_sink is not None:
-            frame_number = int(self._frame_sink(source_id, packet))
+            frame_number = int(self._frame_sink(source_id, replace(packet, worker_stop=stop_event)))
         else:
             frame = camera_frame_service.store_upload(
                 source_id=source_id,

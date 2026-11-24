@@ -197,6 +197,7 @@ class CameraFrameService:
         self._simulation_view_frames: dict[str, CameraFrame] = {}
         self._simulation_source_id = "simulation_camera"
         self._simulation_enabled = False
+        self._observation_mode_generation = 0
         self._simulation_paused = False
         self._simulation_density = "normal"
         self._simulation_seed = int(time.time() * 1000) & 0x7FFFFFFF
@@ -207,6 +208,17 @@ class CameraFrameService:
         self._vehicles: list[_SimVehicle] = []
         self._pedestrians: list[_SimPedestrian] = []
         self._simulation_rng = random.Random(self._simulation_seed)
+
+    def clear_uploaded_source(self, source_id: str) -> None:
+        """Invalidate only the receiver image belonging to this source."""
+        with self._lock:
+            if self._uploaded_frame is not None and self._uploaded_frame.source_id == source_id:
+                self._uploaded_frame = None
+
+    @property
+    def observation_mode_token(self) -> tuple[bool, int]:
+        with self._lock:
+            return self._simulation_enabled, self._observation_mode_generation
 
     def store_upload(self, *, source_id: str, content_type: str, content: bytes, validate_decode: bool = False) -> CameraFrame:
         return self._create_upload(
@@ -297,6 +309,7 @@ class CameraFrameService:
     def set_simulation(self, enabled: bool) -> dict:
         with self._lock:
             self._simulation_enabled = enabled
+            self._observation_mode_generation += 1
             self._simulation_paused = False
             if enabled:
                 self._reset_simulation_locked()

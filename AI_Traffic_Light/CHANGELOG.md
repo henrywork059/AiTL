@@ -1,3 +1,7 @@
+## 0_5_48 — Invalidate disconnected camera observations (candidate; roadmap Update 04 / H03)
+- Retire camera delivery before explicit stop, disconnect, reconnect, restart or session replacement. Clear only that source's latest image and increment its observation epoch. Background inference snapshots carry source/mode tokens; invalid or expired predictions are suppressed at completion, API read and virtual-observation forwarding. A mode-generation change invalidates pre-transition predictions, while fresh cached images may still be promoted with their original identity.
+- Add lifecycle/inference regression; previous `0_5_47`, accepted baseline `0_5_0`; owner PASS pending.
+
 ## 0_5_47 — Preserve ESP cached-frame identity (candidate; roadmap Update 03 / H03)
 - Cache one validated immutable CameraFrame per accepted ESP packet, with its original PC receive timestamp and a globally allocated frame ID. Selection, simulation return and background inference reuse the same object; stale caches remain rejected. Ordinary HTTP uploads still allocate and publish new frames. ESP wire sequence remains a transport diagnostic, not the application frame ID.
 - Add deterministic cached-frame regression and update multi-camera race fixture. Previous `0_5_46`, accepted baseline `0_5_0`; owner PASS pending.

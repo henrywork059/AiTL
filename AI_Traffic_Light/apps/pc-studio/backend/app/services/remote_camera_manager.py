@@ -109,6 +109,7 @@ class RemoteCameraManager:
         self._sessions: dict[str, RemoteCameraService] = {}
         self._session_generations: dict[str, int] = {}
         self._latest_frames: dict[str, CameraFrame] = {}
+        self._observation_epochs: dict[str, int] = {}
         self._active_source_id: str | None = None
         self._active_frame_number: int | None = None
         self._registry_warning: str | None = None
@@ -311,11 +312,26 @@ class RemoteCameraManager:
             self._sessions[source_id] = session
         return session
 
+    def _invalidate_observations_locked(self, source_id: str) -> None:
+        """Called under publication lock; invalidate one source, not its neighbours."""
+        with self._frame_condition:
+            self._observation_epochs[source_id] = self._observation_epochs.get(source_id, 0) + 1
+            self._latest_frames.pop(source_id, None)
+            if self._active_source_id == source_id:
+                self._active_frame_number = None
+            camera_frame_service.clear_uploaded_source(source_id)
+            self._frame_condition.notify_all()
+
+    def _retire_delivery_locked(self, source_id: str, session: RemoteCameraService | None) -> None:
+        if session is not None:
+            session.cancel_pending_frames()
+        self._invalidate_observations_locked(source_id)
+
     def _invalidate_session_locked(self, source_id: str) -> RemoteCameraService | None:
         """Retire one session so any late worker frame is rejected by generation."""
         session = self._sessions.pop(source_id, None)
         self._session_generations[source_id] = self._session_generations.get(source_id, 0) + 1
-        self._latest_frames.pop(source_id, None)
+        self._retire_delivery_locked(source_id, session)
         return session
 
     def _ingest_frame(
@@ -332,6 +348,13 @@ class RemoteCameraManager:
         with self._publish_lock:
             with self._lock:
                 if generation is not None and self._session_generations.get(source_id) != generation:
+                    return int(packet.sequence)
+                session = self._sessions.get(source_id)
+                if session is None or not session.streaming_requested:
+                    return int(packet.sequence)
+                if packet.worker_stop is not None and packet.worker_stop.is_set():
+                    return int(packet.sequence)
+                if camera_frame_service.simulation_enabled:
                     return int(packet.sequence)
 
             frame = camera_frame_service.prepare_upload(
@@ -602,8 +625,10 @@ class RemoteCameraManager:
             select=True,
         )
 
-        with self._lock:
-            session = self._session_locked(normalized_source, create=True)
+        with self._publish_lock:
+            with self._lock:
+                session = self._session_locked(normalized_source, create=True)
+                self._retire_delivery_locked(normalized_source, session)
         assert session is not None
         session.connect(host=normalized_host, source_id=normalized_source)
         return self.status(refresh_device=False)
@@ -642,6 +667,11 @@ class RemoteCameraManager:
             target_fps=normalized_fps,
             select=True,
         )
+        with self._publish_lock:
+            with self._lock:
+                if self._sessions.get(source_id) is not session:
+                    raise AppError(ErrorCode.CAMERA_NOT_CONNECTED, "Camera session was replaced.", status_code=409)
+                self._retire_delivery_locked(source_id, session)
         session.start_stream(
             settings=normalized_settings,
             target_fps=normalized_fps,
@@ -650,26 +680,35 @@ class RemoteCameraManager:
         return self.status(refresh_device=False)
 
     def stop_stream(self, *, best_effort: bool = False) -> dict:
-        with self._lock:
-            profile = self._get_profile_locked()
-            session = self._session_locked(profile["source_id"], create=False)
+        with self._publish_lock:
+            with self._lock:
+                profile = self._get_profile_locked()
+                source_id = profile["source_id"]
+                session = self._session_locked(source_id, create=False)
+                self._retire_delivery_locked(source_id, session)
         if session is None:
             return self.status()
         session.stop_stream(best_effort=best_effort)
         return self.status(refresh_device=False)
 
     def disconnect(self) -> dict:
-        with self._lock:
-            profile = self._get_profile_locked()
-            session = self._session_locked(profile["source_id"], create=False)
+        with self._publish_lock:
+            with self._lock:
+                profile = self._get_profile_locked()
+                source_id = profile["source_id"]
+                session = self._session_locked(source_id, create=False)
+                self._retire_delivery_locked(source_id, session)
         if session is not None:
             session.disconnect()
         return self.status(refresh_device=False)
 
     def disconnect_all(self) -> None:
-        with self._lock:
-            sessions = list(self._sessions.values())
-        for session in sessions:
+        with self._publish_lock:
+            with self._lock:
+                sessions = list(self._sessions.items())
+                for source_id, session in sessions:
+                    self._retire_delivery_locked(source_id, session)
+        for _, session in sessions:
             try:
                 session.disconnect()
             except Exception:
@@ -744,6 +783,8 @@ class RemoteCameraManager:
         with self._lock:
             profiles = list(self._profiles.values())
             cached = dict(self._latest_frames)
+            streaming = {source_id for source_id, session in self._sessions.items()
+                         if session.streaming_requested}
         if camera_frame_service.simulation_enabled:
             return [frame for profile in profiles if profile["kind"] == "simulation"
                     if (frame := camera_frame_service.simulation_frame_for(profile["source_id"])) is not None]
@@ -752,15 +793,50 @@ class RemoteCameraManager:
         for profile in profiles:
             source_id = profile["source_id"]
             item = cached.get(source_id)
-            if profile["kind"] != "esp32" or item is None or not 0 <= now_ms - item.received_at_ms <= 5000:
+            if (profile["kind"] != "esp32" or source_id not in streaming or item is None
+                    or not 0 <= now_ms - item.received_at_ms <= 5000):
                 continue
             frames.append(item)
         uploaded = camera_frame_service.latest_frame()
         if uploaded and uploaded.source_id not in {f.source_id for f in frames} and not any(
             x["source_id"] == uploaded.source_id for x in profiles
-        ) and now_ms - uploaded.received_at_ms <= 5000:
+        ) and 0 <= now_ms - uploaded.received_at_ms <= 5000:
             frames.append(uploaded)
         return frames
+
+    def inference_inputs(self) -> list[tuple[CameraFrame, tuple[tuple[bool, int], int]]]:
+        """Snapshot observations and their source/mode retirement token together."""
+        with self._publish_lock:
+            mode = camera_frame_service.observation_mode_token
+            frames = self.frames_for_inference()
+            if camera_frame_service.observation_mode_token != mode:
+                return []
+            with self._lock:
+                return [(frame, (mode, self._observation_epochs.get(frame.source_id, 0)))
+                        for frame in frames]
+
+    def observation_is_current(
+        self, source_id: str, token: tuple[tuple[bool, int], int], received_at_ms: int,
+    ) -> bool:
+        """Validate lifetime without requiring a slow inference to be the newest frame."""
+        with self._publish_lock:
+            if camera_frame_service.observation_mode_token != token[0]:
+                return False
+            if not 0 <= self._now_ms() - received_at_ms <= 5000:
+                return False
+            with self._lock:
+                if self._observation_epochs.get(source_id, 0) != token[1]:
+                    return False
+                profile = self._profiles.get(source_id)
+                session = self._sessions.get(source_id)
+                if token[0][0]:
+                    return bool(profile and profile["kind"] == "simulation")
+                if profile is not None:
+                    return bool(profile["kind"] == "esp32" and session
+                                and session.streaming_requested and source_id in self._latest_frames)
+            # Ordinary receiver uploads are not registered ESP sessions.
+            uploaded = camera_frame_service.latest_frame()
+            return bool(uploaded and uploaded.source_id == source_id and uploaded.origin == "upload")
 
     def frame_for_preview(self, source_id: str) -> CameraFrame | None:
         """Read the same cached source as global inference without changing selection."""

@@ -57,6 +57,9 @@ class FakeSession:
         self.streaming_requested = True
         return self.status()
 
+    def cancel_pending_frames(self) -> None:
+        self.streaming_requested = False
+
     def stop_stream(self, *, best_effort: bool = False) -> dict:
         del best_effort
         self.streaming_requested = False

@@ -1,3 +1,14 @@
+# V0548 — Invalidate disconnected camera observations
+
+Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Stop/disconnect/restart clears only affected source and rejects old worker delivery.
+- [ ] Retired/mode-obsolete inference results unavailable; active neighbour and normal inference survive.
+- [ ] V0548, V0544–V0547, multi-camera and inference-shutdown regressions; full structure/offline/typecheck/build pass.
+- [ ] Windows/ESP acceptance; explicit owner PASS required. No physical actuation.
+
+---
+
 # V0547 — Preserve ESP cached-frame identity
 
 Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

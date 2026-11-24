@@ -40,7 +40,8 @@ def main() -> None:
         ))
         patches.enter_context(patch.object(
             module, "remote_camera_manager",
-            SimpleNamespace(frames_for_inference=lambda: [frame]),
+            SimpleNamespace(inference_inputs=lambda: [(frame, ((True, 1), 0))],
+                            observation_is_current=lambda *args: True),
         ))
         patches.enter_context(patch.object(
             module, "camera_frame_service",

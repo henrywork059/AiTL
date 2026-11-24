@@ -1,3 +1,20 @@
+# V0548 — Invalidate disconnected camera observations
+
+Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/test_v0548_observation_invalidation.py`, `python scripts/test_remote_camera_multi.py`, `python scripts/test_v0527_late_inference_shutdown.py`, V0544–V0547 and full runner.
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify stop/disconnect/restart, two independent cameras, mode round trips and AI preview. Executed isolated Python reproduction using the retrieved original stop/disconnect and inference-snapshot methods: both operations left the cached image available (2/2 defects reproduced). Patched isolated execution passed 9/9 behavioral checks: stop/neighbour isolation, stale API result suppression, stopped callback, cancelled worker after restart, new delivery and slow current observation, simulation round trip, disconnect, old device generation, and inference completion/virtual snapshot filtering. All 12 copied patched method bodies matched staged source by FNV-1a checksum. Camera/session/clock/model/controller dependencies were injected; this is not a full-module test. Direct GitHub clone failed DNS resolution. Repository regressions added; full CI and owner Windows/ESP acceptance pending.
+
+---
+
 # V0547 — Preserve ESP cached-frame identity
 
 Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

@@ -1,3 +1,13 @@
+# V0548 — Invalidate disconnected camera observations
+
+Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Retire camera delivery before explicit stop, disconnect, reconnect, restart or session replacement. Clear only that source's latest image and increment its observation epoch. Background inference snapshots carry source/mode tokens; invalid or expired predictions are suppressed at completion, API read and virtual-observation forwarding. A mode-generation change invalidates pre-transition predictions, while fresh cached images may still be promoted with their original identity.
+
+See [Patch 0_5_48](PATCH_0_5_48.md). Pull feature branch and run Windows runner with `-SkipUpdate`. Owner PASS pending.
+
+---
+
 # V0547 — Preserve ESP cached-frame identity
 
 Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
