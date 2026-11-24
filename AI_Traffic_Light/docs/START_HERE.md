@@ -1,3 +1,13 @@
+# V0545 — ESP TCP socket-open cancellation
+
+Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Roadmap Update 01 / H02: After a blocking TCP open returns, recheck cancellation, worker event identity, streaming intent and simulation mode before publishing the socket or connection status. The existing finally block closes the returned socket and clears connection status only when it owns the active socket. This prevents a cancelled opener from replacing a new connection. Ordinary open, read and reconnect behavior, firmware, TCP framing, API shapes and signal behavior remain unchanged.
+
+See [Patch 0_5_45](PATCH_0_5_45.md). Pull the feature branch and run the Windows runner with `-SkipUpdate`. Check repeated ESP start/stop, restart, simulation switching and normal reconnect. Owner PASS pending.
+
+---
+
 # V0544 — ESP TCP post-read cancellation boundary
 
 Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

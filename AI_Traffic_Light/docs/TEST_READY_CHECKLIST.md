@@ -1,3 +1,14 @@
+# V0545 — ESP TCP socket-open cancellation
+
+Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] A socket returned after cancellation, replacement or simulation entry is closed without publishing connection state or entering the receive loop.
+- [ ] Cleanup of an unowned socket does not clear the replacement connection; normal open and reconnect behavior is preserved.
+- [ ] Focused V0545/V0544 and remote camera regressions, structure, full offline checks, frontend typecheck/build pass.
+- [ ] Owner Windows/ESP checks pass; explicit owner PASS before any baseline change. No physical signal actuation.
+
+---
+
 # V0544 — ESP TCP post-read cancellation boundary
 
 Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

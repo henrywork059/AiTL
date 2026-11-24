@@ -1,3 +1,22 @@
+# V0545 — ESP TCP socket-open cancellation
+
+Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Roadmap Update 01 / H02. Run `python scripts/test_v0545_tcp_open_cancellation.py`, `python scripts/test_v0544_tcp_read_cancellation.py`, `python scripts/test_remote_camera_pull.py`, `python scripts/test_remote_camera_session.py`, structure validation, full offline regressions and frontend typecheck/build.
+
+From the repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify normal preview, stop during connection, repeated stop/start, simulation entry/exit and camera reconnection. Isolated execution of the exact retrieved `_run` method with injected opener, consumer and operating state: original 2/5, patched 5/5 (stop, restart, simulation switch, normal open, reconnect). Direct clone unavailable because DNS resolution failed; full-module regression and repository CI were not run locally. Owner Windows/ESP PASS pending.
+
+---
+
 # V0544 — ESP TCP post-read cancellation boundary
 
 Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

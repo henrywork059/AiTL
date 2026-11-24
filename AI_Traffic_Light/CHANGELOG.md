@@ -1,3 +1,7 @@
+## 0_5_45 — Guard cancelled ESP TCP opens (candidate; roadmap Update 01 / H02)
+- After a blocking TCP open returns, recheck cancellation, worker event identity, streaming intent and simulation mode before publishing the socket or connection status. The existing finally block closes the returned socket and clears connection status only when it owns the active socket. This prevents a cancelled opener from replacing a new connection. Ordinary open, read and reconnect behavior, firmware, TCP framing, API shapes and signal behavior remain unchanged.
+- Add deterministic five-case socket-open regression. Previous `0_5_44`, accepted baseline `0_5_0`; broader retired-worker failure/recovery audit remains Update 02.
+
 ## 0_5_44 — Guard late ESP TCP reads during stop and simulation switch (candidate)
 - Recheck the worker stop event and current simulation mode immediately after a blocking TCP packet read, before counting or publishing the returned packet. A normal complete packet and ordinary EOF retain their existing behavior. This is a narrow receive-loop boundary fix, not a guarantee of atomic cancellation across every worker or mode-transition path.
 - Add six deterministic receive-loop cases, including EOF during a simulation switch. No ESP firmware, protocol, API or signal changes. Previous `0_5_43`, accepted baseline `0_5_0`, owner PASS pending.

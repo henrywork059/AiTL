@@ -1,5 +1,5 @@
-version: 0_5_44
-status: ESP TCP post-read cancellation boundary candidate
-previous_version: 0_5_43
+version: 0_5_45
+status: ESP TCP socket-open cancellation candidate (roadmap Update 01)
+previous_version: 0_5_44
 passed_baseline: 0_5_0
-notes: Recheck stop and simulation mode after a blocking TCP frame read and before recording or publishing the packet. Preserve normal frame delivery, EOF, TCP framing, API and signal behavior. Isolated six-case method regression passed; repository CI and owner Windows/ESP PASS required.
+notes: Guard socket and connection-state publication after a blocking ESP TCP open; close cancelled sockets and clear only the owned active stream. Isolated worker-method regression: original 2/5, patched 5/5. Full CI and owner Windows/ESP PASS required. Broader old-worker failure and recovery handling remains Update 02.

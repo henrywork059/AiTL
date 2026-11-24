@@ -39,7 +39,7 @@ Status vocabulary: PLANNED, IN PROGRESS, BLOCKED, CANDIDATE (not accepted), ACCE
 | ID | Priority | Status at plan adoption | Task and acceptance criteria |
 | --- | --- | --- | --- |
 | H01 | P0 | CANDIDATE | Post-read ESP cancellation guard; see [0_5_44 patch](PATCH_0_5_44.md). Owner Windows/ESP PASS outstanding at adoption. |
-| H02 | P0 | PLANNED — next | Audit ESP worker lifetime and session transitions: blocked socket open/read, stop timeout, old-worker cleanup, reconnect/restart, mode switch. Reproduce late publication/status corruption and prove retired workers cannot affect replacement sessions. |
+| H02 | P0 | IN PROGRESS | Audit ESP worker lifetime and session transitions: blocked socket open/read, stop timeout, old-worker cleanup, reconnect/restart, mode switch. Reproduce late publication/status corruption and prove retired workers cannot affect replacement sessions. |
 | H03 | P0 | PLANNED | Audit frame/cache freshness and source identity during disconnect, reconnect, replacement and simulation transitions; reject stale/retired inputs with deterministic regressions. |
 | H04 | P0 | PLANNED | Restore a reproducible test checkout/environment; verify existing CI, full offline suite and Windows owner workflow; do not conflate isolated tests with end-to-end PASS. |
 | H05 | P1 | PLANNED | Measure ESP camera FPS, frame age, latency, CPU/memory, packet sequence gaps and reset/weak-Wi-Fi recovery under documented settings. |
@@ -71,8 +71,8 @@ Update numbers are stable planning IDs, not reserved software versions. A new ca
 
 | Update | Backlog | Specific objective | Starting code / area | Implementation scope | Acceptance / focused regression | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01 | H02 | Repair late socket-open cancellation | remote_camera.py: _run, _stop_worker | Reproduce a blocked stream opener completing after stop. Guard publication of the returned stream and connection status; close retired socket. | Delayed opener after stop/restart cannot overwrite active stream; normal open and reconnect still work. | PLANNED — next |
-| 02 | H02 | Guard old-worker finalization and recovery | remote_camera.py: _run, _stop_worker, start_stream | Audit timed-out worker joins; use current worker/event identity to prevent retired finally blocks, errors and recovery from changing replacement state. | Deterministic old-worker cleanup after new worker starts; new stream and status survive; bounded shutdown. | PLANNED |
+| 01 | H02 | Repair late socket-open cancellation | remote_camera.py: _run, _stop_worker | Reproduce a blocked stream opener completing after stop. Guard publication of the returned stream and connection status; close retired socket. | Delayed opener after stop/restart cannot overwrite active stream; normal open and reconnect still work. | CANDIDATE — [0_5_45](PATCH_0_5_45.md); owner PASS pending |
+| 02 | H02 | Guard old-worker finalization and recovery | remote_camera.py: _run, _stop_worker, start_stream | Audit timed-out worker joins; use current worker/event identity to prevent retired finally blocks, errors and recovery from changing replacement state. | Deterministic old-worker cleanup after new worker starts; new stream and status survive; bounded shutdown. | PLANNED — next |
 | 03 | H03 | Prevent cached frame re-stamping | remote_camera_manager.py; camera_frames.py | Audit cache promotion and preserve original receive time/source across selection; never treat cache replay as a distinct fresh observation. | Switch A/B, stale cache, duplicate replay, new frames; exact source/time provenance. | PLANNED |
 | 04 | H03 | Invalidate disconnected camera observations | remote_camera_manager.py; inference service | Audit stop, disconnect, re-address and simulation transitions; clear or expire affected frame and inference snapshots without harming other cameras. | Disconnect/reconnect and old-generation callbacks; no obsolete detections or wrong-source frames. | PLANNED |
 | 05 | H04 | Make test execution reproducible | scripts/update_test_run.ps1; CI; test manifests | Audit current runner, dependency pinning and test discovery; fix verified checkout/setup/test blockers; document exact execution commands. | Clean Windows setup/CI test discovery and focused/full suite; report unavailable environments explicitly. | PLANNED |
@@ -132,6 +132,8 @@ For every experiment record code SHA, settings, seeds, sample size, units, basel
 | Date | ID | Evidence / outcome | Next action |
 | --- | --- | --- | --- |
 | 2026-11-24 | H01 | Candidate [8256bd2](https://github.com/henrywork059/AiTL/commit/8256bd2f3cc3984588884e5eccf3553a11add142); [CI run 45355984796](https://github.com/henrywork059/AiTL/actions/runs/45355984796) completed successfully. Owner acceptance not established. | Windows/ESP validation; H02 worker lifecycle audit. |
+
+| 2026-11-24 | 01 / H02 | [0_5_45](PATCH_0_5_45.md): isolated worker-method cases original 2/5, patched 5/5; full CI and owner Windows/ESP PASS pending. Commit available via patch-file history. | Update 02: retired-worker finalization and recovery; confirm candidate acceptance. |
 
 ## Historical V035 milestones retained as hardware test requirements
 

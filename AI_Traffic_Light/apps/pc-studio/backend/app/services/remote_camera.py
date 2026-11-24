@@ -891,6 +891,12 @@ class RemoteCameraService:
             try:
                 stream = self._stream_opener(host)
                 with self._lock:
+                    # Opening can finish after a stop or replacement worker starts.
+                    if (stop_event.is_set() or self._stop_event is not stop_event
+                            or not self._streaming_requested):
+                        return
+                    if camera_frame_service.simulation_enabled:
+                        continue
                     self._active_stream = stream
                     self._stream_connected = True
                     self._device_reachable = True
@@ -925,9 +931,9 @@ class RemoteCameraService:
                     except Exception:
                         pass
                 with self._lock:
-                    if self._active_stream is stream:
+                    if stream is not None and self._active_stream is stream:
                         self._active_stream = None
-                    self._stream_connected = False
+                        self._stream_connected = False
 
             if stop_event.is_set() or camera_frame_service.simulation_enabled:
                 continue
