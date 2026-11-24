@@ -1,3 +1,16 @@
+# V0554 — Derived device capability contract
+
+Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`.
+
+- [x] Source-qualified capability/health projector passes 3/3 isolated pytest cases, 11 physical states, simulated mode and unknown/unsupported module guards.
+- [x] Unsupported lighting/speaker output always unavailable and physical output explicitly disabled; existing saved profile fields unchanged by implementation.
+- [ ] Execute new V0554 registry round-trip and existing saved-camera lifecycle tests within full repository.
+- [ ] Verify additive API shape, source-selection transitions, multi-camera freshness and TypeScript build.
+- [ ] Complete structure guard/full offline suite, Windows owner runner, real ESP failure/recovery checks and obtain explicit owner PASS.
+- [ ] Do not promote baseline or activate any public-road signal output.
+
+---
+
 # V0553 — Camera endurance benchmarking
 
 Candidate `0_5_53`, previous `0_5_52`, accepted baseline `0_5_0`.

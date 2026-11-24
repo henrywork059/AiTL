@@ -22,6 +22,8 @@ from app.services.remote_camera import (
     normalize_private_lan_ipv4,
 )
 
+from app.services.device_capabilities import project_camera_device
+
 logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -959,11 +961,22 @@ class RemoteCameraManager:
                     key=lambda value: (-int(value["last_used_ms"]), value["source_id"]),
                 )
             ]
+            # Additive, read-only projection; the registry and sessions retain ownership.
+            # Use source-qualified summaries rather than the potentially refreshed
+            # top-level selected session to avoid mixing A's metrics with B's ID.
+            for camera in summaries:
+                camera["device_contract"] = project_camera_device(camera)
+            selected_contract = next(
+                (camera["device_contract"] for camera in summaries
+                 if camera["source_id"] == active_id),
+                None,
+            )
             warning = self._registry_warning
 
         active_status.update(
             {
                 "active_source_id": active_id,
+                "device_contract": selected_contract,
                 "camera_count": len(summaries),
                 "cameras": summaries,
                 "registry_warning": warning,

@@ -59,9 +59,43 @@ export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
 };
 
 
+export type CameraDeviceCapability = {
+  direction: "input" | "output";
+  support: "implemented" | "simulation-only" | "unavailable";
+  available: boolean;
+};
+
+export type CameraDeviceHealth = {
+  state: "not_connected" | "unreachable" | "connected" | "reconnecting" |
+    "waiting_for_frame" | "streaming" | "stale" | "paused" | "error" |
+    "simulated" | "idle";
+  control_connected: boolean | null;
+  reachable: boolean | null;
+  streaming: boolean;
+  transport_connected: boolean;
+  frame_fresh: boolean;
+  frame_age_ms: number | null;
+  last_error: string | null;
+};
+
+export type CameraDeviceContract = {
+  schema_version: 1;
+  source_id: string;
+  device_type: "esp32_camera" | "simulation_camera";
+  control_owner: "pc_studio";
+  capabilities: {
+    camera_input: CameraDeviceCapability;
+    lighting_output: CameraDeviceCapability;
+    speaker_output: CameraDeviceCapability;
+  };
+  health: CameraDeviceHealth;
+  physical_output_allowed: false;
+};
+
 export type RemoteCameraProfile = {
   source_id: string;
   kind: "esp32" | "simulation";
+  device_contract?: CameraDeviceContract;
   host: string;
   target_fps: number;
   settings: RemoteCameraSettings;
@@ -87,6 +121,7 @@ export type RemoteCameraProfile = {
 
 export type RemoteCameraStatus = {
   active_source_id: string | null;
+  device_contract?: CameraDeviceContract | null;
   camera_count: number;
   cameras: RemoteCameraProfile[];
   registry_warning: string | null;

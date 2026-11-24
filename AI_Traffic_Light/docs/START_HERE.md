@@ -1,3 +1,13 @@
+# V0554 — Derived device capability contract
+
+Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`. Roadmap Update 10 / H06.
+
+Add a source-qualified, read-only `device_contract` for each saved ESP and simulation camera, reporting camera input availability, health, and explicitly unavailable lighting/speaker outputs. No new device registry, profile migration, output control or physical actuation. The selected camera's contract is derived from the current source-qualified summary. Existing API and file schemas are preserved.
+
+Pure Python projection: 3/3 local pytest tests passed; legacy registry integration test added but not executed. Full CI, Windows/ESP, structure, offline suite and frontend build remain pending. See [Patch 0_5_54](PATCH_0_5_54.md).
+
+---
+
 # V0553 — Read-only camera endurance recorder
 
 Candidate `0_5_53`, previous `0_5_52`, accepted baseline `0_5_0`, roadmap Update 09 / H05.

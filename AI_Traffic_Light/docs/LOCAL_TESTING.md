@@ -1,3 +1,28 @@
+# V0554 — Device capability contract
+
+Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`, roadmap Update 10 / H06.
+
+Run these from `AI_Traffic_Light`:
+
+```powershell
+python scripts/run_offline_tests.py --focused test_v0554_device_capabilities.py test_v0554_device_registry.py test_remote_camera_multi.py test_remote_camera_session.py test_v0552_camera_transport_diagnostics.py
+python scripts/check_structure.py
+```
+
+Pure isolated contract test passed locally: 3/3 pytest functions, direct execution and Python compilation. The integration test `test_v0554_device_registry.py` was added but not executed locally because the full source checkout could not be retrieved via DNS; no real ESP hardware was used. Verify legacy V1 profile reload, new contracts on all physical/simulation sources, source matching after selection, unavailable outputs, no unexpected writes/commands, and stale/stream state.
+
+From repository root, owner acceptance:
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Only explicit owner PASS may update `passed_baseline`. CI/frontend/Windows full run and ESP recovery must still be checked.
+
+---
+
 # V0553 — Camera endurance evidence
 
 Candidate `0_5_53`, previous `0_5_52`, baseline `0_5_0`.

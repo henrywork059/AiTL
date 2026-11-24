@@ -1,3 +1,34 @@
+## V0554 device capability/health projection (additive)
+
+The existing `GET /api/camera/remote/status` envelope remains unchanged and retains all previous fields. Each saved camera in `data.cameras[]` adds a read-only `device_contract`. The top-level `data.device_contract` represents the selected camera using that camera's source-qualified summary and is `null` without a saved selection; it does **not** imply the other legacy top-level selected-status fields are guaranteed atomic under concurrent selection changes.
+
+```json
+{
+  "schema_version": 1,
+  "source_id": "esp32_cam_01",
+  "device_type": "esp32_camera",
+  "control_owner": "pc_studio",
+  "capabilities": {
+    "camera_input": {"direction": "input", "support": "implemented", "available": false},
+    "lighting_output": {"direction": "output", "support": "unavailable", "available": false},
+    "speaker_output": {"direction": "output", "support": "unavailable", "available": false}
+  },
+  "health": {
+    "state": "not_connected",
+    "control_connected": false,
+    "reachable": false,
+    "streaming": false,
+    "transport_connected": false,
+    "frame_fresh": false,
+    "frame_age_ms": null,
+    "last_error": null
+  },
+  "physical_output_allowed": false
+}
+```
+
+The above is an **illustrative response for a saved, disconnected ESP**, not measured device evidence. For simulated sources, `device_type` is `simulation_camera`, camera support is `simulation-only`, and `control_connected`/`reachable` are null. The ESP input is reported available only when streaming and connected with a non-stale original cached frame; `support: implemented` describes the PC software input adapter, not a verified attached device. Health `state` is one of `not_connected`, `unreachable`, `connected`, `reconnecting`, `waiting_for_frame`, `streaming`, `stale`, `paused`, `error`, `simulated`, or `idle`. No physical output capability can be inferred or commanded, and profile persistence remains V1. Existing consumers may ignore the new fields.
+
 ## V0552 camera transport diagnostics (additive)
 
 `GET /api/camera/remote/status` preserves existing fields and adds `frame_age_ms` (nonnegative milliseconds since the original cached PC receive timestamp, null when no frame), `frame_stale` (disconnected or over 5000 ms while streaming), `repeated_source_frames` and `source_sequence_resets` counters on the selected ESP status. Each saved physical `cameras[]` entry also exposes these fields, `last_frame_interval_ms`, `source_sequence_gaps`, `stream_reconnects` and `session_recoveries`. The one-camera session status may derive its age from the latest transport completion when queried directly; manager status uses the original immutable cached-frame timestamp. `measured_fps` is a smoothed receive-rate indicator, shown as zero while stale/disconnected, not ESP acquisition speed or network latency. Sequence gaps are inferred within an open TCP stream; missing frames between reconnects cannot be measured. Duplicate source sequence plus uptime packets are not republished. No response envelope change, extra JPEG decode or physical signal output.
