@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
@@ -12,7 +11,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
-from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, _image_dimensions, camera_frame_service
+from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, camera_frame_service
 from app.services.remote_camera import (
     CAMERA_SETTING_KEYS,
     DEFAULT_TARGET_FPS,
@@ -81,12 +80,6 @@ BOOL_SETTING_KEYS = {
 }
 
 
-@dataclass(frozen=True)
-class _CachedPacket:
-    packet: _FramePacket
-    received_at_ms: int
-
-
 class RemoteCameraManager:
     """Persist and coordinate several V037/V036-compatible ESP32-CAM sessions.
 
@@ -115,7 +108,7 @@ class RemoteCameraManager:
         self._profiles: dict[str, dict[str, Any]] = {}
         self._sessions: dict[str, RemoteCameraService] = {}
         self._session_generations: dict[str, int] = {}
-        self._latest_packets: dict[str, _CachedPacket] = {}
+        self._latest_frames: dict[str, CameraFrame] = {}
         self._active_source_id: str | None = None
         self._active_frame_number: int | None = None
         self._registry_warning: str | None = None
@@ -322,7 +315,7 @@ class RemoteCameraManager:
         """Retire one session so any late worker frame is rejected by generation."""
         session = self._sessions.pop(source_id, None)
         self._session_generations[source_id] = self._session_generations.get(source_id, 0) + 1
-        self._latest_packets.pop(source_id, None)
+        self._latest_frames.pop(source_id, None)
         return session
 
     def _ingest_frame(
@@ -332,32 +325,27 @@ class RemoteCameraManager:
         *,
         generation: int | None = None,
     ) -> int:
-        """Cache every current session; publish only the selected source without switch races."""
+        """Allocate one immutable observation per accepted packet, selected or not."""
         now_ms = self._now_ms()
-        with self._frame_condition:
-            if generation is not None and self._session_generations.get(source_id) != generation:
-                return int(packet.sequence)
-            self._latest_packets[source_id] = _CachedPacket(packet=packet, received_at_ms=now_ms)
-
-        # Selection and session replacement also take _publish_lock. Re-check both
-        # active identity and generation while holding it so a late frame from a
-        # retired ESP/session cannot overwrite a newly selected or re-addressed ESP.
+        # Serialize generation checks, cache replacement and selected publication.
+        # The same frame object is also consumed by background inference.
         with self._publish_lock:
             with self._lock:
                 if generation is not None and self._session_generations.get(source_id) != generation:
                     return int(packet.sequence)
-                active = self._active_source_id == source_id
-            if not active or camera_frame_service.simulation_enabled:
-                return int(packet.sequence)
 
-            frame = camera_frame_service.store_upload(
-                source_id=source_id,
-                content_type="image/jpeg",
-                content=packet.content,
+            frame = camera_frame_service.prepare_upload(
+                source_id=source_id, content_type="image/jpeg",
+                content=packet.content, received_at_ms=now_ms,
             )
-            with self._frame_condition:
-                self._active_frame_number = frame.frame_number
-                self._frame_condition.notify_all()
+            with self._lock:
+                self._latest_frames[source_id] = frame
+                active = self._active_source_id == source_id
+            if active and not camera_frame_service.simulation_enabled:
+                camera_frame_service.publish_cached_upload(frame)
+                with self._frame_condition:
+                    self._active_frame_number = frame.frame_number
+                    self._frame_condition.notify_all()
             return frame.frame_number
 
     @staticmethod
@@ -394,7 +382,7 @@ class RemoteCameraManager:
 
         with self._lock:
             source_id = self._active_source_id
-            cached = self._latest_packets.get(source_id) if source_id else None
+            cached = self._latest_frames.get(source_id) if source_id else None
             session = self._sessions.get(source_id) if source_id else None
             max_cache_age_ms = self._switch_cache_max_age_ms_locked(source_id) if source_id else 0
 
@@ -403,7 +391,7 @@ class RemoteCameraManager:
             and cached is not None
             and session is not None
             and session.streaming_requested
-            and self._now_ms() - cached.received_at_ms <= max_cache_age_ms
+            and 0 <= self._now_ms() - cached.received_at_ms <= max_cache_age_ms
         )
         if not fresh or source_id is None or cached is None:
             with self._frame_condition:
@@ -411,11 +399,7 @@ class RemoteCameraManager:
                 self._frame_condition.notify_all()
             return
 
-        frame = camera_frame_service.store_upload(
-            source_id=source_id,
-            content_type="image/jpeg",
-            content=cached.packet.content,
-        )
+        frame = camera_frame_service.publish_cached_upload(cached)
         with self._frame_condition:
             self._active_frame_number = frame.frame_number
             self._frame_condition.notify_all()
@@ -759,7 +743,7 @@ class RemoteCameraManager:
         """Snapshot fresh frames for every saved stream, independently of selected camera."""
         with self._lock:
             profiles = list(self._profiles.values())
-            cached = dict(self._latest_packets)
+            cached = dict(self._latest_frames)
         if camera_frame_service.simulation_enabled:
             return [frame for profile in profiles if profile["kind"] == "simulation"
                     if (frame := camera_frame_service.simulation_frame_for(profile["source_id"])) is not None]
@@ -768,15 +752,9 @@ class RemoteCameraManager:
         for profile in profiles:
             source_id = profile["source_id"]
             item = cached.get(source_id)
-            if profile["kind"] != "esp32" or item is None or now_ms - item.received_at_ms > 5000:
+            if profile["kind"] != "esp32" or item is None or not 0 <= now_ms - item.received_at_ms <= 5000:
                 continue
-            dims = _image_dimensions(item.packet.content, "image/jpeg")
-            if dims:
-                frames.append(CameraFrame(
-                    content=item.packet.content, content_type="image/jpeg", source_id=source_id,
-                    width=dims[0], height=dims[1], received_at_ms=item.received_at_ms,
-                    frame_number=max(1, int(item.packet.sequence)), origin="upload",
-                ))
+            frames.append(item)
         uploaded = camera_frame_service.latest_frame()
         if uploaded and uploaded.source_id not in {f.source_id for f in frames} and not any(
             x["source_id"] == uploaded.source_id for x in profiles

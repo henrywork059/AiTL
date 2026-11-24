@@ -1,5 +1,5 @@
-version: 0_5_46
-status: ESP worker retirement and recovery candidate (roadmap Update 02)
-previous_version: 0_5_45
+version: 0_5_47
+status: ESP cached-frame identity candidate (roadmap Update 03)
+previous_version: 0_5_46
 passed_baseline: 0_5_0
-notes: Guard retired-worker failure, join, frame metadata and recovery publication; serialize recovery control with replacement session control. 11/11 isolated behavioral checks passed; focused repository regression added; full CI and owner Windows/ESP PASS required.
+notes: Preserve original PC receive timestamp and frame identity across cache promotion and background inference. 9/9 isolated behavioral checks passed; focused repository regression added; full CI and owner Windows/ESP PASS required.

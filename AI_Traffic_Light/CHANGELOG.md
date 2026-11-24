@@ -1,3 +1,7 @@
+## 0_5_47 — Preserve ESP cached-frame identity (candidate; roadmap Update 03 / H03)
+- Cache one validated immutable CameraFrame per accepted ESP packet, with its original PC receive timestamp and a globally allocated frame ID. Selection, simulation return and background inference reuse the same object; stale caches remain rejected. Ordinary HTTP uploads still allocate and publish new frames. ESP wire sequence remains a transport diagnostic, not the application frame ID.
+- Add deterministic cached-frame regression and update multi-camera race fixture. Previous `0_5_46`, accepted baseline `0_5_0`; owner PASS pending.
+
 ## 0_5_46 — Guard retired ESP workers (candidate; roadmap Update 02 / H02)
 - Guard retired-worker failure, join completion, receive counters/frame metadata and recovery using the worker stop-event identity. Serialize recovery with replacement ESP control commands and recheck ownership around each HTTP stage. Already-issued HTTP calls may finish before replacement control; their stale responses cannot publish state. A frame sink already in progress is not rolled back; cache/source provenance remains Update 03/04.
 - Add 11 deterministic worker-retirement cases; previous `0_5_45`, accepted baseline `0_5_0`, owner PASS pending. No firmware, API or signal changes.

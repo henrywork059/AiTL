@@ -1,3 +1,22 @@
+# V0547 — Preserve ESP cached-frame identity
+
+Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/test_v0547_cached_frame_identity.py`, `python scripts/test_remote_camera_multi.py`, V0544–V0546, structure, full offline regressions and frontend typecheck/build.
+
+From repository root on Windows:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify rapid A/B/A selection, fresh/stale cache behavior, exact source/frame identity, simulation return and normal streaming. Reproduced against the original hash-matched promotion method with an injected receiver: original timestamp 1000 became 1100 and two promotions allocated IDs 1 and 2. Patched isolated method execution passed 9/9 behavioral checks using three FNV-1a-matched source blocks (camera upload methods ca8e8669, manager ingest/promotion 29058cfc, inference snapshot a7bfb222), injected dependencies and real JPEG fixtures: background isolation, preserved time/ID, A/B/A replay, distinct same-ms packets, stale rejection, simulation ownership transition, ordinary upload, retired generation and invalid image rejection. This is not full-module regression execution; image validation and simulation were injected. Direct clone failed DNS resolution; repository regression, full CI and owner Windows/ESP validation pending.
+
+---
+
 # V0546 — ESP worker retirement and recovery
 
 Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

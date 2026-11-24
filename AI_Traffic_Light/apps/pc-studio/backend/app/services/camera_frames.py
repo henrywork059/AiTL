@@ -209,6 +209,28 @@ class CameraFrameService:
         self._simulation_rng = random.Random(self._simulation_seed)
 
     def store_upload(self, *, source_id: str, content_type: str, content: bytes, validate_decode: bool = False) -> CameraFrame:
+        return self._create_upload(
+            source_id=source_id, content_type=content_type, content=content,
+            validate_decode=validate_decode, publish=True,
+        )
+
+    def prepare_upload(self, *, source_id: str, content_type: str, content: bytes, received_at_ms: int) -> CameraFrame:
+        """Allocate one validated frame identity without changing the selected image."""
+        return self._create_upload(
+            source_id=source_id, content_type=content_type, content=content,
+            received_at_ms=received_at_ms, publish=False,
+        )
+
+    def publish_cached_upload(self, frame: CameraFrame) -> CameraFrame:
+        """Promote an already validated receiver frame without allocating a new observation."""
+        with self._lock:
+            self._uploaded_frame = frame
+            return frame
+
+    def _create_upload(
+        self, *, source_id: str, content_type: str, content: bytes,
+        publish: bool, validate_decode: bool = False, received_at_ms: int | None = None,
+    ) -> CameraFrame:
         normalized_type = content_type.split(";", maxsplit=1)[0].strip().lower()
         if not SOURCE_ID_PATTERN.fullmatch(source_id):
             raise AppError(
@@ -252,11 +274,12 @@ class CameraFrameService:
                 source_id=source_id,
                 width=dimensions[0],
                 height=dimensions[1],
-                received_at_ms=int(time.time() * 1000),
+                received_at_ms=int(time.time() * 1000) if received_at_ms is None else received_at_ms,
                 frame_number=self._frame_counter,
                 origin="upload",
             )
-            self._uploaded_frame = frame
+            if publish:
+                self._uploaded_frame = frame
             return frame
 
     def _reset_simulation_locked(self) -> None:

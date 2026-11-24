@@ -1,3 +1,13 @@
+# V0547 — Preserve ESP cached-frame identity
+
+Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Cache one validated immutable CameraFrame per accepted ESP packet, with its original PC receive timestamp and a globally allocated frame ID. Selection, simulation return and background inference reuse the same object; stale caches remain rejected. Ordinary HTTP uploads still allocate and publish new frames. ESP wire sequence remains a transport diagnostic, not the application frame ID.
+
+See [Patch 0_5_47](PATCH_0_5_47.md). Pull the feature branch and run the Windows runner with `-SkipUpdate`. Verify rapid camera switching, correct source/age, normal streaming and simulation return. Owner PASS pending.
+
+---
+
 # V0546 — ESP worker retirement and recovery
 
 Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

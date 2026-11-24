@@ -1,3 +1,14 @@
+# V0547 — Preserve ESP cached-frame identity
+
+Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Cached promotion preserves timestamp, source and frame ID, including A/B/A replay and simulation return.
+- [ ] New accepted packets get distinct IDs, including equal receive milliseconds; background frames do not replace the selected source.
+- [ ] Stale cache rejected; ordinary receiver upload remains functional; multi-camera publication race and V0544–V0546 regressions pass.
+- [ ] Full offline checks, typecheck/build and Windows/ESP acceptance pass. Explicit owner PASS required; no physical actuation.
+
+---
+
 # V0546 — ESP worker retirement and recovery
 
 Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
