@@ -17,6 +17,7 @@ Then open as needed:
 
 - `docs/DOCUMENTATION_MAP.md` — document authority/update ownership;
 - `docs/PROJECT_SCOPE.md` — capability/evidence boundaries;
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — required for open-ended maintenance/development task selection; follow the approved dependency order, record backlog ID and update material progress without bypassing safety or release gates;
 - `docs/AI_AGENT_GUIDE.md` — detailed architecture/development rationale;
 - current `PATCH_*`, `LOCAL_TESTING`, `TEST_READY_CHECKLIST` — candidate-specific testing/acceptance.
 
