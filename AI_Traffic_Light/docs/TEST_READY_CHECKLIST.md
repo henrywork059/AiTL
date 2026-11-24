@@ -1,3 +1,15 @@
+# V0550 — Stale-input virtual signal fallback
+
+Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Camera source-time expiry and replay; missing/future/unavailable observations suppressed.
+- [ ] Persistence restarts after gaps; unverified class conditions unavailable; fused evidence age uses oldest view.
+- [ ] Protected amber, all-red, WALK and CLEAR sequence maintained without conflicting virtual permissions.
+- [ ] V0550 and related signal/crosswalk regressions, full structure/offline/typecheck/build and live smoke pass.
+- [ ] Explicit owner PASS required. No physical actuation.
+
+---
+
 # V0549 — Reproducible offline regression execution
 
 Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

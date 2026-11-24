@@ -1,3 +1,20 @@
+# V0550 — Stale-input virtual signal fallback
+
+Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Run `python scripts/run_offline_tests.py --focused test_v0550_signal_stale_fallback.py test_signal_rules_service.py test_signal_scenarios.py test_v0512_camera_crosswalk.py test_select_changed_tests.py` and then the full runner. Verify stale/missing inputs, competing scenarios, protected phases, class availability, two-view freshness and emergency interlocks.
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Five defects reproduced with four copied original method blocks matched to GitHub by FNV-1a. Ten patched isolated behavioral checks passed (expired, unavailable, future/missing, replay, stale persistence, unavailable persistence, unpolled gap, unknown class, five-second cap, explicit Test mode). Patched block hashes: observe/clear/freshness 6d63a0c9, condition value 59d80e9b, candidate evaluation 1157b7a2, observation values 9965254b. Test harness injected clock, constructor, memory and scenario-match dependencies; this is not full controller or integration testing. The repository regression includes the real protected phase sequence and fused-view age checks; not executed locally. The changed-test selector regression also executed successfully, with source hashes 75004545 and 1c8e6d9f; compileall of the local harness and selector files passed. Direct clone still fails DNS; full CI/Windows/ESP owner PASS pending.
+
+---
+
 # V0549 — Reproducible offline regression execution
 
 Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.

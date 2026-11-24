@@ -66,6 +66,7 @@ ALLOWED_METRICS = {
     "incident_person_fallen",
 }
 TEST_ONLY_METRICS = {"mobility_assistance", "incident_person_fallen"}
+CAMERA_OBSERVATION_SOURCES = {"live_zone_evaluation", "crosswalk_camera_ai"}
 
 
 def _legacy_rule_to_conditions(rule: dict[str, Any]) -> list[dict[str, Any]]:
@@ -465,6 +466,29 @@ class SignalRulesService:
     def observe(self, observation: dict[str, Any]) -> None:
         now = time.monotonic()
         with self._lock:
+            profile = self._active_profile_locked(self._load_config_locked())
+            source = observation.get("data_source")
+            sample_time = now
+            if isinstance(source, str) and source.startswith("inference_unavailable"):
+                self._clear_observation_locked()
+                return
+            if source in CAMERA_OBSERVATION_SOURCES:
+                timestamp = observation.get("source_timestamp_ms")
+                if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool):
+                    self._clear_observation_locked()
+                    return
+                age = time.time() - timestamp / 1000.0
+                if not 0 <= age <= min(5.0, float(profile["stale_data_seconds"])):
+                    self._clear_observation_locked()
+                    return
+                sample_time = now - age
+                if (self._last_observation_monotonic is not None
+                        and self._last_observation.get("source_timestamp_ms") == timestamp
+                        and self._last_observation.get("data_source") == source):
+                    sample_time = min(sample_time, self._last_observation_monotonic)
+            if (not self._observation_is_fresh_locked(profile, now)
+                    or self._last_observation.get("data_source") != source):
+                self._clear_observation_locked()
             zone_class_counts = observation.get("zone_class_counts", {})
             if not isinstance(zone_class_counts, dict):
                 zone_class_counts = {}
@@ -479,20 +503,32 @@ class SignalRulesService:
                 "source_timestamp_ms": observation.get("source_timestamp_ms"),
                 "data_source": observation.get("data_source"),
             }
-            self._last_observation_monotonic = now
-            self._update_memory_locked(self._pedestrian_wait, self._last_observation["pedestrians_waiting"], now)
-            self._update_memory_locked(self._vehicle_wait, self._last_observation["vehicles_waiting"], now)
-            self._update_memory_locked(self._crossing, self._last_observation["pedestrians_crossing"], now)
+            self._last_observation_monotonic = sample_time
+            self._update_memory_locked(self._pedestrian_wait, self._last_observation["pedestrians_waiting"], sample_time)
+            self._update_memory_locked(self._vehicle_wait, self._last_observation["vehicles_waiting"], sample_time)
+            self._update_memory_locked(self._crossing, self._last_observation["pedestrians_crossing"], sample_time)
 
     def clear_observation(self) -> None:
         """Immediately withdraw camera observations after a stream/model becomes invalid."""
         with self._lock:
-            self._last_observation = {}
-            self._last_observation_monotonic = None
-            self._pedestrian_wait = _DemandMemory()
-            self._vehicle_wait = _DemandMemory()
-            self._crossing = _DemandMemory()
-            self._rule_condition_since.clear()
+            self._clear_observation_locked()
+
+    def _clear_observation_locked(self) -> None:
+        self._last_observation = {}
+        self._last_observation_monotonic = None
+        self._pedestrian_wait = _DemandMemory()
+        self._vehicle_wait = _DemandMemory()
+        self._crossing = _DemandMemory()
+        self._rule_condition_since.clear()
+        if not self._emergency_priority_source:
+            self._pending_request = None
+
+    def _observation_is_fresh_locked(self, profile: dict[str, Any], now: float) -> bool:
+        limit = float(profile["stale_data_seconds"])
+        if self._last_observation.get("data_source") in CAMERA_OBSERVATION_SOURCES:
+            limit = min(limit, 5.0)
+        return (self._last_observation_monotonic is not None
+                and 0 <= now - self._last_observation_monotonic <= limit)
 
     @staticmethod
     def _update_memory_locked(memory: _DemandMemory, count: int, now: float) -> None:
@@ -869,7 +905,7 @@ class SignalRulesService:
 
     def _observation_values_locked(self, profile: dict[str, Any]) -> tuple[dict[str, Any], bool, str | None]:
         now = time.monotonic()
-        fresh = self._last_observation_monotonic is not None and now - self._last_observation_monotonic <= float(profile["stale_data_seconds"])
+        fresh = self._observation_is_fresh_locked(profile, now)
         memory_window = float(profile["demand_memory_seconds"])
 
         def memory_count(memory: _DemandMemory, current: int) -> int:
@@ -930,6 +966,10 @@ class SignalRulesService:
             value = float(sum(max(0.0, float(item or 0)) for item in class_counts.values()))
             label = f"all classes in {condition['zone_id']}"
         else:
+            if (config["mode"] != "test" and values.get("data_source") in CAMERA_OBSERVATION_SOURCES
+                    and not any(isinstance(counts, dict) and class_name in counts
+                                for counts in zone_counts.values())):
+                return False, 0.0, f"{class_name} support is unverified in the current camera observation"
             value = float(max(0.0, float(class_counts.get(class_name, 0) or 0)))
             label = f"{class_name} in {condition['zone_id']}"
         return True, value, label
@@ -991,13 +1031,19 @@ class SignalRulesService:
             elif config["mode"] == "fixed":
                 state = "suppressed"
                 reason = "Fixed mode does not execute adaptive scenarios"
+                if mutate:
+                    self._rule_condition_since.pop(scenario["id"], None)
             elif not fresh:
                 state = "suppressed"
                 reason = "adaptive observations are stale or unavailable"
+                if mutate:
+                    self._rule_condition_since.pop(scenario["id"], None)
             else:
                 available, condition_matched, condition_details, reason = self._scenario_match_locked(config, scenario, values)
                 if not available:
                     state = "unavailable"
+                    if mutate:
+                        self._rule_condition_since.pop(scenario["id"], None)
                 elif condition_matched:
                     if mutate:
                         since = self._rule_condition_since.setdefault(scenario["id"], clock)
@@ -1077,6 +1123,8 @@ class SignalRulesService:
             phase_limits = profile["phases"][phase_key]
             self._apply_scenario_locked(winner, clock, elapsed, phase_limits, profile, phase_key)
         if not fresh and fallback_reason:
+            if not self._emergency_priority_source:
+                self._pending_request = None
             self._winning_scenario_id = None
             self._winning_scenario_label = None
             self._last_active_rules = []

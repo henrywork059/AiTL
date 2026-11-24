@@ -1,5 +1,5 @@
-version: 0_5_49
-status: Reproducible offline regression runner candidate (roadmap Update 05)
-previous_version: 0_5_48
+version: 0_5_50
+status: Stale-input virtual signal fallback candidate (roadmap Update 06)
+previous_version: 0_5_49
 passed_baseline: 0_5_0
-notes: Shared CI/Windows offline test discovery; conservative camera/inference fallback and explicit fresh Python 3.11 setup. Two focused local regression scripts passed; full CI and owner PASS pending.
+notes: Preserve source freshness, reset interrupted persistence and suppress unverified class evidence; 10 isolated checks and selector regression passed; full CI and owner PASS pending.

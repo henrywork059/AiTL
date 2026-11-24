@@ -1,3 +1,7 @@
+## 0_5_50 — Stale-input virtual signal fallback (candidate; roadmap Update 06 / A01)
+- Adaptive camera observations use original source receive time, bounded by the shorter of the configured timeout and five seconds; missing, future, expired and explicit unavailable inputs are rejected. Replay cannot renew the same timestamp. Persistence is reset after stale/fixed/unavailable evaluations or an elapsed observation gap, even without polling. Unverified named classes are unavailable instead of assumed zero. Fused crosswalk policy observations use the oldest contributing view. Already-committed phase duration and protected transition sequence are preserved; no physical output.
+- Five reproduced defects; ten isolated checks passed. Previous `0_5_49`, accepted baseline `0_5_0`; full CI/owner PASS pending.
+
 ## 0_5_49 — Reproducible offline regression execution (candidate; roadmap Update 05 / H04)
 - Use one Python offline regression runner in Windows and CI, with deterministic discovery, shared live/hardware exclusions and fail-fast subprocess exit handling. Focused changes to camera/inference/model or camera firmware conservatively run the full suite; missing/deleted tests or empty regression families also fall back to all. Fresh Windows setup targets Python 3.11 and checks native exit codes without replacing an existing venv.
 - Local offline-runner and selector regression scripts passed; previous `0_5_48`, accepted baseline `0_5_0`; full CI/Windows owner PASS pending.

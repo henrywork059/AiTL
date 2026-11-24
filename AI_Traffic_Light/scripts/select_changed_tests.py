@@ -83,7 +83,7 @@ def select(paths: list[str], available_tests: list[str]) -> dict[str, object]:
                 all_tests = True
                 continue
             group = backend_group(path)
-            if group is None or group in {"camera", "inference", "model"}:
+            if group is None or group in {"camera", "inference", "model", "signal"}:
                 # Numbered lifecycle regressions and cross-consumer dependencies
                 # are not reliably discoverable by filename. Run the full suite.
                 all_tests = True

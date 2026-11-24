@@ -41,8 +41,7 @@ def main() -> int:
         P + "apps/pc-studio/backend/app/services/signal_rules.py",
         P + "apps/pc-studio/frontend/src/pages/JunctionNetworkPage.tsx",
     ], TESTS)
-    assert not combined["all"] and combined["frontend"]
-    assert "test_signal_rules_service.py" in combined["tests"]
+    assert combined["all"] and combined["frontend"]
     assert "test_junction_network_frontend_structure.py" in combined["tests"]
 
     manifest = select([P + "apps/pc-studio/frontend/package.json"], TESTS)

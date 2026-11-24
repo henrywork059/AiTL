@@ -1,3 +1,13 @@
+# V0550 — Stale-input virtual signal fallback
+
+Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+Adaptive camera observations use original source receive time, bounded by the shorter of the configured timeout and five seconds; missing, future, expired and explicit unavailable inputs are rejected. Replay cannot renew the same timestamp. Persistence is reset after stale/fixed/unavailable evaluations or an elapsed observation gap, even without polling. Unverified named classes are unavailable instead of assumed zero. Fused crosswalk policy observations use the oldest contributing view. Already-committed phase duration and protected transition sequence are preserved; no physical output.
+
+See [Patch 0_5_50](PATCH_0_5_50.md). Full Windows owner runner and simulation acceptance required.
+
+---
+
 # V0549 — Reproducible offline regression execution
 
 Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
