@@ -1,21 +1,43 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const ts = require('typescript');
-const Module = require('node:module');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
-// Compile the actual source in memory using the project's TypeScript dependency.
-const previousLoader = Module._extensions['.ts'];
-Module._extensions['.ts'] = (module, filename) => {
-  const result = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 },
-  });
-  module._compile(result.outputText, filename);
-};
-const { createPollingScope, runScopedSerialTask } = require('../src/lib/pollingScope.ts');
-const { requestJson, requestJsonStrict, ApiRequestError } = require('../src/lib/apiClient.ts');
-if (previousLoader) Module._extensions['.ts'] = previousLoader;
-else delete Module._extensions['.ts'];
+// Use the locked compiler's CLI, not its version-dependent JavaScript API.
+// Copy only the actual tested modules into an isolated CommonJS project.
+function loadModules() {
+  const frontend = path.resolve(__dirname, '..');
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'aitl-data-access-'));
+  try {
+    const source = path.join(temporary, 'src');
+    fs.mkdirSync(source);
+    const files = ['pollingScope.ts', 'apiClient.ts', 'errorCodes.ts', 'logger.ts'];
+    for (const file of files) {
+      fs.copyFileSync(path.join(frontend, 'src', 'lib', file), path.join(source, file));
+    }
+    fs.writeFileSync(path.join(temporary, 'package.json'), JSON.stringify({ type: 'commonjs' }));
+    const config = path.join(temporary, 'tsconfig.json');
+    fs.writeFileSync(config, JSON.stringify({
+      compilerOptions: {
+        target: 'ES2021', module: 'NodeNext', moduleResolution: 'NodeNext',
+        lib: ['ES2021', 'DOM'], types: [], strict: true, skipLibCheck: true,
+        verbatimModuleSyntax: false, noEmitOnError: true, rootDir: 'src', outDir: 'dist',
+      },
+      include: ['src/*.ts'],
+    }));
+    const compiler = path.join(frontend, 'node_modules', 'typescript', 'bin', 'tsc');
+    execFileSync(process.execPath, [compiler, '--project', config], { stdio: 'inherit' });
+    return {
+      ...require(path.join(temporary, 'dist', 'pollingScope.js')),
+      ...require(path.join(temporary, 'dist', 'apiClient.js')),
+    };
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+const { createPollingScope, runScopedSerialTask, requestJson, requestJsonStrict, ApiRequestError } = loadModules();
 
 async function main() {
   const inFlight = { current: null };

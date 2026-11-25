@@ -5,7 +5,10 @@ Candidate `0_5_63`; previous `0_5_62`; accepted baseline `0_5_0`; Update 19 / A0
 - [x] Shared polling scope and API cancellation implemented.
 - [x] Mocked core/API runtime regression and isolated strict TypeScript compilation passed.
 - [x] Initial CI failure localized to obsolete V059 source predicate; corrected predicates checked directly.
-- [ ] Corrected full Python regression execution, frontend integration, current CI and browser/owner acceptance.
+- [x] Correction 19a full offline regressions passed in CI.
+- [x] Correction 19b replaces incompatible TypeScript compiler API; corrected harness passed locally on TypeScript 5.8.3, exact staged hashes verified.
+- [ ] Locked TypeScript 7.0.2 Windows CI, integrated typecheck/build, browser and owner acceptance.
+- [ ] Investigate two high-severity npm audit findings before adopting new dependencies.
 - [ ] Physical gates unchanged.
 
 See [Patch 0_5_63](PATCH_0_5_63.md).
