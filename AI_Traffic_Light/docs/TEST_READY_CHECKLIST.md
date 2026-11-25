@@ -1,3 +1,17 @@
+# V0560 — Separate ATL1 transport framing from camera lifecycle
+
+Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.
+
+- [x] Existing packet and socket-read implementation extracted without changing wire framing or worker ownership.
+- [x] Isolated transport regression groups and compilation passed.
+- [ ] Full candidate CI and Windows/ESP owner acceptance.
+- [ ] Matched before/after ESP throughput and PC CPU measurements.
+- [ ] Physical lighting/speaker remain blocked.
+
+See [Patch 0_5_60](PATCH_0_5_60.md).
+
+---
+
 # V0559 — Unified camera observation identity
 
 Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.

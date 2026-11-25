@@ -1,5 +1,5 @@
-version: 0_5_59
-status: Unified camera observation identity candidate (roadmap Update 15 / A02)
-previous_version: 0_5_58
+version: 0_5_60
+status: ATL1 transport separation candidate (roadmap Update 16 / A04)
+previous_version: 0_5_59
 passed_baseline: 0_5_0
-notes: Isolated identity contract checked; full producer integration CI and owner PASS pending; physical lighting/speaker blocked.
+notes: Isolated transport tests passed; full CI, ESP throughput/CPU comparison and owner PASS pending.

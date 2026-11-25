@@ -1,3 +1,15 @@
+# V0560 — Separate ATL1 transport framing from camera lifecycle
+
+Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.
+
+Extract the existing ATL1 packet value, exact-length socket wrapper, encoder and decoder into `camera_tcp_transport.py`. The extracted class/function bodies are unchanged. `RemoteCameraService` imports the same symbols at its existing compatibility and monkeypatch seams; it retains socket opening/configuration, worker ownership, stop/join, cancellation, recovery, control requests and frame publication. `RemoteCameraManager` remains the sole registry/session-selection owner. No new transport, duplicate parser, API change, wire change, physical output or freshness policy change.
+
+Three isolated regression groups passed (fragmented framing, socket shutdown, malformed/truncated packets); isolated Python compilation passed. The local test uses the existing 8 MiB frame-size constant in an isolated stub; full checkout could not be cloned because GitHub DNS resolution failed. Full candidate CI, actual ESP throughput/CPU comparison and Windows/ESP owner PASS remain pending. No performance improvement claimed. Previous 0_5_59 CI passed ([run 45518551845](https://github.com/henrywork059/AiTL/actions/runs/45518551845)).
+
+See [Patch 0_5_60](PATCH_0_5_60.md).
+
+---
+
 # V0559 — Unified camera observation identity
 
 Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.

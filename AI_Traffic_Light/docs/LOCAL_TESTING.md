@@ -1,3 +1,26 @@
+# V0560 — Separate ATL1 transport framing from camera lifecycle
+
+Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0560_tcp_transport.py
+python scripts/test_remote_camera_session.py
+python scripts/test_remote_camera_multi.py
+python scripts/test_remote_camera_control_resilience.py
+python scripts/test_v0544_tcp_read_cancellation.py
+python scripts/test_v0545_tcp_open_cancellation.py
+python scripts/test_v0546_worker_retirement.py
+python scripts/test_v0552_camera_transport_diagnostics.py
+```
+
+Three isolated regression groups passed (fragmented framing, socket shutdown, malformed/truncated packets); isolated Python compilation passed. The local test uses the existing 8 MiB frame-size constant in an isolated stub; full checkout could not be cloned because GitHub DNS resolution failed. Full candidate CI, actual ESP throughput/CPU comparison and Windows/ESP owner PASS remain pending. No performance improvement claimed. Previous 0_5_59 CI passed ([run 45518551845](https://github.com/henrywork059/AiTL/actions/runs/45518551845)).
+
+See [Patch 0_5_60](PATCH_0_5_60.md).
+
+---
+
 # V0559 — Unified camera observation identity
 
 Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.
