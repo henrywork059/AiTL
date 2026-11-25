@@ -40,3 +40,7 @@ jobs:
       - name: Build
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm run build
+      - name: Dependency audit evidence (no automatic fixes)
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        continue-on-error: true
+        run: npm audit --audit-level=high --json

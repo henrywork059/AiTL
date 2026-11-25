@@ -1,3 +1,18 @@
+# V0564 — Simulation engine evaluation foundation
+
+Candidate `0_5_64`; previous `0_5_63`; accepted baseline `0_5_0`; Update 20 / S01.
+
+- [x] Upstream comparison and conditional selection documented.
+- [x] Offline fixture, trace and missing-binary regressions passed; compile and exact source hashes verified.
+- [x] Real invocation attempted; blocked explicitly, zero external trials.
+- [ ] Current CI and owner PASS.
+- [ ] Pinned SUMO Windows smoke, matched engine/render benchmarks and dependency security review before adoption.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_64](PATCH_0_5_64.md) and [engine evaluation](SIMULATION_ENGINE_EVALUATION.md).
+
+---
+
 # V0563 — Centralized frontend polling and cancellation
 
 Candidate `0_5_63`; previous `0_5_62`; accepted baseline `0_5_0`; Update 19 / A04.
