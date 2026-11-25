@@ -444,3 +444,8 @@ Cancellation is client-side and does not guarantee the server stops work. Existi
 ### Simulation engine evaluation (0_5_64 candidate)
 
 No HTTP or saved schema changes. The optional offline CLI emits evaluation-only JSON, schema_version 1; status pass/fail/blocked and explicit evidence label, fixed seed, step, horizon, platform, runs (empty if blocked), and optional engine version, trace summaries or error. Not a production endpoint, field measurement, or simulation scene replacement. Existing camera/scene and signal contracts are unchanged.
+
+
+### Fixed-step legacy simulator adapter (0_5_65 candidate)
+
+No HTTP or saved schema change. Scene time advances in completed 50 ms fixed steps, with an internal retained remainder and existing two-second catch-up cap. Optional deterministic seed/clock injection is a Python constructor test seam only, not a new runtime setting or public command. All camera IDs, 1280 × 720 coordinates, frame identity, pause/status keys, protected policy, physical camera and error/envelope contracts are preserved in design; integrated validation pending. No change to public-road actuation prohibition.

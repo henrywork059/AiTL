@@ -1,3 +1,23 @@
+# V0565 — Fixed-step legacy simulator adapter
+
+Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S02.
+
+```powershell
+# From AI_Traffic_Light
+python scripts/test_v0565_simulation_adapter.py
+python scripts/test_camera_frame_service.py
+python scripts/test_camera_simulation_api.py
+python scripts/test_v0515_3d_simulation.py
+```
+
+Executed three isolated unittest cases against the exact new adapter on Python 3.13.5: different poll partitions (20 identical fixed steps over one second), pause/resume with preserved remainder, capped catch-up, backwards monotonic guard, reset and invalid durations. Both isolated Python files compiled. Verified Git blob hashes: adapter bed0c3ef779d3f4d3a63df10449a0ff940881904; regression 18a9deeff86bc1fb4fd688921cca114e85eca5d6. A fourth regression exercises actual legacy camera agents with injected clock/seed and fixed synthetic phase; it has not been executed locally. Full checkout unavailable due to GitHub DNS failure, so camera integration, old API/signal regressions and current full CI pending. Previous [0_5_64 full CI](https://github.com/henrywork059/AiTL/actions/runs/45619974507) passed. Owner PASS pending.
+
+Security gate: previous CI audit JSON (run 45619974507, 25 Nov 2026) identified two high-severity vulnerable packages: locked source-map-js 1.2.1 ([GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q), patched range starts at 1.2.2) and direct Vite 8.2.1 ([GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm), audit suggested Vite 8.3.8; additional lower-severity Vite advisories listed in the CI log). The audit step is non-blocking, exited 1, and is not a security PASS. No dependency changes here; package remediation requires regenerated lockfile and fresh audit/build/test evidence. Restrict prototype development server to trusted local access; do not expose it to untrusted networks or open untrusted projects/source maps. Security remediation takes priority before new dependencies; real SUMO smoke and security gates remain blockers for Update 22.
+
+See [Patch 0_5_65](PATCH_0_5_65.md).
+
+---
+
 # V0564 — Simulation engine evaluation foundation
 
 Candidate `0_5_64`; previous `0_5_63`; accepted baseline `0_5_0`; Update 20 / S01.

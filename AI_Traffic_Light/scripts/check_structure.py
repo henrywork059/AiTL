@@ -77,6 +77,8 @@ REQUIRED_PATHS = (
     "scripts/run_offline_tests.py",
     "scripts/evaluate_simulation_engine.py",
     "scripts/test_v0564_engine_evaluation.py",
+    "scripts/test_v0565_simulation_adapter.py",
+    "apps/pc-studio/backend/app/services/simulation_adapter.py",
     "docs/SIMULATION_ENGINE_EVALUATION.md",
     "scripts/test_offline_test_discovery.py",
     "scripts/test_select_changed_tests.py",

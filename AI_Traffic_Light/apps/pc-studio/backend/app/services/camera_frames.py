@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import random
 import re
@@ -13,6 +14,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
 from app.services.observation_identity import ObservationIdentity, observation_provenance
+from app.services.simulation_adapter import LegacySimulationAdapter
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
@@ -203,8 +205,10 @@ SIMULATION_CAMERA_SOURCE_IDS = tuple(source for pair in SIMULATION_CAMERA_PAIRS 
 class CameraFrameService:
     """Store the latest uploaded frame and provide a signal-aware hardware-free simulator."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, simulation_seed: int | None = None,
+                 simulation_monotonic: Callable[[], float] | None = None) -> None:
         self._lock = Lock()
+        self._simulation_monotonic = simulation_monotonic or time.monotonic
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
         # Reuse the current render for mirrored views instead of decoding PNG.
@@ -213,16 +217,27 @@ class CameraFrameService:
         self._simulation_source_id = "simulation_camera"
         self._simulation_enabled = False
         self._observation_mode_generation = 0
-        self._simulation_paused = False
         self._simulation_density = "normal"
-        self._simulation_seed = int(time.time() * 1000) & 0x7FFFFFFF
+        self._simulation_seed = (int(time.time() * 1000) & 0x7FFFFFFF) if simulation_seed is None else simulation_seed
         self._frame_counter = 0
         self._last_simulation_tick = -1
-        self._simulation_clock_s = 0.0
-        self._simulation_last_update_monotonic: float | None = None
+        self._simulation_adapter = LegacySimulationAdapter(self._step_simulation_world_locked)
         self._vehicles: list[_SimVehicle] = []
         self._pedestrians: list[_SimPedestrian] = []
         self._simulation_rng = random.Random(self._simulation_seed)
+
+    @property
+    def _simulation_clock_s(self) -> float:
+        return self._simulation_adapter.time_s
+
+    @_simulation_clock_s.setter
+    def _simulation_clock_s(self, value: float) -> None:
+        # Preserve the existing controlled regression-fixture seam.
+        self._simulation_adapter.reanchor_time(value)
+
+    @property
+    def _simulation_paused(self) -> bool:
+        return self._simulation_adapter.paused
 
     def clear_uploaded_source(self, source_id: str) -> None:
         """Invalidate only the receiver image belonging to this source."""
@@ -318,8 +333,8 @@ class CameraFrameService:
         self._simulation_canvas = None
         self._simulation_view_frames.clear()
         self._last_simulation_tick = -1
-        self._simulation_clock_s = 0.0
-        self._simulation_last_update_monotonic = time.monotonic()
+        self._simulation_adapter.reset(seed=self._simulation_seed, now=self._simulation_monotonic(),
+                                       paused=self._simulation_paused)
         signal_rules_service.reset_runtime(0.0)
         density_offset = {"light": 101, "normal": 211, "busy": 307}[self._simulation_density]
         self._simulation_rng = random.Random(self._simulation_seed + density_offset)
@@ -329,7 +344,7 @@ class CameraFrameService:
         with self._lock:
             self._simulation_enabled = enabled
             self._observation_mode_generation += 1
-            self._simulation_paused = False
+            self._simulation_adapter.stop()
             if enabled:
                 self._reset_simulation_locked()
             else:
@@ -337,7 +352,6 @@ class CameraFrameService:
                 self._simulation_canvas = None
                 self._simulation_view_frames.clear()
                 self._last_simulation_tick = -1
-                self._simulation_last_update_monotonic = None
                 self._vehicles = []
                 self._pedestrians = []
                 signal_rules_service.reset_runtime(0.0)
@@ -366,8 +380,7 @@ class CameraFrameService:
                         status_code=409,
                     )
                 if paused != self._simulation_paused:
-                    self._simulation_paused = paused
-                    self._simulation_last_update_monotonic = time.monotonic()
+                    self._simulation_adapter.set_paused(paused, self._simulation_monotonic())
                     if not paused:
                         self._simulation_frame = None
                         self._simulation_canvas = None
@@ -429,6 +442,7 @@ class CameraFrameService:
             frame = self._simulation_frame_for_locked(source_id)
             if frame is None:
                 return None
+            clock = self._simulation_adapter.snapshot()
             signal = self._simulation_signal_state_locked()
             return {
                 "source_id": source_id,
@@ -436,8 +450,8 @@ class CameraFrameService:
                 "received_at_ms": frame.received_at_ms,
                 "width": FRAME_WIDTH,
                 "height": FRAME_HEIGHT,
-                "simulation_time_seconds": round(self._simulation_clock_s, 3),
-                "paused": self._simulation_paused,
+                "simulation_time_seconds": round(clock.time_s, 3),
+                "paused": clock.paused,
                 "density": self._simulation_density,
                 "signal": {
                     "phase": signal["phase"],
@@ -593,17 +607,13 @@ class CameraFrameService:
             )
 
     def _advance_simulation_locked(self, dt: float) -> None:
-        if dt <= 0 or self._simulation_paused:
-            return
-        remaining = min(dt, 2.0)
-        while remaining > 1e-9:
-            step = min(0.05, remaining)
-            self._simulation_clock_s += step
-            # Both movement types must obey the same protected phase snapshot.
-            phase = self._simulation_signal_state_locked()["phase"]
-            self._advance_vehicles_locked(step, phase)
-            self._advance_pedestrians_locked(step, phase)
-            remaining -= step
+        self._simulation_adapter.step(dt)
+
+    def _step_simulation_world_locked(self, step: float) -> None:
+        # Both movement types must obey the same protected phase snapshot.
+        phase = self._simulation_signal_state_locked()["phase"]
+        self._advance_vehicles_locked(step, phase)
+        self._advance_pedestrians_locked(step, phase)
 
     def _advance_vehicles_locked(self, dt: float, phase: str) -> None:
         vehicle_go = phase == "vehicle_green"
@@ -670,13 +680,7 @@ class CameraFrameService:
                     pedestrian.y = float(FRAME_HEIGHT - 10 + self._simulation_rng.randint(0, 36))
 
     def _refresh_simulation_locked(self) -> None:
-        now_mono = time.monotonic()
-        if self._simulation_last_update_monotonic is None:
-            self._simulation_last_update_monotonic = now_mono
-        dt = now_mono - self._simulation_last_update_monotonic
-        self._simulation_last_update_monotonic = now_mono
-        if not self._simulation_paused:
-            self._advance_simulation_locked(dt)
+        self._simulation_adapter.sync(self._simulation_monotonic())
         tick = int(self._simulation_clock_s * 2)
         if self._simulation_frame is not None and tick == self._last_simulation_tick:
             return

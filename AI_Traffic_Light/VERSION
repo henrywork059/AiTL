@@ -1,5 +1,5 @@
-version: 0_5_64
-status: Simulation engine evaluation foundation candidate (roadmap Update 20 / S01)
-previous_version: 0_5_63
+version: 0_5_65
+status: Fixed-step legacy simulator adapter candidate (roadmap Update 21 / S02)
+previous_version: 0_5_64
 passed_baseline: 0_5_0
-notes: Conditional SUMO/Three.js evaluation; three offline tests passed; real engine blocked by missing binaries; no dependencies adopted; CI and owner PASS pending.
+notes: Three isolated scheduler tests passed; legacy agent integration and CI pending; security and real SUMO smoke gates remain open; owner PASS pending.

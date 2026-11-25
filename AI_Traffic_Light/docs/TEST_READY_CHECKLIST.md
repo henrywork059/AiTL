@@ -1,3 +1,18 @@
+# V0565 — Fixed-step legacy simulator adapter
+
+Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S02.
+
+- [x] Fixed-step clock adapter, seed/monotonic injection and legacy ownership retained.
+- [x] Three isolated scheduler tests and syntax checks passed; exact hashes verified.
+- [ ] Fourth actual legacy-agent regression, integrated compile/test/API parity and current CI.
+- [ ] Owner Windows/ESP PASS.
+- [ ] Remediate identified npm vulnerabilities and execute pinned SUMO smoke before engine adoption.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_65](PATCH_0_5_65.md).
+
+---
+
 # V0564 — Simulation engine evaluation foundation
 
 Candidate `0_5_64`; previous `0_5_63`; accepted baseline `0_5_0`; Update 20 / S01.
