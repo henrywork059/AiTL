@@ -12,6 +12,7 @@ import numpy as np
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
+from app.services.observation_identity import ObservationIdentity, observation_provenance
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
@@ -43,6 +44,20 @@ class CameraFrame:
     received_at_ms: int
     frame_number: int
     origin: str
+    session_generation: int | None = None
+    source_epoch: int | None = None
+    mode_generation: int | None = None
+
+    @property
+    def observation(self) -> ObservationIdentity:
+        """Internal projection; retain the original frame and public metadata."""
+        return ObservationIdentity(
+            source_id=self.source_id, frame_number=self.frame_number,
+            received_at_ms=self.received_at_ms, width=self.width, height=self.height,
+            provenance=observation_provenance(self.origin, self.session_generation),
+            session_generation=self.session_generation, source_epoch=self.source_epoch,
+            mode_generation=self.mode_generation,
+        )
 
     def metadata(self) -> dict:
         return {
@@ -226,11 +241,13 @@ class CameraFrameService:
             validate_decode=validate_decode, publish=True,
         )
 
-    def prepare_upload(self, *, source_id: str, content_type: str, content: bytes, received_at_ms: int) -> CameraFrame:
+    def prepare_upload(self, *, source_id: str, content_type: str, content: bytes, received_at_ms: int,
+                       session_generation: int | None = None, source_epoch: int | None = None) -> CameraFrame:
         """Allocate one validated frame identity without changing the selected image."""
         return self._create_upload(
             source_id=source_id, content_type=content_type, content=content,
             received_at_ms=received_at_ms, publish=False,
+            session_generation=session_generation, source_epoch=source_epoch,
         )
 
     def publish_cached_upload(self, frame: CameraFrame) -> CameraFrame:
@@ -242,6 +259,7 @@ class CameraFrameService:
     def _create_upload(
         self, *, source_id: str, content_type: str, content: bytes,
         publish: bool, validate_decode: bool = False, received_at_ms: int | None = None,
+        session_generation: int | None = None, source_epoch: int | None = None,
     ) -> CameraFrame:
         normalized_type = content_type.split(";", maxsplit=1)[0].strip().lower()
         if not SOURCE_ID_PATTERN.fullmatch(source_id):
@@ -288,7 +306,8 @@ class CameraFrameService:
                 height=dimensions[1],
                 received_at_ms=int(time.time() * 1000) if received_at_ms is None else received_at_ms,
                 frame_number=self._frame_counter,
-                origin="upload",
+                origin="upload", session_generation=session_generation,
+                source_epoch=source_epoch, mode_generation=self._observation_mode_generation,
             )
             if publish:
                 self._uploaded_frame = frame
@@ -387,7 +406,7 @@ class CameraFrameService:
                 content=encoded.tobytes(), content_type="image/png",
                 source_id=source_id, width=original.width, height=original.height,
                 received_at_ms=original.received_at_ms, frame_number=original.frame_number,
-                origin="simulation",
+                origin="simulation", mode_generation=original.mode_generation,
             )
             self._simulation_view_frames[source_id] = cached
         return cached
@@ -719,7 +738,7 @@ class CameraFrameService:
             height=FRAME_HEIGHT,
             received_at_ms=now_ms,
             frame_number=self._frame_counter,
-            origin="simulation",
+            origin="simulation", mode_generation=self._observation_mode_generation,
         )
 
 

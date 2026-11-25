@@ -358,10 +358,13 @@ class RemoteCameraManager:
                     return int(packet.sequence)
                 if camera_frame_service.simulation_enabled:
                     return int(packet.sequence)
+                accepted_generation = self._session_generations.get(source_id)
+                source_epoch = self._observation_epochs.get(source_id, 0)
 
             frame = camera_frame_service.prepare_upload(
                 source_id=source_id, content_type="image/jpeg",
                 content=packet.content, received_at_ms=now_ms,
+                session_generation=accepted_generation, source_epoch=source_epoch,
             )
             with self._lock:
                 self._latest_frames[source_id] = frame

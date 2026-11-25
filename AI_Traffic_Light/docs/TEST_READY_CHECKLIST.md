@@ -1,3 +1,16 @@
+# V0559 — Unified camera observation identity
+
+Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.
+
+- [x] Immutable internal identity contract, existing public frame metadata preserved by design.
+- [x] Isolated contract assertions and compilation.
+- [ ] Full producer and freshness regression CI, Windows/ESP owner acceptance.
+- [ ] Physical lighting/speaker authorization and hardware prerequisites remain blocked.
+
+See [Patch 0_5_59](PATCH_0_5_59.md).
+
+---
+
 # V0558 — Synthetic speaker preparation
 
 Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.

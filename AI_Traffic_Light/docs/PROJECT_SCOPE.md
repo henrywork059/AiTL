@@ -97,3 +97,8 @@ Real ESP camera detections can now feed the same independent controllers as expl
 ## V0514 virtual Network conflict coordination
 
 Simulation/virtual preview only: Users can define vehicle/pedestrian conflict pairs per connected Crosswalk link; independent controller outputs are supervised so conflicting published green permissions are suppressed. Blocked virtual phase clocks pause and resume after a minimum clearance gap. Emergency vehicle requests are one-hop, explicitly enabled, bounded and subject to the interlock. Camera inference and Side A/B region counts stay assigned per Crosswalk. No physical signal authority, independent conflict geometry verification, proven emergency detection or certified cross-junction safety is claimed.
+
+
+### Observation identity foundation (0_5_59 candidate)
+
+Internal camera identity is shared by synthetic and ESP producers. External upload provenance is not verified physical evidence. No additional perception, multi-junction fusion, control authority or hardware validation is implied.

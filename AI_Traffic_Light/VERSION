@@ -1,5 +1,5 @@
-version: 0_5_58
-status: Synthetic speaker preparation candidate (roadmap Update 14; physical integration blocked)
-previous_version: 0_5_57
+version: 0_5_59
+status: Unified camera observation identity candidate (roadmap Update 15 / A02)
+previous_version: 0_5_58
 passed_baseline: 0_5_0
-notes: Metadata-only speaker; 7 speaker and 6 lighting local tests passed; physical lighting/speaker blocked; CI and owner PASS pending.
+notes: Isolated identity contract checked; full producer integration CI and owner PASS pending; physical lighting/speaker blocked.

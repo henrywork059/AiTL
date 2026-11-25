@@ -413,3 +413,8 @@ R9 does not automatically replace ATL1, promote a firmware architecture, modify 
 `GET /api/camera/diagnostics/progress`
 
 Returns the same standard success envelope with the current diagnostic progress snapshot. Fields include `status`, `engine`, `stage`, `current_test`, `test_index`, `frame_current`, `frame_total`, `detail`, `last_line`, `started_at_ms`, `elapsed_ms`, `error`, and a bounded `log_tail`. `engine` may now be `architecture_benchmark` while R9 is active. Progress polling is observational only and does not start, stop or mutate a diagnostic run.
+
+
+### 0_5_59 internal observation identity
+
+No public response or request fields change. Internal acquisition generation and provenance are not serialized by `CameraFrame.metadata()`; existing source ID, frame number, original PC receive timestamp, image dimensions and origin retain their meanings. Existing lifetime checks and expiry remain authoritative.

@@ -1,3 +1,22 @@
+# V0559 — Unified camera observation identity
+
+Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.
+
+Run from `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0559_observation_identity.py
+python scripts/test_v0547_cached_frame_identity.py
+python scripts/test_v0548_observation_invalidation.py
+python scripts/test_v0550_signal_stale_fallback.py
+```
+
+Seven isolated contract assertions and isolated module compilation passed locally. New producer integration regression and existing freshness/safety regressions require full CI; local checkout unavailable (GitHub DNS blocked). Previous candidate CI passed (run 45517777657). Owner Windows/ESP PASS pending; baseline remains `0_5_0`.
+
+See [Patch 0_5_59](PATCH_0_5_59.md).
+
+---
+
 # V0558 — Synthetic speaker regression
 
 Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.
