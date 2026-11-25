@@ -1,5 +1,5 @@
-version: 0_5_62
-status: Source-qualified traffic observations candidate (roadmap Update 18 / A03)
-previous_version: 0_5_61
+version: 0_5_63
+status: Centralized frontend polling and cancellation candidate (roadmap Update 19 / A04)
+previous_version: 0_5_62
 passed_baseline: 0_5_0
-notes: Isolated helper tests passed; full CI and owner PASS pending; physical gates unchanged.
+notes: Mocked core/API tests and isolated TypeScript passed; full CI and owner PASS pending; physical gates unchanged.

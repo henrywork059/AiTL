@@ -1,3 +1,16 @@
+# V0563 — Centralized frontend polling and cancellation
+
+Candidate `0_5_63`; previous `0_5_62`; accepted baseline `0_5_0`; Update 19 / A04.
+
+- [x] Shared polling scope and API cancellation implemented.
+- [x] Mocked core/API runtime regression and isolated strict TypeScript compilation passed.
+- [ ] Full frontend integration, offline regressions, current CI and browser/owner acceptance.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_63](PATCH_0_5_63.md).
+
+---
+
 # V0562 — Source-qualified traffic observations
 
 Candidate `0_5_62`; previous `0_5_61`; accepted baseline `0_5_0`; Update 18 / A03.

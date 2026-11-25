@@ -11,6 +11,7 @@ import { FunctionChecklist } from "../components/FunctionChecklist";
 import { TrafficFlowChart } from "../components/TrafficFlowChart";
 import { TrafficHistoryChart } from "../components/TrafficHistoryChart";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { PollingContext } from "../lib/pollingScope";
 import type { TrafficFlow, TrafficHistory } from "../types";
 import "./trafficAnalytics.css";
 
@@ -43,8 +44,8 @@ function eventLabel(eventType: string): string {
 
 export function TrafficAnalyticsPage() {
   const [mode, setMode] = useState<AnalyticsMode>("occupancy");
-  const [history, setHistory] = useState<TrafficHistory | null>(null);
-  const [flow, setFlow] = useState<TrafficFlow | null>(null);
+  const [historyResult, setHistory] = useState<{ key: string; data: TrafficHistory } | null>(null);
+  const [flowResult, setFlow] = useState<{ key: string; data: TrafficFlow } | null>(null);
   const [minutes, setMinutes] = useState(15);
   const [regionId, setRegionId] = useState<string | null>(null);
   const [flowScope, setFlowScope] = useState("");
@@ -56,29 +57,40 @@ export function TrafficAnalyticsPage() {
   const flowLineId = flowScope.startsWith("line:") ? flowScope.slice(5) : null;
   const flowRegionId = flowScope.startsWith("region:") ? flowScope.slice(7) : null;
 
-  const refresh = useCallback(async () => {
+  const requestKey = JSON.stringify([mode, minutes, regionId, flowLineId, flowRegionId, className]);
+  const history = historyResult?.key === requestKey ? historyResult.data : null;
+  const flow = flowResult?.key === requestKey ? flowResult.data : null;
+
+  const refresh = useCallback(async (context: PollingContext) => {
     setRefreshing(true);
     try {
       if (mode === "occupancy") {
-        setHistory(await fetchTrafficHistory(minutes, regionId));
+        const data = await fetchTrafficHistory(minutes, regionId, context.signal);
+        if (!context.isCurrent()) return;
+        setHistory({ key: requestKey, data });
       } else {
-        setFlow(await fetchTrafficFlow(minutes, flowLineId, flowRegionId, className || null));
+        const data = await fetchTrafficFlow(minutes, flowLineId, flowRegionId, className || null, context.signal);
+        if (!context.isCurrent()) return;
+        setFlow({ key: requestKey, data });
       }
       setError(null);
     } catch (nextError) {
+      if (!context.isCurrent()) return;
+      if (mode === "occupancy") setHistory(null);
+      else setFlow(null);
       setError(nextError instanceof Error ? nextError.message : "Traffic analytics could not be loaded.");
     } finally {
-      setRefreshing(false);
+      if (context.isCurrent()) setRefreshing(false);
     }
-  }, [mode, minutes, regionId, flowLineId, flowRegionId, className]);
+  }, [mode, minutes, regionId, flowLineId, flowRegionId, className, requestKey]);
 
   const { runNow: refreshAnalytics, waitForIdle: waitForAnalyticsIdle } = useSerialPolling(refresh, 2000, {
     enabled: !clearing,
-    restartKey: [mode, minutes, regionId ?? "", flowLineId ?? "", flowRegionId ?? "", className].join("|"),
+    restartKey: requestKey,
   });
 
   const latest = history && history.points.length > 0 ? history.points[history.points.length - 1] : null;
-  const regionOptions = history?.regions ?? [];
+  const regionOptions = historyResult?.data.regions ?? [];
   const summary = history?.summary;
   const phaseChange = summary?.latest_phase_change;
   const selectedScope = history?.scope.label ?? "Whole frame";
@@ -99,8 +111,8 @@ export function TrafficAnalyticsPage() {
     setClearing(true);
     try {
       await waitForAnalyticsIdle();
-      if (occupancy) await clearTrafficHistory();
-      else await clearTrafficFlow();
+      if (occupancy) { await clearTrafficHistory(); setHistory(null); }
+      else { await clearTrafficFlow(); setFlow(null); }
       await refreshAnalytics();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Traffic analytics could not be cleared.");
@@ -142,8 +154,8 @@ export function TrafficAnalyticsPage() {
               <label>Event scope
                 <select value={flowScope} onChange={(event) => setFlowScope(event.target.value)}>
                   <option value="">All tracked events</option>
-                  {(flow?.lines ?? []).map((line) => <option key={`line:${line.id}`} value={`line:${line.id}`}>Line: {line.label}</option>)}
-                  {(flow?.regions ?? []).map((region) => <option key={`region:${region.id}`} value={`region:${region.id}`}>Region: {region.label}</option>)}
+                  {(flowResult?.data.lines ?? []).map((line) => <option key={`line:${line.id}`} value={`line:${line.id}`}>Line: {line.label}</option>)}
+                  {(flowResult?.data.regions ?? []).map((region) => <option key={`region:${region.id}`} value={`region:${region.id}`}>Region: {region.label}</option>)}
                 </select>
               </label>
               <label>Class
@@ -173,9 +185,10 @@ export function TrafficAnalyticsPage() {
           </>
         )}
         {error && <p className="error-message">{error}</p>}
+        {!history && !flow && <p className="small-note">No current data for these filters.</p>}
       </section>
 
-      {mode === "occupancy" ? (
+      {!history && !flow ? null : mode === "occupancy" ? (
         <>
           <div className="metric-grid traffic-analytics-metrics">
             <div className="metric-card"><span>Vehicles now</span><strong>{latest?.vehicles ?? 0}</strong><small>{selectedScope}</small></div>

@@ -1,3 +1,24 @@
+# V0563 — Centralized frontend polling and cancellation
+
+Candidate `0_5_63`; previous `0_5_62`; accepted baseline `0_5_0`; Update 19 / A04.
+
+From `AI_Traffic_Light` (frontend dependencies installed):
+
+```powershell
+python scripts/test_frontend_polling_structure.py
+Push-Location apps/pc-studio/frontend
+npm run test:data-access
+npm run typecheck
+npm run build
+Pop-Location
+```
+
+Executed the actual pollingScope and apiClient modules with a mocked Node 22 fetch/response test and strict isolated TypeScript compilation, both passed. Git blob hashes for these modules and the test must match the locally tested files. Full checkout unavailable (GitHub DNS failure reproduced); integrated React typecheck/build and full CI pending. Previous 0_5_62 full CI passed ([run 45579569473](https://github.com/henrywork059/AiTL/actions/runs/45579569473)). The new npm test is wired into CI after npm ci. No owner PASS.
+
+See [Patch 0_5_63](PATCH_0_5_63.md).
+
+---
+
 # V0562 — Source-qualified traffic observations
 
 Candidate `0_5_62`; previous `0_5_61`; accepted baseline `0_5_0`; Update 18 / A03.

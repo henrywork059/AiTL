@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { LabelingCanvas } from "../components/LabelingCanvas";
+import { createPollingScope } from "../lib/pollingScope";
 import type {
   CaptureLabelDocument,
   CaptureSummary,
@@ -86,20 +87,20 @@ export function DatasetReviewPage() {
       setLabels([]);
       return;
     }
-    let active = true;
+    const scope = createPollingScope();
     setError(null);
-    void fetchCaptureLabels(selectedCaptureId)
+    void fetchCaptureLabels(selectedCaptureId, scope.signal)
       .then((document) => {
-        if (!active) return;
+        if (!scope.isCurrent()) return;
         setLabelDocument(document);
         setLabels(document.labels);
         setDirty(false);
       })
       .catch((nextError) => {
-        if (!active) return;
+        if (!scope.isCurrent()) return;
         setError(nextError instanceof Error ? nextError.message : "Labels could not be loaded.");
       });
-    return () => { active = false; };
+    return () => scope.retire();
   }, [selectedCaptureId]);
 
   function updateLabels(nextLabels: DatasetLabelBox[]) {

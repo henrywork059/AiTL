@@ -31,15 +31,22 @@ export class ApiRequestError extends Error {
   }
 }
 
+export function isRequestCancelled(error: unknown, signal?: AbortSignal | null): boolean {
+  return Boolean(signal?.aborted) || (error instanceof Error && error.name === "AbortError");
+}
+
 export async function requestJsonStrict<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
+    options?.signal?.throwIfAborted();
     const res = await fetch(endpoint, options);
     let payload: unknown;
     try {
       payload = await res.json();
-    } catch {
+    } catch (error) {
+      if (isRequestCancelled(error, options?.signal)) throw error;
       throw new ApiRequestError(`API returned HTTP ${res.status} without a JSON response.`);
     }
+    options?.signal?.throwIfAborted();
 
     if (isApiEnvelope<T>(payload)) {
       if (res.ok && payload.ok && payload.data !== undefined) {
@@ -64,7 +71,9 @@ export async function requestJsonStrict<T>(endpoint: string, options?: RequestIn
     logInfo("api", "Legacy raw API response received", { endpoint });
     return payload as T;
   } catch (error) {
-    logError("api", FrontendErrorCodes.API_FETCH_FAILED, error, { endpoint });
+    if (!isRequestCancelled(error, options?.signal)) {
+      logError("api", FrontendErrorCodes.API_FETCH_FAILED, error, { endpoint });
+    }
     throw error;
   }
 }
@@ -76,7 +85,8 @@ export async function requestJson<T>(
 ): Promise<T> {
   try {
     return await requestJsonStrict<T>(endpoint, options);
-  } catch {
+  } catch (error) {
+    if (isRequestCancelled(error, options?.signal)) throw error;
     return fallback;
   }
 }

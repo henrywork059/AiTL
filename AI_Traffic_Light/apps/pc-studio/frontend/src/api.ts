@@ -67,58 +67,6 @@ const fallbackSmokeStatus: SmokeStatus = {
   },
 };
 
-const fallbackTrafficFlow: TrafficFlow = {
-  recording: false,
-  max_events: 0,
-  stored_events: 0,
-  flow_path: "outputs/traffic_flow/events.jsonl",
-  oldest_event_at_ms: null,
-  newest_event_at_ms: null,
-  minutes: 15,
-  filters: { line_id: null, region_id: null, class_name: null },
-  lines: [],
-  regions: [],
-  events: [],
-  buckets: [],
-  summary: {
-    unique_passages: 0,
-    unique_vehicle_passages: 0,
-    unique_pedestrian_passages: 0,
-    region_entries: 0,
-    region_exits: 0,
-    average_dwell_ms: 0,
-    average_pedestrian_wait_ms: 0,
-    direction_counts: {},
-    line_counts: {},
-    region_average_dwell_ms: {},
-    unique_event_tracks: 0,
-  },
-};
-
-const fallbackTrafficHistory: TrafficHistory = {
-  recording: false,
-  sample_interval_ms: 1000,
-  max_samples: 0,
-  stored_samples: 0,
-  history_path: "outputs/traffic_history/history.jsonl",
-  oldest_recorded_at_ms: null,
-  newest_recorded_at_ms: null,
-  scope: { region_id: null, label: "Whole frame", type: "whole_frame" },
-  minutes: 15,
-  regions: [],
-  points: [],
-  summary: {
-    sample_count: 0,
-    average_pedestrians: 0,
-    average_vehicles: 0,
-    peak_pedestrians: { count: 0, recorded_at_ms: null },
-    peak_vehicles: { count: 0, recorded_at_ms: null },
-    phase_change_count: 0,
-    latest_phase_change: null,
-    busiest_region: null,
-  },
-};
-
 const fallbackCameraStatus: CameraStatus = {
   mode: "receiver",
   simulation_enabled: false,
@@ -295,14 +243,10 @@ export async function clearSignalDecisionHistory(): Promise<{ cleared: boolean; 
   return requestJsonStrict<{ cleared: boolean; removed_events: number; history_path: string }>(`${API_BASE}/api/traffic/signal-rules/history`, { method: "DELETE" });
 }
 
-export async function fetchTrafficHistory(minutes = 15, regionId: string | null = null): Promise<TrafficHistory> {
+export async function fetchTrafficHistory(minutes = 15, regionId: string | null = null, signal?: AbortSignal): Promise<TrafficHistory> {
   const params = new URLSearchParams({ minutes: String(minutes), limit: "10000" });
   if (regionId) params.set("region_id", regionId);
-  return requestJson<TrafficHistory>(`${API_BASE}/api/traffic/history?${params.toString()}`, {
-    ...fallbackTrafficHistory,
-    minutes,
-    scope: regionId ? { region_id: regionId, label: regionId, type: "counting_region" } : fallbackTrafficHistory.scope,
-  });
+  return requestJsonStrict<TrafficHistory>(`${API_BASE}/api/traffic/history?${params.toString()}`, { signal });
 }
 export async function clearTrafficHistory(): Promise<TrafficHistoryClearResult> { return requestJsonStrict<TrafficHistoryClearResult>(`${API_BASE}/api/traffic/history`, { method: "DELETE" }); }
 export function trafficHistoryExportUrl(minutes = 15, regionId: string | null = null): string {
@@ -310,12 +254,12 @@ export function trafficHistoryExportUrl(minutes = 15, regionId: string | null = 
   if (regionId) params.set("region_id", regionId);
   return `${API_BASE}/api/traffic/history/export.csv?${params.toString()}`;
 }
-export async function fetchTrafficFlow(minutes = 15, lineId: string | null = null, regionId: string | null = null, className: string | null = null): Promise<TrafficFlow> {
+export async function fetchTrafficFlow(minutes = 15, lineId: string | null = null, regionId: string | null = null, className: string | null = null, signal?: AbortSignal): Promise<TrafficFlow> {
   const params = new URLSearchParams({ minutes: String(minutes), limit: "50000" });
   if (lineId) params.set("line_id", lineId);
   if (regionId) params.set("region_id", regionId);
   if (className) params.set("class_name", className);
-  return requestJson<TrafficFlow>(`${API_BASE}/api/traffic/flow?${params.toString()}`, { ...fallbackTrafficFlow, minutes, filters: { line_id: lineId, region_id: regionId, class_name: className } });
+  return requestJsonStrict<TrafficFlow>(`${API_BASE}/api/traffic/flow?${params.toString()}`, { signal });
 }
 export async function clearTrafficFlow(): Promise<TrafficFlowClearResult> { return requestJsonStrict<TrafficFlowClearResult>(`${API_BASE}/api/traffic/flow`, { method: "DELETE" }); }
 export function trafficFlowExportUrl(minutes = 15, lineId: string | null = null, regionId: string | null = null, className: string | null = null): string {
@@ -348,7 +292,7 @@ export async function captureLatestFrame(input: { session_id: string; quality_ta
 export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> { return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList); }
 export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> { return requestJsonStrict<CaptureDeleteResult>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`, { method: "DELETE" }); }
 export function captureImageUrl(captureId: string): string { return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`; }
-export async function fetchCaptureLabels(captureId: string): Promise<CaptureLabelDocument> { return requestJsonStrict<CaptureLabelDocument>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`); }
+export async function fetchCaptureLabels(captureId: string, signal?: AbortSignal): Promise<CaptureLabelDocument> { return requestJsonStrict<CaptureLabelDocument>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`, { signal }); }
 export async function saveCaptureLabels(captureId: string, labels: DatasetLabelBox[]): Promise<CaptureLabelDocument> {
   return requestJsonStrict<CaptureLabelDocument>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/labels`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels: labels.map((label) => ({ class_id: label.class_id, box_xyxy: label.box_xyxy })) }),
@@ -392,8 +336,8 @@ export type CameraInferenceResult = {
   error: string | null;
   diagnostics?: CameraInferenceDiagnostics;
 };
-export async function fetchCameraInference(sourceId: string): Promise<CameraInferenceResult> {
-  return requestJsonStrict<CameraInferenceResult>(`${API_BASE}/api/inference/cameras/${encodeURIComponent(sourceId)}`);
+export async function fetchCameraInference(sourceId: string, signal?: AbortSignal): Promise<CameraInferenceResult> {
+  return requestJsonStrict<CameraInferenceResult>(`${API_BASE}/api/inference/cameras/${encodeURIComponent(sourceId)}`, { signal });
 }
 export function cameraPreviewUrl(sourceId: string, timestamp: number): string {
   return `${API_BASE}/api/camera/preview/${encodeURIComponent(sourceId)}?t=${timestamp}`;

@@ -35,10 +35,11 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
   const [showRegions, setShowRegions] = useState(true);
   const [imageTick, setImageTick] = useState(0);
 
-  useSerialPolling(async () => {
+  useSerialPolling(async (context) => {
     const [nextCameras, nextModel, nextCrosswalks] = await Promise.all([
       fetchRemoteCameraStatus(), fetchInferenceStatus(), fetchCrosswalks(),
     ]);
+    if (!context.isCurrent()) return;
     setCameras(nextCameras);
     setModel(nextModel);
     setCrosswalks(nextCrosswalks);
@@ -53,15 +54,15 @@ export function LiveAiPage({ cameraStatus, onRefresh, refreshing, onDetectionCou
     setError(null);
   }, [sourceId, model?.active_model_id]);
 
-  useSerialPolling(async () => {
+  useSerialPolling(async (context) => {
     if (!sourceId) return;
-    const next = await fetchCameraInference(sourceId);
-    if (next.source_id !== sourceId) return;
+    const next = await fetchCameraInference(sourceId, context.signal);
+    if (!context.isCurrent() || next.source_id !== sourceId) return;
     setFrame(next.frame);
     setDiagnostics(next.diagnostics ?? null);
     setError(next.error);
     setImageTick(Date.now());
-  }, 500, { enabled: sourceId.length > 0, restartKey: sourceId,
+  }, 500, { enabled: sourceId.length > 0, restartKey: JSON.stringify([sourceId, model?.active_model_id ?? null]),
     onError: (reason) => { setFrame(null); setDiagnostics(null); setError(errorMessage(reason)); } });
 
   const camera = cameras?.cameras.find((item) => item.source_id === sourceId);
