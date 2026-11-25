@@ -56,9 +56,18 @@ def main() -> None:
     nav = (FRONTEND / "constants/appNavigation.ts").read_text(encoding="utf-8")
     preview = (FRONTEND / "pages/LiveAiPage.tsx").read_text(encoding="utf-8")
     counts = (FRONTEND / "lib/regionCounts.ts").read_text(encoding="utf-8")
+    api = (FRONTEND / "api.ts").read_text(encoding="utf-8")
+    polling = (FRONTEND / "lib/useSerialPolling.ts").read_text(encoding="utf-8")
     assert nav.index('id: "traffic"') < nav.index('id: "ai"')
     assert "PAGE_DETAILS.settings" not in nav
-    assert "fetchCameraInference(sourceId)" in preview
+    # V0563 retains the selected camera endpoint while adding scoped cancellation.
+    assert "fetchCameraInference(sourceId, context.signal)" in preview
+    guard = "if (!context.isCurrent() || next.source_id !== sourceId) return;"
+    assert guard in preview and preview.index(guard) < preview.index("setFrame(next.frame)")
+    assert "restartKey: JSON.stringify([sourceId, model?.active_model_id ?? null])" in preview
+    assert "fetchCameraInference(sourceId: string, signal?: AbortSignal)" in api
+    assert 'requestJsonStrict<CameraInferenceResult>(`${API_BASE}/api/inference/cameras/${encodeURIComponent(sourceId)}`, { signal })' in api
+    assert "return () => scope.retire()" in polling
     assert "fetchCrosswalks()" in preview
     assert "regionClassCounts" in preview and "onConfidenceChange" not in preview
     assert "vertices_by_side?.[side]" in counts

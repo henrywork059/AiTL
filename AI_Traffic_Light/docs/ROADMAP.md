@@ -176,3 +176,5 @@ Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect
 | 2026-11-25 | 18 / A03 | [0_5_62](PATCH_0_5_62.md): source-qualified flow, occupancy/queue and history; isolated helper checks passed; [previous CI passed](https://github.com/henrywork059/AiTL/actions/runs/45555018709); integration CI and owner PASS pending. | Update 19: centralized frontend data access. |
 
 | 2026-11-25 | 19 / A04 | [0_5_63](PATCH_0_5_63.md): scoped frontend polling and API cancellation; mocked Node tests and isolated TS passed; [previous CI passed](https://github.com/henrywork059/AiTL/actions/runs/45579569473); current CI and owner PASS pending. | Update 20: evaluate replacement simulation engines. |
+
+| 2026-11-25 | 19a / A04 | Same candidate `0_5_63`: [initial CI failed](https://github.com/henrywork059/AiTL/actions/runs/45580743596) at outdated V059 camera-call assertion; corrected cancellation-aware wiring checks (12 direct source checks including reproduction); no runtime changes. | Verify corrective CI before Update 20. |
