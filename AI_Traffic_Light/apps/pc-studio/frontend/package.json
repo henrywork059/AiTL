@@ -12,13 +12,16 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "8.3.8"
   },
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest"
+  },
+  "overrides": {
+    "source-map-js": "1.2.2"
   }
 }

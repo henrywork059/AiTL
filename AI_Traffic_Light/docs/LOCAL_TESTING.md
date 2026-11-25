@@ -1,3 +1,22 @@
+# V0566 — Frontend dependency security remediation
+
+Candidate `0_5_66`; previous `0_5_65`; accepted baseline `0_5_0`; security prerequisite 21b (not a numbered roadmap completion).
+
+```powershell
+# From AI_Traffic_Light/apps/pc-studio/frontend
+npm ci
+npm audit --audit-level=high --json
+npm run test:data-access
+npm run typecheck
+npm run build
+```
+
+Executed evidence: [dependency trial 45630253510](https://github.com/henrywork059/AiTL/actions/runs/45630253510), job 139261197887, completed successfully on Windows with Node 22. Exact-version resolution, regenerated lock, npm ci, npm ls/version assertions, blocking audit, frontend data-access tests, typecheck and build passed. Audit JSON reported zero known vulnerabilities at run time (0 high, 0 critical, 0 total). Reassembled both complete UTF-8 manifests from ordered base64 log chunks (1 and 39, respectively), parsed JSON and reviewed dependency diff and registry/integrity fields before staging. Previous unchanged application standard CI [45630253344](https://github.com/henrywork059/AiTL/actions/runs/45630253344) passed with non-blocking audit on the old lock. New committed candidate CI and owner PASS remain pending; no local full checkout due to DNS.
+
+See [Patch 0_5_66](PATCH_0_5_66.md).
+
+---
+
 # V0565 — Fixed-step legacy simulator adapter
 
 Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S02.

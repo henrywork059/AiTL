@@ -1,3 +1,18 @@
+# V0566 — Frontend dependency security remediation
+
+Candidate `0_5_66`; previous `0_5_65`; accepted baseline `0_5_0`; security prerequisite 21b (not a numbered roadmap completion).
+
+- [x] Exact Windows trial dependency resolution and npm ci passed.
+- [x] Trial blocking audit reported zero vulnerabilities; frontend regression, typecheck and build passed.
+- [x] Complete generated manifests recovered and dependency diff reviewed.
+- [ ] Committed 0_5_66 full CI and blocking audit.
+- [ ] Owner Windows/ESP PASS and browser acceptance.
+- [ ] Real SUMO smoke and new dependency review before Update 22.
+
+See [Patch 0_5_66](PATCH_0_5_66.md).
+
+---
+
 # V0565 — Fixed-step legacy simulator adapter
 
 Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S02.

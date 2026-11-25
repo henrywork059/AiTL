@@ -1,5 +1,5 @@
-version: 0_5_65
-status: Fixed-step legacy simulator adapter candidate (roadmap Update 21 / S02)
-previous_version: 0_5_64
+version: 0_5_66
+status: Frontend dependency security remediation candidate (21b security prerequisite)
+previous_version: 0_5_65
 passed_baseline: 0_5_0
-notes: Three isolated scheduler tests passed; legacy agent integration and CI pending; security and real SUMO smoke gates remain open; owner PASS pending.
+notes: Exact Windows trial manifests; trial audit zero vulnerabilities and frontend checks passed; committed CI and owner PASS pending; real SUMO smoke blocked.

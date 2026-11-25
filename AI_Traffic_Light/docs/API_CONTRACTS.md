@@ -449,3 +449,8 @@ No HTTP or saved schema changes. The optional offline CLI emits evaluation-only 
 ### Fixed-step legacy simulator adapter (0_5_65 candidate)
 
 No HTTP or saved schema change. Scene time advances in completed 50 ms fixed steps, with an internal retained remainder and existing two-second catch-up cap. Optional deterministic seed/clock injection is a Python constructor test seam only, not a new runtime setting or public command. All camera IDs, 1280 × 720 coordinates, frame identity, pause/status keys, protected policy, physical camera and error/envelope contracts are preserved in design; integrated validation pending. No change to public-road actuation prohibition.
+
+
+### Frontend dependency security remediation (0_5_66 candidate)
+
+No HTTP, error envelope, saved schema, simulator, camera, or signal-control contract changes. Frontend build dependencies and CI audit gate only.
