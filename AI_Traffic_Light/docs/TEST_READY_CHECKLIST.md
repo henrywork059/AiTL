@@ -4,6 +4,8 @@ Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A0
 
 - [x] Existing packet and socket-read implementation extracted without changing wire framing or worker ownership.
 - [x] Isolated transport regression groups and compilation passed.
+- [x] Initial CI failure localized to outdated legacy source assertion; corrected static predicates checked directly against parent source.
+- [ ] Corrected legacy test and new compatibility-import regression execution in CI.
 - [ ] Full candidate CI and Windows/ESP owner acceptance.
 - [ ] Matched before/after ESP throughput and PC CPU measurements.
 - [ ] Physical lighting/speaker remain blocked.

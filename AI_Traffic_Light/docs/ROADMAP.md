@@ -165,6 +165,8 @@ For every experiment record code SHA, settings, seeds, sample size, units, basel
 
 | 2026-11-25 | 16 / A04 | [0_5_60](PATCH_0_5_60.md): existing ATL1 codec and socket wrapper extracted; three isolated regression groups passed, prior [0_5_59 CI passed](https://github.com/henrywork059/AiTL/actions/runs/45518551845); current CI, matched ESP throughput/CPU evidence and owner PASS pending. | Update 17: tracker source/intersection isolation; retain outstanding physical validation gate. |
 
+| 2026-11-25 | 16a / A04 | Same candidate `0_5_60`: [initial CI failure](https://github.com/henrywork059/AiTL/actions/runs/45531504572) in historical V0310 static assertion; corrected test owner/import checks and added runtime alias identity assertions. 43 corrected source predicates checked directly; new CI and physical/owner validation pending. | Verify corrective CI before Update 17. |
+
 ## Historical V035 milestones retained as hardware test requirements
 
 Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect recovery; weak-Wi-Fi reconnect behavior; simulation pause/resume; backend relay/parser CPU load. The older next steps (independent buffers/routing, intersection assignment and tracker isolation, controlled model-junction output abstraction, multi-intersection orchestration/evidence UI) are covered by the backlog above. Public-road signal control remains out of scope.

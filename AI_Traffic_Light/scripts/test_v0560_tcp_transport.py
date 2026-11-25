@@ -7,6 +7,7 @@ from unittest.mock import Mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps/pc-studio/backend"))
 from app.services import camera_tcp_transport as tcp
+from app.services import remote_camera as session
 
 
 class Fragmented(BytesIO):
@@ -35,6 +36,12 @@ def rejects(error, content):
 
 
 def main():
+    # Existing diagnostics and session test seams must reference the same codec.
+    for name in ("FRAME_HEADER", "_FramePacket", "_TcpFrameStream",
+                 "_encode_frame_packet", "_read_exact", "_read_frame_packet"):
+        assert getattr(session, name) is getattr(tcp, name), name
+    assert session.FRAME_MAGIC == tcp.FRAME_MAGIC == b"ATL1"
+    print("[PASS] session compatibility imports refer to the single transport implementation")
     jpeg = b"\xff\xd8" + b"payload" * 10 + b"\xff\xd9"
     wire = tcp._encode_frame_packet(jpeg, sequence=0x100000001, source_uptime_ms=123)
     stream = Fragmented(wire + wire)
