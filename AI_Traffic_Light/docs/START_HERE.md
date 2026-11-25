@@ -1,3 +1,11 @@
+# V0557 — Synthetic lighting preparation
+
+Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.
+
+The isolated `FakeLightingDemo` delegates binary synthetic pulses to the existing fake bench controller (integer duration 1–2000 ms, acknowledgment bound 100 ms). It is disabled by default, requires explicit test arming, and fails closed on invalid/overlapping requests, acknowledgment faults, disconnect, expiry and generation changes. Status is explicitly simulation-only and physical lighting remains unavailable. No live route, UI, GPIO, network or firmware integration. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed. Six focused deterministic tests and compilation of the isolated sources passed locally; prior candidate CI passed ([run 45434249530](https://github.com/henrywork059/AiTL/actions/runs/45434249530)). Current full CI and owner acceptance pending. See [Patch 0_5_57](PATCH_0_5_57.md).
+
+---
+
 # V0556 — Fake-only bench output abstraction
 
 Candidate `0_5_56`, previous `0_5_55`, accepted baseline `0_5_0`, roadmap Update 12 / H07.

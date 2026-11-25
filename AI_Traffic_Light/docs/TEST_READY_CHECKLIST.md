@@ -1,3 +1,15 @@
+# V0557 — Synthetic lighting preparation
+
+Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.
+
+- [x] Existing fake controller reused, disabled by default, synthetic-only binary pulse.
+- [x] Six focused tests and isolated Python compilation passed locally.
+- [x] No physical output, firmware, network command, live route or physical capability advertisement.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Physical lighting gate BLOCKED: verify hardware model, voltage/current, driver/interface, controlled-bench authorization and independent hardware fail-safe before real output.
+
+---
+
 # V0556 — Fake-only bench output abstraction
 
 Candidate `0_5_56`; previous `0_5_55`; baseline `0_5_0`.

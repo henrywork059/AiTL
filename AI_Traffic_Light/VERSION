@@ -1,5 +1,5 @@
-version: 0_5_56
-status: Fake-only bench output abstraction candidate (roadmap Update 12)
-previous_version: 0_5_55
+version: 0_5_57
+status: Synthetic lighting preparation candidate (roadmap Update 13; physical integration blocked)
+previous_version: 0_5_56
 passed_baseline: 0_5_0
-notes: Disabled by default; fake-only bounded leases and acknowledgments; 8 local tests passed; CI and owner PASS pending.
+notes: Fake-only binary pulse; 6 local focused tests passed; physical lighting blocked; CI and owner PASS pending.

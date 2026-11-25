@@ -1,3 +1,19 @@
+# V0557 — Synthetic lighting regression
+
+Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0557_bench_lighting.py
+python scripts/run_offline_tests.py --focused test_v0557_bench_lighting.py test_v0556_bench_output.py test_v0554_device_capabilities.py
+python scripts/check_structure.py
+```
+
+Six focused deterministic tests and compilation of the isolated sources passed locally; prior candidate CI passed ([run 45434249530](https://github.com/henrywork059/AiTL/actions/runs/45434249530)). Current full CI and owner acceptance pending. Only the new focused regression and isolated compilation ran locally. Do not attach hardware. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed. Follow the normal owner runner from the repository root with `-SkipUpdate`. See [Patch 0_5_57](PATCH_0_5_57.md).
+
+---
+
 # V0556 — Fake-only bench output regression
 
 Candidate `0_5_56`; previous `0_5_55`; baseline `0_5_0`.

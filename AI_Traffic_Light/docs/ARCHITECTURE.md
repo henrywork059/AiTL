@@ -51,6 +51,10 @@ The manager performs the existing optional network probe without holding the reg
 
 `bench_output.py` defines a disabled-by-default controller and fake in-memory adapter with bounded command lease, correlated acknowledgment, monotonic expiry, explicit off and disconnect. Connection-generation changes invalidate prior arming even when no watchdog tick observed the intervening disconnect. It is not instantiated by live application routes or signal control. No camera, registry, firmware or physical output path changes. The local explicit arm gate is only a test-harness gate. The fake watchdog is checked on operations and explicit tick; a real actuator would need independent watchdog, authorization and electrical safety validation.
 
+## V0557 synthetic lighting preparation
+
+`bench_lighting.py` provides an isolated synthetic binary pulse facade over the existing `BenchOutputController`. It owns no independent lease or arming state. The test-only status projection identifies synthetic lighting separately from physical device availability. Existing camera registry, physical capability projection and traffic logic remain unchanged. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed.
+
 ## Synthetic camera render caching
 
 `CameraFrameService` renders a 1280 × 720 BGR canvas and encodes the canonical simulation PNG once per tick. Mirrored simulation cameras B/C/D flip that same current-tick render and encode their own PNGs; they do not decode the canonical PNG. The bounded canvas cache occupies approximately 2.6 MiB and is discarded when simulation resets, stops or resumes. Existing per-view PNG caching, simulation scene coordinates, camera APIs, and protected virtual signal rules are unchanged. This optimization does not affect the real ESP transport or permit physical traffic-light control.

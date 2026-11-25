@@ -16,6 +16,10 @@ The existing saved-camera setup UI validates private-LAN input and settings, rep
 
 Only a synthetic demo indicator is supported by an isolated, disabled-by-default in-memory adapter. Tests exercise bounded command leases, acknowledgment faults, explicit off, disconnect and monotonic expiry. Physical lighting, speakers, traffic signals and other real outputs remain unavailable; no hardware authorization, real electrical testing or physical watchdog is implied.
 
+## V0557 synthetic lighting preparation
+
+The isolated `FakeLightingDemo` delegates binary synthetic pulses to the existing fake bench controller (integer duration 1–2000 ms, acknowledgment bound 100 ms). It is disabled by default, requires explicit test arming, and fails closed on invalid/overlapping requests, acknowledgment faults, disconnect, expiry and generation changes. Status is explicitly simulation-only and physical lighting remains unavailable. No live route, UI, GPIO, network or firmware integration. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed.
+
 ## Physical camera input
 
 AiTL implements a local PC-controlled ESP32-CAM input path with:
