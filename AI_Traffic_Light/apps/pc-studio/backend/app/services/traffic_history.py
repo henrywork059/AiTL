@@ -59,7 +59,7 @@ class TrafficHistoryService:
         )
         self._lock = RLock()
         self._last_recorded_at_ms: int | None = None
-        self._last_source_key: tuple[Any, Any] | None = None
+        self._last_source_key: tuple[Any, Any, Any] | None = None
         self._append_count = 0
 
     @property
@@ -73,8 +73,12 @@ class TrafficHistoryService:
         if frame_number is None or source_timestamp_ms is None:
             return False
 
+        observation = state.get("traffic_observation")
+        if observation is not None and not observation.get("available"):
+            return False
+        attribution = observation or {}
         recorded_at_ms = int(state.get("evaluated_at_ms") or time() * 1000)
-        source_key = (frame_number, source_timestamp_ms)
+        source_key = (attribution.get("source_id"), frame_number, source_timestamp_ms)
         with self._lock:
             if not force:
                 if source_key == self._last_source_key:
@@ -89,6 +93,9 @@ class TrafficHistoryService:
                 "recorded_at_ms": recorded_at_ms,
                 "source_timestamp_ms": int(source_timestamp_ms),
                 "source_frame_number": int(frame_number),
+                "source_id": attribution.get("source_id"),
+                "intersection_id": attribution.get("intersection_id"),
+                "provenance": attribution.get("provenance", "unknown"),
                 "data_source": str(state.get("data_source") or "unknown"),
                 "phase": str(state.get("phase") or "unknown"),
                 "decision": str(state.get("decision") or "unknown"),
@@ -312,6 +319,9 @@ class TrafficHistoryService:
         return {
             "recorded_at_ms": int(record.get("recorded_at_ms") or 0),
             "source_timestamp_ms": int(record.get("source_timestamp_ms") or 0),
+            "source_id": record.get("source_id"),
+            "intersection_id": record.get("intersection_id"),
+            "provenance": record.get("provenance") or "unknown",
             "source_frame_number": int(record.get("source_frame_number") or 0),
             "pedestrians": pedestrians,
             "vehicles": vehicles,

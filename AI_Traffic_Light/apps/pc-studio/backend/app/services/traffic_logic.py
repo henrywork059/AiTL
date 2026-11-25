@@ -13,6 +13,8 @@ from app.services.object_tracking import object_tracking_service
 from app.services.runtime_settings import runtime_settings_service
 from app.services.signal_rules import signal_rules_service
 from app.services.zones import REFERENCE_HEIGHT, REFERENCE_WIDTH, zone_service
+from app.services.traffic_observations import unavailable_observation, selected_observation_is_current
+from app.services.intersection_network import intersection_network_service
 
 logger = get_logger(__name__)
 
@@ -157,6 +159,7 @@ def evaluate_traffic_state(
             "region_counts": region_counts,
             "tracking": object_tracking_service.status(),
             "prototype_only": True,
+            "traffic_observation": unavailable_observation(),
         }
         validate_traffic_state(state)
         return state
@@ -270,8 +273,59 @@ def evaluate_traffic_state(
         "tracking": detection_frame.get("tracking") if isinstance(detection_frame.get("tracking"), dict) else object_tracking_service.status(),
         "prototype_only": True,
     }
+    state["traffic_observation"] = _qualified_observation(detection_frame, zones, state)
     validate_traffic_state(state)
     return state
+
+
+def _qualified_observation(frame: dict[str, Any], zones: list[dict[str, Any]],
+                           state: dict[str, Any]) -> dict[str, Any]:
+    identity = frame.get("traffic_observation_identity")
+    if not isinstance(identity, dict):
+        return unavailable_observation()
+    tracks = {track["track_id"]: track for track in frame.get("tracking", {}).get("tracks", [])
+              if track.get("last_seen_ms") == identity["source_timestamp_ms"]}
+    queue = {}
+    width = int(frame.get("image_width") or REFERENCE_WIDTH)
+    height = int(frame.get("image_height") or REFERENCE_HEIGHT)
+    ignore = [zone for zone in zones if zone.get("type") == "ignore"]
+    for zone in zones:
+        role = zone.get("type")
+        if role not in {"vehicle_queue", "pedestrian_waiting"}:
+            continue
+        region_id = zone["id"]
+        present = 0
+        stationary = set()
+        for detection in frame.get("detections", []):
+            name = detection.get("class_name")
+            if (role == "vehicle_queue" and name not in VEHICLE_CLASSES) or (
+                role == "pedestrian_waiting" and name != "person"
+            ):
+                continue
+            try:
+                centre = _scaled_center(detection, width, height)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not point_in_polygon(centre, zone["polygon"]) or any(
+                point_in_polygon(centre, item["polygon"]) for item in ignore
+            ):
+                continue
+            present += 1
+            track_id = detection.get("track_id")
+            if region_id in tracks.get(track_id, {}).get("stationary_regions", []):
+                stationary.add(track_id)
+        queue[region_id] = {
+            "role": role, "sampled_presence": present,
+            "stationary_candidates": len(stationary),
+            "unconfirmed_waiting": max(0, present - len(stationary)),
+            "method": "reference_pixel_stationarity_8px_1000ms_not_calibrated_speed",
+        }
+    return {
+        **identity, "available": True,
+        "occupancy": state["region_counts"],
+        "queue": queue if queue else None,
+        "count_semantics": "single_source_sample_not_cross_camera_unique_objects",
+    }
 
 
 def _feed_signal_observation(state: dict[str, Any]) -> None:
@@ -345,6 +399,12 @@ def get_live_traffic_state() -> dict[str, Any]:
             logger.warning("Traffic simulation could not obtain live detections", extra={"error_code": exc.code.value})
             return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}"))
         raise
+    identity = detection_frame.get("traffic_observation_identity")
+    resolution = intersection_network_service.resolve_source(frame.source_id)
+    matched = resolution.get("intersection_id") if resolution.get("source_mapping_matched") else None
+    if (not identity or identity.get("intersection_id") != matched
+        or not selected_observation_is_current(frame.observation)):
+        return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source="observation_unavailable"))
     state = evaluate_traffic_state(detection_frame, zones)
     state["crosswalk_region_counts"] = count_crosswalk_regions(detection_frame, crosswalk_service.get()["crosswalks"])
     return _apply_active_simulation_signal(state)

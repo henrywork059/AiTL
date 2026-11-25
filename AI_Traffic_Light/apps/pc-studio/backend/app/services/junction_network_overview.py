@@ -9,6 +9,7 @@ from app.services.decision_context import build_decision_context
 from app.services.intersection_network import IntersectionNetworkService, intersection_network_service
 from app.services.remote_camera_manager import RemoteCameraManager, remote_camera_manager
 from app.services.traffic_logic import get_live_traffic_state
+from app.services.traffic_observations import observation_for_junction, unavailable_observation
 
 TrafficStateProvider = Callable[[], dict[str, Any]]
 FrameProvider = Callable[[], Any | None]
@@ -241,7 +242,13 @@ class JunctionNetworkOverviewService:
         available_cameras = [remote_camera_views[source_id] for source_id in sorted(remote_camera_views)]
 
         observation_intersection_id = str(resolution["intersection_id"])
+        qualified = live_state.get("traffic_observation")
         observation_available = provenance != "unavailable"
+        if isinstance(qualified, dict):
+            observation_available = observation_for_junction(
+                qualified, observation_intersection_id, current_source_id,
+                now_ms=int(time.time() * 1000),
+            )["available"] and bool(resolution.get("source_mapping_matched"))
         junctions: list[dict[str, Any]] = []
 
         for intersection in network["intersections"]:
@@ -256,6 +263,9 @@ class JunctionNetworkOverviewService:
             live_for_junction = intersection_id == observation_intersection_id
             junction_provenance = provenance if live_for_junction else "unavailable"
             available = live_for_junction and observation_available
+            independent = observation_for_junction(
+                qualified, intersection_id, current_source_id, now_ms=int(time.time() * 1000)
+            ) if isinstance(qualified, dict) and resolution.get("source_mapping_matched") else unavailable_observation()
             vehicle_total = int(live_state.get("vehicles_total", 0) or 0) if live_for_junction else 0
             vehicle_waiting = int(live_state.get("vehicles_waiting", 0) or 0) if live_for_junction else 0
             pedestrian_total = int(live_state.get("pedestrians_total", 0) or 0) if live_for_junction else 0
@@ -337,6 +347,7 @@ class JunctionNetworkOverviewService:
                     "streaming_camera_count": sum(1 for source in assigned_sources if bool(source["streaming"] and source["stream_connected"])),
                     "live": {
                         "available": available,
+                        "traffic_observation": independent,
                         "pipeline_source_active": live_for_junction,
                         "source_id": current_source_id if live_for_junction else None,
                         "source_mapping_matched": bool(resolution.get("source_mapping_matched")) if live_for_junction else False,

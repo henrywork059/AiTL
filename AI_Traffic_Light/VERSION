@@ -1,5 +1,5 @@
-version: 0_5_61
-status: Source/intersection tracking isolation candidate (roadmap Update 17 / A03)
-previous_version: 0_5_60
+version: 0_5_62
+status: Source-qualified traffic observations candidate (roadmap Update 18 / A03)
+previous_version: 0_5_61
 passed_baseline: 0_5_0
-notes: Isolated continuity tests passed; full integration CI and owner PASS pending; physical gates unchanged.
+notes: Isolated helper tests passed; full CI and owner PASS pending; physical gates unchanged.

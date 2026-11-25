@@ -13,6 +13,10 @@ from app.services.intersection_network import intersection_network_service
 from app.services.observation_identity import ObservationIdentity
 from app.services.tracking_scope import TrackingContinuity, TrackingScope, TRACKING_MAX_GAP_MS
 from app.services.zones import REFERENCE_HEIGHT, REFERENCE_WIDTH
+from app.services.traffic_observations import (
+    STATIONARY_RADIUS_REFERENCE_PX, STATIONARY_MIN_MS, observation_fields,
+    selected_observation_is_current,
+)
 
 logger = get_logger(__name__)
 
@@ -106,6 +110,9 @@ class Track:
     inside_regions: set[str] = field(default_factory=set)
     region_entered_at_ms: dict[str, int] = field(default_factory=dict)
     crossed_lines: set[str] = field(default_factory=set)
+    stationary_anchor: tuple[float, float] | None = None
+    stationary_since_ms: int = 0
+    stationary_regions: set[str] = field(default_factory=set)
 
     def public(self) -> dict[str, Any]:
         return {
@@ -119,6 +126,9 @@ class Track:
             "age_frames": self.age_frames,
             "missed_frames": self.missed_frames,
             "inside_regions": sorted(self.inside_regions),
+            "stationary_regions": sorted(self.stationary_regions) if (
+                self.missed_frames == 0 and self.last_seen_ms - self.stationary_since_ms >= STATIONARY_MIN_MS
+            ) else [],
         }
 
 
@@ -127,11 +137,13 @@ class ObjectTrackingService:
 
     def __init__(self, *, flow_service: TrafficFlowService | None = None,
                  intersection_resolver: Callable[[str], dict] | None = None,
-                 clock_ms: Callable[[], int] = lambda: int(time() * 1000)) -> None:
+                 clock_ms: Callable[[], int] = lambda: int(time() * 1000),
+                 observation_validator: Callable[[ObservationIdentity], bool] | None = None) -> None:
         self._lock = RLock()
         self._flow_service = flow_service or traffic_flow_service
         self._intersection_resolver = intersection_resolver
         self._clock_ms = clock_ms
+        self._observation_validator = observation_validator
         self._continuity = TrackingContinuity()
         self._live_timestamp: int | None = None
         self._session_tag = uuid4().hex[:6]
@@ -176,6 +188,7 @@ class ObjectTrackingService:
             for item in detection_frame.get("detections", [])
         ]
         result["tracking"] = self._empty_tracking_locked()
+        result["traffic_observation_identity"] = None
         return result
 
     def _expire_locked(self) -> None:
@@ -197,13 +210,16 @@ class ObjectTrackingService:
                 observation.frame_key != frame_key
                 or (observation.width, observation.height) != (width, height)
                 or not 0 <= self._clock_ms() - timestamp_ms <= TRACKING_MAX_GAP_MS
+                or (self._observation_validator is not None and not self._observation_validator(observation))
             ):
                 return self._without_tracking_locked(detection_frame)
             scope = self._scope_for(source_id, width, height, observation)
             decision = self._continuity.classify(scope, timestamp_ms, frame_number)
             if decision == "repeat":
                 # Multiple callers may use different confidence thresholds on one frame.
-                return self._annotate_without_advancing(detection_frame, width=width, height=height)
+                result = self._annotate_without_advancing(detection_frame, width=width, height=height)
+                result["traffic_observation_identity"] = observation_fields(observation, scope) if observation else None
+                return result
             if decision == "replay":
                 # Never expose another source's tracks or count an old observation again.
                 if scope != self._continuity.scope:
@@ -232,6 +248,7 @@ class ObjectTrackingService:
                 center = _box_center(box)
                 reference_center = _reference_point(center, width, height)
                 track_id = assignments.get(detection_index)
+                had_gap = False
                 if track_id is None:
                     track = self._new_track(
                         detection=detection,
@@ -258,6 +275,7 @@ class ObjectTrackingService:
                     track = self._tracks[track_id]
                     previous_reference = track.reference_center
                     previous_regions = set(track.inside_regions)
+                    had_gap = track.missed_frames > 0
                     track.box_xyxy = box
                     track.center = center
                     track.reference_center = reference_center
@@ -275,6 +293,14 @@ class ObjectTrackingService:
                             frame_number=frame_number,
                         )
                     )
+                if (track.stationary_anchor is None or had_gap
+                    or hypot(reference_center[0] - track.stationary_anchor[0],
+                             reference_center[1] - track.stationary_anchor[1]) > STATIONARY_RADIUS_REFERENCE_PX):
+                    track.stationary_anchor = reference_center
+                    track.stationary_since_ms = timestamp_ms
+                    track.stationary_regions = set(track.inside_regions)
+                else:
+                    track.stationary_regions.intersection_update(track.inside_regions)
                 matched_tracks.add(track.track_id)
                 enriched = dict(detection)
                 enriched["track_id"] = track.track_id
@@ -288,6 +314,12 @@ class ObjectTrackingService:
                 if track.missed_frames > MAX_MISSED_FRAMES:
                     self._tracks.pop(track_id, None)
 
+            identity = observation_fields(observation, scope) if observation else None
+            if identity is not None:
+                if self._observation_validator is not None and not self._observation_validator(observation):
+                    self.reset_active()
+                    return self._without_tracking_locked(detection_frame)
+                events = [{**event, **identity} for event in events]
             self._events_recorded += self._flow_service.record_events(events)
             result = dict(detection_frame)
             # Keep untracked classes in the frame while adding IDs only to supported traffic classes.
@@ -297,6 +329,7 @@ class ObjectTrackingService:
                 for item in detection_frame.get("detections", [])
             ]
             result["tracking"] = self._status_locked()
+            result["traffic_observation_identity"] = identity
             return self._copy_result(result)
 
 
@@ -345,7 +378,9 @@ class ObjectTrackingService:
             if observation is None or not 0 <= self._clock_ms() - observation.received_at_ms <= TRACKING_MAX_GAP_MS:
                 return self._empty_tracking_locked()
             scope = self._scope_for(observation.source_id, observation.width, observation.height, observation)
-            if scope != self._continuity.scope:
+            if scope != self._continuity.scope or (
+                self._observation_validator is not None and not self._observation_validator(observation)
+            ):
                 return self._empty_tracking_locked()
             return self._status_locked()
 
@@ -527,4 +562,7 @@ class ObjectTrackingService:
         return copied
 
 
-object_tracking_service = ObjectTrackingService(intersection_resolver=intersection_network_service.resolve_source)
+object_tracking_service = ObjectTrackingService(
+    intersection_resolver=intersection_network_service.resolve_source,
+    observation_validator=selected_observation_is_current,
+)

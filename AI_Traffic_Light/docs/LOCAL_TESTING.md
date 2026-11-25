@@ -1,3 +1,25 @@
+# V0562 — Source-qualified traffic observations
+
+Candidate `0_5_62`; previous `0_5_61`; accepted baseline `0_5_0`; Update 18 / A03.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0562_traffic_observations.py
+python scripts/test_v0561_tracking_scope.py
+python scripts/test_object_tracking_flow.py
+python scripts/test_zone_traffic_services.py
+python scripts/test_traffic_history_service.py
+python scripts/test_junction_network_overview.py
+python scripts/test_v0550_signal_stale_fallback.py
+```
+
+Locally executed 18 isolated helper cases using stub camera/manager and identity interfaces; compilation passed and Git blob 88909a0b47fc7c427e46609ed430a21278e06c0d matches. Initial isolated test fixture had an incorrect nested retirement token and was corrected before the passing run. Full checkout unavailable due to GitHub DNS failure; new integration regression and full CI pending. Previous CI passed (run 45555018709). Windows/ESP owner PASS pending.
+
+See [Patch 0_5_62](PATCH_0_5_62.md).
+
+---
+
 # V0561 — Scope selected-source tracking by camera and junction
 
 Candidate `0_5_61`; previous `0_5_60`; accepted baseline `0_5_0`; Update 17 / A03.

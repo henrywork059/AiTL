@@ -1,3 +1,16 @@
+# V0562 — Source-qualified traffic observations
+
+Candidate `0_5_62`; previous `0_5_61`; accepted baseline `0_5_0`; Update 18 / A03.
+
+- [x] Source-qualified analytics and observation lifetime guards staged.
+- [x] Isolated observation helper checks and compilation passed.
+- [ ] Full trajectory/queue/history/network/signal regressions, candidate CI and owner PASS.
+- [ ] Physical gates and matched ESP throughput/CPU measurements remain outstanding.
+
+See [Patch 0_5_62](PATCH_0_5_62.md).
+
+---
+
 # V0561 — Scope selected-source tracking by camera and junction
 
 Candidate `0_5_61`; previous `0_5_60`; accepted baseline `0_5_0`; Update 17 / A03.
