@@ -1,5 +1,5 @@
-version: 0_5_57
-status: Synthetic lighting preparation candidate (roadmap Update 13; physical integration blocked)
-previous_version: 0_5_56
+version: 0_5_58
+status: Synthetic speaker preparation candidate (roadmap Update 14; physical integration blocked)
+previous_version: 0_5_57
 passed_baseline: 0_5_0
-notes: Fake-only binary pulse; 6 local focused tests passed; physical lighting blocked; CI and owner PASS pending.
+notes: Metadata-only speaker; 7 speaker and 6 lighting local tests passed; physical lighting/speaker blocked; CI and owner PASS pending.

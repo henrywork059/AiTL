@@ -55,6 +55,10 @@ The manager performs the existing optional network probe without holding the reg
 
 `bench_lighting.py` provides an isolated synthetic binary pulse facade over the existing `BenchOutputController`. It owns no independent lease or arming state. The test-only status projection identifies synthetic lighting separately from physical device availability. Existing camera registry, physical capability projection and traffic logic remain unchanged. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed.
 
+## V0558 synthetic speaker preparation
+
+`bench_speaker.py` wraps the existing `BenchOutputController` with a fixed synthetic notice catalog and normalized volume metadata. A local lock keeps notice metadata consistent with facade operations; the existing controller remains the sole owner of arming, lease and acknowledgment state. Status/tick clears stale metadata and never generates audio. No change to the camera registry, physical capability projection or signal control. Physical speaker integration is BLOCKED: hardware model, amplifier/driver, electrical specifications, acoustic limits, independent hardware fail-safe and controlled-bench authorization remain unconfirmed or unavailable. No acoustic or physical safety validation was performed. Physical lighting also remains blocked.
+
 ## Synthetic camera render caching
 
 `CameraFrameService` renders a 1280 × 720 BGR canvas and encodes the canonical simulation PNG once per tick. Mirrored simulation cameras B/C/D flip that same current-tick render and encode their own PNGs; they do not decode the canonical PNG. The bounded canvas cache occupies approximately 2.6 MiB and is discarded when simulation resets, stops or resumes. Existing per-view PNG caching, simulation scene coordinates, camera APIs, and protected virtual signal rules are unchanged. This optimization does not affect the real ESP transport or permit physical traffic-light control.

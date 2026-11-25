@@ -1,3 +1,15 @@
+# V0558 — Synthetic speaker preparation
+
+Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.
+
+- [x] Fixed synthetic notice catalog, normalized volume/duration bounds and explicit arming; existing fake controller reused.
+- [x] Seven speaker and six lighting focused tests and isolated compilation passed locally.
+- [x] No actual audio, physical output, live route, driver or firmware integration.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Physical speaker BLOCKED: confirm hardware/electrical/acoustic specs, driver, independent fail-safe and authorization before real output. Physical lighting gate remains open.
+
+---
+
 # V0557 — Synthetic lighting preparation
 
 Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.

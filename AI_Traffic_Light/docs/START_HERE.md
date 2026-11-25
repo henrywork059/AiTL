@@ -1,3 +1,11 @@
+# V0558 — Synthetic speaker preparation
+
+Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.
+
+The isolated `FakeSpeakerDemo` reuses the existing fake bench controller for a metadata-only demonstration of two predefined notices (`demo_attention`, `demo_accessibility`). Integer normalized volume 1–100% and duration 1–2000 ms are synthetic test bounds, not acoustic levels or certified limits. Explicit test arming is required; invalid or overlapping commands, acknowledgment faults, off, disconnect, generation changes and expiry clear the active notice. No audio playback, arbitrary speech, live route, UI, GPIO, network or firmware integration. Physical speaker integration is BLOCKED: hardware model, amplifier/driver, electrical specifications, acoustic limits, independent hardware fail-safe and controlled-bench authorization remain unconfirmed or unavailable. No acoustic or physical safety validation was performed. Physical lighting also remains blocked. Seven speaker and six lighting regressions passed locally (13 tests); isolated Python compilation passed. Previous candidate CI passed ([run 45515165289](https://github.com/henrywork059/AiTL/actions/runs/45515165289)). Current full CI and owner acceptance pending. See [Patch 0_5_58](PATCH_0_5_58.md).
+
+---
+
 # V0557 — Synthetic lighting preparation
 
 Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.

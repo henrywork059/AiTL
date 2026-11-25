@@ -20,6 +20,10 @@ Only a synthetic demo indicator is supported by an isolated, disabled-by-default
 
 The isolated `FakeLightingDemo` delegates binary synthetic pulses to the existing fake bench controller (integer duration 1–2000 ms, acknowledgment bound 100 ms). It is disabled by default, requires explicit test arming, and fails closed on invalid/overlapping requests, acknowledgment faults, disconnect, expiry and generation changes. Status is explicitly simulation-only and physical lighting remains unavailable. No live route, UI, GPIO, network or firmware integration. Physical integration is BLOCKED: lighting model, voltage/current requirements, driver/electrical interface and controlled-bench authorization remain unconfirmed; an independent hardware fail-safe is not implemented. No physical testing or electrical safety validation was performed.
 
+## V0558 synthetic speaker preparation
+
+The isolated `FakeSpeakerDemo` reuses the existing fake bench controller for a metadata-only demonstration of two predefined notices (`demo_attention`, `demo_accessibility`). Integer normalized volume 1–100% and duration 1–2000 ms are synthetic test bounds, not acoustic levels or certified limits. Explicit test arming is required; invalid or overlapping commands, acknowledgment faults, off, disconnect, generation changes and expiry clear the active notice. No audio playback, arbitrary speech, live route, UI, GPIO, network or firmware integration. Physical speaker integration is BLOCKED: hardware model, amplifier/driver, electrical specifications, acoustic limits, independent hardware fail-safe and controlled-bench authorization remain unconfirmed or unavailable. No acoustic or physical safety validation was performed. Physical lighting also remains blocked.
+
 ## Physical camera input
 
 AiTL implements a local PC-controlled ESP32-CAM input path with:

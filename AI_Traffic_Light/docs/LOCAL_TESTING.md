@@ -1,3 +1,20 @@
+# V0558 — Synthetic speaker regression
+
+Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0558_bench_speaker.py
+python scripts/test_v0557_bench_lighting.py
+python scripts/run_offline_tests.py --focused test_v0558_bench_speaker.py test_v0557_bench_lighting.py test_v0556_bench_output.py
+python scripts/check_structure.py
+```
+
+Seven speaker and six lighting regressions passed locally (13 tests); isolated Python compilation passed. Previous candidate CI passed ([run 45515165289](https://github.com/henrywork059/AiTL/actions/runs/45515165289)). Current full CI and owner acceptance pending. The focused speaker and lighting tests and isolated compilation ran locally, not the full checkout or frontend build. No audio or hardware connection is required. Physical speaker integration is BLOCKED: hardware model, amplifier/driver, electrical specifications, acoustic limits, independent hardware fail-safe and controlled-bench authorization remain unconfirmed or unavailable. No acoustic or physical safety validation was performed. Physical lighting also remains blocked. Use the normal owner runner with `-SkipUpdate` from the repository root. See [Patch 0_5_58](PATCH_0_5_58.md).
+
+---
+
 # V0557 — Synthetic lighting regression
 
 Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.
