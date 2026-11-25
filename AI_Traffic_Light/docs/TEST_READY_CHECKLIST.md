@@ -4,7 +4,7 @@ Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S0
 
 - [x] Fixed-step clock adapter, seed/monotonic injection and legacy ownership retained.
 - [x] Three isolated scheduler tests and syntax checks passed; exact hashes verified.
-- [ ] Fourth actual legacy-agent regression, integrated compile/test/API parity and current CI.
+- [x] Fourth actual legacy-agent regression, integrated compile/test/API parity and full CI passed (45621580527).
 - [ ] Owner Windows/ESP PASS.
 - [ ] Remediate identified npm vulnerabilities and execute pinned SUMO smoke before engine adoption.
 - [ ] Physical gates unchanged.
@@ -938,3 +938,6 @@ status: Responsive text layout and clear selected-region outline candidate
 - [ ] `python scripts/test_junction_network_frontend_structure.py` passes.
 - [ ] `python scripts/check_structure.py`, frontend typecheck/build and full Windows runner pass.
 - [ ] Owner confirms PASS, otherwise `0_4_0` remains accepted baseline.
+
+
+Security remediation preparation 21a: Preparation 21a (same candidate, no package or runtime changes): [0_5_65 CI 45621580527](https://github.com/henrywork059/AiTL/actions/runs/45621580527) passed the complete offline suite, including all four V0565 scheduler/agent tests, frontend regression, typecheck and build. Its non-blocking audit still reports two high-severity vulnerable packages and exit 1. Local npm registry DNS resolution failed; integrity metadata and regenerated lockfile cannot be guessed. A feature-branch-only, read-only Windows CI trial resolves Vite 8.3.8 and an exact source-map-js 1.2.2 override using npm, emits the generated manifests for inspection, verifies installed versions, tests frontend compatibility and runs a blocking high-severity audit. The trial never commits, publishes or changes the existing candidate's lockfile. Review the generated dependency diff and CI evidence before an atomic 0_5_66 remediation candidate; retain the current owner-accepted baseline. Update 22 remains blocked by security and real SUMO smoke.

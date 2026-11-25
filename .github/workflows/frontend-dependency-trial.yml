@@ -1,0 +1,48 @@
+name: Frontend dependency remediation trial
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths: ['.github/workflows/frontend-dependency-trial.yml']
+permissions:
+  contents: read
+jobs:
+  resolve-and-validate:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve exact remediation targets
+        run: |
+          npm pkg set overrides.source-map-js=1.2.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --save-exact vite@8.3.8
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Emit generated manifest evidence
+        run: |
+          git diff -- package.json package-lock.json
+          node -e "for (const f of ['package.json','package-lock.json']) { const s = require('node:fs').readFileSync(f).toString('base64'); for (let i=0;i<s.length;i+=1500) console.log('MESH_MANIFEST '+f+' '+(i/1500)+' '+s.slice(i,i+1500)); console.log('MESH_MANIFEST_END '+f+' '+Math.ceil(s.length/1500)); }"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install resolved lock
+        run: npm ci --no-audit --no-fund
+      - name: Confirm resolved versions
+        run: |
+          npm ls vite source-map-js --all
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node -e "const l=require('./package-lock.json'); const p=l.packages; if(p['node_modules/vite'].version!=='8.3.8'||Object.entries(p).filter(([k])=>k.endsWith('/source-map-js')).some(([,v])=>v.version!=='1.2.2')||!p['node_modules/source-map-js']) process.exit(1)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Blocking dependency audit
+        run: npm audit --audit-level=high --json
+      - name: Frontend data access regressions
+        run: npm run test:data-access
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
