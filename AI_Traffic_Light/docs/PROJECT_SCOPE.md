@@ -102,3 +102,8 @@ Simulation/virtual preview only: Users can define vehicle/pedestrian conflict pa
 ### Observation identity foundation (0_5_59 candidate)
 
 Internal camera identity is shared by synthetic and ESP producers. External upload provenance is not verified physical evidence. No additional perception, multi-junction fusion, control authority or hardware validation is implied.
+
+
+### Tracking isolation foundation (0_5_61 candidate)
+
+Selected-source tracking resets on camera/junction or acquisition scope changes; bounded replay guards prevent repeated cached observations from creating new tracks while retained. No concurrent multi-camera tracking, cross-camera identity matching or independently aggregated junction flow is established.

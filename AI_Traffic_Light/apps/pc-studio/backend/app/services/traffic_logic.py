@@ -333,7 +333,7 @@ def get_live_traffic_state() -> dict[str, Any]:
     try:
         settings = runtime_settings_service.get()
         detection_frame = inference_service.detect_frame(frame, confidence_threshold=float(settings["default_confidence"]))
-        detection_frame = object_tracking_service.update(detection_frame, zones)
+        detection_frame = object_tracking_service.update(detection_frame, zones, observation=frame.observation)
     except AppError as exc:
         if exc.code in {
             ErrorCode.MODEL_NOT_LOADED,
@@ -341,6 +341,7 @@ def get_live_traffic_state() -> dict[str, Any]:
             ErrorCode.INFERENCE_FAILED,
             ErrorCode.INFERENCE_RESULT_INVALID,
         }:
+            object_tracking_service.reset_active()
             logger.warning("Traffic simulation could not obtain live detections", extra={"error_code": exc.code.value})
             return _apply_active_simulation_signal(evaluate_traffic_state(None, zones, source=f"inference_unavailable:{exc.code.value}"))
         raise

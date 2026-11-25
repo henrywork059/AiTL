@@ -1,3 +1,23 @@
+# V0561 — Scope selected-source tracking by camera and junction
+
+Candidate `0_5_61`; previous `0_5_60`; accepted baseline `0_5_0`; Update 17 / A03.
+
+From `AI_Traffic_Light`:
+
+```powershell
+python scripts/test_v0561_tracking_scope.py
+python scripts/test_object_tracking_flow.py
+python scripts/test_zone_traffic_services.py
+python scripts/test_v0547_cached_frame_identity.py
+python scripts/test_v0550_signal_stale_fallback.py
+```
+
+Locally executed the isolated TrackingContinuity helper: 16 targeted assertions plus a bounded-source loop; compilation passed. The helper's staged blob must match the locally tested hash. Full producer/route/tracker regressions were added but not run locally: GitHub DNS resolution failure reproduced. Previous candidate corrective CI passed ([run 45538583036](https://github.com/henrywork059/AiTL/actions/runs/45538583036)); current CI and Windows/ESP owner acceptance pending. Physical throughput/CPU comparison and lighting/speaker gates remain outstanding.
+
+See [Patch 0_5_61](PATCH_0_5_61.md).
+
+---
+
 # V0560 — Separate ATL1 transport framing from camera lifecycle
 
 Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.

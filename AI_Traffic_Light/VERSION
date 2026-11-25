@@ -1,5 +1,5 @@
-version: 0_5_60
-status: ATL1 transport separation candidate (roadmap Update 16 / A04)
-previous_version: 0_5_59
+version: 0_5_61
+status: Source/intersection tracking isolation candidate (roadmap Update 17 / A03)
+previous_version: 0_5_60
 passed_baseline: 0_5_0
-notes: Corrective 16a updates legacy transport regressions after CI failure; 43 source predicates checked; new CI, ESP throughput/CPU comparison and owner PASS pending.
+notes: Isolated continuity tests passed; full integration CI and owner PASS pending; physical gates unchanged.

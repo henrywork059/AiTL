@@ -418,3 +418,8 @@ Returns the same standard success envelope with the current diagnostic progress 
 ### 0_5_59 internal observation identity
 
 No public response or request fields change. Internal acquisition generation and provenance are not serialized by `CameraFrame.metadata()`; existing source ID, frame number, original PC receive timestamp, image dimensions and origin retain their meanings. Existing lifetime checks and expiry remain authoritative.
+
+
+### 0_5_61 tracking scope
+
+Existing tracking/detection response fields remain unchanged. Live tracking annotations are suppressed for stale, mismatched or previously consumed inactive observations, and tracking status returns empty active tracks when no current matching observation scope exists. Cumulative counters are retained; old flow history is not reclassified. No independent multi-junction flow claim.

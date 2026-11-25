@@ -1,3 +1,16 @@
+# V0561 — Scope selected-source tracking by camera and junction
+
+Candidate `0_5_61`; previous `0_5_60`; accepted baseline `0_5_0`; Update 17 / A03.
+
+- [x] Camera/junction/acquisition scope and bounded replay watermark implemented.
+- [x] Isolated continuity helper checks and compilation passed.
+- [ ] Full tracker/route regressions, candidate CI and owner Windows/ESP acceptance.
+- [ ] Matched ESP throughput/CPU comparison and physical peripheral prerequisites.
+
+See [Patch 0_5_61](PATCH_0_5_61.md).
+
+---
+
 # V0560 — Separate ATL1 transport framing from camera lifecycle
 
 Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.
