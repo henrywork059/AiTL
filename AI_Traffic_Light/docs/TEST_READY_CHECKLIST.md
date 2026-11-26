@@ -1,3 +1,19 @@
+# V0567 — Optional SUMO shadow integration
+
+Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.
+
+- [x] Pinned SUMO/TraCI/libsumo reference and controlled native repeatability trials passed.
+- [x] Python 3.10.11 native compatibility, package closure and advisory metadata checks passed.
+- [x] Camera integration, asynchronous worker, lifecycle, error recovery and virtual permission tests passed in CI.
+- [x] Standard frontend build/typecheck/regressions and blocking audit passed on application revision.
+- [ ] Exact release metadata commit CI (pending at publication).
+- [ ] Owner Windows default-mode acceptance and optional shadow end-to-end exercise.
+- [ ] Matched legacy comparison, native dependency binary audit, endurance and physical hardware validation.
+
+See [Patch 0_5_67](PATCH_0_5_67.md).
+
+---
+
 # V0566 — Frontend dependency security remediation
 
 Candidate `0_5_66`; previous `0_5_65`; accepted baseline `0_5_0`; security prerequisite 21b (not a numbered roadmap completion).

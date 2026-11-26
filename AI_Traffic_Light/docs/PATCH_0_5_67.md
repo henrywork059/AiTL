@@ -1,0 +1,38 @@
+# V0567 — Optional SUMO shadow integration
+
+Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.
+
+## Implementation
+
+The existing CameraFrameService remains authoritative. Optional `MESH_SUMO_SHADOW=1` forwards committed virtual phases to a bounded asynchronous worker and a dedicated libsumo child process through local IPC (no TraCI network listener). Four 50 ms legacy steps produce one 200 ms shadow step; mixed, yellow, flashing or unknown phases grant all-red. Restricted east–west straight vehicle movements and pedestrian crossings are checked against the generated link/conflict matrix, native link mapping and permission readback. Opposing entry is withheld when internal vehicle/crossing edge occupancy is detected. Reset, stop, engine error or backlog overflow invalidate snapshots. Pause stops new legacy ticks, but queued steps may drain. The default is disabled; no automatic dependency install or changes to existing camera/detection/decision/physical outputs. `GET /api/camera/simulation/shadow` is read-only and returns separately labelled synthetic diagnostics; snapshots can lag the authoritative clock.
+
+## Verified evidence
+
+Executed release-gate evidence for application revision `fc3508e52adf460a19fe32b74c8324903d90e35f`: [standard CI 45737386040](https://github.com/henrywork059/AiTL/actions/runs/45737386040) passed compilation, structure, offline regressions (including camera integration and runtime), frontend regressions/typecheck/build and blocking npm audit (0 reported vulnerabilities). [Native CI 45737386082](https://github.com/henrywork059/AiTL/actions/runs/45737386082), Windows x64 Python 3.10.11, passed exact hash-pinned installation, pip check, version-specific PyPI advisory checks (zero active advisories for all five packages), adapter/child process/runtime tests, native reference and controlled simulation. The earlier [Python 3.11 native CI 45736465611](https://github.com/henrywork059/AiTL/actions/runs/45736465611) also passed the reference trial. Both native-plan reference runs reproduced the TraCI digest `34c24376cf005cdb3d5f9ab0b4aab822847970f49b380fdf139fb0426ee76097` exactly. Each controlled run (seed 42, 300 s, 0.2 s step, 1500 ticks) observed 24 agents, completed 12/12 vehicles and 12/12 pedestrians, and produced digest `28a85055d3ef862650da3fce4aef5e8018f4eb37a9e0f2d3bb017eecf4e7c902`. Observed states were `rrrrrGrrrrrrrGrrrrrr`, `rrrrrrrrrrrrrrrrGGGG`, and `rrrrrrrrrrrrrrrrrrrr`; no simultaneous vehicle/pedestrian grants in the tested fixture. Asynchronous runtime and native failure recovery passed. [Retained artifact 15080205533](https://github.com/henrywork059/AiTL/actions/runs/45737386082/artifacts/15080205533), expires 10 December 2026 09:42 HKT. Results verified from CI logs; newest raw artifact not independently re-inspected in this release step.
+
+## Owner acceptance
+
+```powershell
+# From repository root; normal owner acceptance uses legacy default.
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Optional shadow verification is a separate controlled exercise, not required for default acceptance. Use an existing trusted Windows x64 Python 3.10/3.11 backend virtual environment after the default runner has initialized it. Stop the running PC Studio backend first. From `AI_Traffic_Light/apps/pc-studio/backend`:
+
+```powershell
+& .\.venv\Scripts\python.exe -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r requirements-sumo-shadow-win-x64.txt
+if ($LASTEXITCODE -ne 0) { throw 'Optional SUMO installation failed' }
+& .\.venv\Scripts\python.exe -m pip check
+if ($LASTEXITCODE -ne 0) { throw 'Dependency check failed' }
+$env:MESH_SUMO_SHADOW = '1'
+& .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+In the existing frontend, enable simulation, observe the diagnostics at `http://127.0.0.1:8000/api/camera/simulation/shadow`, pause/resume, change density and switch off simulation. Verify the legacy scene is unchanged, the shadow advances separately and resets/clears on stop. Stop the optional backend with Ctrl+C; remove `Env:MESH_SUMO_SHADOW` and restart the normal runner to roll back. Do not enable with live-road hardware or expose the optional service to untrusted networks.
+
+## Limits and next step
+
+Evidence class: actually executed synthetic simulation, not field data. Restricted demand, geometry, and illustrative permission cycle differ from the legacy simulator; no matched performance/controller benefit, physical clearance certification, endurance, or owner browser/ESP PASS is established. The native controlled trial and camera integration regression are separate checks, not an end-to-end native PC Studio session. PyPI advisory metadata is time-specific and does not audit bundled native DLLs. Optional packages are pinned to 1.28.0 with wheel hashes; native dependencies are optional and not automatically installed. Keep the existing engine authoritative and opt-in mode restricted to trusted local synthetic evaluation. No public-road actuation, partnership or pilot. Candidate delivery 22/39; next Update 23 / S03 (replacement 3D road renderer).

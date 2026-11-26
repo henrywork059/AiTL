@@ -1,3 +1,15 @@
+# V0567 — Optional SUMO shadow integration
+
+Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.
+
+The existing CameraFrameService remains authoritative. Optional `MESH_SUMO_SHADOW=1` forwards committed virtual phases to a bounded asynchronous worker and a dedicated libsumo child process through local IPC (no TraCI network listener). Four 50 ms legacy steps produce one 200 ms shadow step; mixed, yellow, flashing or unknown phases grant all-red. Restricted east–west straight vehicle movements and pedestrian crossings are checked against the generated link/conflict matrix, native link mapping and permission readback. Opposing entry is withheld when internal vehicle/crossing edge occupancy is detected. Reset, stop, engine error or backlog overflow invalidate snapshots. Pause stops new legacy ticks, but queued steps may drain. The default is disabled; no automatic dependency install or changes to existing camera/detection/decision/physical outputs. `GET /api/camera/simulation/shadow` is read-only and returns separately labelled synthetic diagnostics; snapshots can lag the authoritative clock.
+
+Evidence class: actually executed synthetic simulation, not field data. Restricted demand, geometry, and illustrative permission cycle differ from the legacy simulator; no matched performance/controller benefit, physical clearance certification, endurance, or owner browser/ESP PASS is established. The native controlled trial and camera integration regression are separate checks, not an end-to-end native PC Studio session. PyPI advisory metadata is time-specific and does not audit bundled native DLLs. Optional packages are pinned to 1.28.0 with wheel hashes; native dependencies are optional and not automatically installed. Keep the existing engine authoritative and opt-in mode restricted to trusted local synthetic evaluation. No public-road actuation, partnership or pilot. Candidate delivery 22/39; next Update 23 / S03 (replacement 3D road renderer).
+
+See [Patch 0_5_67](PATCH_0_5_67.md) and [local testing](LOCAL_TESTING.md). Prior application CI passed; exact release commit CI pending.
+
+---
+
 # V0566 — Frontend dependency security remediation
 
 Candidate `0_5_66`; previous `0_5_65`; accepted baseline `0_5_0`; security prerequisite 21b (not a numbered roadmap completion).

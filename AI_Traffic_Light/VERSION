@@ -1,5 +1,5 @@
-version: 0_5_66
-status: Frontend dependency security remediation candidate (21b security prerequisite)
-previous_version: 0_5_65
+version: 0_5_67
+status: Optional SUMO shadow integration candidate (Update 22 / S02)
+previous_version: 0_5_66
 passed_baseline: 0_5_0
-notes: 22e standard and native libsumo CI passed; 22f opt-in application shadow integration staged for Python 3.10 and controlled native CI; owner PASS pending.
+notes: 22f standard and controlled native Python 3.10 CI passed; release metadata CI and owner PASS pending.
