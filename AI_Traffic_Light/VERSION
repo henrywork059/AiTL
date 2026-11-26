@@ -2,4 +2,4 @@ version: 0_5_66
 status: Frontend dependency security remediation candidate (21b security prerequisite)
 previous_version: 0_5_65
 passed_baseline: 0_5_0
-notes: Exact Windows trial manifests; trial audit zero vulnerabilities and frontend checks passed; committed CI and owner PASS pending; real SUMO smoke blocked.
+notes: Committed full CI and blocking npm audit passed (45644478903, zero reported vulnerabilities); owner PASS pending; 22a pinned SUMO evaluation trial pending, no runtime integration.

@@ -1,0 +1,61 @@
+name: Pinned SUMO evaluation trial
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/sumo-evaluation-trial.yml'
+      - '.github/scripts/sumo_topology_trial.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-smoke:
+    if: github.ref == 'refs/heads/feature/interactive-3d-simulation'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - name: Verify and install isolated SUMO wheel
+        run: |
+          $requirements = Join-Path $env:RUNNER_TEMP 'sumo-trial-requirements.txt'
+          'eclipse-sumo==1.28.0 --hash=sha256:c8c898237d0a98f7f87ae762195a62114baca7b54394a430a06bbfc166145aa8' | Set-Content -Encoding ascii $requirements
+          python -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r $requirements
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip show eclipse-sumo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin = python -c "from importlib.metadata import distribution; from pathlib import Path; d=distribution('eclipse-sumo'); p=[Path(d.locate_file(f)).resolve().parent for f in d.files if f.name.lower()=='sumo.exe']; assert len(p)==1 and (p[0]/'netconvert.exe').is_file(), p; print(p[0])"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify actual executable versions
+        id: verified_engine
+        run: |
+          $s = sumo --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $s
+          if (($s -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected SUMO version' }
+          $n = netconvert --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $n
+          if (($n -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected netconvert version' }
+      - name: Execute two seeded smoke runs
+        working-directory: AI_Traffic_Light
+        run: python scripts/evaluate_simulation_engine.py --output "$env:RUNNER_TEMP/mesh-sumo-smoke.json"
+      - name: Execute topology and crossing diagnostic
+        if: always() && steps.verified_engine.outcome == 'success'
+        run: python .github/scripts/sumo_topology_trial.py --output-dir "$env:RUNNER_TEMP/mesh-sumo-topology"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sumo-1.28.0-synthetic-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/mesh-sumo-smoke.json
+            ${{ runner.temp }}/mesh-sumo-topology/
