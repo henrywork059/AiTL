@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.11'
           architecture: x64
-      - name: Test native binary discovery
+      - name: Test native binary discovery and version checks
         run: python .github/scripts/test_locate_sumo_bin.py
       - name: Verify and install isolated SUMO wheels
         run: |
@@ -43,15 +43,7 @@ jobs:
           "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify actual executable versions
         id: verified_engine
-        run: |
-          $s = & (Join-Path $env:SUMO_HOME 'bin/sumo.exe') --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $s
-          if (($s -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected SUMO version' }
-          $n = & (Join-Path $env:SUMO_HOME 'bin/netconvert.exe') --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $n
-          if (($n -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected netconvert version' }
+        run: python .github/scripts/locate_sumo_bin.py --verify-versions
       - name: Execute two seeded smoke runs
         working-directory: AI_Traffic_Light
         run: python scripts/evaluate_simulation_engine.py --output "$env:RUNNER_TEMP/mesh-sumo-smoke.json"
