@@ -78,9 +78,9 @@ class _BenchmarkSignalRulesService(SignalRulesService):
     production controller's phase/rule/cooldown/arbitration implementation.
     """
 
-    def __init__(self, *, config_path: Path, history_path: Path) -> None:
+    def __init__(self, *, config_path: Path, history_path: Path, respect_environment: bool = True) -> None:
         self._benchmark_clock_s = 0.0
-        super().__init__(config_path=config_path, history_path=history_path)
+        super().__init__(config_path=config_path, history_path=history_path, respect_environment=respect_environment)
 
     def set_benchmark_clock(self, clock_s: float) -> None:
         self._benchmark_clock_s = max(0.0, float(clock_s))

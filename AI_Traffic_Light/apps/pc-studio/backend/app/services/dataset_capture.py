@@ -54,8 +54,8 @@ class CaptureRecord:
 class DatasetCaptureService:
     """Persist and remove camera captures inside the project dataset folder."""
 
-    def __init__(self, dataset_root: Path | None = None) -> None:
-        configured_root = os.environ.get("AITL_DATASET_DIR")
+    def __init__(self, dataset_root: Path | None = None, *, respect_environment: bool = True) -> None:
+        configured_root = os.environ.get("AITL_DATASET_DIR") if respect_environment else None
         self._dataset_root = Path(configured_root) if configured_root else (dataset_root or DEFAULT_DATASET_ROOT)
         self._dataset_root = self._dataset_root.expanduser().resolve()
         self._capture_root = self._dataset_root / "captures"

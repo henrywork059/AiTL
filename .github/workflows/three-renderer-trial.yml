@@ -11,6 +11,8 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/ThreeRoadView.tsx'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/SimulationCamera3D.tsx'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/NativeProjectionView.tsx'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/NativeRoadRenderer.ts'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/NativeRoad3D.tsx'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/vehicle*.ts'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/pedestrian*.ts'
   workflow_dispatch:

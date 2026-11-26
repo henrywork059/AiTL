@@ -11,6 +11,7 @@ from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.models import CameraSimulationSettingsRequest
 from app.services.camera_frames import MAX_FRAME_BYTES, camera_frame_service
+from app.services.native_evaluation import native_evaluation_service
 from app.services.remote_camera_manager import SIMULATION_SOURCE_IDS, remote_camera_manager as remote_camera_service
 
 router = APIRouter()
@@ -366,3 +367,75 @@ def update_camera_simulation_settings(
 ) -> dict:
     data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused)
     return ok(data, request_id=request.state.request_id)
+
+
+class NativeEvaluationIdentity(BaseModel):
+    epoch: str = Field(min_length=32, max_length=32, pattern=r"^[0-9a-f]+$")
+    generation: int = Field(ge=0)
+
+
+class NativeEvaluationStart(NativeEvaluationIdentity):
+    density: Literal["light","normal","busy"] = "normal"
+    seed: int = Field(default=42, ge=0, le=2147483647)
+    mode: Literal["fixed","adaptive"] = "fixed"
+
+
+class NativeEvaluationStep(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    steps: int = Field(ge=1,le=25)
+
+
+class NativeEvaluationPause(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    paused: bool
+
+
+@router.get("/simulation/native-evaluation")
+def read_native_evaluation(request: Request) -> dict:
+    return ok(native_evaluation_service.scene(), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/start")
+def start_native_evaluation(payload: NativeEvaluationStart, request: Request) -> dict:
+    return ok(native_evaluation_service.start(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/step")
+def step_native_evaluation(payload: NativeEvaluationStep, request: Request) -> dict:
+    return ok(native_evaluation_service.step(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/pause")
+def pause_native_evaluation(payload: NativeEvaluationPause, request: Request) -> dict:
+    return ok(native_evaluation_service.pause(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/stop")
+def stop_native_evaluation(payload: NativeEvaluationIdentity, request: Request) -> dict:
+    return ok(native_evaluation_service.stop(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-evaluation/frame")
+def native_evaluation_frame(request: Request, source_id: str, epoch: str,
+                            generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    frame=native_evaluation_service.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+    return Response(content=frame.content, media_type=frame.content_type,headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
+        "X-Native-Generation":str(generation),"X-Received-At-Ms":str(frame.received_at_ms),
+        "X-Observation-Origin":frame.origin})
+
+
+@router.get("/simulation/native-evaluation/capture")
+def native_evaluation_capture(request: Request, epoch: str,
+                              generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    archive=native_evaluation_service.capture(epoch=epoch,generation=generation,tick=tick)
+    return Response(content=archive,media_type="application/zip",headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "Content-Disposition":f'attachment; filename="mesh-native-g{generation}-t{tick}.zip"'})
+
+
+@router.get("/simulation/native-evaluation/export")
+def native_evaluation_export(request: Request, epoch: str,
+                             generation: int = Query(ge=0), tick: int = Query(ge=0)) -> dict:
+    return ok(native_evaluation_service.export(epoch=epoch,generation=generation,tick=tick), request_id=request.state.request_id)

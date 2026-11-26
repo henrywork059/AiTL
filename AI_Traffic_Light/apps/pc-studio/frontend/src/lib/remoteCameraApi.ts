@@ -293,6 +293,9 @@ export type NativeProjectionScene = {
   seed: number;
   tick: number;
   time_s: number;
+  pixels_per_m?: number;
+  paused?: boolean;
+  received_at_ms?: number;
   width: 1280;
   height: 720;
   lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number}>;
@@ -308,4 +311,16 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   return requestJsonStrict<NativeProjectionResponse>(
     `${API_BASE}/api/camera/simulation/native-projection?format=scene`, { signal, cache: "no-store" },
   );
+}
+
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;native_only:true;physical_output_allowed:false};
+const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
+export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
+  return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
+}
+export function nativeEvaluationCommand(action:"start"|"step"|"pause"|"stop",body:Record<string,unknown>,signal:AbortSignal):Promise<NativeEvaluationState>{
+  return requestJsonStrict<NativeEvaluationState>(`${nativeEvaluationBase}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal});
+}
+export function nativeEvaluationCaptureUrl(state:NativeEvaluationState){
+  return `${nativeEvaluationBase}/capture?${new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)})}`;
 }

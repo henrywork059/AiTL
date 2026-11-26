@@ -250,3 +250,7 @@ Isolated simulation_gate_metrics consumes normalized approach/service/exit obser
 ### Finite common service-gate evaluation (Update 28i preparation)
 
 The isolated finite fixture parses the trusted generated network/route XML, supplies common physical vehicle and crossing paths and offered demand to a legacy-style reference and native route-aware measurement. Walking areas are reference chords, native dynamics are not reproduced, and the reference is not CameraFrameService. No selected camera, controller, detector, editor, persistence or physical outputs change.
+
+### Standalone native evaluation milestone (Update 28 preparation)
+
+An explicit startup flag enables a separate bounded native-only application service. Its manually stepped clock, temporary protected controller configuration, native child, route metrics, exact generation/tick publisher and capture archive belong solely to the evaluation instance. Native-only controls never select a saved camera, observe live traffic, or mutate production signal settings. Native Three.js uses actual lane polylines and observed positions, with SVG fallback; original editor pixels stay legacy. App shutdown retires the evaluation. No production authority switch.

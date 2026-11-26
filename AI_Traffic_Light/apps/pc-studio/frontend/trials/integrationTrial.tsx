@@ -13,9 +13,24 @@ let generation = 1;
 let nativeTick = 1;
 let nativeStatus = "running";
 let nativeCalls = 0;
+let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
 const originalFetch = window.fetch;
-window.fetch = async (input) => {
+window.fetch = async (input,init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+  if(url.pathname.startsWith("/api/camera/simulation/native-evaluation")){
+    evalCalls++;
+    const command=url.pathname.split("/").pop();
+    if(init?.method==="POST"){
+      const body=JSON.parse(String(init.body));
+      if(body.generation!==evalGeneration||body.epoch!=="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")throw Error("Wrong evaluation identity");
+      if(command==="start"){evalGeneration++;evalTick=0;evalRunning=true;evalPaused=false;}
+      if(command==="step"){if(evalPaused||body.tick!==evalTick)throw Error("Wrong step");evalTick+=body.steps;}
+      if(command==="pause"){evalPaused=body.paused;}
+      if(command==="stop"){evalGeneration++;evalRunning=false;}
+    }
+    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,physical_output_allowed:false,
+      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
+  }
   if (url.pathname === "/api/camera/simulation/native-projection") {
     nativeCalls++;
     if (url.searchParams.get("format") !== "scene") throw new Error("Unexpected native format");
@@ -88,6 +103,15 @@ async function run(){
       mount(sid);
       await wait(()=>host.querySelector("[data-native-lane]")?.parentElement?.getAttribute("transform")===transform,"Native camera transform failed");
     }
+    button("Native 3D")!.click();
+    await wait(()=>Boolean(host.querySelector("canvas[data-native-webgl]")),"Native volumetric view did not mount");
+    const nativeCanvas=host.querySelector("canvas[data-native-webgl]");
+    nativeTick=1;
+    const native3dCalls=nativeCalls;
+    await wait(()=>nativeCalls>native3dCalls,"Native 3D poll did not occur");
+    check(host.querySelector("canvas[data-native-webgl]")===nativeCanvas,"Native 3D canvas remounted within generation");
+    nativeCanvas!.dispatchEvent(new Event("webglcontextlost",{cancelable:true}));
+    await wait(()=>Boolean(agent())&&!host.querySelector("canvas[data-native-webgl]"),"Native WebGL loss did not fall back");
     nativeStatus="unavailable";
     await wait(()=>!agent()&&Boolean(host.querySelector("[data-native-status='unavailable']")),"Unavailable native retained agents");
     button("Exit native preview")!.click();
@@ -98,11 +122,27 @@ async function run(){
     nativeStatus="running";
     button("Native SUMO preview")!.click();
     await wait(()=>Boolean(agent()),"Native retry failed");
+    button("Standalone evaluation")!.click();
+    await wait(()=>Boolean(button("Start native evaluation")),"Standalone controls not loaded");
+    button("Start native evaluation")!.click();
+    await wait(()=>Boolean(button("Advance 5 s")&&!button("Advance 5 s")!.disabled),"Standalone start failed");
+    button("Advance 5 s")!.click();
+    await wait(()=>Boolean(host.querySelector("[data-native-tick='25']")),"Standalone step failed");
+    await wait(()=>Boolean(button("Pause native")&&!button("Pause native")!.disabled),"Standalone pause unavailable");
+    button("Pause native")!.click();
+    await wait(()=>Boolean(button("Resume native")&&button("Advance 5 s")!.disabled),"Standalone pause failed");
+    await wait(()=>Boolean(button("Stop native evaluation")&&!button("Stop native evaluation")!.disabled),"Standalone stop unavailable");
+    button("Stop native evaluation")!.click();
+    await wait(()=>!agent()&&Boolean(button("Start native evaluation")),"Standalone stop failed");
+    button("Shadow preview")!.click();
+    await wait(()=>Boolean(agent()),"Shadow rollback failed");
+    const evalRetired=evalCalls;
     mount("simulation_camera_d",true);
     check(mode()==="legacy"&&!agent()&&Boolean(host.querySelector(".sim3d-world")),"Native editor fallback failed");
     const editorCalls=nativeCalls;
     await new Promise(resolve=>setTimeout(resolve,650));
     check(nativeCalls===editorCalls,"Native poll continued in editor");
+    check(evalCalls===evalRetired,"Standalone poll continued after rollback");
     flushSync(()=>root.unmount());
     check(!canvas(),"Canvas leaked after unmount");
     result.textContent="MESH_INTEGRATION_PASS";

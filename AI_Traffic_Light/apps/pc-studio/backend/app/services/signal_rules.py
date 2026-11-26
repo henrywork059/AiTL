@@ -285,8 +285,9 @@ def _compare(operator: str, value: float, threshold: float) -> bool:
 class SignalRulesService:
     """Persist and evaluate ranked user-defined signal scenarios for local simulation only."""
 
-    def __init__(self, *, config_path: Path | None = None, history_path: Path | None = None) -> None:
-        configured_path = os.environ.get("AITL_SIGNAL_RULES")
+    def __init__(self, *, config_path: Path | None = None, history_path: Path | None = None,
+                 respect_environment: bool = True) -> None:
+        configured_path = os.environ.get("AITL_SIGNAL_RULES") if respect_environment else None
         self._config_path = Path(configured_path) if configured_path else (config_path or DEFAULT_CONFIG_PATH)
         self._config_path = self._config_path.expanduser().resolve()
         self._history_path = (history_path or DEFAULT_HISTORY_PATH).expanduser().resolve()

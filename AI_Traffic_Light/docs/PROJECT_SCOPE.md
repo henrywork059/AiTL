@@ -189,3 +189,7 @@ See [Patch 0_5_71](PATCH_0_5_71.md).
 Restricted eastbound route and explicit phase schedules (B initially all-red for 120 s) deliberately generate congestion; no optimized cooperation, arbitrary configured topology, calibrated demand, general network capacity guarantee, collision certification or superiority claim. The observed peak occupancy is not a universal capacity limit. Sampling at 0.2 s cannot establish continuous-time physical safety. Earlier single-junction controlled fixture still reported emergency-braking warnings. Existing benchmark and normal camera simulation/editor remain unchanged; no new browser or owner Windows/ESP acceptance. Default migration (Update 28) requires separate parity, resource and rollback evidence; do not switch prematurely. No public-road actuation. 27/39 candidates delivered (69.2%); next Update 28 / S04.
 
 See [Patch 0_5_72](PATCH_0_5_72.md).
+
+### Update 28 native-only evaluation boundary
+
+Opt-in, manually stepped finite synthetic fixture only. Fixed/adaptive uses isolated defaults and synthetic gate observations, not live AI or arbitrary configured network. Simplified 3D agent dimensions/heading derived from observed motion are illustrative; native projection PNGs are position markers, not calibrated sensor imagery. Capture ZIP is temporary evaluation evidence, not training dataset admission. Existing production experiment contract, authoritative camera/editor equivalence, matched replacement resources and Windows owner acceptance remain outstanding. No public-road actuation.
