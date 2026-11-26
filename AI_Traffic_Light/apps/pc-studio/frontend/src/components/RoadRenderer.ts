@@ -4,6 +4,8 @@ import { ROAD, roadSurfaces, worldPoint, cameraPose } from './roadGeometry';
 import type { SimulationScene } from '../lib/remoteCameraApi';
 import { VehicleMotion, mirroredYaw } from './vehicleMotion';
 import { makeVehicleVisual, disposeVehicleVisual, vehicleSignature, type VehicleVisual } from './vehicleMeshes';
+import { PedestrianMotion } from './pedestrianMotion';
+import { makePedestrianVisual, setPedestrianGait, disposePedestrianVisual, type PedestrianVisual } from './pedestrianMeshes';
 
 export class RoadRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -11,7 +13,9 @@ export class RoadRenderer {
   private readonly camera = new THREE.PerspectiveCamera(50, 1, 1, 6000);
   private readonly materials = new Set<THREE.Material>();
   private readonly geometry = new THREE.BoxGeometry(1,1,1);
-  private readonly agents = new THREE.Group();
+  private readonly pedestrianGeometry = new THREE.SphereGeometry(1,10,8);
+  private readonly pedestrians = new Map<string,PedestrianVisual>();
+  private readonly pedestrianMotion = new PedestrianMotion();
   private readonly vehicles = new Map<string,VehicleVisual>();
   private readonly motion = new VehicleMotion();
   private viewportWidth=0;
@@ -51,7 +55,6 @@ export class RoadRenderer {
       this.materials.add(this.pedestrianLamp);
       this.signal(ROAD.width*.36,ROAD.height*.26,this.vehicleLamp);
       this.signal(ROAD.width*.61,ROAD.height*.88,this.pedestrianLamp);
-      this.scene.add(this.agents);
     } catch (error) {
       this.dispose();
       throw error;
@@ -76,30 +79,22 @@ export class RoadRenderer {
     this.box(this.scene,p.x,104,p.z,14,15,24,lamp);
     this.box(this.scene,p.x,104,p.z,24,15,14,lamp);
   }
-  private clearAgents() {
-    for(const child of [...this.agents.children]) {
-      child.traverse(obj=>{
-        if(obj instanceof THREE.Mesh) {
-          const mat=obj.material;
-          if(!Array.isArray(mat)&&this.materials.delete(mat)) mat.dispose();
-        }
-      });
-      this.agents.remove(child);
-    }
+  private clearPedestrians() {
+    for(const visual of this.pedestrians.values())disposePedestrianVisual(visual);
+    this.pedestrians.clear();this.pedestrianMotion.clear();
   }
   private clearVehicles() {
     for(const visual of this.vehicles.values())disposeVehicleVisual(visual);
     this.vehicles.clear();
     this.motion.clear();
   }
-  isAnimating(now=performance.now()) {return !this.closed&&!this.failed&&this.motion.isAnimating(now);}
+  isAnimating(now=performance.now()) {return !this.closed&&!this.failed&&(this.motion.isAnimating(now)||this.pedestrianMotion.isAnimating(now));}
   update(snapshot: SimulationScene | null, now=performance.now()) {
     if(this.closed||this.failed)return;
-    this.clearAgents();
     const s=snapshot?.source_id===this.sourceId?snapshot:null;
     this.vehicleLamp.color.set(s?.signal.vehicle_go?0x42dc89:s?.signal.phase==='vehicle_yellow'?0xf1c247:0xd14f43);
     this.pedestrianLamp.color.set(s?.signal.pedestrian_walk?0x42dc89:0xd14f43);
-    if(!s){this.clearVehicles();return;}
+    if(!s){this.clearVehicles();this.clearPedestrians();return;}
     this.motion.update(s,now);
     const live=new Set<string>();
     for(const v of s.vehicles) {
@@ -110,17 +105,31 @@ export class RoadRenderer {
       if(!visual){visual=makeVehicleVisual(v,this.geometry);this.vehicles.set(v.id,visual);this.scene.add(visual.group);}
     }
     for(const [id,visual] of this.vehicles)if(!live.has(id)){disposeVehicleVisual(visual);this.vehicles.delete(id);}
-    // Pedestrian geometry/lifecycle is unchanged until Update 25.
-    for(const person of s.pedestrians) {
-      const p=worldPoint(person.x,person.y,this.sourceId);
-      this.box(this.agents,p.x,24,p.z,15,48,15,this.material(person.color));
+    this.pedestrianMotion.update(s,now);
+    const people=new Set<string>();
+    for(const person of s.pedestrians){
+      if(!this.pedestrianMotion.pose(person.id,now))continue;
+      people.add(person.id);
+      let visual=this.pedestrians.get(person.id);
+      if(visual&&visual.color!==person.color){disposePedestrianVisual(visual);this.pedestrians.delete(person.id);visual=undefined;}
+      if(!visual){visual=makePedestrianVisual(person,this.geometry,this.pedestrianGeometry);this.pedestrians.set(person.id,visual);this.scene.add(visual.group);}
     }
+    for(const [id,visual] of this.pedestrians)if(!people.has(id)){disposePedestrianVisual(visual);this.pedestrians.delete(id);}
   }
   render(orbit:number,pitch:number,zoom:number,now=performance.now()) {
     if(this.closed||this.failed)return;
     const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);
     if(w!==this.viewportWidth||h!==this.viewportHeight){this.renderer.setSize(w,h,false);this.viewportWidth=w;this.viewportHeight=h;}
     for(const [id,visual] of this.vehicles){const pose=this.motion.pose(id,now);if(pose){const p=worldPoint(pose.x,pose.y,this.sourceId);visual.group.position.set(p.x,0,p.z);visual.group.rotation.y=mirroredYaw(pose.heading,this.sourceId);}}
+    for(const [id,visual] of this.pedestrians){
+      const pose=this.pedestrianMotion.pose(id,now);
+      if(pose){
+        const p=worldPoint(pose.x,pose.y,this.sourceId);
+        visual.group.position.set(p.x,pose.y<ROAD.top||pose.y>=ROAD.bottom?6:0,p.z);
+        visual.group.rotation.y=mirroredYaw(pose.direction*Math.PI/2,this.sourceId);
+        setPedestrianGait(visual,pose.swing);
+      }
+    }
     this.camera.aspect=w/h;
     const p=cameraPose(orbit,pitch,zoom);
     this.camera.position.set(p.x,p.y,p.z);
@@ -133,10 +142,11 @@ export class RoadRenderer {
     if(this.closed)return;
     this.closed=true;
     this.renderer.domElement.removeEventListener('webglcontextlost',this.lost);
-    this.clearAgents();
+    this.clearPedestrians();
     this.clearVehicles();
     this.scene.clear();
     this.geometry.dispose();
+    this.pedestrianGeometry.dispose();
     for(const mat of this.materials)mat.dispose();
     this.materials.clear();
     this.renderer.dispose();

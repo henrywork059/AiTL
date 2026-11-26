@@ -10,6 +10,7 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/ThreeRoadView.tsx'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/SimulationCamera3D.tsx'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/vehicle*.ts'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/pedestrian*.ts'
   workflow_dispatch:
 permissions:
   contents: read
@@ -51,6 +52,8 @@ jobs:
         run: node --experimental-strip-types trials/roadGeometry.test.mjs
       - name: Vehicle motion regressions
         run: node --experimental-strip-types trials/vehicleMotion.test.mjs
+      - name: Pedestrian motion regressions
+        run: node --experimental-strip-types trials/pedestrianMotion.test.mjs
       - name: Typecheck trial and production source
         run: |
           npm run typecheck

@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {PedestrianMotion} from '../src/components/pedestrianMotion.ts';
+const p={id:'p',x:620,y:126,direction:1,color:'#49a8ce'};
+const scene=(time,pedestrians=[p],paused=false,source_id='simulation_camera',density='normal')=>({source_id,simulation_time_seconds:time,paused,density,width:1280,height:720,pedestrians});
+const m=new PedestrianMotion(),near=(a,b)=>assert(Math.abs(a-b)<1e-7,a+' != '+b);
+m.update(scene(0),0);m.update(scene(.45),450);
+assert.equal(m.pose('p',600).walking,false);near(m.pose('p',600).y,126);
+m.update(scene(.9,[{...p,y:166}]),900);
+near(m.pose('p',1125).y,146);assert(m.pose('p',1125).walking);assert.notEqual(m.pose('p',1125).swing,0);
+const mid=m.pose('p',1125);for(let t=901;t<1125;t+=11)m.pose('p',t);assert.deepEqual(m.pose('p',1125),mid);
+m.update(scene(.9,[{...p,y:166}]),1125);assert.deepEqual(m.pose('p',1125),mid);
+m.update(scene(1.1,[{...p,y:166}]),1200);near(m.pose('p',1350).y,166);assert(!m.pose('p',1350).walking);
+m.update(scene(1.3,[{...p,y:170}]),1350);near(m.pose('p',1450).y,168); // slow observation
+m.update(scene(1.4,[{...p,y:172}],true),1450);near(m.pose('p',1450).y,172);assert(!m.isAnimating(1450));assert.equal(m.pose('p',1450).swing,0);
+m.update(scene(1.4,[{...p,y:172}],false),2000);near(m.pose('p',2000).y,172);
+m.update(scene(1.5,[{...p,y:182}]),2100);near(m.pose('p',2150).y,177);
+m.update(scene(1.6,[{...p,y:749}]),2200);m.update(scene(1.7,[{...p,y:40}]),2300);near(m.pose('p',2300).y,40);assert(!m.isAnimating(2300));
+m.update(scene(1.8,[{...p,y:39}]),2400);near(m.pose('p',2400).y,39);assert(!m.isAnimating(2400));
+m.update(scene(0,[{...p,y:674,direction:-1}]),2500);m.update(scene(.2,[{...p,y:654,direction:-1}]),2700);near(m.pose('p',2800).y,664);
+m.update(scene(.3,[{...p,y:19,direction:-1}]),2900);m.update(scene(.4,[{...p,y:735,direction:-1}]),3000);near(m.pose('p',3000).y,735);assert(!m.isAnimating(3000));
+m.update(scene(.5,[]),3100);assert.equal(m.pose('p',3100),undefined);
+m.update(scene(.6,[p]),3200);near(m.pose('p',3200).y,126);
+m.update(scene(.7,[{...p,y:150}],false,'simulation_camera_b'),3300);near(m.pose('p',3300).y,150);
+m.update(scene(.8,[{...p,y:170}],false,'simulation_camera_b','busy'),3400);near(m.pose('p',3400).y,170);
+m.update(scene(3,[{...p,y:300}],false,'simulation_camera_b','busy'),3500);near(m.pose('p',3500).y,300);
+m.update(null,3600);assert.equal(m.pose('p',3600),undefined);
+console.log('[PASS] pedestrian observed motion, stationary/slow gait, repeated frames, pause/resume, both reentries, reset/source/density/gap and removal');

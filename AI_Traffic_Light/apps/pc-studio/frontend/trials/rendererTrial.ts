@@ -1,5 +1,6 @@
 import {RoadRenderer} from './RoadRenderer';
 import * as THREE from 'three';
+import type {PedestrianVisual} from '../src/components/pedestrianMeshes';
 import {makeVehicleVisual,disposeVehicleVisual,vehicleSignature} from '../src/components/vehicleMeshes';
 import type {SimulationScene} from '../src/lib/remoteCameraApi';
 const host=document.getElementById('scene')!;
@@ -34,8 +35,24 @@ try {
     let losses=0;
     const r=new RoadRenderer(host,'simulation_camera',()=>{losses++;});
     try {
-      r.update(snapshot);
-      r.render(-25,48,.85);
+      r.update(snapshot,0);
+      r.render(-25,48,.85,0);
+      const registry=(r as unknown as {pedestrians:Map<string,PedestrianVisual>}).pedestrians;
+      const person=registry.get('p1')!;
+      check(person.group.children.length>=8&&person.arms.length===2&&person.legs.length===2,'Volumetric figure/limbs missing');
+      r.update({...snapshot,paused:false,simulation_time_seconds:.1},100);
+      r.update({...snapshot,paused:false,simulation_time_seconds:.5,pedestrians:[{...snapshot.pedestrians[0],y:166}]},500);
+      r.render(-25,48,.85,700);
+      check(registry.get('p1')===person,'Pedestrian mesh identity lost');
+      check(Math.abs(person.group.position.z-(146-360))<.01,'Pedestrian interpolation not rendered');
+      check(person.legs[0].rotation.z!==0,'Gait not applied');
+      r.update({...snapshot,paused:true,simulation_time_seconds:.5,pedestrians:[{...snapshot.pedestrians[0],y:166}]},700);
+      r.render(-25,48,.85,700);
+      check(person.legs[0].rotation.z===0&&!r.isAnimating(700),'Paused gait did not stop');
+      r.update({...snapshot,pedestrians:[]},800);
+      check(!registry.has('p1')&&person.group.parent===null,'Pedestrian removal leaked group');
+      r.update(snapshot,900);
+      r.render(-25,48,.85,900);
       const gl=r.renderer.getContext();
       check(gl.drawingBufferWidth>0&&gl.drawingBufferHeight>0,'No drawing buffer');
       check(r.renderer.info.render.calls>10,'Road meshes not rendered');
@@ -51,7 +68,7 @@ try {
     check(host.querySelectorAll('canvas').length===0,'Leaked canvas');
   }
   const r=new RoadRenderer(host,'simulation_camera',()=>{});
-  r.update({...snapshot,vehicles:styles.map((vehicle_type,i)=>({...snapshot.vehicles[0],id:'demo'+i,vehicle_type,x:i%2===0?120:820,y:i<2?265:455,width:140+i*30,direction:i<2?1:-1}))});
+  r.update({...snapshot,pedestrians:[{...snapshot.pedestrians[0],id:'wait',x:570,y:126},{...snapshot.pedestrians[0],id:'cross',x:635,y:365,color:'#e5a35d'},{...snapshot.pedestrians[0],id:'south',x:700,y:674,direction:-1,color:'#9dc98b'}],vehicles:styles.map((vehicle_type,i)=>({...snapshot.vehicles[0],id:'demo'+i,vehicle_type,x:i%2===0?120:820,y:i<2?265:455,width:140+i*30,direction:i<2?1:-1}))});
   r.render(-25,48,.85);
   result.textContent='MESH_RENDERER_PASS';
   window.addEventListener('pagehide',()=>r.dispose(),{once:true});
