@@ -6,6 +6,7 @@ import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"apps/pc-studio/backend"))
 from app.services.simulation_finite_fixture import Segment,Trip,FiniteReference,RouteGateAdapter
 from app.services.simulation_gate_metrics import GateMetrics
+from app.services.sumo_shadow_adapter import ShadowAgent
 
 
 def path(prefix,kind,y):
@@ -32,6 +33,31 @@ class Tests(unittest.TestCase):
         self.assertEqual(metrics.summary()["pedestrian_crossings"],1)
         self.assertFalse(adapter.unknown_roads)
         self.assertFalse(reference.advance("all_red"))
+
+    def test_reverse_branch_entry_and_exit(self):
+        start=Segment("approach","walk",((0.,0.),(1.,0.)))
+        forward=(start,Segment("south","pedestrian_gate",((1.,0.),(1.,2.))),
+                 Segment("end","walk",((1.,2.),(2.,2.))))
+        reverse=(start,Segment("west","pedestrian_gate",((1.,0.),(3.,0.))),
+                 Segment("end","walk",((3.,0.),(4.,0.))))
+        trip=Trip("p0","pedestrian",0.,1.,forward,(reverse,))
+        adapter=RouteGateAdapter((trip,))
+        metrics=GateMetrics()
+        trace=[("approach",.9,0.),("west",1.1,0.),("west",1.9,0.),
+               ("west",2.7,0.),("end",3.1,0.)]
+        for tick,(road,x,y) in enumerate(trace,1):
+            metrics.sample(tick,adapter.observations((ShadowAgent("pedestrian","p0",x,y,1.,road),)))
+        self.assertEqual(metrics.summary()["pedestrian_crossings"],1)
+        self.assertFalse(adapter.unknown_roads)
+        self.assertEqual(adapter.seen_roads["p0"],["approach","west","end"])
+
+    def test_missing_entry_is_not_completion(self):
+        trip=Trip("p0","pedestrian",0.,1.,path("p","pedestrian",0.))
+        adapter=RouteGateAdapter((trip,))
+        metrics=GateMetrics()
+        for tick,(road,x) in enumerate((("pg",19.),("pb",20.1)),1):
+            metrics.sample(tick,adapter.observations((ShadowAgent("pedestrian","p0",x,0.,1.,road),)))
+        self.assertEqual(metrics.summary()["pedestrian_crossings"],0)
 
     def test_waiting_finite(self):
         trip=Trip("v0","vehicle",0.,5.,path("v","vehicle",0.))

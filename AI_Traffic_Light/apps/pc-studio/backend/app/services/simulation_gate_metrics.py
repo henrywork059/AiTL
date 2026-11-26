@@ -23,6 +23,8 @@ class GateObservation:
     y: float
     span: float
     gate: str
+    # Optional explicit adjacent-road transition from a trusted route adapter.
+    entry_observed: bool = False
     # A route reset/reentry is never an observed crossing.
 
 
@@ -62,6 +64,13 @@ class GateMetrics:
                 self.censored_service += int(key in self.entered)
                 self.passed.discard(key)
                 self.entered.discard(key)
+            # A route fork may change the approach gate on the entry sample.
+            # Require a consecutive approach observation and bounded displacement;
+            # the route adapter must establish the actual adjacent-road transition.
+            if (a.kind == "pedestrian" and a.entry_observed and old is not None and
+                    old.progress < 0 <= a.progress < 1 and
+                    math.hypot(a.x-old.x, a.y-old.y) <= a.span * .5):
+                self.entered.add(key)
             if continuous:
                 speed = math.hypot(a.x-old.x, a.y-old.y) / a.span / STEP_S
                 if -1 <= a.progress < 0 and -1 <= old.progress < 0 and speed <= STOP_SPEED:

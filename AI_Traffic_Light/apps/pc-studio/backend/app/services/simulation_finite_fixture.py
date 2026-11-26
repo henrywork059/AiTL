@@ -45,6 +45,7 @@ class Trip:
     depart_s: float
     desired_speed: float
     path: tuple[Segment, ...]
+    alternatives: tuple[tuple[Segment, ...], ...] = ()
 
     @property
     def length(self):
@@ -81,46 +82,61 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
                 lane_segment(c.attrib["via"],"vehicle_gate"),
                 lane_segment(last+"_"+c.attrib["toLane"],"road"))
 
-    # The controlled fixture has a directed WC -> southwest walking area ->
-    # south crossing -> southeast area -> east crossing -> northeast area ->
-    # CN walk route. Derive it from actual XML, not fixed internal IDs.
+    # SUMO pedestrian lanes can be traversed in both directions between
+    # walking areas. External route edges retain their declared direction.
     graph = {}
+    internal = {"walkingarea","crossing"}
     for c in net.findall("connection"):
         a,b=c.attrib["from"],c.attrib["to"]
         if c.get("fromLane")=="0" and c.get("toLane")=="0":
-            graph.setdefault(a,[]).append(b)
+            graph.setdefault(a,set()).add(b)
+            if edges[a].get("function") in internal and edges[b].get("function") in internal:
+                graph.setdefault(b,set()).add(a)
 
-    def pedestrian_path(first,last):
+    def pedestrian_paths(first,last):
         pending=[(first,)]
-        found=None
+        found=[]
         while pending:
             path=pending.pop(0)
             if path[-1]==last:
-                found=path
-                break
-            for nxt in sorted(graph.get(path[-1],[])):
+                found.append(path)
+                continue
+            for nxt in sorted(graph.get(path[-1],())):
                 if nxt in path:
                     continue
-                if nxt!=last and edges[nxt].get("function") not in ("walkingarea","crossing"):
+                if nxt!=last and edges[nxt].get("function") not in internal:
                     continue
                 pending.append(path+(nxt,))
-        if found is None:
-            raise ValueError("Missing connected pedestrian route")
-        segments=[]
-        for i,e in enumerate(found):
-            kind=edges[e].get("function")
-            if kind=="walkingarea":
-                a=lane_segment(found[i-1]+"_0","walk").points[-1]
-                b=lane_segment(found[i+1]+"_0","walk").points[0]
-                seg=Segment(e,"walk",(a,b))
-                if seg.length<=0:
-                    raise ValueError("Degenerate walking area chord")
-                segments.append(seg)
-            else:
-                segments.append(lane_segment(e+"_0","pedestrian_gate" if kind=="crossing" else "walk"))
-        if sum(s.kind=="pedestrian_gate" for s in segments)!=2:
-            raise ValueError("Expected two physical crossings in WC-CN route")
-        return tuple(segments)
+        paths=[]
+        for route in found:
+            if sum(edges[e].get("function")=="crossing" for e in route)!=2:
+                continue
+            segments={}
+            for i,e in enumerate(route):
+                kind=edges[e].get("function")
+                if kind=="walkingarea":
+                    continue
+                seg=lane_segment(e+"_0","pedestrian_gate" if kind=="crossing" else "walk")
+                if kind=="crossing":
+                    # The original directed connection indicates the lane's
+                    # forward direction; reverse pedestrian travel is valid.
+                    forward=any(c.get("from")==route[i-1] and c.get("to")==e and
+                                c.get("fromLane")=="0" and c.get("toLane")=="0"
+                                for c in net.findall("connection"))
+                    if not forward:
+                        seg=Segment(e,seg.kind,tuple(reversed(seg.points)))
+                segments[i]=seg
+            for i,e in enumerate(route):
+                if edges[e].get("function")=="walkingarea":
+                    seg=Segment(e,"walk",(segments[i-1].points[-1],segments[i+1].points[0]))
+                    if seg.length<=0:
+                        raise ValueError("Degenerate walking area chord")
+                    segments[i]=seg
+            paths.append(tuple(segments[i] for i in range(len(route))))
+        if len(paths)!=2:
+            raise ValueError("Expected two WC-CN pedestrian alternatives")
+        # Deterministic reference chooses shortest chord path, ties by road IDs.
+        return tuple(sorted(paths,key=lambda path:(sum(s.length for s in path),tuple(s.road_id for s in path))))
 
     declared_routes={n.attrib["id"]:tuple(n.attrib["edges"].split()) for n in demand.findall("route")}
     trips=[]
@@ -134,7 +150,8 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
         path=tuple(walk.attrib["edges"].split())
         if path!=("WC","CN"):
             raise ValueError("Unsupported walking route")
-        trips.append(Trip(person.attrib["id"],"pedestrian",float(person.attrib["depart"]),float(walk.attrib["speed"]),pedestrian_path(*path)))
+        options=pedestrian_paths(*path)
+        trips.append(Trip(person.attrib["id"],"pedestrian",float(person.attrib["depart"]),float(walk.attrib["speed"]),options[0],options[1:]))
     if not trips or len({t.ident for t in trips})!=len(trips) or any(
         not math.isfinite(t.depart_s) or t.depart_s<0 or not math.isfinite(t.desired_speed) or t.desired_speed<=0 for t in trips):
         raise ValueError("Invalid finite demand")
@@ -142,15 +159,16 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
 
 
 class RouteGateAdapter:
-    """Use declared gate identities, not nearest-curb inference.
+    """Observe either declared route; never infer an unobserved crossing.
 
-    Both arms are observed in the same network coordinates. A pedestrian is
-    assigned to the next crossing from its declared route, or the just-exited
-    crossing for one sample. A skipped road segment cannot fabricate completion.
+    Before a branch is resolved, choose the nearest permitted next entry
+    for queue measurement only. Actual adjacent road transitions establish
+    gate entry and exit, including reverse-direction crossing lanes.
     """
     def __init__(self,trips):
         self.trips={t.ident:t for t in trips}
         self.previous={}
+        self.candidates={}
         self.seen_roads={}
         self.unknown_roads=set()
 
@@ -161,36 +179,46 @@ class RouteGateAdapter:
             trip=self.trips[a.engine_id]
             if a.kind!=trip.kind:
                 raise ValueError("Trip kind mismatch")
-            indices=[i for i,s in enumerate(trip.path) if s.road_id==a.road_id]
-            if len(indices)!=1:
+            old=self.previous.get(a.engine_id)
+            point=(a.x_m,a.y_m)
+            options=self.candidates.get(a.engine_id,(trip.path,*trip.alternatives))
+            valid=[path for path in options if sum(s.road_id==a.road_id for s in path)==1]
+            if not valid:
                 self.unknown_roads.add((a.engine_id,a.road_id))
                 continue
-            index=indices[0]
-            current[a.engine_id]=index
+            self.candidates[a.engine_id]=tuple(valid)
+            current[a.engine_id]=a
             seen=self.seen_roads.setdefault(a.engine_id,[])
             if not seen or seen[-1]!=a.road_id:
                 seen.append(a.road_id)
-            gate_indices=[i for i,s in enumerate(trip.path) if s.kind==a.kind+"_gate"]
-            prev=self.previous.get(a.engine_id)
-            exited=prev if prev in gate_indices and index==prev+1 else None
-            gate_index=exited if exited is not None else next((i for i in gate_indices if i>=index),None)
-            if gate_index is None:
-                continue
-            gate=trip.path[gate_index]
-            point=(a.x_m,a.y_m)
-            span=gate.length
-            first,last=gate.points[0],gate.points[-1]
-            if index<gate_index:
-                progress=-max(math.dist(point,first)/span,1e-9)
-            elif index==gate_index:
-                chord=math.dist(first,last)
-                if chord<=0:
-                    raise ValueError("Degenerate gate")
-                progress=((point[0]-first[0])*(last[0]-first[0])+(point[1]-first[1])*(last[1]-first[1]))/chord**2
-                progress=max(0.,min(.999999,progress))
-            else:
-                progress=1.
-            rows.append(GateObservation(a.id,a.kind,progress,a.x_m,a.y_m,span,gate.road_id))
+            choices=[]
+            for path in valid:
+                index=next(i for i,s in enumerate(path) if s.road_id==a.road_id)
+                gates=[i for i,s in enumerate(path) if s.kind==a.kind+"_gate"]
+                prev=next((i for i,s in enumerate(path) if old is not None and s.road_id==old.road_id),None)
+                exited=prev if prev in gates and index==prev+1 else None
+                gate_index=exited if exited is not None else next((i for i in gates if i>=index),None)
+                if gate_index is None:
+                    continue
+                gate=path[gate_index]
+                first,last=gate.points[0],gate.points[-1]
+                span=gate.length
+                entry=(index==gate_index and prev==index-1 and a.kind=="pedestrian")
+                if index<gate_index:
+                    progress=-max(math.dist(point,first)/span,1e-9)
+                elif index==gate_index:
+                    chord=math.dist(first,last)
+                    if chord<=0:
+                        raise ValueError("Degenerate gate")
+                    progress=((point[0]-first[0])*(last[0]-first[0])+(point[1]-first[1])*(last[1]-first[1]))/chord**2
+                    progress=max(0.,min(.999999,progress))
+                else:
+                    progress=1.
+                row=GateObservation(a.id,a.kind,progress,a.x_m,a.y_m,span,gate.road_id,entry_observed=entry)
+                # Actual occupied/exited gates outrank unresolved approach choices.
+                choices.append((0 if index>=gate_index else 1,math.dist(point,first),gate.road_id,row))
+            if choices:
+                rows.append(min(choices,key=lambda c:c[:3])[-1])
         self.previous=current
         return rows
 
