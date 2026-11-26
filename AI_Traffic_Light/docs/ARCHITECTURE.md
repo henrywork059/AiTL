@@ -226,3 +226,9 @@ Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S0
 The optional Three.js preview replaces pedestrian box proxies with persistent volumetric figures (head, torso, separate arms, legs, shoes). PedestrianMotion follows canonical observed positions, bounds interpolation to 450 ms, derives gait from observed displacement, stops gait when stationary/paused, and resets on backwards/large jumps, source/density/clock changes or gaps. RoadRenderer retains mesh groups by existing pedestrian slot ID and color; removes absent groups and disposes owned materials. Shared geometry, mirrored heading, curb elevation and existing animation scheduling are retained. No extrapolation, new crossing authorization, simulator speed or controller change. Legacy CSS remains default and retains the source-coordinate editor and overlays. No API, dependency or physical-output changes.
 
 See [patch evidence](PATCH_0_5_70.md).
+
+### Isolated lane scenario (0_5_71 candidate)
+
+The trusted synthetic SUMO scenario is internally opt-in via `GeneratedSession(seed, lane_scenario=True)`; the standard shadow session and legacy authoritative simulator remain unchanged. The isolated libsumo worker uses the existing validated topology and protected phase upper bound. Seeded finite demand includes straight, left/right turns, a temporary downstream blocker and pedestrians. Lane-leader admission grants at most one vehicle link, rejects insufficient exit space, holds vehicle entry while a pedestrian or vehicle occupies the junction, and allows pedestrian entry only during pedestrian green with no vehicle inside. Yellow, flashing and all-red grant no new entry. No new network listener, frontend mode, API schema, dependency or physical output. Native SUMO retains lane following and motion ownership; the admission function is not an independent physical safety controller.
+
+See [Patch 0_5_71](PATCH_0_5_71.md).

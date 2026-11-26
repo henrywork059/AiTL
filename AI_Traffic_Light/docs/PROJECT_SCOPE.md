@@ -177,3 +177,9 @@ Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S0
 Backend pedestrian IDs are recycled slots, not persistent trip identities; reentry snaps rather than traverses the scene. Gait is an illustrative distance-derived animation, not a biomechanical model or accessibility classification. Slow fixture tests do not establish full clearance safety. Non-WALK holds test signal-blocked entry only, not physical obstructions/collision avoidance or downstream capacity. The legacy movement helper is unchanged; renderer may trail observations or snap on reset/pause and is not a safety authority. Small low-poly figures, viewport footprint and Vite large-chunk warning remain. Full Windows owner visual/coordinate drag-save acceptance, native GPU performance, endurance and hardware checks pending. No public-road actuation. Exact release commit CI pending at publication. 25/39 candidates delivered (64.1%); next Update 26 / S04.
 
 See [patch evidence](PATCH_0_5_70.md).
+
+### V0571 synthetic lane scenario boundary
+
+Single generated junction, restricted route set and conservative single vehicle-link grant are not a calibrated traffic model, collision certification, live controller comparison or throughput improvement. Capacity check uses observed exit rear-bumper space, not a general network reservation/spillback algorithm; occupancy is sampled at 0.2 s. The earlier controlled fixture reported emergency braking warnings; native fidelity, resource and endurance checks remain outstanding. Normal camera simulation and editor are unchanged; no fresh manual Windows drag/save or physical ESP acceptance. Lane scenario is an internal evaluation seam, not a new UI feature. Default engine migration is reserved for Update 28 after parity/resource gates. No public-road actuation. 26/39 candidates delivered (66.7%); next Update 27 / S04.
+
+See [Patch 0_5_71](PATCH_0_5_71.md).

@@ -1,3 +1,18 @@
+# V0571 — Isolated SUMO lane queues and turning scenarios
+
+Candidate `0_5_71`; previous `0_5_70`; accepted baseline `0_5_0`; Update 26 / S04. Owner PASS pending.
+
+- [x] Standard CI, compile, structure, offline regressions, frontend tests/build and blocking audit passed on 26b.
+- [x] Native pinned dependency, shadow lifecycle, deterministic demand and lane trials passed.
+- [x] Actual stop-line queue, blocked exit, straight and turning movement, entry permission, WALK/CLEAR and completed journeys verified in native logs.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, editor drag/save and manual visual acceptance.
+- [ ] Multi-intersection transfer/spillback, matched parity/resource checks, native endurance and physical gates.
+
+See [Patch 0_5_71](PATCH_0_5_71.md).
+
+---
+
 # V0570 — Persistent articulated pedestrians and observed gait
 
 Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.

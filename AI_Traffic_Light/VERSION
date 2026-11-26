@@ -1,5 +1,5 @@
-version: 0_5_70
-status: Persistent articulated pedestrians and observed gait candidate (Update 25 / S03)
-previous_version: 0_5_69
+version: 0_5_71
+status: Isolated SUMO lane queues and turning scenarios candidate (Update 26 / S04)
+previous_version: 0_5_70
 passed_baseline: 0_5_0
-notes: 25a standard and renderer CI passed; actual screenshot inspected; release commit CI and owner PASS pending.
+notes: 26b standard and native SUMO CI passed; actual seeded evidence inspected; release commit CI and owner PASS pending.
