@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-import csv
-from io import StringIO
 import json
 import math
 from pathlib import Path
@@ -20,6 +18,7 @@ from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 from app.services.signal_rules import SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
+from app.services.experiment_timeline_csv import serialize_experiment_timeline
 
 logger = get_logger(__name__)
 
@@ -757,26 +756,7 @@ class SimulationExperimentService:
         return {"deleted": True, "run_id": run_id}
 
     def export_csv(self, run_id: str) -> str:
-        result = self.get(run_id)
-        fixed_timeline = result.get("fixed", {}).get("timeline", [])
-        adaptive_timeline = result.get("adaptive", {}).get("timeline", [])
-        rows = max(len(fixed_timeline), len(adaptive_timeline))
-        output = StringIO()
-        writer = csv.writer(output, lineterminator="\n")
-        writer.writerow([
-            "t_seconds",
-            "fixed_phase", "fixed_vehicle_queue", "fixed_pedestrian_queue", "fixed_vehicle_passages", "fixed_pedestrian_crossings", "fixed_active_rules",
-            "adaptive_phase", "adaptive_vehicle_queue", "adaptive_pedestrian_queue", "adaptive_vehicle_passages", "adaptive_pedestrian_crossings", "adaptive_active_rules",
-        ])
-        for index in range(rows):
-            fixed = fixed_timeline[index] if index < len(fixed_timeline) else {}
-            adaptive = adaptive_timeline[index] if index < len(adaptive_timeline) else {}
-            writer.writerow([
-                fixed.get("t", adaptive.get("t", "")),
-                fixed.get("phase", ""), fixed.get("vehicle_queue", ""), fixed.get("pedestrian_queue", ""), fixed.get("vehicle_passages", ""), fixed.get("pedestrian_crossings", ""), "|".join(fixed.get("active_rules", [])),
-                adaptive.get("phase", ""), adaptive.get("vehicle_queue", ""), adaptive.get("pedestrian_queue", ""), adaptive.get("vehicle_passages", ""), adaptive.get("pedestrian_crossings", ""), "|".join(adaptive.get("active_rules", [])),
-            ])
-        return output.getvalue()
+        return serialize_experiment_timeline(self.get(run_id))
 
     def _write_run(self, result: dict[str, Any]) -> None:
         try:
