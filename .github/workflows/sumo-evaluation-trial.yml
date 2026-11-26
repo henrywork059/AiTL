@@ -20,6 +20,10 @@ on:
       - '.github/scripts/sumo_projection_trial.py'
       - '.github/scripts/sumo_density_capture_trial.py'
       - '.github/scripts/sumo_publisher_trial.py'
+      - '.github/scripts/sumo_gate_metric_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_metrics.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_adapters.py'
+      - 'AI_Traffic_Light/scripts/test_simulation_gate_metrics.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_frame_publisher.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/experiment_timeline_csv.py'
       - 'AI_Traffic_Light/scripts/test_sumo_frame_publisher.py'
@@ -114,6 +118,8 @@ jobs:
         run: python .github/scripts/sumo_density_capture_trial.py "$env:RUNNER_TEMP/mesh-sumo-density-capture.json"
       - name: Execute isolated native-only matched read workload and partial export
         run: python .github/scripts/sumo_publisher_trial.py "$env:RUNNER_TEMP/mesh-sumo-publisher.json"
+      - name: Execute repeated actual native and legacy normalized gate metric trial
+        run: python .github/scripts/sumo_gate_metric_trial.py "$env:RUNNER_TEMP/mesh-sumo-gate-metrics"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -131,3 +137,4 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-projection/
             ${{ runner.temp }}/mesh-sumo-density-capture.json
             ${{ runner.temp }}/mesh-sumo-publisher.json
+            ${{ runner.temp }}/mesh-sumo-gate-metrics/

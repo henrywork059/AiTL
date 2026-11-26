@@ -242,3 +242,7 @@ See [Patch 0_5_72](PATCH_0_5_72.md).
 ### Native diagnostic frame publishing (Update 28 preparation)
 
 The optional ShadowRuntime owns native observations from committed legacy phase steps. NativeProjection provides independent network geometry; NativeFramePublisher caches only one validated current-generation tick for diagnostic bundle and exact binary frame reads, with encoding outside the camera/worker condition lock and revalidation before publication. Scene-only reads avoid PNG work. Native IDs and explicit synthetic provenance never enter selected camera, saved sources, detector, editor or signal authority. Legacy remains authoritative; see [migration gates](SIMULATOR_MIGRATION_GATES.md).
+
+### Common evaluation gate metrics (Update 28h preparation)
+
+Isolated simulation_gate_metrics consumes normalized approach/service/exit observations. Engine adapters preserve native world and legacy pixel geometry; common event rules never feed controller, detector, editor or camera source. Existing experiment CSV semantics remain unchanged. See [migration gates](SIMULATOR_MIGRATION_GATES.md).
