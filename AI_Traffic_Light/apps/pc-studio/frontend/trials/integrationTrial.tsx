@@ -78,6 +78,12 @@ async function run(){
     generation=2; nativeTick=0;
     await wait(()=>Boolean(host.querySelector("[data-native-generation='2']")),"Generation reset failed");
     check(agent()!==firstAgent,"Generation retained old DOM agent");
+    generation=1; nativeTick=99;
+    const oldGenerationCall=nativeCalls;
+    await wait(()=>nativeCalls>oldGenerationCall,"Old generation poll missing");
+    await new Promise(resolve=>setTimeout(resolve,30));
+    check(Boolean(host.querySelector("[data-native-generation='2']")),"Older generation replaced scene");
+    generation=2; nativeTick=0;
     for(const [sid,transform] of [["simulation_camera",""],["simulation_camera_b","translate(0 719) scale(1 -1)"],["simulation_camera_c","translate(1279 0) scale(-1 1)"],["simulation_camera_d","translate(1279 719) scale(-1 -1)"]]){
       mount(sid);
       await wait(()=>host.querySelector("[data-native-lane]")?.parentElement?.getAttribute("transform")===transform,"Native camera transform failed");
@@ -86,11 +92,17 @@ async function run(){
     await wait(()=>!agent()&&Boolean(host.querySelector("[data-native-status='unavailable']")),"Unavailable native retained agents");
     button("Exit native preview")!.click();
     await wait(()=>mode()==="legacy","Native rollback failed");
+    const retiredCalls=nativeCalls;
+    await new Promise(resolve=>setTimeout(resolve,650));
+    check(nativeCalls===retiredCalls,"Native poll continued after exit");
     nativeStatus="running";
     button("Native SUMO preview")!.click();
     await wait(()=>Boolean(agent()),"Native retry failed");
     mount("simulation_camera_d",true);
     check(mode()==="legacy"&&!agent()&&Boolean(host.querySelector(".sim3d-world")),"Native editor fallback failed");
+    const editorCalls=nativeCalls;
+    await new Promise(resolve=>setTimeout(resolve,650));
+    check(nativeCalls===editorCalls,"Native poll continued in editor");
     flushSync(()=>root.unmount());
     check(!canvas(),"Canvas leaked after unmount");
     result.textContent="MESH_INTEGRATION_PASS";

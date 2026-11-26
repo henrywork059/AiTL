@@ -9,7 +9,7 @@ try {
   let ready=false;
   for(let i=0;i<100;i++){try{if((await fetch(url)).ok){ready=true;break;}}catch{} await new Promise(r=>setTimeout(r,200));}
   if(!ready)throw new Error('Trial server unavailable');
-  const args=['--headless=new','--disable-background-networking','--no-first-run','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--window-size=1000,650','--virtual-time-budget=8000'];
+  const args=['--headless=new','--disable-background-networking','--no-first-run','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--window-size=1000,650','--virtual-time-budget=12000'];
   const profile=resolve(process.env.RUNNER_TEMP||'.','mesh-edge-dom');
   const dom=spawnSync(edge,[...args,'--user-data-dir='+profile,'--dump-dom',url],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(dom.status!==0||!dom.stdout.includes('<div id="result">MESH_RENDERER_PASS</div>'))throw new Error('Browser trial failed: '+dom.stdout.slice(-1500)+' '+dom.stderr.slice(-1000));
@@ -20,4 +20,5 @@ try {
   const integration=spawnSync(edge,[...args,'--user-data-dir='+profile+'-integration','--dump-dom','http://127.0.0.1:4179/integration.html'],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(integration.status!==0||!integration.stdout.includes('<div id="result">MESH_INTEGRATION_PASS</div>'))throw new Error('Production integration trial failed: '+integration.stdout.slice(-2000)+' '+integration.stderr.slice(-1500));
   console.log('[PASS] production React renderer opt-in, source change, top view, editor/overlay fallback, loss/retry, rollback and cleanup');
+  console.log('[PASS] native SVG persistent agent identity, older tick/generation rejection, four transforms, unavailable state, exit/editor polling retirement');
 } finally {server.kill();}

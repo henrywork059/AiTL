@@ -15,14 +15,16 @@ from app.services.sumo_lane_scenarios import generate_lane_fixture
 
 
 class GeneratedSession(LibsumoSession):
-    def __init__(self, seed: int, *, lane_scenario: bool = False):
+    def __init__(self, seed: int, *, lane_scenario: bool = False, density: str | None = None):
+        if lane_scenario and density is not None:
+            raise ValueError('Density preset is only supported for the controlled fixture')
         self._temp = TemporaryDirectory(prefix='mesh-shadow-')
         root = Path(self._temp.name)
         try:
             if lane_scenario:
                 generate_lane_fixture(root, seed)
             else:
-                generate_controlled_fixture(root)
+                generate_controlled_fixture(root, density=density)
             super().__init__(root, seed, controlled=True, lane_scenario=lane_scenario)
         except BaseException:
             self._temp.cleanup()

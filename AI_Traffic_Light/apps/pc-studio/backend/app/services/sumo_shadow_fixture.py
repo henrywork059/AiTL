@@ -11,9 +11,14 @@ import xml.etree.ElementTree as ET
 PHASES = frozenset({'vehicle_green', 'vehicle_yellow', 'pedestrian_green',
                     'pedestrian_flashing', 'all_red'})
 PIN = '1.28.0'
+# Finite synthetic offered demand, not the legacy recirculating slot population.
+DENSITY_COUNTS = {'light': (4, 4), 'normal': (8, 7), 'busy': (12, 11)}
+SLOW_WALK_M_S = 0.65
 
 
-def write_scenario(root: Path, *, controlled: bool = False) -> None:
+def write_scenario(root: Path, *, controlled: bool = False, density: str | None = None) -> None:
+    if density is not None and (not controlled or density not in DENSITY_COUNTS):
+        raise ValueError('Invalid controlled density preset')
     nodes = ET.Element('nodes')
     ET.SubElement(nodes, 'node', id='C', x='0', y='0', type='traffic_light')
     edges = ET.Element('edges')
@@ -27,10 +32,21 @@ def write_scenario(root: Path, *, controlled: bool = False) -> None:
     ET.SubElement(routes, 'route', id='we', edges='WC CE')
     alternate = 'ew' if controlled else 'ns'
     ET.SubElement(routes, 'route', id=alternate, edges='EC CW' if controlled else 'NC CS')
-    for i in range(12):
-        ET.SubElement(routes, 'vehicle', id=f'v{i}', type='car', route='we' if i % 2 == 0 else alternate, depart=str(i*5))
-        person = ET.SubElement(routes, 'person', id=f'p{i}', depart=str(i*5))
-        ET.SubElement(person, 'walk', edges='WC CN')
+    if density is None:
+        for i in range(12):
+            ET.SubElement(routes, 'vehicle', id=f'v{i}', type='car', route='we' if i % 2 == 0 else alternate, depart=str(i*5))
+            person = ET.SubElement(routes, 'person', id=f'p{i}', depart=str(i*5))
+            ET.SubElement(person, 'walk', edges='WC CN')
+    else:
+        vehicles, persons = DENSITY_COUNTS[density]
+        # SUMO route input must be globally departure-sorted. One explicitly
+        # slow pedestrian per preset; no mobility classification is inferred.
+        for i in range(max(vehicles, persons)):
+            if i < vehicles:
+                ET.SubElement(routes, 'vehicle', id=f'v{i}', type='car', route='we' if i % 2 == 0 else alternate, depart=str(i*5))
+            if i < persons:
+                person = ET.SubElement(routes, 'person', id=f'p{i}', depart=str(i*5))
+                ET.SubElement(person, 'walk', edges='WC CN', speed=str(SLOW_WALK_M_S if i == 0 else 1.39))
     for name, element in [('nodes.xml', nodes), ('edges.xml', edges), ('routes.xml', routes)]:
         ET.ElementTree(element).write(root / name, encoding='utf-8', xml_declaration=True)
 
@@ -97,7 +113,7 @@ def native_netconvert() -> Path:
     return matches[0]
 
 
-def generate_controlled_fixture(root: Path) -> None:
+def generate_controlled_fixture(root: Path, *, density: str | None = None) -> None:
     native = native_netconvert()
     binary = str(native)
     env = {**os.environ, "SUMO_HOME": str(native.parent.parent)}
@@ -105,7 +121,7 @@ def generate_controlled_fixture(root: Path) -> None:
     banner = version.stdout.splitlines()[0] if version.stdout else ''
     if banner.strip() not in (f'Eclipse SUMO netconvert {PIN}', f'Eclipse SUMO netconvert Version {PIN}'):
         raise RuntimeError('Unexpected netconvert version')
-    write_scenario(root, controlled=True)
+    write_scenario(root, controlled=True, density=density)
     subprocess.run([binary, '--node-files', 'nodes.xml', '--edge-files', 'edges.xml',
                     '--crossings.guess', 'true', '--output-file', 'network.xml'],
                    cwd=root, env=env, capture_output=True, check=True, timeout=15)
