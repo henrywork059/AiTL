@@ -2,4 +2,4 @@ version: 0_5_66
 status: Frontend dependency security remediation candidate (21b security prerequisite)
 previous_version: 0_5_65
 passed_baseline: 0_5_0
-notes: 22c standard and SUMO CI passed; 22d isolated shadow adapter and pinned TraCI trial pending native execution and owner PASS.
+notes: 22d standard and native TraCI CI passed; 22e replaces proposed TCP runtime transport with isolated libsumo child process for validation; owner PASS pending.
