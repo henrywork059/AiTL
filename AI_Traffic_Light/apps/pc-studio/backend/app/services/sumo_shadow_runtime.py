@@ -10,15 +10,19 @@ from threading import Condition, Thread
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import PHASES, generate_controlled_fixture
 from app.services.sumo_shadow_process import LibsumoSession
+from app.services.sumo_lane_scenarios import generate_lane_fixture
 
 
 class GeneratedSession(LibsumoSession):
-    def __init__(self, seed: int):
+    def __init__(self, seed: int, *, lane_scenario: bool = False):
         self._temp = TemporaryDirectory(prefix='mesh-shadow-')
         root = Path(self._temp.name)
         try:
-            generate_controlled_fixture(root)
-            super().__init__(root, seed, controlled=True)
+            if lane_scenario:
+                generate_lane_fixture(root, seed)
+            else:
+                generate_controlled_fixture(root)
+            super().__init__(root, seed, controlled=True, lane_scenario=lane_scenario)
         except BaseException:
             self._temp.cleanup()
             raise

@@ -9,6 +9,8 @@ from pathlib import Path
 from app.services.sumo_shadow_adapter import ShadowAgent, STEP_S
 from app.services.sumo_shadow_fixture import PhaseMap, PHASES, native_netconvert
 
+from app.services.sumo_lane_scenarios import choose_permission, observe_lanes
+
 PIN = "1.28.0"
 
 
@@ -20,7 +22,11 @@ def _controlled_worker(pipe, root: str, seed: int) -> None:
     _run_worker(pipe, root, seed, controlled=True)
 
 
-def _run_worker(pipe, root: str, seed: int, *, controlled: bool) -> None:
+def _lane_worker(pipe, root: str, seed: int) -> None:
+    _run_worker(pipe, root, seed, controlled=True, lane_scenario=True)
+
+
+def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: bool = False) -> None:
     engine = None
     started = False
     try:
@@ -56,9 +62,11 @@ def _run_worker(pipe, root: str, seed: int, *, controlled: bool) -> None:
             if phase_map is not None:
                 if not isinstance(command, tuple) or len(command) != 2 or command[0] != "step" or command[1] not in PHASES:
                     raise ValueError("Invalid shadow phase command")
-                state = phase_map.state(command[1],
+                occupied = dict(
                     vehicle_inside=any(engine.vehicle.getRoadID(i).startswith(":C_") for i in engine.vehicle.getIDList()),
                     pedestrian_inside=any(engine.person.getRoadID(i) in phase_map.crossing_edges for i in engine.person.getIDList()))
+                state = (choose_permission(phase_map, command[1], observe_lanes(engine), **occupied)
+                         if lane_scenario else phase_map.state(command[1], **occupied))
                 engine.trafficlight.setRedYellowGreenState("C", state)
                 if engine.trafficlight.getRedYellowGreenState("C") != state:
                     raise RuntimeError("Shadow permission readback mismatch")
@@ -100,12 +108,14 @@ class LibsumoSession:
     No engine import in the parent, public API, shell, or physical-control path.
     A failed or timed-out request closes/reaps the child before returning.
     """
-    def __init__(self, root: Path, seed: int, *, controlled: bool = False, _target=None, _timeout: float = 15.0):
+    def __init__(self, root: Path, seed: int, *, controlled: bool = False, lane_scenario: bool = False, _target=None, _timeout: float = 15.0):
         root = root.resolve(strict=True)
         if not all((root / name).is_file() for name in ("network.xml", "routes.xml")):
             raise ValueError("Missing generated shadow fixture")
         if type(seed) is not int or not 0 <= seed <= 2**31 - 1:
             raise ValueError("Invalid seed")
+        if lane_scenario and not controlled:
+            raise ValueError("Lane scenario requires protected phase mapping")
         self._timeout = _timeout
         self._controlled = controlled
         self._phase = "all_red"
@@ -115,7 +125,7 @@ class LibsumoSession:
         self.person_arrived: set[str] = set()
         ctx = mp.get_context("spawn")
         self._pipe, child = ctx.Pipe()
-        self.proc = ctx.Process(target=_target or (_controlled_worker if controlled else _worker), args=(child, str(root), seed), daemon=True)
+        self.proc = ctx.Process(target=_target or (_lane_worker if lane_scenario else _controlled_worker if controlled else _worker), args=(child, str(root), seed), daemon=True)
         try:
             self.proc.start()
             child.close()
