@@ -110,24 +110,35 @@ class NativeProjection:
         self.generation = generation
         self._background = layout.geometry_canvas()
 
-    def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
+    def metadata(self, snapshot: ShadowSnapshot) -> dict:
         if snapshot.provenance != "synthetic_sumo_shadow":
             raise ValueError("Unexpected observation provenance")
         rows = []
-        image = self._background.copy()
         for a in snapshot.agents:
             x, y = self.layout.pixel(a.x_m, a.y_m)
             row = {"id": a.id, "kind": a.kind, "road_id": a.road_id,
                    "x_m": a.x_m, "y_m": a.y_m, "speed_m_s": a.speed_m_s,
                    "x": x, "y": y}
             rows.append(row)
-            # Deliberately illustrative position markers, not detection boxes.
-            cv2.circle(image, (round(x), round(y)), 4 if a.kind == "vehicle" else 3,
-                       (255, 170, 65) if a.kind == "vehicle" else (65, 220, 245), -1)
-        meta = {"schema_version": 1, "provenance": PROVENANCE, "generation": self.generation,
+        return {"schema_version": 1, "provenance": PROVENANCE, "generation": self.generation,
                 "seed": snapshot.seed, "tick": snapshot.tick, "time_s": snapshot.time_s,
                 "paused": snapshot.paused, "width": WIDTH, "height": HEIGHT,
                 "bounds_m": self.layout.bounds, "pixels_per_m": self.layout.scale, "agents": rows}
+
+    def scene(self, snapshot: ShadowSnapshot) -> dict:
+        return {**self.metadata(snapshot), "lanes": [
+            {"id": lane.ident, "kind": lane.kind,
+             "points": [self.layout.pixel(*pt) for pt in lane.points],
+             "width_px": lane.width_m * self.layout.scale}
+            for lane in self.layout.lanes]}
+
+    def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
+        meta = self.metadata(snapshot)
+        image = self._background.copy()
+        for row in meta["agents"]:
+            # Position markers, not detection boxes.
+            cv2.circle(image, (round(row["x"]), round(row["y"])), 4 if row["kind"] == "vehicle" else 3,
+                       (255, 170, 65) if row["kind"] == "vehicle" else (65, 220, 245), -1)
         views = {}
         for sid, flip in VIEW_FLIPS.items():
             view = image if flip is None else cv2.flip(image, flip)

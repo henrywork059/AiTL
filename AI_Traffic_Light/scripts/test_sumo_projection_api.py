@@ -43,6 +43,10 @@ class Tests(unittest.TestCase):
                     self.assertEqual(data["snapshot"]["tick"], 1)
                     self.assertEqual(data["snapshot"]["agents"][0]["id"], "sumo:vehicle:0")
                     self.assertEqual(len(data["views_png_base64"]), 4)
+                    light = assert_envelope(client.get("/api/camera/simulation/native-projection?format=scene"))["data"]
+                    self.assertEqual(light["snapshot"]["agents"], data["snapshot"]["agents"])
+                    self.assertEqual(light["snapshot"]["lanes"][0]["id"], "WC_1")
+                    self.assertNotIn("views_png_base64", light)
                     self.assertEqual(runtime.status()["snapshot"]["tick"], 1)
                     self.assertIsNone(service.latest_frame())
                     old_generation = data["generation"]

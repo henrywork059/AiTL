@@ -4,6 +4,7 @@ import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraA
 import { useSerialPolling } from "../lib/useSerialPolling";
 import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from "./simulation3dMotion";
 import { ThreeRoadView } from "./ThreeRoadView";
+import { NativeProjectionView } from "./NativeProjectionView";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -46,6 +47,7 @@ export function SimulationCamera3D({
   const [pitch, setPitch] = useState(48);
   const [zoom, setZoom] = useState(0.85);
   const [threeRequested, setThreeRequested] = useState(false);
+  const [nativeRequested, setNativeRequested] = useState(false);
   const [threeFailed, setThreeFailed] = useState(false);
   const onThreeFailure = useCallback(() => setThreeFailed(true), []);
   const drag = useRef<{ x: number; y: number; orbit: number; pitch: number } | null>(null);
@@ -133,18 +135,22 @@ export function SimulationCamera3D({
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
   // The legacy world owns source-pixel overlays and editing until projection parity is tested.
   const canUseThree = !editing && !hasOverlay && activeScene !== null && sizeX === 1280 && sizeY === 720;
-  const usingThree = canUseThree && threeRequested && !threeFailed;
+  const usingNative = canUseThree && nativeRequested;
+  const usingThree = canUseThree && threeRequested && !threeFailed && !usingNative;
+  useEffect(() => {
+    if (!canUseThree) setNativeRequested(false);
+  }, [canUseThree]);
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
   const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
 
   return (
-    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`} data-renderer={usingThree ? "three" : "legacy"}>
+    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`} data-renderer={usingNative ? "native" : usingThree ? "three" : "legacy"}>
       <div className="sim3d-viewport" tabIndex={editing ? undefined : 0}
         aria-label="3D camera view: arrow keys orbit and tilt, plus or minus zoom, Home resets"
         onKeyDown={editing ? undefined : keyboardCamera}
         onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
         onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
-        {usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
+        {usingNative ? <NativeProjectionView key={sourceId} sourceId={sourceId} /> : usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
           orbit={orbit} pitch={pitch} zoom={zoom} onFailure={onThreeFailure} /> : <div className="sim3d-world" aria-hidden="true" style={{
           transform: editing
             ? "translate(-50%, -50%) scale(1) rotateX(0deg) rotateZ(0deg)"
@@ -249,28 +255,32 @@ export function SimulationCamera3D({
         {activeScene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       {!editing && <div className="sim3d-actions">
-        <button type="button" disabled={!canUseThree} aria-pressed={usingThree}
+        <button type="button" disabled={!canUseThree} aria-pressed={usingNative}
+          onClick={() => {setNativeRequested(current => !current); setThreeRequested(false);}}>
+          {usingNative ? "Exit native preview" : "Native SUMO preview"}
+        </button>
+        <button type="button" disabled={!canUseThree || usingNative} aria-pressed={usingThree}
           title={hasOverlay ? "Hide detection and region overlays to try Three.js" : "Experimental 3D road preview; detailed vehicles"}
           onClick={() => {
             if (threeFailed) { setThreeFailed(false); setThreeRequested(true); }
             else setThreeRequested(current => !current);
           }}>{usingThree ? "Legacy view" : threeFailed ? "Retry Three.js" : "Three.js preview"}</button>
-        <button type="button" onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
-        <button type="button" onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
+        <button type="button" disabled={usingNative} onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
+        <button type="button" disabled={usingNative} onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
           {pitch === 0 ? "Perspective" : "Top"}
         </button>
-        <label>Zoom <input aria-label="3D camera zoom" type="range" min="0.5" max="1.35" step="0.05"
+        <label>Zoom <input aria-label="3D camera zoom" type="range" disabled={usingNative} min="0.5" max="1.35" step="0.05"
           value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
       </div>}
-      <div className="sim3d-status" aria-live="off">
+      {!usingNative && <div className="sim3d-status" aria-live="off">
         {activeScene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
           <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(activeScene.signal.seconds_remaining))} s</span>
           <span>{activeScene.vehicles.length} vehicles · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
-      </div>
-      {!editing && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
+      </div>}
+      {!editing && !usingNative && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
       {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );

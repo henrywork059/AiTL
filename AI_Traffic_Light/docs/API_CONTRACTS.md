@@ -470,3 +470,7 @@ No HTTP, saved topology or diagnostic schema change. `CorridorSession(seed)` own
 ### Update 28c experimental native projection (not a release)
 
 `GET /api/camera/simulation/native-projection` uses the existing success envelope. Disabled unless both process environment flags `MESH_SUMO_SHADOW=1` and `MESH_SUMO_PROJECTION=1` are set. Status disabled/idle/starting/running/busy/unavailable; provenance `synthetic_sumo_projection`; generation when available; snapshot null unless coherent running observation. Successful bundle contains snapshot metadata/agents (native metres and canonical A pixels), `views_png_base64` keyed by four simulation view IDs, and `agents_csv` from the same snapshot. A read does not advance simulation; tick may lag legacy clock. In-flight old-generation results are discarded. No saved setting, authoritative frame, capture, editor, detection or signal-control change. Restart without projection flag for rollback.
+
+### Update 28d scene-only projection (not a release)
+
+Optional `format=scene` on the existing experimental projection GET returns the same status/provenance/generation and snapshot metadata/agents plus canonical A pixel `lanes` (id, kind, points, width_px). No PNG or CSV encoding in this mode. Default `bundle` response preserved. The frontend uses a separately opted-in diagnostic SVG view; no capture, saved source, editor, detector or signal authority change.

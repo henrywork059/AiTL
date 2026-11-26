@@ -142,6 +142,10 @@ def arm(enabled):
                     assert projection["snapshot"]["provenance"] == "synthetic_sumo_projection"
                     assert len(list(csv.DictReader(io.StringIO(projection["agents_csv"])))) == len(projection["snapshot"]["agents"])
                     assert set(projection["views_png_base64"]) == set(SIMULATION_CAMERA_SOURCE_IDS)
+                    scene_only = assert_envelope(client.get("/api/camera/simulation/native-projection?format=scene"))["data"]
+                    assert scene_only["snapshot"]["agents"] == projection["snapshot"]["agents"]
+                    assert scene_only["snapshot"]["lanes"] and "views_png_base64" not in scene_only
+                    assert scene_only["snapshot"]["tick"] == projection["snapshot"]["tick"]
                     for encoded in projection["views_png_base64"].values():
                         image = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
                         assert image.shape == (720, 1280, 3)

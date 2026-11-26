@@ -141,7 +141,7 @@ class ShadowRuntime:
             'agents': [dict(asdict(a), id=a.id) for a in snap.agents]}
         return result
 
-    def projection_bundle(self) -> dict:
+    def projection_bundle(self, *, scene_only: bool = False) -> dict:
         """Read one coherent, generation-scoped diagnostic snapshot; never step."""
         if not self._projection_enabled:
             return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
@@ -158,10 +158,13 @@ class ShadowRuntime:
             return {**empty, "status": "busy"}
         try:
             from app.services.sumo_projection import export_csv
-            meta, views = projection.render(snap)
-            bundle = {**empty, "snapshot": meta,
-                      "views_png_base64": {sid: b64encode(data).decode("ascii") for sid, data in views.items()},
-                      "agents_csv": export_csv(meta)}
+            if scene_only:
+                bundle = {**empty, "snapshot": projection.scene(snap)}
+            else:
+                meta, views = projection.render(snap)
+                bundle = {**empty, "snapshot": meta,
+                          "views_png_base64": {sid: b64encode(data).decode("ascii") for sid, data in views.items()},
+                          "agents_csv": export_csv(meta)}
         except Exception:
             bundle = {**empty, "status": "unavailable"}
         finally:

@@ -285,3 +285,27 @@ export async function disconnectRemoteCamera(): Promise<RemoteCameraStatus> {
 export async function refreshCameraAfterRemoteChange(): Promise<CameraStatus> {
   return fetchCameraStatus();
 }
+
+export type NativeProjectionScene = {
+  schema_version: 1;
+  provenance: "synthetic_sumo_projection";
+  generation: number;
+  seed: number;
+  tick: number;
+  time_s: number;
+  width: 1280;
+  height: 720;
+  lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number}>;
+  agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number}>;
+};
+export type NativeProjectionResponse = {
+  status: "disabled" | "idle" | "starting" | "running" | "busy" | "unavailable";
+  provenance: "synthetic_sumo_projection";
+  generation?: number;
+  snapshot: NativeProjectionScene | null;
+};
+export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjectionResponse> {
+  return requestJsonStrict<NativeProjectionResponse>(
+    `${API_BASE}/api/camera/simulation/native-projection?format=scene`, { signal, cache: "no-store" },
+  );
+}

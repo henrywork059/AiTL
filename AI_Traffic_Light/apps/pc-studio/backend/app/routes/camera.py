@@ -131,9 +131,9 @@ def simulation_shadow_diagnostics(request: Request) -> dict:
 
 
 @router.get("/simulation/native-projection")
-def simulation_native_projection(request: Request) -> dict:
+def simulation_native_projection(request: Request, format: Literal["bundle", "scene"] = "bundle") -> dict:
     """Explicitly opted-in, non-authoritative diagnostic bundle."""
-    return ok(camera_frame_service.native_projection_diagnostics(), request_id=request.state.request_id)
+    return ok(camera_frame_service.native_projection_diagnostics(scene_only=format == "scene"), request_id=request.state.request_id)
 
 
 @router.get("/live.mjpeg")

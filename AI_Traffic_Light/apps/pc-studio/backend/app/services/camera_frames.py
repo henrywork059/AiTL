@@ -506,10 +506,10 @@ class CameraFrameService:
             return {"status": "disabled", "provenance": "synthetic_sumo_shadow", "snapshot": None}
         return self._shadow.status()
 
-    def native_projection_diagnostics(self) -> dict:
+    def native_projection_diagnostics(self, *, scene_only: bool = False) -> dict:
         if self._shadow is None:
             return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
-        return self._shadow.projection_bundle()
+        return self._shadow.projection_bundle(scene_only=scene_only)
 
     def close_shadow(self) -> None:
         if self._shadow is not None:
