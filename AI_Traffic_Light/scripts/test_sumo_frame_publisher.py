@@ -5,6 +5,9 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import cv2
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps/pc-studio/backend"))
 from app.services.experiment_timeline_csv import serialize_experiment_timeline
@@ -56,6 +59,37 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.scene_for("simulation_camera"))
             with self.assertRaises(ValueError):
                 pub.publish(meta3, views2, received_at_ms=48)
+
+    def test_lazy_view_cache_and_retirement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            projection=NativeProjection(Projection.load(path),1)
+            snap=ShadowSnapshot(42,1,False,(ShadowAgent("vehicle","v0",5,0,1,"WC"),))
+            meta,pixels=projection.render_pixels(snap)
+            expected=projection.render(snap)[1]
+            pub=NativeFramePublisher()
+            pub.begin(1)
+            with patch("app.services.sumo_frame_publisher.cv2.imencode",wraps=cv2.imencode) as encoder:
+                pub.prepare(meta,pixels,received_at_ms=42)
+                pixels[:]=0
+                self.assertEqual(encoder.call_count,0)
+                first=pub.frame_for("simulation_camera_d")
+                self.assertEqual(encoder.call_count,1)
+                self.assertIs(first,pub.frame_for("simulation_camera_d"))
+                self.assertEqual(encoder.call_count,1)
+                for sid in VIEW_FLIPS:
+                    self.assertEqual(pub.frame_for(sid).content,expected[sid])
+                self.assertEqual(encoder.call_count,4)
+                self.assertEqual(pub.scene_for("simulation_camera_d")["agents"][0]["x"],1279-meta["agents"][0]["x"])
+            newmeta,newpixels=projection.render_pixels(ShadowSnapshot(42,2,False,snap.agents))
+            pub.prepare(newmeta,newpixels,received_at_ms=43)
+            self.assertTrue(pub.has_tick(2))
+            with patch("app.services.sumo_frame_publisher.cv2.imencode",return_value=(False,None)):
+                with self.assertRaises(RuntimeError):
+                    pub.frame_for("simulation_camera_b")
+            self.assertIsNone(pub.frame_for("simulation_camera_d"))
+            self.assertFalse(pub.has_tick(2))
 
     def test_export_contract(self):
         timeline = {"fixed":{"timeline":[{"t":1,"phase":"vehicle_green","vehicle_queue":3,

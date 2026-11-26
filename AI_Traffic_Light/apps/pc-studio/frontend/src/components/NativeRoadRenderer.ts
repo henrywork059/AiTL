@@ -113,12 +113,12 @@ export class NativeRoadRenderer {
       const p=pose(t,now);t.visual.group.position.set(p.x,2,p.z);t.visual.group.rotation.y=t.heading;
       if(t.kind==="pedestrian"){
         const fraction=t.duration?Math.max(0,Math.min(1,(now-t.start)/t.duration)):1;
-        setPedestrianGait(t.visual as PedestrianVisual,t.duration&&fraction<1?Math.sin(fraction*Math.PI*2)*Math.min(1,(1-fraction)*5):0);
+        setPedestrianGait(t.visual as PedestrianVisual,t.duration&&fraction<1?Math.sin(fraction*Math.PI*2)*Math.min(1,Math.hypot(t.to.x-t.from.x,t.to.z-t.from.z)/2)*Math.min(1,(1-fraction)*5):0);
       }
     }
     this.camera.aspect=w/h;
     // Fit native junction more tightly, with a separate close view of crossing agents.
-    const distance=(detail ? .16 : .55)*Math.max(1,1.3/this.camera.aspect);
+    const distance=(detail ? .085 : .39)*Math.max(1,1.3/this.camera.aspect);
     this.camera.position.set(0,(top?1800:1450)*distance,(top?0:1050)*distance);
     if(top)this.camera.up.set(0,0,-1);else this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);this.camera.updateProjectionMatrix();

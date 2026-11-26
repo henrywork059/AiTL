@@ -12,6 +12,33 @@ from zipfile import ZipFile
 from sumo_migration_trial import processes
 from app.services.native_evaluation import NativeEvaluationService
 from app.services.signal_rules import SignalRulesService
+from app.services.simulation_finite_fixture import Segment, Trip, FiniteReference, RouteGateAdapter
+from app.services.simulation_gate_metrics import GateMetrics
+import hashlib
+
+
+def replay_reference(arm):
+    """Same declared route geometry/offers and requested phases; not legacy PC Studio."""
+    def segment(row):
+        return Segment(row["road_id"],row["kind"],tuple(tuple(pt) for pt in row["points"]))
+    trips=tuple(Trip(t["ident"],t["kind"],t["depart_s"],t["desired_speed"],
+                     tuple(segment(s) for s in t["path"]),
+                     tuple(tuple(segment(s) for s in path) for path in t["alternatives"]))
+                for t in arm["demand_manifest"])
+    digest=hashlib.sha256(json.dumps(arm["demand_manifest"],sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    assert digest==arm["demand_digest"]
+    model=FiniteReference(trips)
+    adapter=RouteGateAdapter(trips)
+    metrics=GateMetrics()
+    timeline=[]
+    for row in arm["timeline"]:
+        agents=model.advance(row["phase"])
+        timeline.append({**metrics.sample(row["tick"],adapter.observations(agents)),"requested_phase":row["phase"]})
+    return {"engine":"finite_reference","demand_digest":digest,"layout_id":arm["layout_id"],
+            "summary":metrics.summary(),"waiting_episodes":metrics.waiting_episodes(),
+            "timeline":timeline,"arrived":sorted(model.arrived),
+            "active":sorted(model.active),"pending":sorted(t.ident for t in model.pending),
+            "production_experiment_parity":False}
 
 
 def main(out):
@@ -47,6 +74,9 @@ def main(out):
                             for kind, waits in arm["waiting_episodes"].items():
                                 assert waits["observed_agent_seconds"] == arm["summary"][kind+"_wait_agent_s"]
                             summaries[mode] = arm["summary"]
+                            reference=replay_reference(arm)
+                            assert len(reference["timeline"])==len(arm["timeline"])
+                            (out/f"{seed}-{density}-{geometry}-{mode}-reference.json").write_text(json.dumps(reference,indent=2),encoding="utf-8")
                         rows.append({"archive":name,"seed":seed,"density":density,"geometry":geometry,"layout_id":manifest["layout_id"],
                             "wall_s":elapsed,"demand_digest":manifest["demand_digest"],
                             "summaries":summaries,"deltas":deltas})
@@ -56,7 +86,7 @@ def main(out):
             service.close()
     result = {"evidence":"executed synthetic native policy matrix",
               "duration_seconds":120,"step_seconds":.2,"pairs":rows,
-              "production_experiment_parity":False,"physical_output_allowed":False}
+              "reference_replays":16,"production_experiment_parity":False,"physical_output_allowed":False}
     (out/"matrix.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     print(json.dumps(result,indent=2))
 

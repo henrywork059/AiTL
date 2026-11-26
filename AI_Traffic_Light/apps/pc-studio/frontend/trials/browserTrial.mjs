@@ -31,5 +31,8 @@ try {
   const nativePng=resolve(process.env.RUNNER_TEMP||'.',actual?'mesh-native-actual.png':'mesh-native-fixture.png');
   const nativeShot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-native-shot','--screenshot='+nativePng,nativeUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(nativeShot.status!==0||!existsSync(nativePng)||readFileSync(nativePng).length<1000)throw Error('Native screenshot missing');
+  const detailPng=resolve(process.env.RUNNER_TEMP||'.',actual?'mesh-native-actual-detail.png':'mesh-native-fixture-detail.png');
+  const detailShot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-native-detail','--screenshot='+detailPng,nativeUrl+(actual?'&':'?')+'detail=1'],{encoding:'utf8',timeout:45000,windowsHide:true});
+  if(detailShot.status!==0||!existsSync(detailPng)||readFileSync(detailPng).length<1000)throw Error('Native detail screenshot missing');
   console.log('[PASS] native WebGL screenshot from '+(actual?'actual SUMO capture':'illustrative scene fixture'));
 } finally {server.kill();}

@@ -98,6 +98,10 @@ class Tests(unittest.TestCase):
                     count=assert_envelope(client.post(BASE+"/region",json=region))["data"]
                     self.assertEqual(count["counts"],{"vehicle":1,"pedestrian":0})
                     self.assertFalse(count["persisted"])
+                    self.assertFalse(v["observation"]["authoritative"])
+                    self.assertFalse(v["observation"]["detector_observation"])
+                    self.assertEqual(v["observation"],count["observation"])
+                    self.assertEqual(len(count["polygon_world_m"]),4)
                     assert_envelope(client.post(BASE+"/region",json={**region,"coordinate_space":"legacy_pixels"}),expected_status=409)
                     assert_envelope(client.post(BASE+"/region",json={**region,"layout_id":"0"*64}),expected_status=409)
                     assert_envelope(client.post(BASE+"/region",json={**region,"polygon":[polygon[0],polygon[2],polygon[1],polygon[3]]}),expected_status=422)
@@ -110,6 +114,8 @@ class Tests(unittest.TestCase):
                 response=client.get(BASE+"/capture",params=params)
                 self.assertEqual(response.status_code,200)
                 with ZipFile(io.BytesIO(response.content)) as z:
+                    observations=json.loads(z.read("observations.json"))
+                    self.assertEqual(len(observations),4)
                     for sid in VIEW_FLIPS:
                         frame=client.get(BASE+"/frame",params={**params,"source_id":sid})
                         self.assertEqual(frame.status_code,200)
@@ -120,6 +126,8 @@ class Tests(unittest.TestCase):
                         self.assertEqual(frame.headers["x-received-at-ms"],str(meta["source_received_at_ms"]))
                 result=assert_envelope(client.get(BASE+"/export",params=params))["data"]
                 self.assertEqual(len(result["timeline"]),5)
+                self.assertEqual(result["trip_accounting"]["active"],["v0"])
+                self.assertEqual(result["trip_accounting"]["offered"],["v0"])
                 for kind, waits in result["waiting_episodes"].items():
                     self.assertEqual(waits["observed_agent_seconds"],result["summary"][kind+"_wait_agent_s"])
                 self.assertFalse(result["production_experiment_parity"])

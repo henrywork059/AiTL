@@ -262,3 +262,7 @@ NativeProjection layout identity derives from lane geometry and projection param
 ### Reconciled native workspace
 
 Legacy experiment routes do not load native evaluation dependencies until the native endpoint is called. Simulation Lab exposes the same optional native service, with standalone A–D view selection and client playback, without changing selected camera. Region drafts use the existing native_projection_v1 layout identity, exact epoch/generation/tick and view, and never persist to production zones. Saved-policy comparison ZIP remains the sole paired native contract; matching demand digest and timeline checks plus derived native gate metrics/deltas augment it. Native permission readback must equal protected phase-map state. No production authority switch.
+
+### S04 exact native observation and raster cache (unreleased)
+
+The native evaluation publisher holds one immutable canonical raster and lazily validates/encodes each requested view, under its existing service lock. Existing shadow bundle publisher still validates all four external PNGs. Native region/world geometry, capture descriptor and scene share exact epoch/generation/tick/layout identity, with explicit non-authoritative synthetic ground truth; no selected camera, inference or live policy injection. Native demand manifests support independent finite-reference replay under identical requested phases; not production legacy movement or controller equivalence.

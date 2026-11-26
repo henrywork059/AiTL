@@ -34,6 +34,7 @@ async function run(){
     renderer.update({...scene,generation:scene.generation-1,agents:[],lanes:[]});
     renderer.render(false);
     if(renderer.renderer.info.render.triangles!==triangles)throw Error("Retired generation replaced active scene");
+    if(new URLSearchParams(location.search).get("detail")==="1")renderer.render(false,performance.now(),true);
     source.textContent=(actual?"Executed SUMO capture":"Illustrative native scene fixture")+
       ` · seed ${scene.seed} · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents`;
     result.textContent="MESH_NATIVE_RENDERER_PASS";

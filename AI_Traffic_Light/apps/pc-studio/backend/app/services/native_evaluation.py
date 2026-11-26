@@ -51,6 +51,8 @@ class NativeEvaluationService:
         self._policy = None
         self._demand_digest = None
         self._geometry = None
+        self._trips = ()
+        self._seen_trips = set()
 
     @staticmethod
     def _conflict(message):
@@ -78,6 +80,8 @@ class NativeEvaluationService:
         self._policy = None
         self._demand_digest = None
         self._geometry = None
+        self._trips = ()
+        self._seen_trips = set()
         self._state = state
         try:
             if adapter is not None:
@@ -122,6 +126,7 @@ class NativeEvaluationService:
                 network = self._session.network_path
                 self._projection = NativeProjection(Projection.load(network), self.generation)
                 trips = self._trip_loader(network, network.parent/"routes.xml")
+                self._trips = tuple(trips)
                 self._routes = RouteGateAdapter(trips)
                 self._demand_digest = hashlib.sha256(json.dumps([asdict(t) for t in trips],sort_keys=True,separators=(",",":")).encode()).hexdigest()
                 self._phase_map = self._phase_loader(network)
@@ -157,6 +162,7 @@ class NativeEvaluationService:
                         raise RuntimeError("Conflicting or unknown protected phase")
                     self._session.set_phase(phase)
                     snap = self._adapter.step()
+                    self._seen_trips.update(a.engine_id for a in snap.agents)
                     permission = self._session.last_permission
                     vehicle_inside=any(a.kind=="vehicle" and a.road_id.startswith(":C_") for a in before.agents)
                     expected=self._phase_map.state(phase,vehicle_inside=vehicle_inside,pedestrian_inside=bool(crossing))
@@ -216,10 +222,9 @@ class NativeEvaluationService:
 
     def _ensure_frames(self):
         snap = self._adapter.snapshot()
-        frame = self._publisher.frame_for("simulation_camera")
-        if frame is None or frame.frame_number != snap.tick:
-            meta, views = self._projection.render(snap)
-            self._publisher.publish(meta,views,received_at_ms=self._received_at_ms)
+        if not self._publisher.has_tick(snap.tick):
+            meta, pixels = self._projection.render_pixels(snap)
+            self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms)
 
     def frame(self, *, epoch, generation, tick, source_id):
         with self._lock:
@@ -251,9 +256,25 @@ class NativeEvaluationService:
                         z.writestr("scene.json",json.dumps(meta,indent=2))
                         z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
+                        z.writestr("observations.json",json.dumps([self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS],indent=2))
                     return stream.getvalue()
             except Exception as exc:
                 raise self._failure() from exc
+
+    def _trip_accounting(self):
+        snap = self._adapter.snapshot()
+        active = {a.engine_id for a in snap.agents}
+        arrived = set(self._session.arrived) | set(self._session.person_arrived)
+        offered = {t.ident for t in self._trips}
+        if not active.isdisjoint(arrived) or not (active | arrived) <= offered:
+            raise RuntimeError("Inconsistent native trip identity")
+        return {"offered": sorted(offered), "active": sorted(active),
+                "arrived": sorted(arrived),
+                "not_observed_due": sorted(t.ident for t in self._trips
+                    if t.depart_s <= snap.time_s and t.ident not in self._seen_trips | arrived | active),
+                "not_yet_due": sorted(t.ident for t in self._trips
+                    if t.depart_s > snap.time_s and t.ident not in self._seen_trips | arrived | active),
+                "retired_without_arrival": sorted(self._seen_trips - active - arrived)}
 
     def export(self, *, epoch, generation, tick):
         with self._lock:
@@ -266,6 +287,8 @@ class NativeEvaluationService:
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
                 "demand_digest":self._demand_digest,"derived_metrics":summarize_timeline(self._timeline,self._metrics.summary()),
                 "waiting_episodes":self._metrics.waiting_episodes(),
+                "demand_manifest":[asdict(t) for t in self._trips],
+                "trip_accounting":self._trip_accounting(),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
                 "production_experiment_parity":False,"physical_output_allowed":False}
@@ -277,8 +300,15 @@ class NativeEvaluationService:
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
             scene=self.scene(source_id=source_id)["snapshot"]
-            return {**scene,"view_id":source_id,"source_id":f"native_eval_g{generation}_{source_id}",
-                    "frame_number":tick,"legacy_editor_compatible":False}
+            identity = {"epoch":epoch,"generation":generation,"tick":tick,
+                "source_id":f"native_eval_g{generation}_{source_id}","view_id":source_id,
+                "frame_number":tick,"received_at_ms":self._received_at_ms,
+                "coordinate_space":scene["coordinate_space"],"layout_id":scene["layout_id"],
+                "width":scene["width"],"height":scene["height"],
+                "provenance":PROVENANCE,"observation_kind":"synthetic_ground_truth",
+                "detector_observation":False,"authoritative":False,"physical_output_allowed":False}
+            return {**scene,"view_id":source_id,"source_id":identity["source_id"],
+                    "frame_number":tick,"legacy_editor_compatible":False,"observation":identity}
 
     def evaluate_region(self, *, epoch, generation, tick, source_id, coordinate_space, layout_id, polygon):
         with self._lock:
@@ -290,8 +320,12 @@ class NativeEvaluationService:
                 result=region_counts(scene,polygon)
             except (ValueError,TypeError) as exc:
                 raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
+            # Mirror within this layout only. Never translate a saved legacy polygon.
+            layout=self._projection.layout
+            world=[layout.world(*pt,source_id) for pt in result["polygon"]]
             return {"epoch":epoch,"generation":generation,"tick":tick,"source_id":source_id,
                     "coordinate_space":coordinate_space,"layout_id":layout_id,**result,
+                    "polygon_world_m":world,"observation":scene["observation"],
                     "provenance":"synthetic_native_region_evaluation","persisted":False,"physical_output_allowed":False}
 
     def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard'):

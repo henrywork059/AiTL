@@ -178,4 +178,5 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-native-evaluation/
             ${{ runner.temp }}/mesh-sumo-http-compatibility/
             ${{ runner.temp }}/mesh-native-actual.png
+            ${{ runner.temp }}/mesh-native-actual-detail.png
             ${{ runner.temp }}/mesh-sumo-policy-matrix/

@@ -154,13 +154,18 @@ class NativeProjection:
                     row["y"] = HEIGHT - 1 - row["y"]
         return {**meta, "lanes": deepcopy(self._lanes_by_view[source_id])}
 
-    def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
+    def render_pixels(self, snapshot: ShadowSnapshot) -> tuple[dict, np.ndarray]:
+        """One canonical image; callers may encode individual mirrored views."""
         meta = self.metadata(snapshot)
         image = self._background.copy()
         for row in meta["agents"]:
             # Position markers, not detection boxes.
             cv2.circle(image, (round(row["x"]), round(row["y"])), 4 if row["kind"] == "vehicle" else 3,
                        (255, 170, 65) if row["kind"] == "vehicle" else (65, 220, 245), -1)
+        return meta, image
+
+    def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
+        meta, image = self.render_pixels(snapshot)
         views = {}
         for sid, flip in VIEW_FLIPS.items():
             view = image if flip is None else cv2.flip(image, flip)
