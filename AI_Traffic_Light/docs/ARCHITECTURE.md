@@ -218,3 +218,11 @@ See [patch evidence](PATCH_0_5_69.md).
 ### Pedestrian presentation (S03 / 25a)
 
 Update 25a / S03 preparation: exact 0_5_69 release CI 45754606972 passed. Persistent volumetric figures with head, torso, separate swinging limbs, shared box/sphere geometry and per-figure material disposal. Presentation follows observed positions only, distance-derived gait, bounded 450 ms interpolation, no extrapolation, no walking in place after stationary samples, pause/reset/source/density/large-gap/reentry guards, camera-mirrored heading and curb elevation. Existing backend phase and speed unchanged; fixed seeded tests call actual pedestrian movement helper for both directions, WALK entry, CLEAR continuation, non-WALK curb hold, slow fixture and reentry. No physical obstruction simulation or mobility classification claimed. Browser trial directly asserts persistent pedestrian group identity, interpolated pose, gait freeze and removal, preserves legacy fallback. No dependency, API, controller, hardware or coordinate editing changes. New CI and screenshot pending; version stays 0_5_69.
+
+#### 25b verification
+
+Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.
+
+The optional Three.js preview replaces pedestrian box proxies with persistent volumetric figures (head, torso, separate arms, legs, shoes). PedestrianMotion follows canonical observed positions, bounds interpolation to 450 ms, derives gait from observed displacement, stops gait when stationary/paused, and resets on backwards/large jumps, source/density/clock changes or gaps. RoadRenderer retains mesh groups by existing pedestrian slot ID and color; removes absent groups and disposes owned materials. Shared geometry, mirrored heading, curb elevation and existing animation scheduling are retained. No extrapolation, new crossing authorization, simulator speed or controller change. Legacy CSS remains default and retains the source-coordinate editor and overlays. No API, dependency or physical-output changes.
+
+See [patch evidence](PATCH_0_5_70.md).

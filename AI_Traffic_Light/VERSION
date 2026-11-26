@@ -1,5 +1,5 @@
-version: 0_5_69
-status: Persistent vehicle meshes and bounded motion interpolation candidate (Update 24 / S03)
-previous_version: 0_5_68
+version: 0_5_70
+status: Persistent articulated pedestrians and observed gait candidate (Update 25 / S03)
+previous_version: 0_5_69
 passed_baseline: 0_5_0
-notes: 24a standard and renderer CI passed; actual screenshot inspected; release commit CI and owner PASS pending.
+notes: 25a standard and renderer CI passed; actual screenshot inspected; release commit CI and owner PASS pending.

@@ -1,3 +1,19 @@
+# V0570 — Persistent articulated pedestrians and observed gait
+
+Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.
+
+- [x] Standard CI, exact dependencies, typecheck/build and blocking audit passed on application revision.
+- [x] Three actual movement-helper fixtures for WALK/CLEAR, curb holds, slow motion and seeded reentry passed.
+- [x] Deterministic presentation motion and actual WebGL pedestrian group identity, gait, interpolation, pause and removal passed; screenshot inspected.
+- [x] React legacy editor/overlay fallback, retry and rollback passed.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save, full motion and four-camera visual acceptance.
+- [ ] Physical-obstruction/collision and downstream-capacity tests, full clearance safety, GPU benchmarks and endurance; physical gates unchanged.
+
+See [Patch 0_5_70](PATCH_0_5_70.md).
+
+---
+
 # V0569 — Persistent vehicle meshes and bounded motion interpolation
 
 Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.

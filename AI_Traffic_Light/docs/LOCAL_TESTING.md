@@ -1,3 +1,23 @@
+# V0570 — Persistent articulated pedestrians and observed gait
+
+Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.
+
+```powershell
+# From repository root
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Use synthetic simulation only. Confirm legacy default, hide visible overlays if necessary, select Three.js preview; observe pedestrian approach, waiting, WALK/CLEAR, direction, pause/resume and reentry across A–D; test orbit/Top/Zoom/Reset and resize. Confirm no walking in place after observations settle. Select Legacy view, open editor, drag/save/reopen vertex and verify unchanged reference coordinates; re-enable overlays to verify fallback. Confirm no physical camera/signal output changes. Owner alone confirms PASS.
+
+Application revision `40fcd2ea232ae4a79d16ca17d1b7a16e15cf510c`: [standard CI 45755422048](https://github.com/henrywork059/AiTL/actions/runs/45755422048) and [renderer CI 45755422084](https://github.com/henrywork059/AiTL/actions/runs/45755422084) passed. Standard CI executed three Python lifecycle tests on the actual existing movement helper with fixed phase inputs: both directions, WALK entry, CLEAR continuation, non-WALK curb holds, 30 vs 90 reference pixels/s slow/normal fixtures and seeded reentry. TypeScript motion tests passed for stationary/slow displacement, repeated frames, pause/resume, reentry both directions, reset/source/density/gap and removal; sample independence also asserted. Actual WebGL trial directly asserts persistent pedestrian group reference identity, interpolated position, limb rotation, paused gait freeze and removal; drawing, top view, context loss and cleanup passed. React integration confirms opt-in, source change, editor/overlay fallback, retry and rollback. Both blocking audits reported zero known npm vulnerabilities at execution time. Downloaded [artifact 15087790604](https://github.com/henrywork059/AiTL/actions/runs/45755422084/artifacts/15087790604); SHA-256 31048dfc19e162a4076c5031a3c1f74901f73dd67bba2a91ad2572f953358f35 matches metadata; 1000×650 actual screenshot inspected, three figures (two pavements, one crossing), four vehicles, markings and signals visible, MESH_RENDERER_PASS. Screenshot is a deliberately staged rendering fixture, not proof of safe concurrent movements. Package/lock blobs match b72a6215cf357fb94a83f23a8f4af82c6366a75d and faabff6777280a9ab2f52ff47d2e5f9a3bf5d34b. Evidence: executed synthetic tests, not field data.
+
+See [Patch 0_5_70](PATCH_0_5_70.md). Exact release CI and owner PASS pending.
+
+---
+
 # V0569 — Persistent vehicle meshes and bounded motion interpolation
 
 Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.

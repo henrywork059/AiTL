@@ -169,3 +169,11 @@ See [patch evidence](PATCH_0_5_69.md).
 ### Pedestrian figure preparation (Update 25)
 
 Update 25a / S03 preparation: exact 0_5_69 release CI 45754606972 passed. Persistent volumetric figures with head, torso, separate swinging limbs, shared box/sphere geometry and per-figure material disposal. Presentation follows observed positions only, distance-derived gait, bounded 450 ms interpolation, no extrapolation, no walking in place after stationary samples, pause/reset/source/density/large-gap/reentry guards, camera-mirrored heading and curb elevation. Existing backend phase and speed unchanged; fixed seeded tests call actual pedestrian movement helper for both directions, WALK entry, CLEAR continuation, non-WALK curb hold, slow fixture and reentry. No physical obstruction simulation or mobility classification claimed. Browser trial directly asserts persistent pedestrian group identity, interpolated pose, gait freeze and removal, preserves legacy fallback. No dependency, API, controller, hardware or coordinate editing changes. New CI and screenshot pending; version stays 0_5_69.
+
+#### 25b verification
+
+Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.
+
+Backend pedestrian IDs are recycled slots, not persistent trip identities; reentry snaps rather than traverses the scene. Gait is an illustrative distance-derived animation, not a biomechanical model or accessibility classification. Slow fixture tests do not establish full clearance safety. Non-WALK holds test signal-blocked entry only, not physical obstructions/collision avoidance or downstream capacity. The legacy movement helper is unchanged; renderer may trail observations or snap on reset/pause and is not a safety authority. Small low-poly figures, viewport footprint and Vite large-chunk warning remain. Full Windows owner visual/coordinate drag-save acceptance, native GPU performance, endurance and hardware checks pending. No public-road actuation. Exact release commit CI pending at publication. 25/39 candidates delivered (64.1%); next Update 26 / S04.
+
+See [patch evidence](PATCH_0_5_70.md).
