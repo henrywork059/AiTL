@@ -254,3 +254,7 @@ The isolated finite fixture parses the trusted generated network/route XML, supp
 ### Standalone native evaluation milestone (Update 28 preparation)
 
 An explicit startup flag enables a separate bounded native-only application service. Its manually stepped clock, temporary protected controller configuration, native child, route metrics, exact generation/tick publisher and capture archive belong solely to the evaluation instance. Native-only controls never select a saved camera, observe live traffic, or mutate production signal settings. Native Three.js uses actual lane polylines and observed positions, with SVG fallback; original editor pixels stay legacy. App shutdown retires the evaluation. No production authority switch.
+
+### Native integration and acceptance batch
+
+NativeProjection layout identity derives from lane geometry and projection parameters, not a legacy camera ID. Exact native view scenes return namespaced source identity and the independent coordinate space. Standalone playback is explicitly client-driven and bounded, serialized by the existing polling scope; exit/editor switch retires requests, and an already-issued single step may finish. The paired native experiment route copies the saved signal policy once and runs separate native fixed/adaptive sessions under the protected controller without modifying production configuration or experiment persistence. ZIP and view metadata distinguish native metrics and layout. Existing camera and region planes remain authoritative in production. See migration gates for limitations.

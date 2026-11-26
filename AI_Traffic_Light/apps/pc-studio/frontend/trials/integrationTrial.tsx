@@ -128,6 +128,15 @@ async function run(){
     await wait(()=>Boolean(button("Advance 5 s")&&!button("Advance 5 s")!.disabled),"Standalone start failed");
     button("Advance 5 s")!.click();
     await wait(()=>Boolean(host.querySelector("[data-native-tick='25']")),"Standalone step failed");
+    await wait(()=>Boolean(button("Play native")&&!button("Play native")!.disabled),"Standalone playback unavailable");
+    button("Play native")!.click();
+    await wait(()=>evalTick>=27,"Native playback did not advance");
+    button("Stop playback")!.click();
+    await wait(()=>Boolean(button("Play native")),"Playback stop failed");
+    await new Promise(resolve=>setTimeout(resolve,250));
+    const stoppedTick=evalTick;
+    await new Promise(resolve=>setTimeout(resolve,650));
+    check(evalTick===stoppedTick,"Native playback continued after stop");
     await wait(()=>Boolean(button("Pause native")&&!button("Pause native")!.disabled),"Standalone pause unavailable");
     button("Pause native")!.click();
     await wait(()=>Boolean(button("Resume native")&&button("Advance 5 s")!.disabled),"Standalone pause failed");
@@ -143,6 +152,22 @@ async function run(){
     await new Promise(resolve=>setTimeout(resolve,650));
     check(nativeCalls===editorCalls,"Native poll continued in editor");
     check(evalCalls===evalRetired,"Standalone poll continued after rollback");
+    // Reopen and leave while actively playing; retire both command and poll scope.
+    mount("simulation_camera");
+    await wait(()=>Boolean(button("Native SUMO preview")&&!button("Native SUMO preview")!.disabled),"Native preview unavailable after editor");
+    button("Native SUMO preview")!.click();
+    await wait(()=>Boolean(button("Standalone evaluation")),"Standalone selector missing");
+    button("Standalone evaluation")!.click();
+    await wait(()=>Boolean(button("Start native evaluation")),"Standalone restart missing");
+    button("Start native evaluation")!.click();
+    await wait(()=>Boolean(button("Play native")&&!button("Play native")!.disabled),"Restart play unavailable");
+    button("Play native")!.click();
+    await wait(()=>evalTick>=2,"Restart playback failed");
+    mount("simulation_camera",true);
+    await new Promise(resolve=>setTimeout(resolve,250));
+    const retiredTick=evalTick,retiredEvalCalls=evalCalls;
+    await new Promise(resolve=>setTimeout(resolve,650));
+    check(evalTick===retiredTick&&evalCalls===retiredEvalCalls,"Playback or polling survived editor rollback");
     flushSync(()=>root.unmount());
     check(!canvas(),"Canvas leaked after unmount");
     result.textContent="MESH_INTEGRATION_PASS";

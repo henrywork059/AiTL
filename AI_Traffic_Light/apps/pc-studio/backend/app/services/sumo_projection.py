@@ -9,6 +9,8 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 import io
+import hashlib
+import json
 import math
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -109,6 +111,10 @@ class NativeProjection:
         self.layout = layout
         self.generation = generation
         self._background = layout.geometry_canvas()
+        manifest = {"schema":1,"width":WIDTH,"height":HEIGHT,"bounds":layout.bounds,
+                    "scale":layout.scale,"offsets":[layout.offset_x,layout.offset_y],
+                    "lanes":[(lane.ident,lane.kind,lane.points,lane.width_m) for lane in layout.lanes]}
+        self.layout_id = hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
     def metadata(self, snapshot: ShadowSnapshot) -> dict:
         if snapshot.provenance != "synthetic_sumo_shadow":
@@ -121,6 +127,7 @@ class NativeProjection:
                    "x": x, "y": y}
             rows.append(row)
         return {"schema_version": 1, "provenance": PROVENANCE, "generation": self.generation,
+                "coordinate_space": "native_projection_v1", "layout_id": self.layout_id,
                 "seed": snapshot.seed, "tick": snapshot.tick, "time_s": snapshot.time_s,
                 "paused": snapshot.paused, "width": WIDTH, "height": HEIGHT,
                 "bounds_m": self.layout.bounds, "pixels_per_m": self.layout.scale, "agents": rows}

@@ -83,3 +83,4 @@ jobs:
             ${{ runner.temp }}/mesh-renderer-package.json
             ${{ runner.temp }}/mesh-renderer-package-lock.json
             ${{ runner.temp }}/mesh-renderer.png
+            ${{ runner.temp }}/mesh-native-fixture.png

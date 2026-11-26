@@ -439,3 +439,10 @@ def native_evaluation_capture(request: Request, epoch: str,
 def native_evaluation_export(request: Request, epoch: str,
                              generation: int = Query(ge=0), tick: int = Query(ge=0)) -> dict:
     return ok(native_evaluation_service.export(epoch=epoch,generation=generation,tick=tick), request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-evaluation/view")
+def native_evaluation_view(request: Request,source_id: str,epoch: str,
+                           generation: int=Query(ge=0),tick: int=Query(ge=0)) -> dict:
+    data=native_evaluation_service.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+    return ok(data,request_id=request.state.request_id)

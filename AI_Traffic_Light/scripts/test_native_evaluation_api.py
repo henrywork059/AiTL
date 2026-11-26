@@ -13,6 +13,10 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"apps/pc-studio/backen
 from fastapi.testclient import TestClient
 from test_camera_simulation_api import build_test_app, assert_envelope
 from app.routes import camera as routes
+from app.routes import experiments as experiment_routes
+from app.services.signal_rules import SignalRulesService
+from app.services.camera_frames import CameraFrameService
+from app.services.zones import ZoneService
 from app.services.native_evaluation import NativeEvaluationService
 from app.services.simulation_finite_fixture import Segment,Trip
 from app.services.sumo_shadow_adapter import ShadowAgent
@@ -71,6 +75,18 @@ class Tests(unittest.TestCase):
                 step={**identity,"tick":0,"steps":5}
                 state=assert_envelope(client.post(BASE+"/step",json=step))["data"]
                 self.assertEqual(state["snapshot"]["tick"],5)
+                self.assertFalse(state["snapshot"]["legacy_editor_compatible"])
+                layout=state["snapshot"]["layout_id"]
+                self.assertEqual(len(layout),64)
+                for sid in VIEW_FLIPS:
+                    v=assert_envelope(client.get(BASE+"/view",params={**identity,"tick":5,"source_id":sid}))["data"]
+                    self.assertEqual(v["layout_id"],layout)
+                    self.assertEqual(v["frame_number"],5)
+                    self.assertTrue(v["source_id"].startswith("native_eval_g"))
+                    x,y=v["agents"][0]["x"],v["agents"][0]["y"]
+                    a=state["snapshot"]["agents"][0]
+                    self.assertAlmostEqual(x,1279-a["x"] if sid.endswith(("_c","_d")) else a["x"])
+                    self.assertAlmostEqual(y,719-a["y"] if sid.endswith(("_b","_d")) else a["y"])
                 assert_envelope(client.post(BASE+"/step",json=step),expected_status=409)
                 params={**identity,"tick":5}
                 frozen=assert_envelope(client.post(BASE+"/pause",json={**params,"paused":True}))["data"]
@@ -100,6 +116,24 @@ class Tests(unittest.TestCase):
                 self.assertIsNone(stopped["snapshot"])
                 self.assertTrue(sessions[0].closed)
                 assert_envelope(client.post(BASE+"/start",json=identity),expected_status=409)
+                # Both comparison arms copy one saved policy, never modify its bytes.
+                policy=SignalRulesService(config_path=root/"policy.json",history_path=root/"policy-history.json",respect_environment=False)
+                policy.save_config(policy.defaults())
+                before=policy.config_path.read_bytes()
+                current={k:stopped[k] for k in ("epoch","generation")}
+                with patch("app.services.native_evaluation.signal_rules_service",policy):
+                    archive=service.compare(**current,density="light",seed=42,duration_seconds=30)
+                with ZipFile(io.BytesIO(archive)) as z:
+                    m=json.loads(z.read("manifest.json"))
+                    self.assertFalse(m["production_experiment_parity"])
+                    self.assertEqual(m["profile"],policy.get_config()["active_profile"])
+                    for mode in ("fixed","adaptive"):
+                        result=json.loads(z.read(mode+".json"))
+                        self.assertEqual(len(result["timeline"]),150)
+                        self.assertEqual(result["layout_id"],layout)
+                        self.assertEqual(result["policy_config"]["mode"],mode)
+                self.assertEqual(policy.config_path.read_bytes(),before)
+                self.assertTrue(all(s.closed for s in sessions))
 
 
 if __name__=="__main__":

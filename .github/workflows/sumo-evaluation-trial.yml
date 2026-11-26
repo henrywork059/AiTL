@@ -23,6 +23,8 @@ on:
       - '.github/scripts/sumo_gate_metric_trial.py'
       - '.github/scripts/sumo_finite_fixture_trial.py'
       - '.github/scripts/sumo_native_evaluation_trial.py'
+      - '.github/scripts/sumo_http_compatibility_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/routes/experiments.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation.py'
       - 'AI_Traffic_Light/scripts/test_native_evaluation_api.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_finite_fixture.py'
@@ -130,6 +132,24 @@ jobs:
         run: python .github/scripts/sumo_finite_fixture_trial.py "$env:RUNNER_TEMP/mesh-sumo-finite-fixture"
       - name: Execute native-only HTTP fixed adaptive and capture milestone trial
         run: python .github/scripts/sumo_native_evaluation_trial.py "$env:RUNNER_TEMP/mesh-sumo-native-evaluation"
+      - name: Execute repeated matched HTTP camera workload and saved-policy comparison
+        run: python .github/scripts/sumo_http_compatibility_trial.py "$env:RUNNER_TEMP/mesh-sumo-http-compatibility"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Render retained actual native capture in Edge WebGL
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: |
+          $source = "$env:RUNNER_TEMP/mesh-sumo-http-compatibility/1-0/capture.zip"
+          Expand-Archive -Path $source -DestinationPath "$env:RUNNER_TEMP/mesh-native-scene" -Force
+          New-Item -ItemType Directory -Force trials/public | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/mesh-native-scene/scene.json" trials/public/native-scene.json
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node node_modules/vite/bin/vite.js build --config trials/vite.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node trials/browserTrial.mjs --native-only
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -150,3 +170,5 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-gate-metrics/
             ${{ runner.temp }}/mesh-sumo-finite-fixture/
             ${{ runner.temp }}/mesh-sumo-native-evaluation/
+            ${{ runner.temp }}/mesh-sumo-http-compatibility/
+            ${{ runner.temp }}/mesh-native-actual.png

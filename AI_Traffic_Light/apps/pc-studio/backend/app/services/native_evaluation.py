@@ -4,6 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 from io import BytesIO
 import json
+import hashlib
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -16,6 +17,8 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.dataset_capture import DatasetCaptureService
 from app.services.simulation_experiments import _BenchmarkSignalRulesService
+from app.services.signal_rules import signal_rules_service
+from app.services.experiment_timeline_csv import serialize_experiment_timeline
 from app.services.simulation_finite_fixture import load_trips, RouteGateAdapter
 from app.services.simulation_gate_metrics import GateMetrics, STEP_S
 from app.services.sumo_frame_publisher import NativeFramePublisher
@@ -42,6 +45,7 @@ class NativeEvaluationService:
         self._timeline = []
         self._signal = self._received_at_ms = self._density = self._mode = None
         self._paused = False
+        self._policy = None
 
     @staticmethod
     def _conflict(message):
@@ -66,6 +70,7 @@ class NativeEvaluationService:
         self._timeline = []
         self._signal = self._received_at_ms = self._density = self._mode = None
         self._paused = False
+        self._policy = None
         self._state = state
         try:
             if adapter is not None:
@@ -81,7 +86,7 @@ class NativeEvaluationService:
             pass
         return AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Native evaluation failed and was retired.", status_code=503)
 
-    def start(self, *, epoch, generation, density, seed, mode):
+    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None):
         with self._lock:
             self._require(epoch, generation, running=False)
             if density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
@@ -92,10 +97,12 @@ class NativeEvaluationService:
                 folder = Path(self._temp.name)
                 self._controller = _BenchmarkSignalRulesService(config_path=folder/"signals.json",
                     history_path=folder/"history.jsonl", respect_environment=False)
-                config = self._controller.defaults()
+                config = deepcopy(policy_config) if policy_config is not None else self._controller.defaults()
+                if profile is not None:
+                    config["active_profile"] = profile
                 config["mode"] = mode
                 config["dry_run"] = False
-                self._controller.save_config(config)
+                self._policy = self._controller.save_config(config)
                 self._controller.reset_runtime(0.)
                 def open_session(value):
                     self._session = self._factory(value, density=density)
@@ -180,10 +187,13 @@ class NativeEvaluationService:
             if self._state == "running":
                 snap = self._adapter.snapshot()
                 snapshot = {**self._projection.scene(snap),"received_at_ms":self._received_at_ms,
-                    "paused":self._paused,"density":self._density,"signal":deepcopy(self._signal)}
+                    "paused":self._paused,"density":self._density,"signal":deepcopy(self._signal),
+                    "epoch":self.epoch,"profile":self._policy["active_profile"],
+                    "legacy_editor_compatible":False}
             return {"status":self._state,"provenance":PROVENANCE,"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
-                "density":self._density,"max_ticks":MAX_TICKS,"native_only":True,"physical_output_allowed":False}
+                "density":self._density,"max_ticks":MAX_TICKS,"native_only":True,
+                "profile":self._policy["active_profile"] if self._policy else None,"physical_output_allowed":False}
 
     def _ensure_frames(self):
         snap = self._adapter.snapshot()
@@ -232,9 +242,76 @@ class NativeEvaluationService:
                 "metric_contract":"normalized_physical_service_gate_v1","seed":self._adapter.snapshot().seed,
                 "mode":self._mode,"density":self._density,"step_s":STEP_S,"summary":self._metrics.summary(),
                 "timeline":deepcopy(self._timeline),"observed_routes":deepcopy(self._routes.seen_roads),
+                "layout_id":self._projection.layout_id,"coordinate_space":"native_projection_v1",
+                "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
                 "production_experiment_parity":False,"physical_output_allowed":False}
+
+    def view_scene(self, *, epoch, generation, tick, source_id):
+        """Exact native scene in a requested image plane; canonical editor is untouched."""
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if source_id not in VIEW_FLIPS:
+                raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
+            scene=self.scene()["snapshot"]
+            layout=self._projection.layout
+            for agent in scene["agents"]:
+                agent["x"],agent["y"]=layout.pixel(agent["x_m"],agent["y_m"],source_id)
+            for lane in scene["lanes"]:
+                lane["points"]=[layout.pixel(*layout.world(*pt),source_id) for pt in lane["points"]]
+            return {**scene,"view_id":source_id,"source_id":f"native_eval_g{generation}_{source_id}",
+                    "frame_number":tick,"legacy_editor_compatible":False}
+
+    def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None):
+        """Run a bounded pair with one immutable copy of the saved policy.
+
+        Only when standalone evaluation is idle. No changes to the saved profile,
+        existing experiment store or selected camera. Hold the service lock so
+        another native session cannot start during this paired experiment.
+        """
+        with self._lock:
+            self._require(epoch,generation,running=False)
+            if self._state == "running":
+                raise self._conflict("Stop the active native evaluation before comparing policies.")
+            if density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
+                raise AppError(ErrorCode.INVALID_REQUEST,"Invalid native comparison settings.",status_code=422)
+            policy=deepcopy(signal_rules_service.get_config())
+            selected=profile or policy.get("active_profile")
+            if selected not in policy.get("profiles",{}):
+                raise AppError(ErrorCode.INVALID_REQUEST,"Unknown experiment policy profile.",status_code=422)
+            policy["active_profile"]=selected
+            pair={}
+            child=NativeEvaluationService(enabled=True,factory=self._factory,
+                trip_loader=self._trip_loader,phase_loader=self._phase_loader)
+            try:
+                for mode in ("fixed","adaptive"):
+                    initial=child.start(epoch=child.epoch,generation=child.generation,density=density,
+                        seed=seed,mode=mode,policy_config=policy,profile=selected)
+                    gen=initial["generation"]
+                    horizon=duration_seconds*5
+                    for tick in range(0,horizon,MAX_BATCH):
+                        child.step(epoch=child.epoch,generation=gen,tick=tick,steps=min(MAX_BATCH,horizon-tick))
+                    pair[mode]=child.export(epoch=child.epoch,generation=gen,tick=horizon)
+                    child.stop(epoch=child.epoch,generation=gen)
+            finally:
+                child.close()
+            if pair["fixed"]["layout_id"]!=pair["adaptive"]["layout_id"]:
+                raise AppError(ErrorCode.INVALID_REQUEST,"Native comparison geometry differs.",status_code=409)
+            meta={"schema_version":1,"evidence":"executed_synthetic_native_comparison",
+                "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
+                "layout_id":pair["fixed"]["layout_id"],"profile":selected,"density":density,"seed":seed,
+                "duration_seconds":duration_seconds,"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
+                "production_experiment_parity":False,"physical_output_allowed":False,
+                "limitations":"Same native finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained."}
+            stream=BytesIO()
+            with ZipFile(stream,"w") as z:
+                z.writestr("manifest.json",json.dumps(meta,indent=2))
+                z.writestr("policy.json",json.dumps(policy,indent=2))
+                z.writestr("fixed.json",json.dumps(pair["fixed"],indent=2))
+                z.writestr("adaptive.json",json.dumps(pair["adaptive"],indent=2))
+                z.writestr("normalized_gate_comparison.csv",serialize_experiment_timeline(pair))
+            return stream.getvalue()
 
 
 native_evaluation_service = NativeEvaluationService(enabled=os.getenv("MESH_SUMO_NATIVE_EVALUATION")=="1")

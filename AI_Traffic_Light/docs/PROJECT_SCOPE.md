@@ -193,3 +193,7 @@ See [Patch 0_5_72](PATCH_0_5_72.md).
 ### Update 28 native-only evaluation boundary
 
 Opt-in, manually stepped finite synthetic fixture only. Fixed/adaptive uses isolated defaults and synthetic gate observations, not live AI or arbitrary configured network. Simplified 3D agent dimensions/heading derived from observed motion are illustrative; native projection PNGs are position markers, not calibrated sensor imagery. Capture ZIP is temporary evaluation evidence, not training dataset admission. Existing production experiment contract, authoritative camera/editor equivalence, matched replacement resources and Windows owner acceptance remain outstanding. No public-road actuation.
+
+### Update 28 integration/acceptance evidence boundary
+
+Verified native fixed/adaptive trial, seed 42 normal density: 15/15 journeys per run and 23.3% lower queued pedestrian agent-seconds (145.8 to 111.8) with equal vehicle queue integral 60.2; deterministic repetitions do not constitute independent seeds. Native coordinate layout is not the legacy editor plane. Matched HTTP workload measures application read costs, not physical or GPU equivalence. New browser screenshot from an actual retained native capture and copied-policy comparison remain pending CI. No field efficacy, general traffic safety, default migration or owner acceptance claim.

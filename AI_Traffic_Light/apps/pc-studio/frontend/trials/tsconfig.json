@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "include": [
     "rendererTrial.ts",
+    "nativeRendererTrial.ts",
     "integrationTrial.tsx",
     "RoadRenderer.ts"
   ]

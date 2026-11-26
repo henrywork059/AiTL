@@ -294,6 +294,9 @@ export type NativeProjectionScene = {
   tick: number;
   time_s: number;
   pixels_per_m?: number;
+  coordinate_space?: "native_projection_v1";
+  layout_id?: string;
+  legacy_editor_compatible?: false;
   paused?: boolean;
   received_at_ms?: number;
   width: 1280;
@@ -323,4 +326,25 @@ export function nativeEvaluationCommand(action:"start"|"step"|"pause"|"stop",bod
 }
 export function nativeEvaluationCaptureUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/capture?${new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)})}`;
+}
+
+
+function evaluationQuery(state:NativeEvaluationState){
+  return new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)});
+}
+export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:string){
+  const params=evaluationQuery(state);params.set("source_id",sourceId);
+  return `${nativeEvaluationBase}/frame?${params}`;
+}
+export function nativeEvaluationExportUrl(state:NativeEvaluationState){
+  return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
+}
+export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal):Promise<Blob>{
+  const response=await fetch(`${API_BASE}/api/traffic/native-experiments`,{
+    method:"POST",headers:{"Content-Type":"application/json"},signal,
+    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed:42,duration_seconds:500}),
+  });
+  if(!response.ok||!response.headers.get("content-type")?.includes("application/zip"))
+    throw new Error("Native comparison rejected or unavailable");
+  return response.blob();
 }
