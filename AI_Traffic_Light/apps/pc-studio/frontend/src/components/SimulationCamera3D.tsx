@@ -135,22 +135,23 @@ export function SimulationCamera3D({
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
   // The legacy world owns source-pixel overlays and editing until projection parity is tested.
   const canUseThree = !editing && !hasOverlay && activeScene !== null && sizeX === 1280 && sizeY === 720;
-  const usingNative = canUseThree && nativeRequested;
+  // Native uses a separate snapshot; a legacy camera source refresh must not retire it.
+  const usingNative = !editing && !hasOverlay && nativeRequested;
   const usingThree = canUseThree && threeRequested && !threeFailed && !usingNative;
   useEffect(() => {
-    if (!canUseThree) setNativeRequested(false);
-  }, [canUseThree]);
+    if (editing || hasOverlay) setNativeRequested(false);
+  }, [editing, hasOverlay]);
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
   const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
 
   return (
     <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`} data-renderer={usingNative ? "native" : usingThree ? "three" : "legacy"}>
-      <div className="sim3d-viewport" tabIndex={editing ? undefined : 0}
+      <div className="sim3d-viewport" tabIndex={editing || usingNative ? undefined : 0}
         aria-label="3D camera view: arrow keys orbit and tilt, plus or minus zoom, Home resets"
-        onKeyDown={editing ? undefined : keyboardCamera}
-        onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
-        onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
-        {usingNative ? <NativeProjectionView key={sourceId} sourceId={sourceId} /> : usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
+        onKeyDown={editing || usingNative ? undefined : keyboardCamera}
+        onPointerDown={editing || usingNative ? undefined : beginDrag} onPointerMove={editing || usingNative ? undefined : moveDrag}
+        onPointerUp={editing || usingNative ? undefined : endDrag} onPointerCancel={editing || usingNative ? undefined : endDrag} onWheel={editing || usingNative ? undefined : changeZoom}>
+        {usingNative ? <NativeProjectionView sourceId={sourceId} /> : usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
           orbit={orbit} pitch={pitch} zoom={zoom} onFailure={onThreeFailure} /> : <div className="sim3d-world" aria-hidden="true" style={{
           transform: editing
             ? "translate(-50%, -50%) scale(1) rotateX(0deg) rotateZ(0deg)"
@@ -255,7 +256,7 @@ export function SimulationCamera3D({
         {activeScene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       {!editing && <div className="sim3d-actions">
-        <button type="button" disabled={!canUseThree} aria-pressed={usingNative}
+        <button type="button" disabled={!canUseThree && !usingNative} aria-pressed={usingNative}
           onClick={() => {setNativeRequested(current => !current); setThreeRequested(false);}}>
           {usingNative ? "Exit native preview" : "Native SUMO preview"}
         </button>
