@@ -16,6 +16,7 @@ on:
       - '.github/scripts/sumo_controlled_shadow_trial.py'
       - '.github/scripts/sumo_lane_trial.py'
       - '.github/scripts/sumo_corridor_trial.py'
+      - '.github/scripts/sumo_migration_trial.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor_session.py'
       - 'AI_Traffic_Light/scripts/test_sumo_corridor.py'
@@ -90,6 +91,10 @@ jobs:
         run: python AI_Traffic_Light/scripts/test_sumo_corridor.py
       - name: Execute pinned native two-junction corridor trial
         run: python .github/scripts/sumo_corridor_trial.py "$env:RUNNER_TEMP/mesh-sumo-corridor.json"
+      - name: Install existing backend requirements for application trial
+        run: python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt
+      - name: Execute matched camera and native shadow resource trial
+        run: python .github/scripts/sumo_migration_trial.py "$env:RUNNER_TEMP/mesh-sumo-migration.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -103,3 +108,4 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-controlled-shadow.json
             ${{ runner.temp }}/mesh-sumo-lanes.json
             ${{ runner.temp }}/mesh-sumo-corridor.json
+            ${{ runner.temp }}/mesh-sumo-migration.json
