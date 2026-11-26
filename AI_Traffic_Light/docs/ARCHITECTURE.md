@@ -246,3 +246,7 @@ The optional ShadowRuntime owns native observations from committed legacy phase 
 ### Common evaluation gate metrics (Update 28h preparation)
 
 Isolated simulation_gate_metrics consumes normalized approach/service/exit observations. Engine adapters preserve native world and legacy pixel geometry; common event rules never feed controller, detector, editor or camera source. Existing experiment CSV semantics remain unchanged. See [migration gates](SIMULATOR_MIGRATION_GATES.md).
+
+### Finite common service-gate evaluation (Update 28i preparation)
+
+The isolated finite fixture parses the trusted generated network/route XML, supplies common physical vehicle and crossing paths and offered demand to a legacy-style reference and native route-aware measurement. Walking areas are reference chords, native dynamics are not reproduced, and the reference is not CameraFrameService. No selected camera, controller, detector, editor, persistence or physical outputs change.
