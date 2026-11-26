@@ -183,3 +183,9 @@ See [patch evidence](PATCH_0_5_70.md).
 Single generated junction, restricted route set and conservative single vehicle-link grant are not a calibrated traffic model, collision certification, live controller comparison or throughput improvement. Capacity check uses observed exit rear-bumper space, not a general network reservation/spillback algorithm; occupancy is sampled at 0.2 s. The earlier controlled fixture reported emergency braking warnings; native fidelity, resource and endurance checks remain outstanding. Normal camera simulation and editor are unchanged; no fresh manual Windows drag/save or physical ESP acceptance. Lane scenario is an internal evaluation seam, not a new UI feature. Default engine migration is reserved for Update 28 after parity/resource gates. No public-road actuation. 26/39 candidates delivered (66.7%); next Update 27 / S04.
 
 See [Patch 0_5_71](PATCH_0_5_71.md).
+
+### V0572 synthetic corridor boundary
+
+Restricted eastbound route and explicit phase schedules (B initially all-red for 120 s) deliberately generate congestion; no optimized cooperation, arbitrary configured topology, calibrated demand, general network capacity guarantee, collision certification or superiority claim. The observed peak occupancy is not a universal capacity limit. Sampling at 0.2 s cannot establish continuous-time physical safety. Earlier single-junction controlled fixture still reported emergency-braking warnings. Existing benchmark and normal camera simulation/editor remain unchanged; no new browser or owner Windows/ESP acceptance. Default migration (Update 28) requires separate parity, resource and rollback evidence; do not switch prematurely. No public-road actuation. 27/39 candidates delivered (69.2%); next Update 28 / S04.
+
+See [Patch 0_5_72](PATCH_0_5_72.md).

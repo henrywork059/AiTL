@@ -1,3 +1,18 @@
+# V0572 — Isolated SUMO two-junction corridor and spillback
+
+Candidate `0_5_72`; previous `0_5_71`; accepted baseline `0_5_0`; Update 27 / S04. Owner PASS pending.
+
+- [x] Standard CI, compile, structure, offline regressions, frontend tests/build and blocking audit passed on 27a.
+- [x] Pinned native dependencies, previous trials and corridor permissions/capacity regressions passed.
+- [x] Actual two-junction identity, reproducible travel times, blocked admission/spillback, independent permissions and pedestrian WALK/CLEAR verified in native logs.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, editor drag/save and manual visual acceptance.
+- [ ] Replacement default migration: matched parity/resource tests, API/capture/editor and four-view integration, experiment export and rollback; physical gates unchanged.
+
+See [Patch 0_5_72](PATCH_0_5_72.md).
+
+---
+
 # V0571 — Isolated SUMO lane queues and turning scenarios
 
 Candidate `0_5_71`; previous `0_5_70`; accepted baseline `0_5_0`; Update 26 / S04. Owner PASS pending.

@@ -232,3 +232,9 @@ See [patch evidence](PATCH_0_5_70.md).
 The trusted synthetic SUMO scenario is internally opt-in via `GeneratedSession(seed, lane_scenario=True)`; the standard shadow session and legacy authoritative simulator remain unchanged. The isolated libsumo worker uses the existing validated topology and protected phase upper bound. Seeded finite demand includes straight, left/right turns, a temporary downstream blocker and pedestrians. Lane-leader admission grants at most one vehicle link, rejects insufficient exit space, holds vehicle entry while a pedestrian or vehicle occupies the junction, and allows pedestrian entry only during pedestrian green with no vehicle inside. Yellow, flashing and all-red grant no new entry. No new network listener, frontend mode, API schema, dependency or physical output. Native SUMO retains lane following and motion ownership; the admission function is not an independent physical safety controller.
 
 See [Patch 0_5_71](PATCH_0_5_71.md).
+
+### Isolated two-junction corridor (0_5_72 candidate)
+
+The optional `CorridorSession(seed)` generates a trusted two-junction SUMO fixture with centres 45 m apart and directed vehicle route WA → AB → BE. It reuses the pinned native child process, lane-leader exit-space admission and validated per-junction phase mapping. SUMO owns continuous vehicle motion and persistent IDs. `set_junction_phases` requires explicit virtual phases for both A and B; independently validated permissions, internal vehicle occupancy and pedestrian crossing occupancy restrict each junction. The downstream exit-space gate prevents upstream admission during observed spillback. No new dependency, saved topology integration, HTTP endpoint, frontend selection, physical output or live signal authority; standard shadow and legacy defaults remain unchanged.
+
+See [Patch 0_5_72](PATCH_0_5_72.md).

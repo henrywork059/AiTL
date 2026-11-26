@@ -462,3 +462,7 @@ No HTTP, error envelope, saved schema, simulator, camera, or signal-control cont
 ### V0571 internal lane scenario (0_5_71 candidate)
 
 No HTTP or saved configuration change. `GeneratedSession(seed, lane_scenario=True)` selects a trusted generated isolated lane fixture; default `False` preserves the previous controlled shadow session. `LibsumoSession(..., controlled=True, lane_scenario=True)` selects the private child worker; uncontrolled lane selection is rejected. Diagnostic snapshot fields, ownership and permission provenance are unchanged. No new authority or physical outputs.
+
+### V0572 internal corridor session (0_5_72 candidate)
+
+No HTTP, saved topology or diagnostic schema change. `CorridorSession(seed)` owns a trusted generated temporary fixture and private native worker. `set_junction_phases` accepts exactly A and B with known protected virtual phase strings; invalid inputs are rejected. `last_permission` is a per-junction mapping only for the internal corridor session; existing single-junction session permission string and public diagnostic contracts are preserved. No physical or live control authority.
