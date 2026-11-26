@@ -506,6 +506,11 @@ class CameraFrameService:
             return {"status": "disabled", "provenance": "synthetic_sumo_shadow", "snapshot": None}
         return self._shadow.status()
 
+    def native_projection_diagnostics(self) -> dict:
+        if self._shadow is None:
+            return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
+        return self._shadow.projection_bundle()
+
     def close_shadow(self) -> None:
         if self._shadow is not None:
             self._shadow.close()
@@ -767,5 +772,6 @@ class CameraFrameService:
 
 
 camera_frame_service = CameraFrameService(
-    shadow=ShadowRuntime() if os.getenv("MESH_SUMO_SHADOW") == "1" else None
+    shadow=ShadowRuntime(projection_enabled=os.getenv("MESH_SUMO_PROJECTION") == "1")
+    if os.getenv("MESH_SUMO_SHADOW") == "1" else None
 )

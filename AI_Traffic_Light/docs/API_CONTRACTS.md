@@ -466,3 +466,7 @@ No HTTP or saved configuration change. `GeneratedSession(seed, lane_scenario=Tru
 ### V0572 internal corridor session (0_5_72 candidate)
 
 No HTTP, saved topology or diagnostic schema change. `CorridorSession(seed)` owns a trusted generated temporary fixture and private native worker. `set_junction_phases` accepts exactly A and B with known protected virtual phase strings; invalid inputs are rejected. `last_permission` is a per-junction mapping only for the internal corridor session; existing single-junction session permission string and public diagnostic contracts are preserved. No physical or live control authority.
+
+### Update 28c experimental native projection (not a release)
+
+`GET /api/camera/simulation/native-projection` uses the existing success envelope. Disabled unless both process environment flags `MESH_SUMO_SHADOW=1` and `MESH_SUMO_PROJECTION=1` are set. Status disabled/idle/starting/running/busy/unavailable; provenance `synthetic_sumo_projection`; generation when available; snapshot null unless coherent running observation. Successful bundle contains snapshot metadata/agents (native metres and canonical A pixels), `views_png_base64` keyed by four simulation view IDs, and `agents_csv` from the same snapshot. A read does not advance simulation; tick may lag legacy clock. In-flight old-generation results are discarded. No saved setting, authoritative frame, capture, editor, detection or signal-control change. Restart without projection flag for rollback.

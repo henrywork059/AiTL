@@ -18,6 +18,8 @@ on:
       - '.github/scripts/sumo_corridor_trial.py'
       - '.github/scripts/sumo_migration_trial.py'
       - '.github/scripts/sumo_projection_trial.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_projection_api.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/routes/camera.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection_session.py'
       - 'AI_Traffic_Light/scripts/test_sumo_projection.py'

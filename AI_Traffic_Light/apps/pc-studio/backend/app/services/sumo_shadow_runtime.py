@@ -1,11 +1,12 @@
 """Opt-in asynchronous shadow observation; never supplies live control or detections."""
 from __future__ import annotations
 
+from base64 import b64encode
 from collections import deque
 from dataclasses import asdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Condition, Thread
+from threading import Condition, Lock, Thread
 
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import PHASES, generate_controlled_fixture
@@ -45,8 +46,11 @@ class ShadowRuntime:
     all-red. A failed/overloaded generation is invalidated rather than skipping
     steps. Reset/stop invalidate publication immediately, then reap asynchronously.
     """
-    def __init__(self, factory=GeneratedSession, *, max_backlog: int = 100):
+    def __init__(self, factory=GeneratedSession, *, max_backlog: int = 100, projection_enabled: bool = False):
         self._factory = factory
+        self._projection_enabled = projection_enabled
+        self._projection = None
+        self._projection_lock = Lock()
         self._max_backlog = max_backlog
         self._cv = Condition()
         self._events = deque()
@@ -66,6 +70,7 @@ class ShadowRuntime:
         self._events.clear()
         self._phases.clear()
         self._snapshot = self._permission = self._requested_phase = None
+        self._projection = None
         self._legacy_steps = 0
         self._state, self._reason = state, reason
 
@@ -136,8 +141,40 @@ class ShadowRuntime:
             'agents': [dict(asdict(a), id=a.id) for a in snap.agents]}
         return result
 
+    def projection_bundle(self) -> dict:
+        """Read one coherent, generation-scoped diagnostic snapshot; never step."""
+        if not self._projection_enabled:
+            return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
+        with self._cv:
+            generation = self._generation
+            snap, projection = self._snapshot, self._projection
+            state = self._state
+        empty = {"status": state, "provenance": "synthetic_sumo_projection",
+                 "generation": generation, "snapshot": None}
+        if snap is None or projection is None or state != "running":
+            return empty
+        # One bounded encoder at a time; never block the camera/worker on PNG I/O.
+        if not self._projection_lock.acquire(blocking=False):
+            return {**empty, "status": "busy"}
+        try:
+            from app.services.sumo_projection import export_csv
+            meta, views = projection.render(snap)
+            bundle = {**empty, "snapshot": meta,
+                      "views_png_base64": {sid: b64encode(data).decode("ascii") for sid, data in views.items()},
+                      "agents_csv": export_csv(meta)}
+        except Exception:
+            bundle = {**empty, "status": "unavailable"}
+        finally:
+            self._projection_lock.release()
+        with self._cv:
+            if generation != self._generation or self._state != "running":
+                return {"status": self._state, "provenance": "synthetic_sumo_projection",
+                        "generation": self._generation, "snapshot": None}
+        return bundle
+
     def _run(self) -> None:
         session = None
+        projection = None
         # The wrapped factory captures the session without sharing native handles.
         def factory(seed):
             nonlocal session
@@ -152,11 +189,16 @@ class ShadowRuntime:
                 if action in ('stop', 'close'):
                     adapter.shutdown()
                     session = None
+                    projection = None
                     if action == 'close':
                         return
                     continue
                 if action == 'reset':
                     snap = adapter.reset(seed=arg)
+                    projection = None
+                    if self._projection_enabled:
+                        from app.services.sumo_projection import NativeProjection, Projection
+                        projection = NativeProjection(Projection.load(session.network_path), generation)
                     permission = None
                 else:
                     if session is None:
@@ -167,6 +209,7 @@ class ShadowRuntime:
                 with self._cv:
                     if generation == self._generation:
                         self._snapshot, self._permission = snap, permission
+                        self._projection = projection
                         self._requested_phase = arg if action == 'step' else None
                         self._state = 'running'
             except Exception:

@@ -68,7 +68,7 @@ def arm(enabled):
         session = GeneratedSession(seed)
         sessions.append(session)
         return session
-    shadow = ShadowRuntime(factory=factory) if enabled else None
+    shadow = ShadowRuntime(factory=factory, projection_enabled=True) if enabled else None
     service = CameraFrameService(simulation_seed=SEED, simulation_monotonic=lambda: now[0], shadow=shadow)
     digest = hashlib.sha256()
     phases = set()
@@ -132,6 +132,21 @@ def arm(enabled):
                 assert {"vehicle_green", "vehicle_yellow", "pedestrian_green", "pedestrian_flashing", "all_red"} <= phases, phases
                 if shadow:
                     assert max_native_agents > 0
+                projection = assert_envelope(client.get("/api/camera/simulation/native-projection"))["data"]
+                if shadow:
+                    import base64
+                    import csv
+                    import io
+                    assert projection["status"] == "running"
+                    assert projection["snapshot"]["tick"] == SAMPLES * 2
+                    assert projection["snapshot"]["provenance"] == "synthetic_sumo_projection"
+                    assert len(list(csv.DictReader(io.StringIO(projection["agents_csv"])))) == len(projection["snapshot"]["agents"])
+                    assert set(projection["views_png_base64"]) == set(SIMULATION_CAMERA_SOURCE_IDS)
+                    for encoded in projection["views_png_base64"].values():
+                        image = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
+                        assert image.shape == (720, 1280, 3)
+                else:
+                    assert projection["status"] == "disabled" and projection["snapshot"] is None
                 # Pause must freeze both clocks; native state stays diagnostic.
                 paused = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": True}))["data"]
                 assert paused["simulation_paused"]
@@ -165,6 +180,7 @@ def arm(enabled):
                 assert_envelope(client.get("/api/camera/simulation/scene"), expected_status=409)
                 if shadow:
                     assert shadow.status()["snapshot"] is None and shadow.status()["status"] == "idle"
+                    assert assert_envelope(client.get("/api/camera/simulation/native-projection"))["data"]["snapshot"] is None
                 else:
                     assert service.shadow_diagnostics()["status"] == "disabled"
                 resource = {"wall_s": wall_s, "before": before, "after": after,
@@ -175,6 +191,7 @@ def arm(enabled):
                         "simulation_s": SAMPLES * INTERVAL_S, "phases": sorted(phases),
                         "native_max_agents": max_native_agents, "captures": 4,
                         "zone_round_trip": True, "pause_resume_reset_stop": True,
+                        "native_projection_api": "verified" if enabled else "disabled_verified",
                         "resources": resource}
             finally:
                 service.set_simulation(False)
