@@ -27,6 +27,10 @@ class GeneratedSession(LibsumoSession):
             self._temp.cleanup()
             raise
 
+    @property
+    def network_path(self) -> Path:
+        return Path(self._temp.name) / 'network.xml'
+
     def close(self) -> None:
         try:
             super().close()
