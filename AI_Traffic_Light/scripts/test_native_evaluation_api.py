@@ -63,7 +63,7 @@ class Tests(unittest.TestCase):
                 return obj
             trips=(Trip("v0","vehicle",0.,10.,(Segment("WC","road",((0.,0.),(20.,0.))),)),)
             service=NativeEvaluationService(enabled=True,factory=factory,trip_loader=lambda *args:trips,
-                phase_loader=lambda _:PhaseMap((),(0,),(1,),frozenset()))
+                phase_loader=lambda _:PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset()))
             self.addCleanup(service.close)
             sentinel=root/"never-write.json"
             with patch.dict(os.environ,{"AITL_SIGNAL_RULES":str(sentinel),"AITL_DATASET_DIR":str(root/"never-dataset")}), \
@@ -87,6 +87,14 @@ class Tests(unittest.TestCase):
                     a=state["snapshot"]["agents"][0]
                     self.assertAlmostEqual(x,1279-a["x"] if sid.endswith(("_c","_d")) else a["x"])
                     self.assertAlmostEqual(y,719-a["y"] if sid.endswith(("_b","_d")) else a["y"])
+                    polygon=[[x-1,y-1],[x+1,y-1],[x+1,y+1],[x-1,y+1]]
+                    region={**identity,"tick":5,"source_id":sid,"layout_id":layout,"coordinate_space":"native_projection_v1","polygon":polygon}
+                    count=assert_envelope(client.post(BASE+"/region",json=region))["data"]
+                    self.assertEqual(count["counts"],{"vehicle":1,"pedestrian":0})
+                    self.assertFalse(count["persisted"])
+                    assert_envelope(client.post(BASE+"/region",json={**region,"coordinate_space":"legacy_pixels"}),expected_status=409)
+                    assert_envelope(client.post(BASE+"/region",json={**region,"layout_id":"0"*64}),expected_status=409)
+                    assert_envelope(client.post(BASE+"/region",json={**region,"polygon":[polygon[0],polygon[2],polygon[1],polygon[3]]}),expected_status=422)
                 assert_envelope(client.post(BASE+"/step",json=step),expected_status=409)
                 params={**identity,"tick":5}
                 frozen=assert_envelope(client.post(BASE+"/pause",json={**params,"paused":True}))["data"]
@@ -126,6 +134,8 @@ class Tests(unittest.TestCase):
                 with ZipFile(io.BytesIO(archive)) as z:
                     m=json.loads(z.read("manifest.json"))
                     self.assertFalse(m["production_experiment_parity"])
+                    self.assertEqual(len(m["demand_digest"]),64)
+                    self.assertIn("deltas.json",z.namelist())
                     self.assertEqual(m["profile"],policy.get_config()["active_profile"])
                     for mode in ("fixed","adaptive"):
                         result=json.loads(z.read(mode+".json"))
@@ -134,6 +144,11 @@ class Tests(unittest.TestCase):
                         self.assertEqual(result["policy_config"]["mode"],mode)
                 self.assertEqual(policy.config_path.read_bytes(),before)
                 self.assertTrue(all(s.closed for s in sessions))
+                new=assert_envelope(client.post(BASE+"/start",json=current))["data"]
+                with patch.object(sessions[-1],"set_phase",side_effect=lambda _:setattr(sessions[-1],"last_permission","GG")):
+                    assert_envelope(client.post(BASE+"/step",json={"epoch":new["epoch"],"generation":new["generation"],"tick":0,"steps":1}),expected_status=503)
+                self.assertTrue(sessions[-1].closed)
+                self.assertIsNone(assert_envelope(client.get(BASE))["data"]["snapshot"])
 
 
 if __name__=="__main__":

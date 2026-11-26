@@ -89,7 +89,7 @@ export class NativeRoadRenderer {
     this.tick=s.tick;
   }
   isAnimating(now=performance.now()){return !this.closed&&[...this.tracks.values()].some(t=>t.duration>0&&now<t.start+t.duration);}
-  render(top:boolean,now=performance.now()){
+  render(top:boolean,now=performance.now(),detail=false){
     if(this.closed)return;
     const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);
     if(w!==this.w||h!==this.h){this.renderer.setSize(w,h,false);this.w=w;this.h=h;}
@@ -101,7 +101,9 @@ export class NativeRoadRenderer {
       }
     }
     this.camera.aspect=w/h;
-    this.camera.position.set(0,top?1800:1450,top?0:1050);
+    // Fit native junction more tightly, with a separate close view of crossing agents.
+    const distance=(detail ? .16 : .55)*Math.max(1,1.3/this.camera.aspect);
+    this.camera.position.set(0,(top?1800:1450)*distance,(top?0:1050)*distance);
     if(top)this.camera.up.set(0,0,-1);else this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);this.camera.updateProjectionMatrix();
     this.renderer.render(this.scene,this.camera);

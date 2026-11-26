@@ -14,6 +14,7 @@ let nativeTick = 1;
 let nativeStatus = "running";
 let nativeCalls = 0;
 let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
+const layoutId="b".repeat(64);
 const originalFetch = window.fetch;
 window.fetch = async (input,init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
@@ -23,13 +24,17 @@ window.fetch = async (input,init) => {
     if(init?.method==="POST"){
       const body=JSON.parse(String(init.body));
       if(body.generation!==evalGeneration||body.epoch!=="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")throw Error("Wrong evaluation identity");
+      if(command==="region"){
+        if(body.layout_id!==layoutId||body.coordinate_space!=="native_projection_v1"||body.tick!==evalTick||body.polygon.length!==4)throw Error("Wrong region identity");
+        return new Response(JSON.stringify({ok:true,data:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false}}),{headers:{"Content-Type":"application/json"}});
+      }
       if(command==="start"){evalGeneration++;evalTick=0;evalRunning=true;evalPaused=false;}
       if(command==="step"){if(evalPaused||body.tick!==evalTick)throw Error("Wrong step");evalTick+=body.steps;}
       if(command==="pause"){evalPaused=body.paused;}
       if(command==="stop"){evalGeneration++;evalRunning=false;}
     }
     return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,physical_output_allowed:false,
-      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
+      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
   }
   if (url.pathname === "/api/camera/simulation/native-projection") {
     nativeCalls++;
@@ -140,6 +145,19 @@ async function run(){
     await wait(()=>Boolean(button("Pause native")&&!button("Pause native")!.disabled),"Standalone pause unavailable");
     button("Pause native")!.click();
     await wait(()=>Boolean(button("Resume native")&&button("Advance 5 s")!.disabled),"Standalone pause failed");
+    await wait(()=>Boolean(button("Draft region")&&!button("Draft region")!.disabled),"Native draft unavailable");
+    button("Draft region")!.click();
+    await wait(()=>Boolean(host.querySelector("[data-native-region-editor]")),"Native draft did not open");
+    const editor=host.querySelector("[data-native-region-editor]") as SVGSVGElement;
+    for(const [i,p] of [[100,100],[300,100],[300,300],[100,300]].entries()){
+      const screen=new DOMPoint(p[0],p[1]).matrixTransform(editor.getScreenCTM()!);
+      editor.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,clientX:screen.x,clientY:screen.y,pointerId:1}));
+      await wait(()=>editor.querySelectorAll("circle").length===i+1,"Draft vertex not recorded");
+    }
+    button("Evaluate draft")!.click();
+    await wait(()=>Boolean(host.textContent?.includes("Vehicles 0 · Pedestrians 1")),"Native draft result missing");
+    button("Close draft")!.click();
+    await wait(()=>!host.querySelector("[data-native-region-editor]"),"Native draft retirement failed");
     await wait(()=>Boolean(button("Stop native evaluation")&&!button("Stop native evaluation")!.disabled),"Standalone stop unavailable");
     button("Stop native evaluation")!.click();
     await wait(()=>!agent()&&Boolean(button("Start native evaluation")),"Standalone stop failed");

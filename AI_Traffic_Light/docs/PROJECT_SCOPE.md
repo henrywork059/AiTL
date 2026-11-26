@@ -197,3 +197,7 @@ Opt-in, manually stepped finite synthetic fixture only. Fixed/adaptive uses isol
 ### Update 28 integration/acceptance evidence boundary
 
 Verified native fixed/adaptive trial, seed 42 normal density: 15/15 journeys per run and 23.3% lower queued pedestrian agent-seconds (145.8 to 111.8) with equal vehicle queue integral 60.2; deterministic repetitions do not constitute independent seeds. Native coordinate layout is not the legacy editor plane. Matched HTTP workload measures application read costs, not physical or GPU equivalence. New browser screenshot from an actual retained native capture and copied-policy comparison remain pending CI. No field efficacy, general traffic safety, default migration or owner acceptance claim.
+
+### Reconciliation boundaries
+
+Native Lab region drafts are non-persistent, center-based synthetic observations and not detector boxes. Native overview/detail camera framing is illustrative display only. Actual native read workload used more resources than legacy; no approved replacement resource budget. Full production coordinate equivalence, saved-region/AI admission, legacy per-visit metric parity and Windows owner acceptance remain open. No default switch or publication.

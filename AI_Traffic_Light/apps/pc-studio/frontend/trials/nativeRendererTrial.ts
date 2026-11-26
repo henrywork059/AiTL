@@ -26,6 +26,9 @@ async function run(){
     }
     const renderer=new NativeRoadRenderer(host,"simulation_camera",()=>{result.textContent="MESH_NATIVE_RENDERER_FAIL: context loss";});
     renderer.update(scene);renderer.render(false);
+    renderer.render(false,performance.now(),true);
+    if(renderer.renderer.info.render.triangles<=0)throw Error("Native detail draw missing");
+    renderer.render(false);
     if(renderer.renderer.info.render.triangles<=0||renderer.renderer.info.render.calls<=0)throw Error("No WebGL draw");
     source.textContent=(actual?"Executed SUMO capture":"Illustrative native scene fixture")+
       ` · seed ${scene.seed} · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents`;

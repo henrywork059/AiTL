@@ -111,7 +111,20 @@ def arm(native,out):
                     with ZipFile(io.BytesIO(data.content)) as z:
                         for sid in SIMULATION_CAMERA_SOURCE_IDS:
                             assert z.read(sid+".png")==client.get(BASE+"/frame",params={**params,"source_id":sid}).content
+                    region_evidence=[]
+                    for sid in SIMULATION_CAMERA_SOURCE_IDS:
+                        view=assert_envelope(client.get(BASE+"/view",params={**params,"source_id":sid}))["data"]
+                        payload={**params,"source_id":sid,"coordinate_space":view["coordinate_space"],
+                                 "layout_id":view["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
+                        region=assert_envelope(client.post(BASE+"/region",json=payload))["data"]
+                        assert sorted(region["agent_ids"])==sorted(a["id"] for a in view["agents"])
+                        assert not region["persisted"]
+                        assert_envelope(client.post(BASE+"/region",json={**payload,"coordinate_space":"legacy_pixels"}),expected_status=409)
+                        assert_envelope(client.post(BASE+"/region",json={**payload,"layout_id":"0"*64}),expected_status=409)
+                        region_evidence.append(region)
+                    (out/"region-evidence.json").write_text(json.dumps(region_evidence,indent=2),encoding="utf-8")
                     assert_envelope(client.post(BASE+"/stop",json=identity))
+                    assert_envelope(client.post(BASE+"/region",json=payload),expected_status=409)
                     assert_envelope(client.get(BASE+"/frame",params={**params,"source_id":"simulation_camera"}),expected_status=409)
                     # Roll back to the exact initial legacy geometry and seed.
                     now[0]=0.
@@ -125,12 +138,14 @@ def arm(native,out):
                     from fastapi import FastAPI
                     app=build_test_app()
                     app.include_router(experiment_routes.router,prefix="/api/traffic")
-                    with patch.object(experiment_routes,"native_evaluation_service",evaluation),TestClient(app) as exp:
+                    with patch.object(experiment_routes,"_native_evaluation_service",return_value=evaluation),TestClient(app) as exp:
                         comparison=exp.post("/api/traffic/native-experiments",json={"epoch":init["epoch"],"generation":init["generation"],"seed":SEED,"duration_seconds":500,"density":"normal"})
                         assert comparison.status_code==200,comparison.text[:200]
                         (out/"comparison.zip").write_bytes(comparison.content)
                         with ZipFile(io.BytesIO(comparison.content)) as z:
                             manifest=json.loads(z.read("manifest.json"))
+                            assert len(manifest["demand_digest"])==64
+                            assert "deltas.json" in z.namelist()
                             assert not manifest["production_experiment_parity"]
                             for mode in ("fixed","adaptive"):
                                 result=json.loads(z.read(mode+".json"))

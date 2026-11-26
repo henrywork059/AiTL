@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel, Field
 from typing import Literal
-from app.services.native_evaluation import native_evaluation_service
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
@@ -144,9 +143,15 @@ class NativeComparisonRequest(BaseModel):
     profile: str | None=Field(default=None,max_length=100)
 
 
+def _native_evaluation_service():
+    # Optional evaluation dependencies must not load with legacy experiment routes.
+    from app.services.native_evaluation import native_evaluation_service
+    return native_evaluation_service
+
+
 @router.post("/native-experiments")
 def run_native_comparison(payload: NativeComparisonRequest,request: Request) -> Response:
-    archive=native_evaluation_service.compare(**payload.model_dump())
+    archive=_native_evaluation_service().compare(**payload.model_dump())
     return Response(content=archive,media_type="application/zip",headers={
         "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
         "Content-Disposition":'attachment; filename="mesh-native-comparison.zip"'})

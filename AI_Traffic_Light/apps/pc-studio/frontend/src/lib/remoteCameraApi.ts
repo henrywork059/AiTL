@@ -299,6 +299,7 @@ export type NativeProjectionScene = {
   legacy_editor_compatible?: false;
   paused?: boolean;
   received_at_ms?: number;
+  signal?: {phase:string;vehicle_go:boolean;pedestrian_walk:boolean;applied_permission:string;applied_vehicle_go?:boolean;applied_pedestrian_walk?:boolean}|null;
   width: 1280;
   height: 720;
   lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number}>;
@@ -339,12 +340,19 @@ export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:st
 export function nativeEvaluationExportUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
 }
-export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal):Promise<Blob>{
+export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string):Promise<Blob>{
   const response=await fetch(`${API_BASE}/api/traffic/native-experiments`,{
     method:"POST",headers:{"Content-Type":"application/json"},signal,
-    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed:42,duration_seconds:500}),
+    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null}),
   });
   if(!response.ok||!response.headers.get("content-type")?.includes("application/zip"))
     throw new Error("Native comparison rejected or unavailable");
   return response.blob();
+}
+
+export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false};
+export function evaluateNativeRegion(state:NativeEvaluationState,sourceId:string,polygon:[number,number][],signal:AbortSignal):Promise<NativeRegionResult>{
+  const snapshot=state.snapshot;
+  if(snapshot?.coordinate_space!=="native_projection_v1"||!snapshot.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
+  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,coordinate_space:snapshot.coordinate_space,layout_id:snapshot.layout_id,polygon}),signal});
 }

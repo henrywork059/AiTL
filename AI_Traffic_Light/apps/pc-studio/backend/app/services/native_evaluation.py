@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import asdict
 from io import BytesIO
 import json
 import hashlib
@@ -26,6 +27,8 @@ from app.services.sumo_projection import NativeProjection, Projection, PROVENANC
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import DENSITY_COUNTS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
+from app.services.native_evaluation_geometry import region_counts
+from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
 
 MAX_TICKS = 2500
 MAX_BATCH = 25
@@ -46,6 +49,7 @@ class NativeEvaluationService:
         self._signal = self._received_at_ms = self._density = self._mode = None
         self._paused = False
         self._policy = None
+        self._demand_digest = None
 
     @staticmethod
     def _conflict(message):
@@ -71,6 +75,7 @@ class NativeEvaluationService:
         self._signal = self._received_at_ms = self._density = self._mode = None
         self._paused = False
         self._policy = None
+        self._demand_digest = None
         self._state = state
         try:
             if adapter is not None:
@@ -111,7 +116,9 @@ class NativeEvaluationService:
                 self._adapter.reset(seed=seed)
                 network = self._session.network_path
                 self._projection = NativeProjection(Projection.load(network), self.generation)
-                self._routes = RouteGateAdapter(self._trip_loader(network, network.parent/"routes.xml"))
+                trips = self._trip_loader(network, network.parent/"routes.xml")
+                self._routes = RouteGateAdapter(trips)
+                self._demand_digest = hashlib.sha256(json.dumps([asdict(t) for t in trips],sort_keys=True,separators=(",",":")).encode()).hexdigest()
                 self._phase_map = self._phase_loader(network)
                 self._metrics = GateMetrics()
                 self._publisher.begin(self.generation)
@@ -145,6 +152,10 @@ class NativeEvaluationService:
                     self._session.set_phase(phase)
                     snap = self._adapter.step()
                     permission = self._session.last_permission
+                    vehicle_inside=any(a.kind=="vehicle" and a.road_id.startswith(":C_") for a in before.agents)
+                    expected=self._phase_map.state(phase,vehicle_inside=vehicle_inside,pedestrian_inside=bool(crossing))
+                    if permission!=expected:
+                        raise RuntimeError("Native permission differs from protected phase map")
                     grants = {i for i,c in enumerate(permission) if c=="G"}
                     if (grants.intersection(self._phase_map.vehicles) and grants.intersection(self._phase_map.pedestrians) or
                         grants and phase not in ("vehicle_green","pedestrian_green") or
@@ -157,7 +168,9 @@ class NativeEvaluationService:
                         "vehicle_trip_arrivals":len(self._session.arrived),"pedestrian_trip_arrivals":len(self._session.person_arrived)})
                     self._signal = {"phase":phase,"vehicle_go":signal["vehicle_go"],
                         "pedestrian_walk":signal["pedestrian_walk"],"seconds_remaining":signal["seconds_remaining"],
-                        "applied_permission":permission}
+                        "applied_permission":permission,
+                        "applied_vehicle_go":bool(grants.intersection(self._phase_map.vehicles)),
+                        "applied_pedestrian_walk":bool(grants.intersection(self._phase_map.pedestrians))}
                 self._received_at_ms = time.time_ns() // 1_000_000
                 return self.scene()
             except Exception as exc:
@@ -230,6 +243,7 @@ class NativeEvaluationService:
                             z.writestr(sid+".json",(writer.dataset_root/rec.metadata_path).read_bytes())
                         meta=self.scene()["snapshot"]
                         z.writestr("scene.json",json.dumps(meta,indent=2))
+                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
                     return stream.getvalue()
             except Exception as exc:
@@ -244,6 +258,7 @@ class NativeEvaluationService:
                 "timeline":deepcopy(self._timeline),"observed_routes":deepcopy(self._routes.seen_roads),
                 "layout_id":self._projection.layout_id,"coordinate_space":"native_projection_v1",
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
+                "demand_digest":self._demand_digest,"derived_metrics":summarize_timeline(self._timeline,self._metrics.summary()),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
                 "production_experiment_parity":False,"physical_output_allowed":False}
@@ -262,6 +277,20 @@ class NativeEvaluationService:
                 lane["points"]=[layout.pixel(*layout.world(*pt),source_id) for pt in lane["points"]]
             return {**scene,"view_id":source_id,"source_id":f"native_eval_g{generation}_{source_id}",
                     "frame_number":tick,"legacy_editor_compatible":False}
+
+    def evaluate_region(self, *, epoch, generation, tick, source_id, coordinate_space, layout_id, polygon):
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if coordinate_space!="native_projection_v1" or layout_id!=self._projection.layout_id:
+                raise self._conflict("Region coordinate space or layout does not match native geometry.")
+            scene=self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+            try:
+                result=region_counts(scene,polygon)
+            except (ValueError,TypeError) as exc:
+                raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
+            return {"epoch":epoch,"generation":generation,"tick":tick,"source_id":source_id,
+                    "coordinate_space":coordinate_space,"layout_id":layout_id,**result,
+                    "provenance":"synthetic_native_region_evaluation","persisted":False,"physical_output_allowed":False}
 
     def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None):
         """Run a bounded pair with one immutable copy of the saved policy.
@@ -296,12 +325,14 @@ class NativeEvaluationService:
                     child.stop(epoch=child.epoch,generation=gen)
             finally:
                 child.close()
-            if pair["fixed"]["layout_id"]!=pair["adaptive"]["layout_id"]:
-                raise AppError(ErrorCode.INVALID_REQUEST,"Native comparison geometry differs.",status_code=409)
+            try:
+                deltas=validate_pair(pair["fixed"],pair["adaptive"])
+            except ValueError as exc:
+                raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=409) from exc
             meta={"schema_version":1,"evidence":"executed_synthetic_native_comparison",
                 "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
                 "layout_id":pair["fixed"]["layout_id"],"profile":selected,"density":density,"seed":seed,
-                "duration_seconds":duration_seconds,"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
+                "duration_seconds":duration_seconds,"demand_digest":pair["fixed"]["demand_digest"],"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
                 "production_experiment_parity":False,"physical_output_allowed":False,
                 "limitations":"Same native finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained."}
             stream=BytesIO()
@@ -311,6 +342,7 @@ class NativeEvaluationService:
                 z.writestr("fixed.json",json.dumps(pair["fixed"],indent=2))
                 z.writestr("adaptive.json",json.dumps(pair["adaptive"],indent=2))
                 z.writestr("normalized_gate_comparison.csv",serialize_experiment_timeline(pair))
+                z.writestr("deltas.json",json.dumps(deltas,indent=2))
             return stream.getvalue()
 
 

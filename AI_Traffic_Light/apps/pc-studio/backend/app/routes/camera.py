@@ -446,3 +446,16 @@ def native_evaluation_view(request: Request,source_id: str,epoch: str,
                            generation: int=Query(ge=0),tick: int=Query(ge=0)) -> dict:
     data=native_evaluation_service.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
     return ok(data,request_id=request.state.request_id)
+
+
+class NativeEvaluationRegion(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    coordinate_space: str = Field(max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+
+
+@router.post("/simulation/native-evaluation/region")
+def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region(**payload.model_dump()),request_id=request.state.request_id)

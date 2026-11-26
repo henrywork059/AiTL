@@ -10,6 +10,7 @@ import {
 } from "../experimentApi";
 import type { ExperimentDelta, ExperimentModeResult, SimulationExperiment, SimulationExperimentSummary } from "../types/experiments";
 import "./simulationLab.css";
+import {NativeSimulationWorkspace} from "./NativeSimulationWorkspace";
 
 type TabId = "summary" | "waiting" | "throughput" | "signal" | "samples";
 type SampleMode = "fixed" | "adaptive";
@@ -70,6 +71,7 @@ function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
 }
 
 export function SimulationLabPage() {
+  const [nativeWorkspace,setNativeWorkspace]=useState(false);
   const [tab, setTab] = useState<TabId>("summary");
   const [sampleMode, setSampleMode] = useState<SampleMode>("adaptive");
   const [duration, setDuration] = useState(300);
@@ -177,6 +179,8 @@ export function SimulationLabPage() {
     [sampleSource, clampedSamplePage, pageSize],
   );
 
+  if(nativeWorkspace)return <div className="experiment-page native-lab-page"><button type="button" onClick={()=>setNativeWorkspace(false)}>Back to legacy experiments</button><NativeSimulationWorkspace profile={profile||undefined}/></div>;
+
   return (
     <div className="experiment-page">
       <section className="panel experiment-workspace">
@@ -185,7 +189,7 @@ export function SimulationLabPage() {
             <h2>Fixed vs Adaptive Simulation Lab</h2>
             <p className="placeholder-copy">Run the same seeded prototype junction in Fixed and Adaptive modes, then compare waiting, queues, throughput, signal use, scenario activity, and conflict diagnostics.</p>
           </div>
-          <span className="status-pill muted">isolated benchmark</span>
+          <div className="button-row"><span className="status-pill muted">isolated benchmark</span><button type="button" onClick={()=>setNativeWorkspace(true)}>Native evaluation workspace</button></div>
         </div>
 
         <div className="experiment-control-grid">
