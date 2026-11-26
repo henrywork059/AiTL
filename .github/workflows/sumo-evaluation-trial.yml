@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/sumo-evaluation-trial.yml'
       - '.github/scripts/sumo_topology_trial.py'
+      - '.github/scripts/locate_sumo_bin.py'
+      - '.github/scripts/test_locate_sumo_bin.py'
+      - 'AI_Traffic_Light/scripts/evaluate_simulation_engine.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,26 +24,31 @@ jobs:
         with:
           python-version: '3.11'
           architecture: x64
-      - name: Verify and install isolated SUMO wheel
+      - name: Test native binary discovery
+        run: python .github/scripts/test_locate_sumo_bin.py
+      - name: Verify and install isolated SUMO wheels
         run: |
           $requirements = Join-Path $env:RUNNER_TEMP 'sumo-trial-requirements.txt'
-          'eclipse-sumo==1.28.0 --hash=sha256:c8c898237d0a98f7f87ae762195a62114baca7b54394a430a06bbfc166145aa8' | Set-Content -Encoding ascii $requirements
+          @(
+            'eclipse-sumo==1.28.0 --hash=sha256:c8c898237d0a98f7f87ae762195a62114baca7b54394a430a06bbfc166145aa8',
+            'sumo-data==1.28.0 --hash=sha256:48120c1b0174fe7af69a5711d936fc4d3b6d41f28e48326602d7d6d6b6efcc42'
+          ) | Set-Content -Encoding ascii $requirements
           python -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r $requirements
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pip show eclipse-sumo
+          python -m pip show eclipse-sumo sumo-data
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $bin = python -c "from importlib.metadata import distribution; from pathlib import Path; d=distribution('eclipse-sumo'); p=[Path(d.locate_file(f)).resolve().parent for f in d.files if f.name.lower()=='sumo.exe']; assert len(p)==1 and (p[0]/'netconvert.exe').is_file(), p; print(p[0])"
+          $bin = python .github/scripts/locate_sumo_bin.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify actual executable versions
         id: verified_engine
         run: |
-          $s = sumo --version
+          $s = & (Join-Path $env:SUMO_HOME 'bin/sumo.exe') --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $s
           if (($s -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected SUMO version' }
-          $n = netconvert --version
+          $n = & (Join-Path $env:SUMO_HOME 'bin/netconvert.exe') --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $n
           if (($n -join " ") -notmatch 'Version 1\.28\.0\b') { throw 'Unexpected netconvert version' }
