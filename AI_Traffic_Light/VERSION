@@ -1,5 +1,5 @@
-version: 0_5_67
-status: Optional SUMO shadow integration candidate (Update 22 / S02)
-previous_version: 0_5_66
+version: 0_5_68
+status: Opt-in Three.js road renderer candidate (Update 23 / S03)
+previous_version: 0_5_67
 passed_baseline: 0_5_0
-notes: 23a dependency/geometry passed; 23b corrects isolated TypeScript trial and strengthens WebGL checks; owner PASS pending.
+notes: 23d standard and renderer integration CI passed; release commit CI and owner PASS pending.

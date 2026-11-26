@@ -1,3 +1,23 @@
+# V0568 — Opt-in Three.js road renderer
+
+Candidate `0_5_68`; previous `0_5_67`; accepted baseline `0_5_0`; Update 23 / S03. Owner PASS pending.
+
+```powershell
+# From repository root
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Use synthetic preview; confirm legacy default, hide visible overlays if necessary, select Three.js preview, test orbit/Top/Zoom/Reset, A–D and resize; select Legacy view, reopen the editor, drag/save/reopen a vertex, check unchanged reference coordinates, re-enable overlays and verify fallback. Confirm physical camera and signal output unchanged. Owner alone confirms PASS.
+
+Application revision `6380561a6038d0dc3ee85a4bd7cf2bd1a0dc705f`: [standard CI 45740124107](https://github.com/henrywork059/AiTL/actions/runs/45740124107) and [renderer CI 45740124021](https://github.com/henrywork059/AiTL/actions/runs/45740124021) passed. Geometry fixtures cover four mirrored views; isolated WebGL draw/pixel/top-view/context-loss/disposal and React integration tests passed (actual component with mocked read-only synthetic scene: default legacy, opt-in, source A→B, top view, editor/region-overlay fallback, loss/retry, rollback and cleanup). Both audits reported zero known npm vulnerabilities at execution time. Exact generated manifest and lock blobs b72a6215cf357fb94a83f23a8f4af82c6366a75d and faabff6777280a9ab2f52ff47d2e5f9a3bf5d34b; eight new lock entries, existing non-root entries unchanged. Earlier 23c screenshot inspected; [23d artifact 15080298917](https://github.com/henrywork059/AiTL/actions/runs/45740124021/artifacts/15080298917) retains screenshot/manifests; no fresh manual inspection claimed. Evidence: executed synthetic browser tests, not field data.
+
+See [Patch 0_5_68](PATCH_0_5_68.md). Exact release CI and owner PASS pending.
+
+---
+
 # V0567 — Optional SUMO shadow integration
 
 Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.

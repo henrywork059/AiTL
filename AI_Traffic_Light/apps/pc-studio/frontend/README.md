@@ -18,3 +18,7 @@ The current quality-preserving ESP path keeps the configured JPEG quality and re
 
 Camera Diagnostics is a separate Operate page. With a saved camera selected, **Diagnose camera** runs one staged test and reports the most likely failing layer. The page covers ESP control reachability, firmware/camera readiness, Wi-Fi telemetry, direct ATL1/JPEG transport, stream behavior while status polling is active, and the normal PC Studio managed receiver path. Previous camera/simulation state is restored after the run where possible.
 V038 R2 Camera Test presents one-click functionality checks, a 0–100 stability score, detailed transport metrics, and explicit bottleneck attribution.
+
+## Optional synthetic road renderer
+
+Three.js 0.187.0 (MIT, exact pin) renders canonical 1280×720 synthetic road geometry, crossing, markings, pavements/kerbs, virtual signals and coarse agent proxies. SimulationCamera3D retains polling, camera controls and source matching; ThreeRoadView owns WebGL lifecycle and RoadRenderer is shared with the trial. Default CSS rendering is retained; select Three.js preview explicitly for compatible snapshots without visible region/detection overlays. Editor/overlay modes, incompatible or absent snapshots and WebGL failures fall back to legacy. Retry or select Legacy view. No API, coordinate, simulator/controller authority or physical output changes.

@@ -1,3 +1,18 @@
+# V0568 — Opt-in Three.js road renderer
+
+Candidate `0_5_68`; previous `0_5_67`; accepted baseline `0_5_0`; Update 23 / S03. Owner PASS pending.
+
+- [x] Exact dependencies, geometry, audit, typecheck/build passed.
+- [x] Actual WebGL draw/pixels/top/context-loss/disposal and React integration fallback/retry/rollback passed.
+- [x] Standard CI passed on application revision 6380561a6038d0dc3ee85a4bd7cf2bd1a0dc705f.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save round trip, four-view manual check.
+- [ ] GPU benchmarks, detailed agents and interpolation; physical gates unchanged.
+
+See [Patch 0_5_68](PATCH_0_5_68.md).
+
+---
+
 # V0567 — Optional SUMO shadow integration
 
 Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.

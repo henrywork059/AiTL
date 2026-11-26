@@ -15,6 +15,7 @@ The authoritative release state is always in [`VERSION`](VERSION). Current-candi
 - occupancy, tracking and traffic-flow analytics
 - configurable protected signal timing and adaptive scenario logic
 - deterministic simulation experiments
+- opt-in Three.js synthetic road preview with legacy editor/overlay fallback
 - Junction Network configuration and visualization
 - decision/explainability evidence for simulation/network experiments
 
