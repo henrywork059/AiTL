@@ -2,4 +2,4 @@ version: 0_5_67
 status: Optional SUMO shadow integration candidate (Update 22 / S02)
 previous_version: 0_5_66
 passed_baseline: 0_5_0
-notes: 0_5_67 release CI passed; 23a isolated Three.js geometry/dependency and browser trial pending; owner PASS pending.
+notes: 23a dependency/geometry passed; 23b corrects isolated TypeScript trial and strengthens WebGL checks; owner PASS pending.
