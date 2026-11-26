@@ -49,24 +49,28 @@ class PhaseMap:
         crossings = frozenset(e.attrib['id'] for e in network.findall('edge') if e.get('function') == 'crossing')
         if external != {'WC', 'CW', 'EC', 'CE', 'NC', 'CN', 'SC', 'CS'} or len(crossings) != 4:
             raise ValueError('Unexpected shadow topology')
+        return cls.for_junction(network, 'C', {('WC', 'CE'), ('EC', 'CW')}, crossings)
+
+    @classmethod
+    def for_junction(cls, network, junction: str, straight_routes, crossings) -> PhaseMap:
         connections = {}
         vehicles, pedestrians = [], []
         for c in network.findall('connection'):
-            if c.get('tl') != 'C':
+            if c.get('tl') != junction:
                 continue
             idx = int(c.attrib['linkIndex'])
             if idx in connections:
                 raise ValueError('Duplicate shadow link')
             a, b = c.attrib['from'], c.attrib['to']
             connections[idx] = (a + '_' + c.attrib['fromLane'], b + '_' + c.attrib['toLane'], c.get('via', ''))
-            if (a, b) in {('WC', 'CE'), ('EC', 'CW')} and c.get('dir') == 's':
+            if (a, b) in straight_routes and c.get('dir') == 's':
                 vehicles.append(idx)
             if b in crossings:
                 pedestrians.append(idx)
-        if set(connections) != set(range(20)) or len(vehicles) != 2 or len(pedestrians) != 4:
+        if set(connections) != set(range(20)) or len(vehicles) != len(straight_routes) or len(pedestrians) != 4:
             raise ValueError('Unexpected controlled links')
         foes = {int(r.attrib['index']): r.attrib['foes'][::-1]
-                for r in network.findall("junction[@id='C']/request")}
+                for r in network.findall(f"junction[@id='{junction}']/request")}
         if set(foes) != set(connections) or any(len(bits) != 20 or set(bits) - {'0', '1'} for bits in foes.values()):
             raise ValueError('Missing conflict matrix')
         for group in (vehicles, pedestrians):

@@ -10,6 +10,7 @@ from app.services.sumo_shadow_adapter import ShadowAgent, STEP_S
 from app.services.sumo_shadow_fixture import PhaseMap, PHASES, native_netconvert
 
 from app.services.sumo_lane_scenarios import choose_permission, observe_lanes
+from app.services.sumo_corridor import JUNCTIONS, load_corridor, observe_permissions, validate_phases
 
 PIN = "1.28.0"
 
@@ -26,7 +27,11 @@ def _lane_worker(pipe, root: str, seed: int) -> None:
     _run_worker(pipe, root, seed, controlled=True, lane_scenario=True)
 
 
-def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: bool = False) -> None:
+def _corridor_worker(pipe, root: str, seed: int) -> None:
+    _run_worker(pipe, root, seed, controlled=True, corridor=True)
+
+
+def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: bool = False, corridor: bool = False) -> None:
     engine = None
     started = False
     try:
@@ -43,15 +48,19 @@ def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: 
         started = True
         if engine.getVersion()[1].split()[-1] != PIN:
             raise RuntimeError("Unexpected native engine version")
-        phase_map = PhaseMap.load(Path(root) / "network.xml") if controlled else None
-        if phase_map is not None:
-            links = engine.trafficlight.getControlledLinks("C")
-            if len(links) != len(phase_map.links) or any(
+        maps = (load_corridor(Path(root) / "network.xml") if corridor else
+                {"C": PhaseMap.load(Path(root) / "network.xml")} if controlled else {})
+        if maps and set(engine.trafficlight.getIDList()) != set(maps):
+            raise RuntimeError("Unexpected native traffic lights")
+        for junction, mapping in maps.items():
+            links = engine.trafficlight.getControlledLinks(junction)
+            if len(links) != len(mapping.links) or any(
                 len(group) != 1 or tuple(group[0][:2]) != expected[:2]
-                for group, expected in zip(links, phase_map.links)
+                for group, expected in zip(links, mapping.links)
             ):
                 raise RuntimeError("Native controlled links differ from fixture")
-            engine.trafficlight.setRedYellowGreenState("C", "r" * len(links))
+            engine.trafficlight.setRedYellowGreenState(junction, "r" * len(links))
+        phase_map = maps.get("C")
         pipe.send(("ok", None))
         tick = 0
         while True:
@@ -59,7 +68,15 @@ def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: 
             if command == "close":
                 break
             state = None
-            if phase_map is not None:
+            if corridor:
+                if not isinstance(command, tuple) or len(command) != 2 or command[0] != "step":
+                    raise ValueError("Invalid corridor command")
+                state = observe_permissions(engine, maps, command[1])
+                for junction, permission in state.items():
+                    engine.trafficlight.setRedYellowGreenState(junction, permission)
+                    if engine.trafficlight.getRedYellowGreenState(junction) != permission:
+                        raise RuntimeError("Corridor permission readback mismatch")
+            elif phase_map is not None:
                 if not isinstance(command, tuple) or len(command) != 2 or command[0] != "step" or command[1] not in PHASES:
                     raise ValueError("Invalid shadow phase command")
                 occupied = dict(
@@ -73,7 +90,10 @@ def _run_worker(pipe, root: str, seed: int, *, controlled: bool, lane_scenario: 
             elif command != "step":
                 raise ValueError("Unknown shadow command")
             engine.simulationStep()
-            if state is not None and engine.trafficlight.getRedYellowGreenState("C") != state:
+            if corridor:
+                if any(engine.trafficlight.getRedYellowGreenState(j) != state[j] for j in JUNCTIONS):
+                    raise RuntimeError("Corridor permission changed during step")
+            elif state is not None and engine.trafficlight.getRedYellowGreenState("C") != state:
                 raise RuntimeError("Shadow permission changed during step")
             tick += 1
             if abs(engine.simulation.getTime() - tick * STEP_S) > 1e-6:
@@ -108,24 +128,25 @@ class LibsumoSession:
     No engine import in the parent, public API, shell, or physical-control path.
     A failed or timed-out request closes/reaps the child before returning.
     """
-    def __init__(self, root: Path, seed: int, *, controlled: bool = False, lane_scenario: bool = False, _target=None, _timeout: float = 15.0):
+    def __init__(self, root: Path, seed: int, *, controlled: bool = False, lane_scenario: bool = False, corridor: bool = False, _target=None, _timeout: float = 15.0):
         root = root.resolve(strict=True)
         if not all((root / name).is_file() for name in ("network.xml", "routes.xml")):
             raise ValueError("Missing generated shadow fixture")
         if type(seed) is not int or not 0 <= seed <= 2**31 - 1:
             raise ValueError("Invalid seed")
-        if lane_scenario and not controlled:
+        if (lane_scenario or corridor) and not controlled or lane_scenario and corridor:
             raise ValueError("Lane scenario requires protected phase mapping")
         self._timeout = _timeout
         self._controlled = controlled
-        self._phase = "all_red"
-        self.last_permission: str | None = None
+        self._corridor = corridor
+        self._phase = {j: "all_red" for j in JUNCTIONS} if corridor else "all_red"
+        self.last_permission: str | dict[str, str] | None = None
         self._agents = ()
         self.arrived: set[str] = set()
         self.person_arrived: set[str] = set()
         ctx = mp.get_context("spawn")
         self._pipe, child = ctx.Pipe()
-        self.proc = ctx.Process(target=_target or (_lane_worker if lane_scenario else _controlled_worker if controlled else _worker), args=(child, str(root), seed), daemon=True)
+        self.proc = ctx.Process(target=_target or (_corridor_worker if corridor else _lane_worker if lane_scenario else _controlled_worker if controlled else _worker), args=(child, str(root), seed), daemon=True)
         try:
             self.proc.start()
             child.close()
@@ -145,9 +166,14 @@ class LibsumoSession:
         return payload
 
     def set_phase(self, phase: str) -> None:
-        if not self._controlled or phase not in PHASES:
+        if self._corridor or not self._controlled or phase not in PHASES:
             raise ValueError("Invalid virtual shadow phase")
         self._phase = phase
+
+    def set_junction_phases(self, phases: dict[str, str]) -> None:
+        if not self._corridor:
+            raise ValueError("Not a corridor session")
+        self._phase = validate_phases(phases)
 
     def advance(self) -> None:
         try:

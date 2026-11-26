@@ -28,7 +28,8 @@ class LaneVehicle:
 
 
 def choose_permission(mapping: PhaseMap, phase: str, vehicles: tuple[LaneVehicle, ...],
-                      *, vehicle_inside: bool, pedestrian_inside: bool) -> str:
+                      *, vehicle_inside: bool, pedestrian_inside: bool,
+                      routes=tuple(ROUTES.values())) -> str:
     """Grant at most one vehicle link, only to a lane leader with room beyond C."""
     red = "r" * len(mapping.links)
     if phase != "vehicle_green":
@@ -45,7 +46,7 @@ def choose_permission(mapping: PhaseMap, phase: str, vehicles: tuple[LaneVehicle
         for index, (source, target, _) in enumerate(mapping.links):
             if source != v.lane or target.rsplit("_", 1)[0] != v.destination:
                 continue
-            if (source.rsplit("_", 1)[0], v.destination) not in ROUTES.values():
+            if (source.rsplit("_", 1)[0], v.destination) not in routes:
                 continue
             # SUMO lane position is the front bumper. The minimum rear position
             # on the exit must leave space for the incoming vehicle plus its gap.
@@ -56,14 +57,14 @@ def choose_permission(mapping: PhaseMap, phase: str, vehicles: tuple[LaneVehicle
     return red
 
 
-def observe_lanes(engine) -> tuple[LaneVehicle, ...]:
+def observe_lanes(engine, approaches=APPROACHES) -> tuple[LaneVehicle, ...]:
     rows = []
     for ident in engine.vehicle.getIDList():
         road = engine.vehicle.getRoadID(ident)
         route = engine.vehicle.getRoute(ident)
         index = engine.vehicle.getRouteIndex(ident)
         target = None
-        if road in APPROACHES and 0 <= index < len(route) - 1 and route[index] == road:
+        if road in approaches and 0 <= index < len(route) - 1 and route[index] == road:
             target = route[index + 1]
         rows.append(LaneVehicle(ident, engine.vehicle.getLaneID(ident),
                     engine.vehicle.getLanePosition(ident), engine.vehicle.getLength(ident),

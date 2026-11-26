@@ -15,6 +15,10 @@ on:
       - 'AI_Traffic_Light/scripts/evaluate_simulation_engine.py'
       - '.github/scripts/sumo_controlled_shadow_trial.py'
       - '.github/scripts/sumo_lane_trial.py'
+      - '.github/scripts/sumo_corridor_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor_session.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_corridor.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_lane_scenarios.py'
       - 'AI_Traffic_Light/scripts/test_sumo_lane_scenarios.py'
       - '.github/scripts/check_sumo_shadow_dependencies.py'
@@ -82,6 +86,10 @@ jobs:
         run: python AI_Traffic_Light/scripts/test_sumo_lane_scenarios.py
       - name: Execute pinned native lane and turning trial
         run: python .github/scripts/sumo_lane_trial.py "$env:RUNNER_TEMP/mesh-sumo-lanes.json"
+      - name: Test independent corridor permissions and capacity
+        run: python AI_Traffic_Light/scripts/test_sumo_corridor.py
+      - name: Execute pinned native two-junction corridor trial
+        run: python .github/scripts/sumo_corridor_trial.py "$env:RUNNER_TEMP/mesh-sumo-corridor.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -94,3 +102,4 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-shadow.json
             ${{ runner.temp }}/mesh-sumo-controlled-shadow.json
             ${{ runner.temp }}/mesh-sumo-lanes.json
+            ${{ runner.temp }}/mesh-sumo-corridor.json
