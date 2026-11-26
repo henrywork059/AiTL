@@ -454,3 +454,7 @@ No HTTP or saved schema change. Scene time advances in completed 50 ms fixed ste
 ### Frontend dependency security remediation (0_5_66 candidate)
 
 No HTTP, error envelope, saved schema, simulator, camera, or signal-control contract changes. Frontend build dependencies and CI audit gate only.
+
+### Optional SUMO shadow diagnostics (22f validation)
+
+`GET /api/camera/simulation/shadow` uses the existing success envelope and never advances simulation. Default: `status: disabled`, `provenance: synthetic_sumo_shadow`, `snapshot: null`. When explicitly enabled for controlled local evaluation, `status` is idle/starting/running/unavailable; `reason`, `generation`, `legacy_steps`, `requested_phase`, `applied_permission` and `snapshot` are diagnostic-only. Snapshot contains seed, tick, time_s and agents with kind, engine_id, namespaced id, x_m, y_m, speed_m_s and road_id in synthetic SUMO network coordinates (not camera pixels). Snapshot may lag committed legacy ticks; reset/stop/failure invalidates publication. No POST, new saved config, physical output, detection or signal-control authority. Optional native validation and dependency gate pending; keep disabled until verified.

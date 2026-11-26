@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import os
 import random
 import re
 from threading import Lock
@@ -15,6 +16,7 @@ from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
 from app.services.observation_identity import ObservationIdentity, observation_provenance
 from app.services.simulation_adapter import LegacySimulationAdapter
+from app.services.sumo_shadow_runtime import ShadowRuntime
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
@@ -206,8 +208,10 @@ class CameraFrameService:
     """Store the latest uploaded frame and provide a signal-aware hardware-free simulator."""
 
     def __init__(self, *, simulation_seed: int | None = None,
-                 simulation_monotonic: Callable[[], float] | None = None) -> None:
+                 simulation_monotonic: Callable[[], float] | None = None,
+                 shadow: ShadowRuntime | None = None) -> None:
         self._lock = Lock()
+        self._shadow = shadow
         self._simulation_monotonic = simulation_monotonic or time.monotonic
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
@@ -339,6 +343,8 @@ class CameraFrameService:
         density_offset = {"light": 101, "normal": 211, "busy": 307}[self._simulation_density]
         self._simulation_rng = random.Random(self._simulation_seed + density_offset)
         self._initialize_agents_locked()
+        if self._shadow is not None:
+            self._shadow.reset(self._simulation_seed)
 
     def set_simulation(self, enabled: bool) -> dict:
         with self._lock:
@@ -348,6 +354,8 @@ class CameraFrameService:
             if enabled:
                 self._reset_simulation_locked()
             else:
+                if self._shadow is not None:
+                    self._shadow.stop()
                 self._simulation_frame = None
                 self._simulation_canvas = None
                 self._simulation_view_frames.clear()
@@ -493,6 +501,15 @@ class CameraFrameService:
         with self._lock:
             return dict(self._simulation_signal_state_locked())
 
+    def shadow_diagnostics(self) -> dict:
+        if self._shadow is None:
+            return {"status": "disabled", "provenance": "synthetic_sumo_shadow", "snapshot": None}
+        return self._shadow.status()
+
+    def close_shadow(self) -> None:
+        if self._shadow is not None:
+            self._shadow.close()
+
     def reset_simulation_signal_policy(self) -> dict:
         """Reset transient adaptive policy state at the current simulation clock."""
         with self._lock:
@@ -614,6 +631,8 @@ class CameraFrameService:
         phase = self._simulation_signal_state_locked()["phase"]
         self._advance_vehicles_locked(step, phase)
         self._advance_pedestrians_locked(step, phase)
+        if self._shadow is not None:
+            self._shadow.observe(phase)
 
     def _advance_vehicles_locked(self, dt: float, phase: str) -> None:
         vehicle_go = phase == "vehicle_green"
@@ -747,4 +766,6 @@ class CameraFrameService:
 
 
 
-camera_frame_service = CameraFrameService()
+camera_frame_service = CameraFrameService(
+    shadow=ShadowRuntime() if os.getenv("MESH_SUMO_SHADOW") == "1" else None
+)

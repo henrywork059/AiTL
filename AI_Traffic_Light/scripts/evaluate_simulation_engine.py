@@ -1,4 +1,4 @@
-"""Optional, isolated SUMO evaluation; no production imports or installation."""
+"""Optional, isolated SUMO evaluation; shared pure fixture builder, no installation."""
 from __future__ import annotations
 
 import argparse
@@ -8,35 +8,17 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'apps/pc-studio/backend'))
+from app.services.sumo_shadow_fixture import write_scenario
+
 SEED = 42
 STEP = 0.2
 DURATION = 180
-
-
-def write_scenario(root: Path) -> None:
-    nodes = ET.Element('nodes')
-    ET.SubElement(nodes, 'node', id='C', x='0', y='0', type='traffic_light')
-    edges = ET.Element('edges')
-    for name, x, y in [('W', -100, 0), ('E', 100, 0), ('N', 0, 100), ('S', 0, -100)]:
-        ET.SubElement(nodes, 'node', id=name, x=str(x), y=str(y))
-        for a, b in [(name, 'C'), ('C', name)]:
-            ET.SubElement(edges, 'edge', {'id': a+b, 'from': a, 'to': b,
-                          'numLanes': '1', 'speed': '10', 'sidewalkWidth': '2'})
-    routes = ET.Element('routes')
-    ET.SubElement(routes, 'vType', id='car', vClass='passenger', sigma='0.5')
-    ET.SubElement(routes, 'route', id='we', edges='WC CE')
-    ET.SubElement(routes, 'route', id='ns', edges='NC CS')
-    # Ordered departure times and identical demand for both runs.
-    for i in range(12):
-        ET.SubElement(routes, 'vehicle', id=f'v{i}', type='car', route='we' if i % 2 == 0 else 'ns', depart=str(i*5))
-        person = ET.SubElement(routes, 'person', id=f'p{i}', depart=str(i*5))
-        ET.SubElement(person, 'walk', edges='WC CN')
-    for name, element in [('nodes.xml', nodes), ('edges.xml', edges), ('routes.xml', routes)]:
-        ET.ElementTree(element).write(root / name, encoding='utf-8', xml_declaration=True)
 
 
 def trace_summary(path: Path, kind: str) -> dict:

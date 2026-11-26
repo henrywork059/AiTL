@@ -29,6 +29,7 @@ from app.routes.template import router as template_router
 from app.routes.traffic import router as traffic_router
 from app.routes.training import router as training_router
 from app.routes.zones import router as zones_router
+from app.services.camera_frames import camera_frame_service
 from app.services.multi_camera_inference import multi_camera_inference_service
 from app.services.remote_camera_manager import remote_camera_manager
 from app.services.traffic_recorder import traffic_recorder_service
@@ -47,6 +48,7 @@ async def app_lifespan(_: FastAPI):
         multi_camera_inference_service.stop()
         remote_camera_manager.stop()
         traffic_recorder_service.stop()
+        camera_frame_service.close_shadow()
 
 
 def create_app() -> FastAPI:

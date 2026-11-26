@@ -2,4 +2,4 @@ version: 0_5_66
 status: Frontend dependency security remediation candidate (21b security prerequisite)
 previous_version: 0_5_65
 passed_baseline: 0_5_0
-notes: 22d standard and native TraCI CI passed; 22e replaces proposed TCP runtime transport with isolated libsumo child process for validation; owner PASS pending.
+notes: 22e standard and native libsumo CI passed; 22f opt-in application shadow integration staged for Python 3.10 and controlled native CI; owner PASS pending.

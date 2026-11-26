@@ -13,6 +13,13 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_process.py'
       - 'AI_Traffic_Light/scripts/test_sumo_shadow_process.py'
       - 'AI_Traffic_Light/scripts/evaluate_simulation_engine.py'
+      - '.github/scripts/sumo_controlled_shadow_trial.py'
+      - '.github/scripts/check_sumo_shadow_dependencies.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_fixture.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_runtime.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/requirements-sumo-shadow-win-x64.txt'
+      - 'AI_Traffic_Light/scripts/test_sumo_shadow_runtime.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/camera_frames.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,20 +34,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
           architecture: x64
       - name: Test native binary discovery and version checks
         run: python .github/scripts/test_locate_sumo_bin.py
       - name: Verify and install isolated SUMO wheels
         run: |
-          $requirements = Join-Path $env:RUNNER_TEMP 'sumo-trial-requirements.txt'
-          @(
-            'eclipse-sumo==1.28.0 --hash=sha256:c8c898237d0a98f7f87ae762195a62114baca7b54394a430a06bbfc166145aa8',
-            'sumo-data==1.28.0 --hash=sha256:48120c1b0174fe7af69a5711d936fc4d3b6d41f28e48326602d7d6d6b6efcc42',
-            'traci==1.28.0 --hash=sha256:cbc88b5b38b60c0dba4939f9171615a97bd12dd113c5bc7730d76dfe2db73881',
-            'sumolib==1.28.0 --hash=sha256:eda134defdcc39b966756cc00828ecbabfc35e0631326971f2fe1dea8acd9239',
-            'libsumo==1.28.0 --hash=sha256:f3a2ffc1bcbf0b5c0d2a93f8d766e959893259b7e1068e33c7ece81b58a0fb5f'
-          ) | Set-Content -Encoding ascii $requirements
+          $requirements = 'AI_Traffic_Light/apps/pc-studio/backend/requirements-sumo-shadow-win-x64.txt'
           python -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r $requirements
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip show eclipse-sumo sumo-data
@@ -49,6 +49,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify exact Python package advisory metadata
+        run: python .github/scripts/check_sumo_shadow_dependencies.py
       - name: Verify actual executable versions
         id: verified_engine
         run: python .github/scripts/locate_sumo_bin.py --verify-versions
@@ -69,6 +71,10 @@ jobs:
         run: python AI_Traffic_Light/scripts/test_sumo_shadow_process.py
       - name: Execute pinned native libsumo shadow trial
         run: python .github/scripts/sumo_shadow_trial.py "$env:RUNNER_TEMP/mesh-sumo-topology" "$env:RUNNER_TEMP/mesh-sumo-shadow.json"
+      - name: Test asynchronous runtime and phase mapping
+        run: python AI_Traffic_Light/scripts/test_sumo_shadow_runtime.py
+      - name: Execute controlled native shadow trial
+        run: python .github/scripts/sumo_controlled_shadow_trial.py "$env:RUNNER_TEMP/mesh-sumo-controlled-shadow.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -79,3 +85,4 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-smoke.json
             ${{ runner.temp }}/mesh-sumo-topology/
             ${{ runner.temp }}/mesh-sumo-shadow.json
+            ${{ runner.temp }}/mesh-sumo-controlled-shadow.json

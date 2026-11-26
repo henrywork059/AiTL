@@ -125,6 +125,11 @@ def camera_status(request: Request) -> dict:
     return ok(camera_frame_service.status(), request_id=request.state.request_id)
 
 
+@router.get("/simulation/shadow")
+def simulation_shadow_diagnostics(request: Request) -> dict:
+    return ok(camera_frame_service.shadow_diagnostics(), request_id=request.state.request_id)
+
+
 @router.get("/live.mjpeg")
 def live_camera_mjpeg(request: Request, source_id: str | None = Query(default=None)) -> StreamingResponse:
     """Low-latency preview with per-camera views for the simulated pair."""
