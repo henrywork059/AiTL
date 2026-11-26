@@ -157,3 +157,11 @@ Optional read-only synthetic preview; CSS remains default and mandatory for edit
 ### Vehicle mesh preparation (Update 24)
 
 Update 24a / S03 preparation: 0_5_68 release CI 45753611276 passed. Implement stable vehicle meshes by existing backend slot ID/signature; car/SUV/van/bus body, cabin, windows, lights, wheels; shared geometry and per-vehicle material cleanup. Pure time-based interpolation between authoritative snapshots only, bounded 450 ms, no extrapolation, source/density/reset/gap guards, immediate snap for recycled slots and pause/resume, mirrored heading. RequestAnimationFrame only while interpolating, cleanup on unmount; legacy editor/overlay fallback and APIs/controller untouched. Backend currently straight road; turning regression is synthetic, not live turning support. No new dependencies or physical outputs. New CI and screenshot pending; candidate remains 0_5_68.
+
+#### 24b verification
+
+Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.
+
+Existing backend IDs are recycled slots, not unique trip IDs; large-jump and direction-based respawn detection is heuristic. Straight-road backend does not execute turning paths; turning tests are synthetic. Interpolation intentionally trails observations, may snap on pause/reset or stale gap, and does not measure controller timing or safety. Direct live mesh-object identity assertion, real Windows owner drag/save round trip, native GPU benchmarks, endurance, full-motion visual acceptance and hardware checks remain outstanding. Models are low-poly; viewport footprint and Vite large-chunk warning remain. Pedestrians remain coarse until Update 25. No public-road actuation. Exact release commit CI pending at publication. 24/39 candidates delivered (61.5%); next Update 25 / S03.
+
+See [patch evidence](PATCH_0_5_69.md).

@@ -1,3 +1,19 @@
+# V0569 — Persistent vehicle meshes and bounded motion interpolation
+
+Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.
+
+- [x] Standard CI, locked dependencies, typecheck/build and blocking audit passed on application revision.
+- [x] Deterministic motion, mirrored heading, reentry, pause/resume, reset and removal fixtures passed.
+- [x] Actual WebGL mesh variants, drawing, context-loss/disposal and React fallback tests passed; downloaded screenshot inspected.
+- [x] Stable group mapping reviewed in source; direct browser reference-identity test remains outstanding.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save, full motion and four-camera visual acceptance.
+- [ ] Native GPU benchmarks, endurance and physical gates.
+
+See [Patch 0_5_69](PATCH_0_5_69.md).
+
+---
+
 # V0568 — Opt-in Three.js road renderer
 
 Candidate `0_5_68`; previous `0_5_67`; accepted baseline `0_5_0`; Update 23 / S03. Owner PASS pending.

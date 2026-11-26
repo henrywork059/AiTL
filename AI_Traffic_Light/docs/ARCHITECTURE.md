@@ -206,3 +206,11 @@ The existing CameraFrameService remains the sole authoritative simulator/camera 
 ### Vehicle presentation motion (S03 / 24a)
 
 Update 24a / S03 preparation: 0_5_68 release CI 45753611276 passed. Implement stable vehicle meshes by existing backend slot ID/signature; car/SUV/van/bus body, cabin, windows, lights, wheels; shared geometry and per-vehicle material cleanup. Pure time-based interpolation between authoritative snapshots only, bounded 450 ms, no extrapolation, source/density/reset/gap guards, immediate snap for recycled slots and pause/resume, mirrored heading. RequestAnimationFrame only while interpolating, cleanup on unmount; legacy editor/overlay fallback and APIs/controller untouched. Backend currently straight road; turning regression is synthetic, not live turning support. No new dependencies or physical outputs. New CI and screenshot pending; candidate remains 0_5_68.
+
+#### 24b verification
+
+Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.
+
+The opt-in Three.js preview uses distinct procedural car, SUV, van and bus meshes with body/cabin proportions, windows, wheels and lights. RoadRenderer retains mesh groups by backend vehicle slot ID and shape signature; removes absent groups and disposes owned materials. VehicleMotion interpolates authoritative observed centers and shortest-angle headings for at most 450 ms, without extrapolation or simulator-clock mutation. Large jumps, backwards straight movement, changed shape, source/density change, clock rollback or a gap over one simulation second reset the affected motion; pause/resume snaps to the authoritative pose. RequestAnimationFrame runs only during active interpolation. The legacy CSS renderer remains default and preserves editing/overlay fallback, camera coordinates and all backend APIs and signal authority. No dependency or physical output changes.
+
+See [patch evidence](PATCH_0_5_69.md).

@@ -1,5 +1,5 @@
-version: 0_5_68
-status: Opt-in Three.js road renderer candidate (Update 23 / S03)
-previous_version: 0_5_67
+version: 0_5_69
+status: Persistent vehicle meshes and bounded motion interpolation candidate (Update 24 / S03)
+previous_version: 0_5_68
 passed_baseline: 0_5_0
-notes: 23d standard and renderer integration CI passed; release commit CI and owner PASS pending.
+notes: 24a standard and renderer CI passed; actual screenshot inspected; release commit CI and owner PASS pending.
