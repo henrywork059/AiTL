@@ -158,8 +158,8 @@ class ShadowRuntime:
         from app.services.sumo_frame_publisher import NativeFramePublisher
         publisher = NativeFramePublisher()
         publisher.begin(generation)
-        meta, views = projection.render(snap)
-        publisher.publish(meta, views, received_at_ms=received_at_ms)
+        meta, pixels = projection.render_pixels(snap)
+        publisher.prepare(meta, pixels, received_at_ms=received_at_ms)
         with self._cv:
             if generation != self._generation or self._snapshot is not snap or self._state != "running":
                 return None

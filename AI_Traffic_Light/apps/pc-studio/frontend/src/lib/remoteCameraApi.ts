@@ -180,7 +180,11 @@ export function liveCameraMjpegUrl(): string {
   return `${API_BASE}/api/camera/live.mjpeg`;
 }
 
+export type SimulationObservation = {epoch:string;generation:number;tick:number;source_id:string;view_id:string;frame_number:number;received_at_ms:number;coordinate_space:string;layout_id:string;width:number;height:number;provenance:string;tick_kind:string;observation_kind:"synthetic_ground_truth";detector_observation:false;authoritative:false;detector_input_eligible:boolean;physical_output_allowed:false};
+
 export type SimulationScene = {
+  observation?: SimulationObservation;
+  view_agents?: Array<{id:string;kind:"vehicle"|"pedestrian";x:number;y:number}>;
   source_id: string;
   frame_number: number;
   received_at_ms: number;

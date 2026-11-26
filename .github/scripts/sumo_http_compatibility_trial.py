@@ -102,11 +102,14 @@ def arm(native,out):
                             stage=time.perf_counter()
                             legacy.set_simulation_source(sid)
                             response=client.get("/api/camera/frame")
-                            assert abs(scene["simulation_time_seconds"]-now[0])<1e-6
+                            assert -1e-6 <= now[0]-scene["simulation_time_seconds"] <= .5+1e-6
+                            assert scene["observation"]["frame_number"]==scene["frame_number"]
+                            assert scene["observation"]["detector_input_eligible"]
                         timings["frame_ms"].append((time.perf_counter()-stage)*1000)
                         stage=time.perf_counter()
                         assert response.status_code==200 and response.headers["x-camera-source"]==scene["source_id"]
                         assert int(response.headers["x-frame-number"])==scene["frame_number"]
+                        assert int(response.headers["x-received-at-ms"])==scene["observation"]["received_at_ms"]
                         image=cv2.imdecode(np.frombuffer(response.content,np.uint8),cv2.IMREAD_COLOR)
                         assert image.shape==(720,1280,3)
                         if canonical is None: canonical=image

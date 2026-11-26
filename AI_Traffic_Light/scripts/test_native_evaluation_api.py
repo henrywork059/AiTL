@@ -2,6 +2,7 @@
 from pathlib import Path
 import io
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 import json
 import os
 import sys
@@ -149,8 +150,25 @@ class Tests(unittest.TestCase):
                 policy.save_config(policy.defaults())
                 before=policy.config_path.read_bytes()
                 current={k:stopped[k] for k in ("epoch","generation")}
-                with patch("app.services.native_evaluation.signal_rules_service",policy):
-                    archive=service.compare(**current,density="light",seed=42,duration_seconds=30)
+                entered,release=Event(),Event()
+                original_advance=FakeSession.advance
+                def blocking_advance(session):
+                    entered.set()
+                    if not release.wait(5):
+                        raise RuntimeError("Test comparison release timeout")
+                    original_advance(session)
+                with patch("app.services.native_evaluation.signal_rules_service",policy),patch.object(FakeSession,"advance",blocking_advance):
+                    with ThreadPoolExecutor(max_workers=1) as pool:
+                        future=pool.submit(service.compare,**current,density="light",seed=42,duration_seconds=30)
+                        try:
+                            self.assertTrue(entered.wait(5))
+                            self.assertEqual(service.scene()["status"],"busy")
+                            assert_envelope(client.post(BASE+"/start",json=current),expected_status=409)
+                            assert_envelope(client.post(BASE+"/stop",json=current),expected_status=409)
+                        finally:
+                            release.set()
+                        archive=future.result(timeout=10)
+                self.assertEqual(service.scene()["status"],"idle")
                 with ZipFile(io.BytesIO(archive)) as z:
                     m=json.loads(z.read("manifest.json"))
                     self.assertFalse(m["production_experiment_parity"])

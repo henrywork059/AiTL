@@ -81,6 +81,8 @@ class Tests(unittest.TestCase):
                 for sid in VIEW_FLIPS:
                     self.assertEqual(pub.frame_for(sid).content,expected[sid])
                 self.assertEqual(encoder.call_count,4)
+                self.assertIsNone(pub._pixels)
+                self.assertIs(first,pub.frame_for("simulation_camera_d"))
                 self.assertEqual(pub.scene_for("simulation_camera_d")["agents"][0]["x"],1279-meta["agents"][0]["x"])
             newmeta,newpixels=projection.render_pixels(ShadowSnapshot(42,2,False,snap.agents))
             pub.prepare(newmeta,newpixels,received_at_ms=43)

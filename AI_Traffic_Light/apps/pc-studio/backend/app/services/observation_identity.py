@@ -31,3 +31,33 @@ def observation_provenance(origin: str, session_generation: int | None) -> Obser
     if origin == "upload":
         return "esp32_stream" if session_generation is not None else "external_upload"
     return "unknown"
+
+
+# Shared synthetic scene/image view contract. A source name never grants
+# camera or controller authority; the selected-frame service owns that decision.
+SIMULATION_VIEW_FLIPS = {"simulation_camera": None, "simulation_camera_b": 0,
+                         "simulation_camera_c": 1, "simulation_camera_d": -1}
+
+
+def simulation_view_point(x, y, width, height, view_id):
+    flip = SIMULATION_VIEW_FLIPS[view_id]
+    return (width - 1 - x if flip in (1, -1) else x,
+            height - 1 - y if flip in (0, -1) else y)
+
+
+def synthetic_scene_identity(*, epoch, generation, tick, source_id, view_id,
+                             frame_number, received_at_ms, coordinate_space,
+                             layout_id, width, height, provenance,
+                             tick_kind, detector_input_eligible=False):
+    """Scene metadata only, never an inference result or permission token."""
+    if view_id not in SIMULATION_VIEW_FLIPS:
+        raise ValueError("Unknown simulation view")
+    return {"epoch": epoch, "generation": generation, "tick": tick,
+            "source_id": source_id, "view_id": view_id,
+            "frame_number": frame_number, "received_at_ms": received_at_ms,
+            "coordinate_space": coordinate_space, "layout_id": layout_id,
+            "width": width, "height": height, "provenance": provenance,
+            "tick_kind": tick_kind, "observation_kind": "synthetic_ground_truth",
+            "detector_observation": False, "authoritative": False,
+            "detector_input_eligible": detector_input_eligible,
+            "physical_output_allowed": False}

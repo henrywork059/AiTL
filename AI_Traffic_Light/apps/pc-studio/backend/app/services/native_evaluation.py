@@ -9,7 +9,7 @@ import hashlib
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import RLock
+from threading import Event, RLock
 import time
 from uuid import uuid4
 from zipfile import ZipFile
@@ -29,6 +29,7 @@ from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, P
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
+from app.services.observation_identity import synthetic_scene_identity
 
 MAX_TICKS = 2500
 MAX_BATCH = 25
@@ -39,6 +40,7 @@ class NativeEvaluationService:
         self.enabled = enabled
         self._factory, self._trip_loader, self._phase_loader = factory, trip_loader, phase_loader
         self._lock = RLock()
+        self._comparison = None
         self.epoch = uuid4().hex
         self.generation = 0
         self._state = "idle" if enabled else "disabled"
@@ -63,6 +65,8 @@ class NativeEvaluationService:
             raise self._conflict("Standalone native evaluation is disabled.")
         if epoch != self.epoch or generation != self.generation:
             raise self._conflict("Retired native evaluation generation.")
+        if self._comparison is not None:
+            raise self._conflict("Native comparison is busy.")
         if running and self._state != "running":
             raise self._conflict("No active native evaluation.")
         if tick is not None and (self._adapter is None or self._adapter.snapshot().tick != tick):
@@ -204,7 +208,14 @@ class NativeEvaluationService:
 
     def close(self):
         with self._lock:
+            comparison = self._comparison
+            if comparison is not None:
+                comparison[0].set()
             self._retire("idle" if self.enabled else "disabled")
+        if comparison is not None:
+            # Wait at most for the current serialized child operation; the
+            # comparison checks cancellation before starting another batch.
+            comparison[1].close()
 
     def scene(self, *, source_id="simulation_camera"):
         with self._lock:
@@ -300,13 +311,13 @@ class NativeEvaluationService:
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
             scene=self.scene(source_id=source_id)["snapshot"]
-            identity = {"epoch":epoch,"generation":generation,"tick":tick,
-                "source_id":f"native_eval_g{generation}_{source_id}","view_id":source_id,
-                "frame_number":tick,"received_at_ms":self._received_at_ms,
-                "coordinate_space":scene["coordinate_space"],"layout_id":scene["layout_id"],
-                "width":scene["width"],"height":scene["height"],
-                "provenance":PROVENANCE,"observation_kind":"synthetic_ground_truth",
-                "detector_observation":False,"authoritative":False,"physical_output_allowed":False}
+            identity = synthetic_scene_identity(
+                epoch=epoch,generation=generation,tick=tick,
+                source_id=f"native_eval_g{generation}_{source_id}",view_id=source_id,
+                frame_number=tick,received_at_ms=self._received_at_ms,
+                coordinate_space=scene["coordinate_space"],layout_id=scene["layout_id"],
+                width=scene["width"],height=scene["height"],provenance=PROVENANCE,
+                tick_kind="native_fixed_step")
             return {**scene,"view_id":source_id,"source_id":identity["source_id"],
                     "frame_number":tick,"legacy_editor_compatible":False,"observation":identity}
 
@@ -332,8 +343,8 @@ class NativeEvaluationService:
         """Run a bounded pair with one immutable copy of the saved policy.
 
         Only when standalone evaluation is idle. No changes to the saved profile,
-        existing experiment store or selected camera. Hold the service lock so
-        another native session cannot start during this paired experiment.
+        existing experiment store or selected camera. Reserve a child session
+        under lock, then release the lock so state reads remain responsive.
         """
         with self._lock:
             self._require(epoch,generation,running=False)
@@ -349,18 +360,33 @@ class NativeEvaluationService:
             pair={}
             child=NativeEvaluationService(enabled=True,factory=self._factory,
                 trip_loader=self._trip_loader,phase_loader=self._phase_loader)
+            cancelled=Event()
+            reservation=(cancelled,child)
+            previous_state=self._state
+            self._comparison=reservation
+            self._state="busy"
+        try:
             try:
                 for mode in ("fixed","adaptive"):
-                    initial=child.start(epoch=child.epoch,generation=child.generation,density=density,
-                        seed=seed,mode=mode,policy_config=policy,profile=selected,geometry=geometry)
+                    # Serialize the final cancellation check with child startup.
+                    # Shutdown cannot finish reaping and then see a new child.
+                    with child._lock:
+                        if cancelled.is_set():
+                            raise self._conflict("Native comparison cancelled.")
+                        initial=child.start(epoch=child.epoch,generation=child.generation,density=density,
+                            seed=seed,mode=mode,policy_config=policy,profile=selected,geometry=geometry)
                     gen=initial["generation"]
                     horizon=duration_seconds*5
                     for tick in range(0,horizon,MAX_BATCH):
+                        if cancelled.is_set():
+                            raise self._conflict("Native comparison cancelled.")
                         child.step(epoch=child.epoch,generation=gen,tick=tick,steps=min(MAX_BATCH,horizon-tick),_return_scene=False)
                     pair[mode]=child.export(epoch=child.epoch,generation=gen,tick=horizon)
                     child.stop(epoch=child.epoch,generation=gen)
             finally:
                 child.close()
+            if cancelled.is_set():
+                raise self._conflict("Native comparison cancelled.")
             try:
                 deltas=validate_pair(pair["fixed"],pair["adaptive"])
             except ValueError as exc:
@@ -380,6 +406,13 @@ class NativeEvaluationService:
                 z.writestr("normalized_gate_comparison.csv",serialize_experiment_timeline(pair))
                 z.writestr("deltas.json",json.dumps(deltas,indent=2))
             return stream.getvalue()
+        finally:
+            with self._lock:
+                if self._comparison is reservation:
+                    self._comparison=None
+                    if self._state=="busy":
+                        self._state=previous_state
+
 
 
 native_evaluation_service = NativeEvaluationService(enabled=os.getenv("MESH_SUMO_NATIVE_EVALUATION")=="1")

@@ -147,6 +147,7 @@ class _ModeSimulation:
         policy_config: dict[str, Any],
         zones: list[dict[str, Any]],
         temp_root: Path,
+        normalized_gate_evidence: bool = False,
     ) -> None:
         self.mode = mode
         self.density = density
@@ -163,7 +164,7 @@ class _ModeSimulation:
         config_path = temp_root / f"{mode}_policy.json"
         history_path = temp_root / f"{mode}_controller_history.jsonl"
         config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-        self.controller = _BenchmarkSignalRulesService(config_path=config_path, history_path=history_path)
+        self.controller = _BenchmarkSignalRulesService(config_path=config_path, history_path=history_path, respect_environment=False)
         self.controller_history_path = history_path
 
         self.vehicles = self._make_vehicles()
@@ -186,6 +187,11 @@ class _ModeSimulation:
         self.timeline: list[dict[str, Any]] = []
         self._previous_phase_key: str | None = None
         self._sample_at_s = 0.0
+        self._gate_metrics = None
+        self._gate_timeline = []
+        if normalized_gate_evidence:
+            from app.services.simulation_gate_metrics import GateMetrics
+            self._gate_metrics = GateMetrics()
 
     def _make_vehicles(self) -> list[_Vehicle]:
         count = {"light": 4, "normal": 8, "busy": 12}[self.density]
@@ -319,13 +325,30 @@ class _ModeSimulation:
             self._record_overlap(signal, dt)
 
             clock += dt
+            if self._gate_metrics is not None:
+                from app.services.simulation_gate_metrics import STEP_S
+                from app.services.simulation_gate_adapters import legacy_observations
+                tick = self._gate_metrics.tick + 1
+                if clock + 1e-9 >= tick * STEP_S:
+                    self._gate_timeline.append({**self._gate_metrics.sample(tick,
+                        legacy_observations(self.vehicles,self.pedestrians)),
+                        "phase":signal["phase"],"t":round(tick*STEP_S,6)})
             if clock + 1e-9 >= self._sample_at_s:
                 self._append_timeline(clock, signal, vehicle_waiting, ped_waiting_count)
                 self._sample_at_s += self.sample_interval_seconds
 
         self._finalize_open_waits(self.duration_seconds)
         controller_stats = self._controller_stats()
-        return self._build_result(last_signal, controller_stats)
+        result = self._build_result(last_signal, controller_stats)
+        if self._gate_metrics is not None:
+            result["normalized_gate_evidence"] = {
+                "engine":"production_legacy_experiment",
+                "metric_contract":"normalized_physical_service_gate_v1",
+                "summary":self._gate_metrics.summary(),
+                "waiting_episodes":self._gate_metrics.waiting_episodes(),
+                "timeline":self._gate_timeline,
+                "geometry_demand_matched_to_native":False}
+        return result
 
     def _record_signal_time(self, signal: dict[str, Any], dt: float) -> None:
         phase = str(signal["phase"])

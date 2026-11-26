@@ -54,6 +54,41 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 adapter.step(value)
 
+    def test_published_scene_matches_cached_camera_frame(self):
+        from app.services.camera_frames import CameraFrameService
+        from app.services.observation_identity import simulation_view_point
+        now=[0.]
+        service=CameraFrameService(simulation_seed=42,simulation_monotonic=lambda:now[0])
+        phase={"phase":"vehicle_green","vehicle_go":True,"pedestrian_walk":False,
+               "seconds_remaining":12,"base_cycle_seconds":34,"mode":"fixed",
+               "active_profile":"fixture","active_rules":[]}
+        with patch.object(service,"_simulation_signal_state_locked",return_value=phase):
+            service.set_simulation(True)
+            first=service.simulation_scene_for("simulation_camera")
+            frame=service.latest_frame()
+            now[0]=.2
+            later=service.simulation_scene_for("simulation_camera")
+            self.assertEqual(later,first)
+            self.assertIs(frame,service.latest_frame())
+            self.assertEqual(service._simulation_clock_s,.2)
+            mirror=service.simulation_scene_for("simulation_camera_d")
+            self.assertEqual(mirror["vehicles"],first["vehicles"])
+            self.assertEqual(mirror["observation"]["frame_number"],frame.frame_number)
+            for a,b in zip(first["view_agents"],mirror["view_agents"]):
+                self.assertEqual((b["x"],b["y"]),simulation_view_point(a["x"],a["y"],1280,720,"simulation_camera_d"))
+            first["vehicles"].clear()
+            self.assertTrue(service.simulation_scene_for("simulation_camera")["vehicles"])
+            now[0]=.5
+            current=service.simulation_scene_for("simulation_camera")
+            self.assertGreater(current["frame_number"],frame.frame_number)
+            self.assertEqual(current["simulation_time_seconds"],.5)
+            token=service.observation_mode_token
+            service.configure_simulation(density="busy")
+            self.assertNotEqual(service.observation_mode_token,token)
+            reset=service.simulation_scene_for("simulation_camera")
+            self.assertEqual(reset["observation"]["generation"],service.observation_mode_token[1])
+            self.assertEqual(len(reset["vehicles"]),12)
+
     def test_actual_legacy_agents(self):
         from app.services.camera_frames import CameraFrameService
         def run(times, seed):

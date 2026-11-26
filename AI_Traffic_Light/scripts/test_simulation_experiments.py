@@ -11,7 +11,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.services.signal_rules import signal_rules_service  # noqa: E402
-from app.services.simulation_experiments import SimulationExperimentService  # noqa: E402
+from app.services.simulation_experiments import SimulationExperimentService, _ModeSimulation  # noqa: E402
 
 
 
@@ -68,6 +68,20 @@ def main() -> int:
             storage_root=Path(temporary) / "experiments",
             config_provider=signal_rules_service.get_config,
         )
+        # The optional normalized metric path must not change the original
+        # production benchmark result or its existing metric schema.
+        args=dict(mode="fixed",density="normal",seed=42,duration_seconds=30,
+                  sample_interval_seconds=1,policy_config=signal_rules_service.get_config(),
+                  zones=[],temp_root=Path(temporary))
+        ordinary=_ModeSimulation(**args).run()
+        measured=_ModeSimulation(**args,normalized_gate_evidence=True).run()
+        common=measured.pop("normalized_gate_evidence")
+        assert ordinary==measured
+        assert common["engine"]=="production_legacy_experiment"
+        assert len(common["timeline"])==150
+        assert not common["geometry_demand_matched_to_native"]
+        for kind,waits in common["waiting_episodes"].items():
+            assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
         first = service.run(
             duration_seconds=90,
             density="busy",

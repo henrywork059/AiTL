@@ -20,11 +20,11 @@ import cv2
 import numpy as np
 
 from app.services.sumo_shadow_adapter import ShadowSnapshot
+from app.services.observation_identity import SIMULATION_VIEW_FLIPS, simulation_view_point
 
 WIDTH, HEIGHT = 1280, 720
 MARGIN = 24
-VIEW_FLIPS = {"simulation_camera": None, "simulation_camera_b": 0,
-              "simulation_camera_c": 1, "simulation_camera_d": -1}
+VIEW_FLIPS = SIMULATION_VIEW_FLIPS
 PROVENANCE = "synthetic_sumo_projection"
 
 
@@ -80,9 +80,7 @@ class Projection:
         py = self.offset_y + (hi_y - y) * self.scale
         if not (0 <= px < WIDTH and 0 <= py < HEIGHT):
             raise ValueError("Native agent outside projection canvas")
-        flip = VIEW_FLIPS[source_id]
-        return (WIDTH - 1 - px if flip in (1, -1) else px,
-                HEIGHT - 1 - py if flip in (0, -1) else py)
+        return simulation_view_point(px, py, WIDTH, HEIGHT, source_id)
 
     def world(self, px: float, py: float, source_id: str = "simulation_camera") -> tuple[float, float]:
         if source_id not in VIEW_FLIPS or not all(map(math.isfinite, (px, py))) or not (0 <= px < WIDTH and 0 <= py < HEIGHT):

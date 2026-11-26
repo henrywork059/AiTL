@@ -318,6 +318,8 @@ def latest_camera_frame(request: Request) -> Response:
             "X-Request-ID": request.state.request_id,
             "X-Camera-Source": frame.source_id,
             "X-Frame-Number": str(frame.frame_number),
+            "X-Received-At-Ms": str(frame.received_at_ms),
+            "X-Observation-Origin": frame.origin,
         },
     )
 

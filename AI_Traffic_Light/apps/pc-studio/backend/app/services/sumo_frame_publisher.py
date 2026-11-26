@@ -102,6 +102,8 @@ class NativeFramePublisher:
                 received_at_ms=self._received_at_ms, frame_number=self._meta["tick"],
                 origin=PROVENANCE, mode_generation=self._generation)
             self._frames[source] = frame
+            if len(self._frames) == len(VIEW_FLIPS):
+                self._pixels = None  # all validated views cached; release the raster
             return frame
         except Exception:
             self.invalidate()

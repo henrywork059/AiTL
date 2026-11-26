@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
+import hashlib
+import json
+from uuid import uuid4
 from dataclasses import dataclass
 import os
 import random
@@ -14,7 +18,8 @@ import numpy as np
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
-from app.services.observation_identity import ObservationIdentity, observation_provenance
+from app.services.observation_identity import (ObservationIdentity, observation_provenance,
+    SIMULATION_VIEW_FLIPS, simulation_view_point, synthetic_scene_identity)
 from app.services.simulation_adapter import LegacySimulationAdapter
 from app.services.sumo_shadow_runtime import ShadowRuntime
 
@@ -34,6 +39,13 @@ EASTBOUND_STOP_LINE = 495
 WESTBOUND_STOP_LINE = 785
 TOP_PEDESTRIAN_WAIT_Y = 126
 BOTTOM_PEDESTRIAN_WAIT_Y = 674
+# Fixed legacy editor plane: no native metre calibration is implied.
+LEGACY_LAYOUT_ID = hashlib.sha256(json.dumps({
+    'schema':'legacy_camera_pixels_v1','dimensions':[FRAME_WIDTH,FRAME_HEIGHT],
+    'road':[ROAD_TOP,ROAD_BOTTOM],'crossing':[CROSSING_LEFT,CROSSING_RIGHT],
+    'stop_lines':[EASTBOUND_STOP_LINE,WESTBOUND_STOP_LINE],
+    'curbs':[TOP_PEDESTRIAN_WAIT_Y,BOTTOM_PEDESTRIAN_WAIT_Y],
+    'views':SIMULATION_VIEW_FLIPS},sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -215,6 +227,8 @@ class CameraFrameService:
         self._simulation_monotonic = simulation_monotonic or time.monotonic
         self._uploaded_frame: CameraFrame | None = None
         self._simulation_frame: CameraFrame | None = None
+        self._simulation_scene: dict | None = None
+        self._simulation_epoch = uuid4().hex
         # Reuse the current render for mirrored views instead of decoding PNG.
         self._simulation_canvas: np.ndarray | None = None
         self._simulation_view_frames: dict[str, CameraFrame] = {}
@@ -334,6 +348,7 @@ class CameraFrameService:
 
     def _reset_simulation_locked(self) -> None:
         self._simulation_frame = None
+        self._simulation_scene = None
         self._simulation_canvas = None
         self._simulation_view_frames.clear()
         self._last_simulation_tick = -1
@@ -357,6 +372,7 @@ class CameraFrameService:
                 if self._shadow is not None:
                     self._shadow.stop()
                 self._simulation_frame = None
+                self._simulation_scene = None
                 self._simulation_canvas = None
                 self._simulation_view_frames.clear()
                 self._last_simulation_tick = -1
@@ -368,6 +384,9 @@ class CameraFrameService:
     def configure_simulation(self, *, density: str | None = None, paused: bool | None = None) -> dict:
         with self._lock:
             reset_agents = False
+            if paused is not None and not self._simulation_enabled:
+                raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,
+                    'Start simulation mode before pausing or resuming the synthetic scene.', status_code=409)
             if density is not None:
                 normalized_density = density.strip().lower()
                 if normalized_density not in SIMULATION_DENSITIES:
@@ -381,19 +400,16 @@ class CameraFrameService:
                     self._simulation_density = normalized_density
                     reset_agents = True
             if paused is not None:
-                if not self._simulation_enabled:
-                    raise AppError(
-                        ErrorCode.CAMERA_STREAM_NOT_STARTED,
-                        "Start simulation mode before pausing or resuming the synthetic scene.",
-                        status_code=409,
-                    )
                 if paused != self._simulation_paused:
                     self._simulation_adapter.set_paused(paused, self._simulation_monotonic())
                     if not paused:
                         self._simulation_frame = None
+                        self._simulation_scene = None
                         self._simulation_canvas = None
                         self._last_simulation_tick = -1
             if reset_agents and self._simulation_enabled:
+                # A reset retires pending inference even when simulation stays enabled.
+                self._observation_mode_generation += 1
                 self._reset_simulation_locked()
         return self.status()
 
@@ -419,7 +435,7 @@ class CameraFrameService:
             if image is None:
                 raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Simulation render cache unavailable.", status_code=500)
             # Each pair shows vertically mirrored sides; pair 2 uses a horizontal viewpoint.
-            flip = {"simulation_camera_b": 0, "simulation_camera_c": 1, "simulation_camera_d": -1}[source_id]
+            flip = SIMULATION_VIEW_FLIPS[source_id]
             success, encoded = cv2.imencode(".png", cv2.flip(image, flip))
             if not success:
                 raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Mirrored simulation frame encoding failed.", status_code=500)
@@ -450,46 +466,70 @@ class CameraFrameService:
             frame = self._simulation_frame_for_locked(source_id)
             if frame is None:
                 return None
-            clock = self._simulation_adapter.snapshot()
-            signal = self._simulation_signal_state_locked()
-            return {
-                "source_id": source_id,
-                "frame_number": frame.frame_number,
-                "received_at_ms": frame.received_at_ms,
-                "width": FRAME_WIDTH,
-                "height": FRAME_HEIGHT,
-                "simulation_time_seconds": round(clock.time_s, 3),
-                "paused": clock.paused,
-                "density": self._simulation_density,
-                "signal": {
-                    "phase": signal["phase"],
-                    "vehicle_go": signal["vehicle_go"],
-                    "pedestrian_walk": signal["pedestrian_walk"],
-                    "seconds_remaining": signal["seconds_remaining"],
-                },
-                "vehicles": [
-                    {
-                        "id": f"vehicle_{index}",
-                        "x": round(vehicle.x, 2),
-                        "y": vehicle.y,
-                        "width": vehicle.width,
-                        "direction": vehicle.direction,
-                        "vehicle_type": vehicle.vehicle_type,
-                        "color": "#{:02x}{:02x}{:02x}".format(*reversed(vehicle.color)),
-                    }
-                    for index, vehicle in enumerate(self._vehicles)
-                ],
-                "pedestrians": [
-                    {
-                        "id": f"pedestrian_{index}",
-                        "x": pedestrian.x,
-                        "y": round(pedestrian.y, 2),
-                        "direction": pedestrian.direction,
-                        "color": "#{:02x}{:02x}{:02x}".format(*reversed(pedestrian.color)),
-                    }
-                    for index, pedestrian in enumerate(self._pedestrians)
-                ],
-            }
+            # The scene must describe the actual published raster, not a newer
+            # world step under the same frame identity.
+            if self._simulation_scene is None:
+                raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED,
+                    "Simulation scene cache unavailable.", status_code=500)
+            scene = deepcopy(self._simulation_scene)
+            scene.update(source_id=source_id, frame_number=frame.frame_number,
+                         received_at_ms=frame.received_at_ms, paused=self._simulation_paused)
+            scene["observation"] = synthetic_scene_identity(
+                epoch=self._simulation_epoch, generation=frame.mode_generation,
+                tick=frame.frame_number, source_id=source_id, view_id=source_id,
+                frame_number=frame.frame_number, received_at_ms=frame.received_at_ms,
+                coordinate_space="legacy_camera_pixels_v1", layout_id=LEGACY_LAYOUT_ID,
+                width=frame.width, height=frame.height, provenance="simulation",
+                tick_kind="published_frame", detector_input_eligible=True)
+            # Keep existing canonical vehicle/pedestrian arrays for the 3D
+            # renderer; expose exact mirrored image-centres separately.
+            scene["view_agents"] = [
+                {"id": a["id"], "kind": kind, "x": x, "y": y}
+                for kind, agents in (("vehicle",scene["vehicles"]),("pedestrian",scene["pedestrians"]))
+                for a in agents
+                for x,y in [simulation_view_point(
+                    a["x"] + (a["width"]/2 if kind == "vehicle" else 0),
+                    a["y"], FRAME_WIDTH, FRAME_HEIGHT, source_id)]]
+            return scene
+
+    def _snapshot_simulation_scene_locked(self) -> dict:
+        clock = self._simulation_adapter.snapshot()
+        signal = self._simulation_signal_state_locked()
+        return {
+            "width": FRAME_WIDTH,
+            "height": FRAME_HEIGHT,
+            "simulation_time_seconds": round(clock.time_s, 3),
+            "paused": clock.paused,
+            "density": self._simulation_density,
+            "signal": {
+                "phase": signal["phase"],
+                "vehicle_go": signal["vehicle_go"],
+                "pedestrian_walk": signal["pedestrian_walk"],
+                "seconds_remaining": signal["seconds_remaining"],
+            },
+            "vehicles": [
+                {
+                    "id": f"vehicle_{index}",
+                    "x": round(vehicle.x, 2),
+                    "y": vehicle.y,
+                    "width": vehicle.width,
+                    "direction": vehicle.direction,
+                    "vehicle_type": vehicle.vehicle_type,
+                    "color": "#{:02x}{:02x}{:02x}".format(*reversed(vehicle.color)),
+                }
+                for index, vehicle in enumerate(self._vehicles)
+            ],
+            "pedestrians": [
+                {
+                    "id": f"pedestrian_{index}",
+                    "x": pedestrian.x,
+                    "y": round(pedestrian.y, 2),
+                    "direction": pedestrian.direction,
+                    "color": "#{:02x}{:02x}{:02x}".format(*reversed(pedestrian.color)),
+                }
+                for index, pedestrian in enumerate(self._pedestrians)
+            ],
+        }
 
     def latest_frame(self) -> CameraFrame | None:
         with self._lock:
@@ -764,6 +804,7 @@ class CameraFrameService:
                 "Failed to encode the synthetic camera frame.",
                 status_code=500,
             )
+        self._simulation_scene = self._snapshot_simulation_scene_locked()
         self._simulation_canvas = canvas
         self._simulation_frame = CameraFrame(
             content=encoded.tobytes(),

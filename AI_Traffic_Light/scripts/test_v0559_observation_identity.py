@@ -72,6 +72,11 @@ def main():
         assert mirror.frame_number == sim.frame_number
         assert mirror.observation.frame_key != sim.observation.frame_key
         assert frames.simulation_frame_for("simulation_camera") is sim
+        old_mode=frames.observation_mode_token
+        frames.configure_simulation(density="busy")
+        assert frames.observation_mode_token != old_mode
+        assert frames.simulation_frame_for("simulation_camera").observation.mode_generation != sim.observation.mode_generation
+        assert not manager.observation_is_current("simulation_camera", (old_mode,0),sim.received_at_ms)
         frames.set_simulation(False)
         assert frames.simulation_frame_for("simulation_camera") is None
         assert not manager.observation_is_current("cam_a", token, 10000)
