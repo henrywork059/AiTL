@@ -250,7 +250,7 @@ export function SimulationCamera3D({
       </div>
       {!editing && <div className="sim3d-actions">
         <button type="button" disabled={!canUseThree} aria-pressed={usingThree}
-          title={hasOverlay ? "Hide detection and region overlays to try Three.js" : "Experimental 3D road preview; coarse agents"}
+          title={hasOverlay ? "Hide detection and region overlays to try Three.js" : "Experimental 3D road preview; detailed vehicles"}
           onClick={() => {
             if (threeFailed) { setThreeFailed(false); setThreeRequested(true); }
             else setThreeRequested(current => !current);
@@ -270,7 +270,7 @@ export function SimulationCamera3D({
           <span>{activeScene.vehicles.length} vehicles · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
-      {!editing && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · coarse agents · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
+      {!editing && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
       {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );

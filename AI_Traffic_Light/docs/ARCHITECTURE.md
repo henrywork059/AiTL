@@ -202,3 +202,7 @@ The existing CameraFrameService remains the sole authoritative simulator/camera 
 ### Optional road renderer (S03; 0_5_68 candidate)
 
 `SimulationCamera3D` retains camera controls, scene polling, source match and legacy overlay/editor plane. `ThreeRoadView` owns only WebGL lifecycle and viewport resize; `RoadRenderer` consumes immutable snapshots and canonical `roadGeometry.ts` reference pixels. Trial imports the same renderer. Opt-in, fallback on unsupported view/context failure; no simulator or signal authority. See [integration evidence](S03_RENDERER_INTEGRATION.md).
+
+### Vehicle presentation motion (S03 / 24a)
+
+Update 24a / S03 preparation: 0_5_68 release CI 45753611276 passed. Implement stable vehicle meshes by existing backend slot ID/signature; car/SUV/van/bus body, cabin, windows, lights, wheels; shared geometry and per-vehicle material cleanup. Pure time-based interpolation between authoritative snapshots only, bounded 450 ms, no extrapolation, source/density/reset/gap guards, immediate snap for recycled slots and pause/resume, mirrored heading. RequestAnimationFrame only while interpolating, cleanup on unmount; legacy editor/overlay fallback and APIs/controller untouched. Backend currently straight road; turning regression is synthetic, not live turning support. No new dependencies or physical outputs. New CI and screenshot pending; candidate remains 0_5_68.

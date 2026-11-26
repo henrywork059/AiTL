@@ -16,28 +16,40 @@ export function ThreeRoadView({ sourceId, snapshot, orbit, pitch, zoom, onFailur
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<RoadRenderer | null>(null);
   const pose = useRef({ orbit, pitch, zoom });
+  const draw = useRef<(() => void) | null>(null);
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
     let renderer: RoadRenderer | null = null;
     let observer: ResizeObserver | null = null;
+    let frame: number | null = null;
+    let stopped = false;
+    const stop = () => {stopped=true;if(frame!==null)cancelAnimationFrame(frame);frame=null;};
     try {
       renderer = new RoadRenderer(element, sourceId, onFailure);
       instance.current = renderer;
       const current = renderer;
-      observer = new ResizeObserver(() => {
-        if (instance.current !== current || element.clientWidth === 0 || element.clientHeight === 0) return;
-        try { current.render(pose.current.orbit, pose.current.pitch, pose.current.zoom); }
-        catch { onFailure(); }
-      });
+      const render = (now=performance.now()) => {
+        if (stopped || instance.current !== current || !element.clientWidth || !element.clientHeight) return;
+        try {
+          current.render(pose.current.orbit,pose.current.pitch,pose.current.zoom,now);
+          if(current.isAnimating(now)&&frame===null)frame=requestAnimationFrame(t=>{frame=null;render(t);});
+        } catch { stop();onFailure(); }
+      };
+      draw.current=()=>render();
+      observer = new ResizeObserver(()=>render());
       observer.observe(element);
     } catch {
+      stop();
+      draw.current=null;
       observer?.disconnect();
       instance.current = null;
       renderer?.dispose();
       onFailure();
     }
     return () => {
+      stop();
+      draw.current=null;
       observer?.disconnect();
       instance.current = null;
       renderer?.dispose();
@@ -51,9 +63,7 @@ export function ThreeRoadView({ sourceId, snapshot, orbit, pitch, zoom, onFailur
 
   useLayoutEffect(() => {
     pose.current = { orbit, pitch, zoom };
-    if (!host.current?.clientWidth || !host.current?.clientHeight) return;
-    try { instance.current?.render(orbit, pitch, zoom); }
-    catch { onFailure(); }
+    draw.current?.();
   }, [sourceId, snapshot, orbit, pitch, zoom, onFailure]);
 
   return <div ref={host} className="sim3d-three-host" aria-hidden="true" style={{ position: "absolute", inset: 0 }} />;

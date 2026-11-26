@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { ROAD, roadSurfaces, worldPoint, cameraPose } from './roadGeometry';
 import type { SimulationScene } from '../lib/remoteCameraApi';
+import { VehicleMotion, mirroredYaw } from './vehicleMotion';
+import { makeVehicleVisual, disposeVehicleVisual, vehicleSignature, type VehicleVisual } from './vehicleMeshes';
 
 export class RoadRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -10,6 +12,10 @@ export class RoadRenderer {
   private readonly materials = new Set<THREE.Material>();
   private readonly geometry = new THREE.BoxGeometry(1,1,1);
   private readonly agents = new THREE.Group();
+  private readonly vehicles = new Map<string,VehicleVisual>();
+  private readonly motion = new VehicleMotion();
+  private viewportWidth=0;
+  private viewportHeight=0;
   private readonly vehicleLamp: THREE.MeshBasicMaterial;
   private readonly pedestrianLamp: THREE.MeshBasicMaterial;
   private closed = false;
@@ -81,28 +87,40 @@ export class RoadRenderer {
       this.agents.remove(child);
     }
   }
-  update(snapshot: SimulationScene | null) {
+  private clearVehicles() {
+    for(const visual of this.vehicles.values())disposeVehicleVisual(visual);
+    this.vehicles.clear();
+    this.motion.clear();
+  }
+  isAnimating(now=performance.now()) {return !this.closed&&!this.failed&&this.motion.isAnimating(now);}
+  update(snapshot: SimulationScene | null, now=performance.now()) {
     if(this.closed||this.failed)return;
     this.clearAgents();
     const s=snapshot?.source_id===this.sourceId?snapshot:null;
     this.vehicleLamp.color.set(s?.signal.vehicle_go?0x42dc89:s?.signal.phase==='vehicle_yellow'?0xf1c247:0xd14f43);
     this.pedestrianLamp.color.set(s?.signal.pedestrian_walk?0x42dc89:0xd14f43);
-    if(!s)return;
-    // Coarse visual proxies only. Detailed vehicle/pedestrian meshes belong to S04/S05.
+    if(!s){this.clearVehicles();return;}
+    this.motion.update(s,now);
+    const live=new Set<string>();
     for(const v of s.vehicles) {
-      const p=worldPoint(v.x+v.width/2,v.y,this.sourceId);
-      const h=v.vehicle_type==='bus'?45:26;
-      this.box(this.agents,p.x,h/2,p.z,v.width,h,55,this.material(v.color));
+      if(!this.motion.pose(v.id,now))continue;
+      live.add(v.id);
+      let visual=this.vehicles.get(v.id);
+      if(visual&&visual.signature!==vehicleSignature(v)){disposeVehicleVisual(visual);this.vehicles.delete(v.id);visual=undefined;}
+      if(!visual){visual=makeVehicleVisual(v,this.geometry);this.vehicles.set(v.id,visual);this.scene.add(visual.group);}
     }
+    for(const [id,visual] of this.vehicles)if(!live.has(id)){disposeVehicleVisual(visual);this.vehicles.delete(id);}
+    // Pedestrian geometry/lifecycle is unchanged until Update 25.
     for(const person of s.pedestrians) {
       const p=worldPoint(person.x,person.y,this.sourceId);
       this.box(this.agents,p.x,24,p.z,15,48,15,this.material(person.color));
     }
   }
-  render(orbit:number,pitch:number,zoom:number) {
+  render(orbit:number,pitch:number,zoom:number,now=performance.now()) {
     if(this.closed||this.failed)return;
     const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);
-    this.renderer.setSize(w,h,false);
+    if(w!==this.viewportWidth||h!==this.viewportHeight){this.renderer.setSize(w,h,false);this.viewportWidth=w;this.viewportHeight=h;}
+    for(const [id,visual] of this.vehicles){const pose=this.motion.pose(id,now);if(pose){const p=worldPoint(pose.x,pose.y,this.sourceId);visual.group.position.set(p.x,0,p.z);visual.group.rotation.y=mirroredYaw(pose.heading,this.sourceId);}}
     this.camera.aspect=w/h;
     const p=cameraPose(orbit,pitch,zoom);
     this.camera.position.set(p.x,p.y,p.z);
@@ -116,6 +134,7 @@ export class RoadRenderer {
     this.closed=true;
     this.renderer.domElement.removeEventListener('webglcontextlost',this.lost);
     this.clearAgents();
+    this.clearVehicles();
     this.scene.clear();
     this.geometry.dispose();
     for(const mat of this.materials)mat.dispose();

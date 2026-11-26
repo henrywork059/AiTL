@@ -153,3 +153,7 @@ The existing CameraFrameService remains the sole authoritative simulator/camera 
 ### Three.js road preview (Update 23 / S03; 0_5_68 candidate)
 
 Optional read-only synthetic preview; CSS remains default and mandatory for editor/overlays. Shared scene polling, controls and protected virtual signals unchanged. Coarse agents; no calibrated projection, physical control, comparative GPU performance or owner acceptance. See [integration evidence and gates](S03_RENDERER_INTEGRATION.md).
+
+### Vehicle mesh preparation (Update 24)
+
+Update 24a / S03 preparation: 0_5_68 release CI 45753611276 passed. Implement stable vehicle meshes by existing backend slot ID/signature; car/SUV/van/bus body, cabin, windows, lights, wheels; shared geometry and per-vehicle material cleanup. Pure time-based interpolation between authoritative snapshots only, bounded 450 ms, no extrapolation, source/density/reset/gap guards, immediate snap for recycled slots and pause/resume, mirrored heading. RequestAnimationFrame only while interpolating, cleanup on unmount; legacy editor/overlay fallback and APIs/controller untouched. Backend currently straight road; turning regression is synthetic, not live turning support. No new dependencies or physical outputs. New CI and screenshot pending; candidate remains 0_5_68.

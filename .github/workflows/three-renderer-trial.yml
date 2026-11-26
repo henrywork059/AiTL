@@ -6,6 +6,10 @@ on:
       - '.github/workflows/three-renderer-trial.yml'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/trials/**'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/roadGeometry.ts'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/RoadRenderer.ts'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/ThreeRoadView.tsx'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/SimulationCamera3D.tsx'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/vehicle*.ts'
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,6 +49,8 @@ jobs:
         run: npm audit --audit-level=high --json
       - name: Pure geometry regressions
         run: node --experimental-strip-types trials/roadGeometry.test.mjs
+      - name: Vehicle motion regressions
+        run: node --experimental-strip-types trials/vehicleMotion.test.mjs
       - name: Typecheck trial and production source
         run: |
           npm run typecheck
