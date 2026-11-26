@@ -27,6 +27,20 @@ class Tests(unittest.TestCase):
         self.assertEqual(m.summary()["pedestrian_wait_agent_s"],.2)
         self.assertEqual(m.summary()["censored_pedestrian_visits"],0)
 
+    def test_wait_episodes_complete_censor_and_match_integral(self):
+        m=GateMetrics()
+        m.sample(1,[obs("v","vehicle",-.2),obs("p","pedestrian",-.2)])
+        m.sample(2,[obs("v","vehicle",-.2),obs("p","pedestrian",-.2)])
+        m.sample(3,[obs("v","vehicle",-.2),obs("p","pedestrian",-.1)])
+        m.sample(4,[obs("p","pedestrian",-.1)])
+        waits=m.waiting_episodes()
+        self.assertEqual(waits["vehicle"]["censored_observed_seconds"],[.4])
+        self.assertEqual(waits["pedestrian"]["completed_seconds"],[.2])
+        self.assertEqual(waits["pedestrian"]["censored_observed_seconds"],[.2])
+        for kind in waits:
+            self.assertEqual(waits[kind]["observed_agent_seconds"],m.summary()[kind+"_wait_agent_s"])
+        self.assertEqual(m.waiting_episodes(),waits)
+
     def test_disappearance_and_reset_are_not_crossings(self):
         m=GateMetrics()
         m.sample(1,[obs("p","pedestrian",-.1)])

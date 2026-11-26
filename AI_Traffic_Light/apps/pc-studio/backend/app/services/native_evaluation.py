@@ -129,7 +129,7 @@ class NativeEvaluationService:
             except Exception as exc:
                 raise self._failure() from exc
 
-    def step(self, *, epoch, generation, tick, steps):
+    def step(self, *, epoch, generation, tick, steps, _return_scene=True):
         with self._lock:
             self._require(epoch, generation, tick)
             if self._paused or tick >= MAX_TICKS:
@@ -172,7 +172,7 @@ class NativeEvaluationService:
                         "applied_vehicle_go":bool(grants.intersection(self._phase_map.vehicles)),
                         "applied_pedestrian_walk":bool(grants.intersection(self._phase_map.pedestrians))}
                 self._received_at_ms = time.time_ns() // 1_000_000
-                return self.scene()
+                return self.scene() if _return_scene else None
             except Exception as exc:
                 raise self._failure() from exc
 
@@ -194,12 +194,12 @@ class NativeEvaluationService:
         with self._lock:
             self._retire("idle" if self.enabled else "disabled")
 
-    def scene(self):
+    def scene(self, *, source_id="simulation_camera"):
         with self._lock:
             snapshot = None
             if self._state == "running":
                 snap = self._adapter.snapshot()
-                snapshot = {**self._projection.scene(snap),"received_at_ms":self._received_at_ms,
+                snapshot = {**self._projection.scene(snap, source_id),"received_at_ms":self._received_at_ms,
                     "paused":self._paused,"density":self._density,"signal":deepcopy(self._signal),
                     "epoch":self.epoch,"profile":self._policy["active_profile"],
                     "legacy_editor_compatible":False}
@@ -259,6 +259,7 @@ class NativeEvaluationService:
                 "layout_id":self._projection.layout_id,"coordinate_space":"native_projection_v1",
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
                 "demand_digest":self._demand_digest,"derived_metrics":summarize_timeline(self._timeline,self._metrics.summary()),
+                "waiting_episodes":self._metrics.waiting_episodes(),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
                 "production_experiment_parity":False,"physical_output_allowed":False}
@@ -269,12 +270,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,tick)
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
-            scene=self.scene()["snapshot"]
-            layout=self._projection.layout
-            for agent in scene["agents"]:
-                agent["x"],agent["y"]=layout.pixel(agent["x_m"],agent["y_m"],source_id)
-            for lane in scene["lanes"]:
-                lane["points"]=[layout.pixel(*layout.world(*pt),source_id) for pt in lane["points"]]
+            scene=self.scene(source_id=source_id)["snapshot"]
             return {**scene,"view_id":source_id,"source_id":f"native_eval_g{generation}_{source_id}",
                     "frame_number":tick,"legacy_editor_compatible":False}
 
@@ -320,7 +316,7 @@ class NativeEvaluationService:
                     gen=initial["generation"]
                     horizon=duration_seconds*5
                     for tick in range(0,horizon,MAX_BATCH):
-                        child.step(epoch=child.epoch,generation=gen,tick=tick,steps=min(MAX_BATCH,horizon-tick))
+                        child.step(epoch=child.epoch,generation=gen,tick=tick,steps=min(MAX_BATCH,horizon-tick),_return_scene=False)
                     pair[mode]=child.export(epoch=child.epoch,generation=gen,tick=horizon)
                     child.stop(epoch=child.epoch,generation=gen)
             finally:

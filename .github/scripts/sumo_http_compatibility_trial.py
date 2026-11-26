@@ -77,24 +77,34 @@ def arm(native,out):
                 before=processes(pids)
                 start=time.perf_counter()
                 digest=hashlib.sha256()
+                timings={"step_ms":[],"scene_ms":[],"frame_ms":[],"decode_ms":[]}
                 for i in range(1,SAMPLES+1):
+                    stage=time.perf_counter()
                     if native:
                         state=assert_envelope(client.post(BASE+"/step",json={**identity,"tick":2*(i-1),"steps":2}))["data"]
                         params={**identity,"tick":2*i}
                     else:
                         now[0]=i*INTERVAL_S
+                    timings["step_ms"].append((time.perf_counter()-stage)*1000)
                     canonical=None
                     for sid in SIMULATION_CAMERA_SOURCE_IDS:
+                        stage=time.perf_counter()
                         if native:
                             scene=assert_envelope(client.get(BASE+"/view",params={**params,"source_id":sid}))["data"]
+                            timings["scene_ms"].append((time.perf_counter()-stage)*1000)
+                            stage=time.perf_counter()
                             response=client.get(BASE+"/frame",params={**params,"source_id":sid})
                             assert scene["coordinate_space"]=="native_projection_v1" and not scene["legacy_editor_compatible"]
                             assert abs(scene["time_s"]-i*INTERVAL_S)<1e-6
                         else:
                             scene=assert_envelope(client.get("/api/camera/simulation/scene",params={"source_id":sid}))["data"]
+                            timings["scene_ms"].append((time.perf_counter()-stage)*1000)
+                            stage=time.perf_counter()
                             legacy.set_simulation_source(sid)
                             response=client.get("/api/camera/frame")
                             assert abs(scene["simulation_time_seconds"]-now[0])<1e-6
+                        timings["frame_ms"].append((time.perf_counter()-stage)*1000)
+                        stage=time.perf_counter()
                         assert response.status_code==200 and response.headers["x-camera-source"]==scene["source_id"]
                         assert int(response.headers["x-frame-number"])==scene["frame_number"]
                         image=cv2.imdecode(np.frombuffer(response.content,np.uint8),cv2.IMREAD_COLOR)
@@ -102,6 +112,7 @@ def arm(native,out):
                         if canonical is None: canonical=image
                         else: assert np.array_equal(image,cv2.flip(canonical,{"simulation_camera_b":0,"simulation_camera_c":1,"simulation_camera_d":-1}[sid]))
                         digest.update(response.content)
+                        timings["decode_ms"].append((time.perf_counter()-stage)*1000)
                 wall=time.perf_counter()-start
                 after=processes(pids)
                 if native:
@@ -159,7 +170,9 @@ def arm(native,out):
                         assert (capture.dataset_root/record.image_path).read_bytes()==frame.content
                 assert (folder/"zones.json").read_bytes()==zone_bytes
                 assert policy.config_path.read_bytes()==policy_bytes
-                result={"arm":"native_only" if native else "legacy_only","scene_reads":400,"frame_reads":400,
+                latency={name:{"count":len(values),"mean":float(np.mean(values)),"p50":float(np.percentile(values,50)),"p95":float(np.percentile(values,95)),"max":max(values)} for name,values in timings.items()}
+                (out/"latency-samples.json").write_text(json.dumps(timings),encoding="utf-8")
+                result={"latency_ms":latency,"arm":"native_only" if native else "legacy_only","scene_reads":400,"frame_reads":400,
                         "simulated_seconds":40,"captures":4,"digest":digest.hexdigest(),"rollback_verified":native,
                         "saved_policy_and_zone_bytes_unchanged":True,
                         "resources":{"wall_s":wall,"cpu_delta_s":sum(after[k]["cpu_s"]-before[k]["cpu_s"] for k in before),

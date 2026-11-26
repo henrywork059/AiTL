@@ -1,6 +1,7 @@
 """Offline native evaluation API and isolated capture tests."""
 from pathlib import Path
 import io
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import sys
@@ -76,6 +77,9 @@ class Tests(unittest.TestCase):
                 state=assert_envelope(client.post(BASE+"/step",json=step))["data"]
                 self.assertEqual(state["snapshot"]["tick"],5)
                 self.assertFalse(state["snapshot"]["legacy_editor_compatible"])
+                detached=service.scene()["snapshot"]
+                detached["lanes"][0]["points"].clear()
+                self.assertTrue(service.scene()["snapshot"]["lanes"][0]["points"])
                 layout=state["snapshot"]["layout_id"]
                 self.assertEqual(len(layout),64)
                 for sid in VIEW_FLIPS:
@@ -114,11 +118,17 @@ class Tests(unittest.TestCase):
                         self.assertEqual(frame.headers["x-received-at-ms"],str(meta["source_received_at_ms"]))
                 result=assert_envelope(client.get(BASE+"/export",params=params))["data"]
                 self.assertEqual(len(result["timeline"]),5)
+                for kind, waits in result["waiting_episodes"].items():
+                    self.assertEqual(waits["observed_agent_seconds"],result["summary"][kind+"_wait_agent_s"])
                 self.assertFalse(result["production_experiment_parity"])
                 self.assertFalse(sentinel.exists())
                 self.assertFalse((root/"never-dataset").exists())
                 assert_envelope(client.post(BASE+"/pause",json={**params,"paused":False}))
-                assert_envelope(client.post(BASE+"/step",json={**params,"steps":1}))
+                def competing_step():
+                    return client.post(BASE+"/step",json={**params,"steps":1}).status_code
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    self.assertEqual(sorted(pool.map(lambda _:competing_step(),range(2))),[200,409])
+                self.assertEqual(service.scene()["snapshot"]["tick"],6)
                 assert_envelope(client.get(BASE+"/frame",params={**params,"source_id":"simulation_camera"}),expected_status=409)
                 stopped=assert_envelope(client.post(BASE+"/stop",json=identity))["data"]
                 self.assertIsNone(stopped["snapshot"])

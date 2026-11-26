@@ -39,6 +39,9 @@ class GateMetrics:
         self.passages = 0
         self.crossings = 0
         self.censored_service = 0
+        self._waiting = {}
+        self._completed_wait = {"vehicle": [], "pedestrian": []}
+        self._censored_wait = {"vehicle": [], "pedestrian": []}
 
     def sample(self, tick: int, rows: list[GateObservation]) -> dict:
         if type(tick) is not int or tick != self.tick + 1:
@@ -50,6 +53,8 @@ class GateMetrics:
             for a in rows):
             raise ValueError("Invalid gate observations")
         queues = {"vehicle": 0, "pedestrian": 0}
+        waiting_now = {}
+        continuous_keys = set()
         for ident, a in current.items():
             old = self.previous.get(ident)
             if old is not None and old.kind != a.kind:
@@ -72,9 +77,12 @@ class GateMetrics:
                     math.hypot(a.x-old.x, a.y-old.y) <= a.span * .5):
                 self.entered.add(key)
             if continuous:
+                continuous_keys.add(key)
                 speed = math.hypot(a.x-old.x, a.y-old.y) / a.span / STEP_S
                 if -1 <= a.progress < 0 and -1 <= old.progress < 0 and speed <= STOP_SPEED:
                     queues[a.kind] += 1
+                    prior = self._waiting.get(key)
+                    waiting_now[key] = (a.kind, (prior[1] if prior else 0) + 1)
                 if a.kind == "vehicle" and key not in self.passed and old.progress < .5 <= a.progress:
                     self.passages += 1
                     self.passed.add(key)
@@ -98,11 +106,37 @@ class GateMetrics:
         for kind, count in queues.items():
             self.wait_samples[kind] += count
             self.peak_queue[kind] = max(self.peak_queue[kind], count)
+        for key, (kind, count) in self._waiting.items():
+            if key not in waiting_now:
+                target = self._completed_wait if key in continuous_keys else self._censored_wait
+                target[kind].append(count)
+        self._waiting = waiting_now
         self.previous = current
         self.tick = tick
         return {"tick":tick,"t_seconds":round(tick * STEP_S, 6),
                 "vehicle_queue":queues["vehicle"],"pedestrian_queue":queues["pedestrian"],
                 "vehicle_passages":self.passages,"pedestrian_crossings":self.crossings}
+
+    def waiting_episodes(self) -> dict:
+        """Sampled stationary approach episodes; horizon and lost visits censored.
+
+        An episode ends on a continuous nonqueued observation; a disappeared
+        or discontinuous visit is censored, never treated as a completed wait.
+        Total observed episode time equals the queue-integral agent-seconds.
+        """
+        result = {}
+        for kind in self.wait_samples:
+            completed = self._completed_wait[kind]
+            censored = self._censored_wait[kind] + [
+                n for k, n in self._waiting.values() if k == kind]
+            result[kind] = {
+                "completed_count": len(completed),
+                "censored_count": len(censored),
+                "completed_seconds": [round(n * STEP_S, 6) for n in completed],
+                "censored_observed_seconds": [round(n * STEP_S, 6) for n in censored],
+                "observed_agent_seconds": round((sum(completed) + sum(censored)) * STEP_S, 6),
+            }
+        return result
 
     def summary(self) -> dict:
         return {"samples":self.tick,"vehicle_passages":self.passages,

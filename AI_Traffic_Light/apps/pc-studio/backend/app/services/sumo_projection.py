@@ -7,6 +7,7 @@ agent slots, detections, or traffic policy is synthesized here.
 from __future__ import annotations
 
 import csv
+from copy import deepcopy
 from dataclasses import dataclass
 import io
 import hashlib
@@ -111,6 +112,14 @@ class NativeProjection:
         self.layout = layout
         self.generation = generation
         self._background = layout.geometry_canvas()
+        # Static geometry is projected once per generation and view. Public
+        # scenes receive detached lane data, so consumers cannot mutate the cache.
+        self._lanes_by_view = {
+            sid: [{"id": lane.ident, "kind": lane.kind,
+                   "points": [layout.pixel(*pt, sid) for pt in lane.points],
+                   "width_px": lane.width_m * layout.scale} for lane in layout.lanes]
+            for sid in VIEW_FLIPS
+        }
         manifest = {"schema":1,"width":WIDTH,"height":HEIGHT,"bounds":layout.bounds,
                     "scale":layout.scale,"offsets":[layout.offset_x,layout.offset_y],
                     "lanes":[(lane.ident,lane.kind,lane.points,lane.width_m) for lane in layout.lanes]}
@@ -132,12 +141,18 @@ class NativeProjection:
                 "paused": snapshot.paused, "width": WIDTH, "height": HEIGHT,
                 "bounds_m": self.layout.bounds, "pixels_per_m": self.layout.scale, "agents": rows}
 
-    def scene(self, snapshot: ShadowSnapshot) -> dict:
-        return {**self.metadata(snapshot), "lanes": [
-            {"id": lane.ident, "kind": lane.kind,
-             "points": [self.layout.pixel(*pt) for pt in lane.points],
-             "width_px": lane.width_m * self.layout.scale}
-            for lane in self.layout.lanes]}
+    def scene(self, snapshot: ShadowSnapshot, source_id: str = "simulation_camera") -> dict:
+        if source_id not in VIEW_FLIPS:
+            raise ValueError("Unknown native view")
+        meta = self.metadata(snapshot)
+        flip = VIEW_FLIPS[source_id]
+        if flip is not None:
+            for row in meta["agents"]:
+                if flip in (1, -1):
+                    row["x"] = WIDTH - 1 - row["x"]
+                if flip in (0, -1):
+                    row["y"] = HEIGHT - 1 - row["y"]
+        return {**meta, "lanes": deepcopy(self._lanes_by_view[source_id])}
 
     def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
         meta = self.metadata(snapshot)
