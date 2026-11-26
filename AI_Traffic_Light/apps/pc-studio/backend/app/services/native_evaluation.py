@@ -248,6 +248,20 @@ class NativeEvaluationService:
             except Exception as exc:
                 raise self._failure() from exc
 
+    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id):
+        """Same read seam as the legacy frame owner; no authority transfer."""
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if layout_id != self._projection.layout_id:
+                raise self._conflict("Native publication layout mismatch.")
+            return self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+
+    def current_simulation_scene(self, source_id):
+        with self._lock:
+            self._require(self.epoch,self.generation)
+            return self.view_scene(epoch=self.epoch,generation=self.generation,
+                                   tick=self._adapter.snapshot().tick,source_id=source_id)
+
     def capture(self, *, epoch, generation, tick):
         """Bounded four-view ZIP; never writes user datasets."""
         with self._lock:

@@ -419,10 +419,10 @@ class CameraFrameService:
         with self._lock:
             self._simulation_source_id = source_id
 
-    def _simulation_frame_for_locked(self, source_id: str) -> CameraFrame | None:
+    def _simulation_frame_for_locked(self, source_id: str, *, refresh: bool = True) -> CameraFrame | None:
         if not self._simulation_enabled:
             return None
-        if self._simulation_frame is None or not self._simulation_paused:
+        if refresh and (self._simulation_frame is None or not self._simulation_paused):
             self._refresh_simulation_locked()
         original = self._simulation_frame
         if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
@@ -451,6 +451,29 @@ class CameraFrameService:
     def simulation_frame_for(self, source_id: str) -> CameraFrame | None:
         with self._lock:
             return self._simulation_frame_for_locked(source_id)
+
+    def simulation_frames_for(self, source_ids) -> list[CameraFrame]:
+        """One world publication for an entire multi-camera inference batch."""
+        ids = tuple(dict.fromkeys(source_ids))
+        if any(sid not in SIMULATION_CAMERA_SOURCE_IDS for sid in ids):
+            raise ValueError("Unknown simulation camera")
+        with self._lock:
+            if not self._simulation_enabled or not ids:
+                return []
+            if self._simulation_frame is None or not self._simulation_paused:
+                self._refresh_simulation_locked()
+            return [frame for sid in ids
+                    if (frame := self._simulation_frame_for_locked(sid, refresh=False)) is not None]
+
+    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id):
+        """Read the requested current publication without stepping or selecting."""
+        with self._lock:
+            if (not self._simulation_enabled or self._simulation_frame is None or
+                epoch != self._simulation_epoch or generation != self._observation_mode_generation or
+                tick != self._simulation_frame.frame_number or layout_id != LEGACY_LAYOUT_ID):
+                raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,
+                    "Retired legacy simulation publication or layout.", status_code=409)
+            return self._simulation_frame_for_locked(source_id, refresh=False)
 
     def simulation_scene_for(self, source_id: str) -> dict | None:
         """Read the running simulator's actual agents for the optional 3D UI.

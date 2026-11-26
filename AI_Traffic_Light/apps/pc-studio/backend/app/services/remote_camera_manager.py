@@ -806,8 +806,8 @@ class RemoteCameraManager:
             streaming = {source_id for source_id, session in self._sessions.items()
                          if session.streaming_requested}
         if camera_frame_service.simulation_enabled:
-            return [frame for profile in profiles if profile["kind"] == "simulation"
-                    if (frame := camera_frame_service.simulation_frame_for(profile["source_id"])) is not None]
+            return camera_frame_service.simulation_frames_for(
+                profile["source_id"] for profile in profiles if profile["kind"] == "simulation")
         now_ms = self._now_ms()
         frames: list[CameraFrame] = []
         for profile in profiles:

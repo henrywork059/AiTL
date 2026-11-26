@@ -78,6 +78,20 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual((b["x"],b["y"]),simulation_view_point(a["x"],a["y"],1280,720,"simulation_camera_d"))
             first["vehicles"].clear()
             self.assertTrue(service.simulation_scene_for("simulation_camera")["vehicles"])
+            identity=later["observation"]
+            exact={k:identity[k] for k in ("epoch","generation","tick","layout_id","source_id")}
+            self.assertIs(frame,service.exact_simulation_frame(**exact))
+            self.assertEqual(service._simulation_clock_s,.2)
+            # A batch acquires the clock once, even when encoding multiple views.
+            times=iter([.5,1.,1.5,2.])
+            service._simulation_monotonic=lambda:next(times)
+            batch=service.simulation_frames_for(("simulation_camera","simulation_camera_b","simulation_camera_d"))
+            self.assertEqual(len({(f.frame_number,f.received_at_ms) for f in batch}),1)
+            self.assertEqual(service._simulation_clock_s,.5)
+            from app.core.exceptions import AppError
+            with self.assertRaises(AppError):
+                service.exact_simulation_frame(**exact)
+            service._simulation_monotonic=lambda:now[0]
             now[0]=.5
             current=service.simulation_scene_for("simulation_camera")
             self.assertGreater(current["frame_number"],frame.frame_number)

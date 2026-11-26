@@ -339,6 +339,11 @@ function evaluationQuery(state:NativeEvaluationState){
 }
 export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:string){
   const params=evaluationQuery(state);params.set("source_id",sourceId);
+  // New shared exact publication path; no implicit selection or fallback to legacy.
+  if(state.snapshot?.layout_id){
+    params.set("engine","native");params.set("layout_id",state.snapshot.layout_id);
+    return `${API_BASE}/api/camera/simulation/observation/frame?${params}`;
+  }
   return `${nativeEvaluationBase}/frame?${params}`;
 }
 export function nativeEvaluationExportUrl(state:NativeEvaluationState){

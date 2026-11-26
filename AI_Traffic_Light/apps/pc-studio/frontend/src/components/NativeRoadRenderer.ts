@@ -12,7 +12,7 @@ const pose=(t:Track,now:number):Point=>{const f=t.duration?Math.max(0,Math.min(1
 export class NativeRoadRenderer {
   readonly renderer:THREE.WebGLRenderer;
   private scene=new THREE.Scene();
-  private camera=new THREE.PerspectiveCamera(45,1,1,8000);
+  private camera=new THREE.PerspectiveCamera(45,1,5,4000);
   private box=new THREE.BoxGeometry(1,1,1);
   private sphere=new THREE.SphereGeometry(1,10,8);
   private roadGroup=new THREE.Group();
@@ -61,8 +61,10 @@ export class NativeRoadRenderer {
             const count=kind==="crossing"?Math.min(24,Math.max(1,Math.round(len/Math.max(2,(s.pixels_per_m??3.2)*.8)))):1;
             for(let j=0;j<count;j++){
               const along=(j+.5)/count;
-              transform.position.set(a.x+dx*along,index*.5,a.z+dz*along);
-              transform.scale.set(kind==="crossing"?len/count*.55:len+lane.width_px*.08,1,lane.width_px);
+              // Separate overlapping segment top surfaces to avoid coplanar z-fighting.
+              const layer=index*.8+matrices.length/(matrices.length+1)*.12;
+              transform.position.set(a.x+dx*along,layer,a.z+dz*along);
+              transform.scale.set(kind==="crossing"?len/count*.55:len+lane.width_px*.08,.3,lane.width_px);
               transform.rotation.set(0,-Math.atan2(dz,dx),0);transform.updateMatrix();
               matrices.push(transform.matrix.clone());
             }

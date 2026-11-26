@@ -53,7 +53,7 @@ class Tests(unittest.TestCase):
                     self.assertNotIn("views_png_base64", light)
                     self.assertEqual(runtime.status()["snapshot"]["tick"], 1)
                     params = {"source_id": "simulation_camera", "generation": data["generation"], "tick": 1}
-                    with patch.object(runtime._projection, "render", wraps=runtime._projection.render) as render:
+                    with patch.object(runtime._projection, "render_pixels", wraps=runtime._projection.render_pixels) as render:
                         for sid, encoded in data["views_png_base64"].items():
                             response = client.get("/api/camera/simulation/native-frame", params={**params, "source_id": sid})
                             self.assertEqual(response.status_code, 200)
@@ -101,13 +101,13 @@ class Tests(unittest.TestCase):
             generation = runtime.status()["generation"]
             entered, release = Event(), Event()
             results = []
-            original = runtime._projection.render
+            original = runtime._projection.render_pixels
             def blocked(snap):
                 entered.set()
                 if not release.wait(5):
                     raise RuntimeError("test timed out")
                 return original(snap)
-            with patch.object(runtime._projection, "render", side_effect=blocked):
+            with patch.object(runtime._projection, "render_pixels", side_effect=blocked):
                 thread = Thread(target=lambda: results.append(runtime.projection_frame(
                     "simulation_camera", generation=generation, tick=0)))
                 thread.start()

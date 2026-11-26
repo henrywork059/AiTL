@@ -89,6 +89,17 @@ class Tests(unittest.TestCase):
                     v=assert_envelope(client.get(BASE+"/view",params={**identity,"tick":5,"source_id":sid}))["data"]
                     self.assertEqual(v["layout_id"],layout)
                     self.assertEqual(v["frame_number"],5)
+                    shared=assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"native","source_id":sid}))["data"]
+                    self.assertEqual(shared["observation"],v["observation"])
+                    self.assertEqual(shared["agents"],v["agents"])
+                    self.assertFalse(shared["legacy_editor_compatible"])
+                    exact={**identity,"tick":5,"source_id":sid,"layout_id":layout,"engine":"native"}
+                    binary=client.get("/api/camera/simulation/observation/frame",params=exact)
+                    self.assertEqual(binary.status_code,200)
+                    self.assertEqual(binary.headers["x-layout-id"],layout)
+                    self.assertEqual(binary.content,client.get(BASE+"/frame",params={**identity,"tick":5,"source_id":sid}).content)
+                    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"layout_id":"0"*64}),expected_status=409)
+                    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"engine":"legacy"}),expected_status=409)
                     self.assertTrue(v["source_id"].startswith("native_eval_g"))
                     x,y=v["agents"][0]["x"],v["agents"][0]["y"]
                     a=state["snapshot"]["agents"][0]
@@ -125,6 +136,13 @@ class Tests(unittest.TestCase):
                         self.assertEqual(meta["source_frame_number"],5)
                         self.assertEqual(meta["origin"],"synthetic_sumo_projection")
                         self.assertEqual(frame.headers["x-received-at-ms"],str(meta["source_received_at_ms"]))
+                from app.services.inference import InferenceService
+                from app.core.exceptions import AppError
+                detector=InferenceService()
+                native_frame=service.frame(**params,source_id="simulation_camera")
+                with self.assertRaises(AppError) as rejection:
+                    detector.detect_frame(native_frame)
+                self.assertIn("not live detector inputs",str(rejection.exception))
                 result=assert_envelope(client.get(BASE+"/export",params=params))["data"]
                 self.assertEqual(len(result["timeline"]),5)
                 self.assertEqual(result["trip_accounting"]["active"],["v0"])

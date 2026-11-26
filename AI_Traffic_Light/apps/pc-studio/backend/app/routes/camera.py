@@ -462,3 +462,43 @@ class NativeEvaluationRegion(NativeEvaluationIdentity):
 @router.post("/simulation/native-evaluation/region")
 def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) -> dict:
     return ok(native_evaluation_service.evaluate_region(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.get("/simulation/observation")
+def simulation_observation(request: Request, engine: Literal["legacy","native"] = "legacy",
+                           source_id: str = "simulation_camera") -> dict:
+    """Common read-only scene interface, explicit engine and image plane."""
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
+    if engine == "legacy":
+        scene = camera_frame_service.simulation_scene_for(source_id)
+        if scene is None:
+            raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"No active legacy simulation.",status_code=409)
+        agents = scene["view_agents"]
+        time_s = scene["simulation_time_seconds"]
+    else:
+        scene = native_evaluation_service.current_simulation_scene(source_id)
+        agents = scene["agents"]
+        time_s = scene["time_s"]
+    return ok({"engine":engine,"observation":scene["observation"],"agents":agents,
+               "time_s":time_s,"paused":scene["paused"],"signal":scene["signal"],
+               "legacy_editor_compatible":engine=="legacy","physical_output_allowed":False},
+              request_id=request.state.request_id)
+
+
+@router.get("/simulation/observation/frame")
+def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","native"],
+                                       source_id: str, epoch: str,
+                                       generation: int=Query(ge=0),tick: int=Query(ge=0),
+                                       layout_id: str=Query(min_length=64,max_length=64)) -> Response:
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
+    owner = camera_frame_service if engine=="legacy" else native_evaluation_service
+    frame = owner.exact_simulation_frame(epoch=epoch,generation=generation,tick=tick,
+                                        layout_id=layout_id,source_id=source_id)
+    return Response(content=frame.content,media_type=frame.content_type,headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
+        "X-Received-At-Ms":str(frame.received_at_ms),"X-Observation-Origin":frame.origin,
+        "X-Simulation-Engine":engine,"X-Layout-ID":layout_id,
+        "X-Observation-Epoch":epoch,"X-Observation-Generation":str(generation)})

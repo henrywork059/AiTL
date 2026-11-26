@@ -99,7 +99,9 @@ def arm(enabled):
                     for sid in SIMULATION_CAMERA_SOURCE_IDS:
                         scene = assert_envelope(client.get("/api/camera/simulation/scene", params={"source_id": sid}))["data"]
                         assert scene["source_id"] == sid and (scene["width"], scene["height"]) == (1280, 720)
-                        assert abs(scene["simulation_time_seconds"] - now[0]) < 1e-6, scene
+                        assert -1e-6 <= now[0]-scene["simulation_time_seconds"] <= .5+1e-6, scene
+                        assert abs(service._simulation_clock_s-now[0]) < 1e-6
+                        assert scene["observation"]["frame_number"]==scene["frame_number"]
                         signal = scene["signal"]
                         assert not (signal["vehicle_go"] and signal["pedestrian_walk"])
                         phases.add(signal["phase"])
@@ -116,10 +118,15 @@ def arm(enabled):
                         else:
                             flip = {"simulation_camera_b": 0, "simulation_camera_c": 1, "simulation_camera_d": -1}[sid]
                             assert np.array_equal(image, cv2.flip(canonical, flip))
+                        assert int(response.headers["x-received-at-ms"])==scene["observation"]["received_at_ms"]==scene["received_at_ms"]
                         scene.pop("received_at_ms")
+                        # Process-local identity is intentionally unique; compare all deterministic fields.
+                        scene["observation"].pop("epoch")
+                        scene["observation"].pop("received_at_ms")
                         digest.update(json.dumps(scene, sort_keys=True).encode())
                         digest.update(response.content)
                         scenes.append(scene)
+                    assert all(s["frame_number"]==scenes[0]["frame_number"] and s["simulation_time_seconds"]==scenes[0]["simulation_time_seconds"] for s in scenes)
                     assert all(s["vehicles"] == scenes[0]["vehicles"] and
                                s["pedestrians"] == scenes[0]["pedestrians"] for s in scenes)
                     if shadow:

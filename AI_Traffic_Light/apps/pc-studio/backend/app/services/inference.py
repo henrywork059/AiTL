@@ -212,6 +212,12 @@ class InferenceService:
                 status_code=409,
             )
 
+        # Native ground-truth renderings are evaluation-only. Reject accidental
+        # routing into the production detector/cache, even from internal callers.
+        if frame.origin == "synthetic_sumo_projection":
+            raise AppError(ErrorCode.INFERENCE_SOURCE_MISSING,
+                "Native evaluation images are not live detector inputs.",status_code=409)
+
         effective_confidence = round(max(MODEL_CONFIDENCE_MIN, min(1.0, confidence_threshold or DEFAULT_MODEL_CONFIDENCE)), 4)
         detection_key = (*frame.observation.frame_key, effective_confidence)
         with self._state_lock:

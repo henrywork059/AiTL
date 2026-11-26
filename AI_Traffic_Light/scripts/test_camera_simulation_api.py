@@ -77,6 +77,16 @@ def main() -> int:
     )
     assert invalid["error"]["code"] == "ATL-API-002"
 
+    shared=assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"legacy","source_id":"simulation_camera_b"}))["data"]
+    assert shared["legacy_editor_compatible"] and shared["observation"]["detector_input_eligible"]
+    identity=shared["observation"]
+    exact={k:identity[k] for k in ("epoch","generation","tick","layout_id")}
+    exact.update(engine="legacy",source_id="simulation_camera_b")
+    same=client.get("/api/camera/simulation/observation/frame",params=exact)
+    assert same.status_code==200 and same.headers["x-frame-number"]==str(identity["frame_number"])
+    assert same.headers["x-layout-id"]==identity["layout_id"]
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"layout_id":"0"*64}),expected_status=409)
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"engine":"native"}),expected_status=409)
     resumed = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": False}))
     assert resumed["data"]["simulation_paused"] is False
 
