@@ -3,7 +3,7 @@ import type {SimulationScene} from '../src/lib/remoteCameraApi';
 const host=document.getElementById('scene')!;
 const result=document.getElementById('result')!;
 function check(condition:unknown,message:string) {if(!condition)throw new Error(message);}
-function verifyPixels(gl: WebGL2RenderingContext) {
+function verifyPixels(gl: WebGLRenderingContext | WebGL2RenderingContext) {
   const colors = new Set<string>();
   const pixel = new Uint8Array(4);
   for (let y = 1; y <= 9; y++) {
