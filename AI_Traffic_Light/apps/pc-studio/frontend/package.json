@@ -14,12 +14,14 @@
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "three": "0.187.0",
     "typescript": "latest",
     "vite": "8.3.8"
   },
   "devDependencies": {
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "@types/three": "0.187.0"
   },
   "overrides": {
     "source-map-js": "1.2.2"

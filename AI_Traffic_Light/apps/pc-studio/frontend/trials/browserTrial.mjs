@@ -17,4 +17,7 @@ try {
   const shot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-shot','--screenshot='+png,url],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(shot.status!==0||!existsSync(png)||readFileSync(png).length<1000)throw new Error('Screenshot missing');
   console.log('[PASS] actual headless WebGL draw, top view, context loss callback, repeated disposal and screenshot');
+  const integration=spawnSync(edge,[...args,'--user-data-dir='+profile+'-integration','--dump-dom','http://127.0.0.1:4179/integration.html'],{encoding:'utf8',timeout:45000,windowsHide:true});
+  if(integration.status!==0||!integration.stdout.includes('<div id="result">MESH_INTEGRATION_PASS</div>'))throw new Error('Production integration trial failed: '+integration.stdout.slice(-2000)+' '+integration.stderr.slice(-1500));
+  console.log('[PASS] production React renderer opt-in, source change, top view, editor/overlay fallback, loss/retry, rollback and cleanup');
 } finally {server.kill();}

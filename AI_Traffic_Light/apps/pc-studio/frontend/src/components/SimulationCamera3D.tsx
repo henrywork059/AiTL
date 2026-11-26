@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
 import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from "./simulation3dMotion";
+import { ThreeRoadView } from "./ThreeRoadView";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -44,6 +45,9 @@ export function SimulationCamera3D({
   const [orbit, setOrbit] = useState(initialOrbit);
   const [pitch, setPitch] = useState(48);
   const [zoom, setZoom] = useState(0.85);
+  const [threeRequested, setThreeRequested] = useState(false);
+  const [threeFailed, setThreeFailed] = useState(false);
+  const onThreeFailure = useCallback(() => setThreeFailed(true), []);
   const drag = useRef<{ x: number; y: number; orbit: number; pitch: number } | null>(null);
   const previousPositions = useRef<{
     sourceId: string;
@@ -127,17 +131,21 @@ export function SimulationCamera3D({
   const vehicleSignalPoint = simulationSourcePoint(sizeX * 0.36, sizeY * 0.26, sourceId, sizeX, sizeY);
   const pedestrianSignalPoint = simulationSourcePoint(sizeX * 0.61, sizeY * 0.88, sourceId, sizeX, sizeY);
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
+  // The legacy world owns source-pixel overlays and editing until projection parity is tested.
+  const canUseThree = !editing && !hasOverlay && activeScene !== null && sizeX === 1280 && sizeY === 720;
+  const usingThree = canUseThree && threeRequested && !threeFailed;
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
   const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
 
   return (
-    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`}>
+    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`} data-renderer={usingThree ? "three" : "legacy"}>
       <div className="sim3d-viewport" tabIndex={editing ? undefined : 0}
         aria-label="3D camera view: arrow keys orbit and tilt, plus or minus zoom, Home resets"
         onKeyDown={editing ? undefined : keyboardCamera}
         onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
         onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
-        <div className="sim3d-world" aria-hidden="true" style={{
+        {usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
+          orbit={orbit} pitch={pitch} zoom={zoom} onFailure={onThreeFailure} /> : <div className="sim3d-world" aria-hidden="true" style={{
           transform: editing
             ? "translate(-50%, -50%) scale(1) rotateX(0deg) rotateZ(0deg)"
             : `translate(-50%, -50%) scale(${zoom}) rotateX(${pitch}deg) rotateZ(${orbit}deg)`,
@@ -233,7 +241,7 @@ export function SimulationCamera3D({
               })}
             </svg>
           )}
-        </div>
+        </div>}
       </div>
       <div className="sim3d-head">
         <span className="sim3d-flag">3D CAMERA</span>
@@ -241,6 +249,12 @@ export function SimulationCamera3D({
         {activeScene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       {!editing && <div className="sim3d-actions">
+        <button type="button" disabled={!canUseThree} aria-pressed={usingThree}
+          title={hasOverlay ? "Hide detection and region overlays to try Three.js" : "Experimental 3D road preview; coarse agents"}
+          onClick={() => {
+            if (threeFailed) { setThreeFailed(false); setThreeRequested(true); }
+            else setThreeRequested(current => !current);
+          }}>{usingThree ? "Legacy view" : threeFailed ? "Retry Three.js" : "Three.js preview"}</button>
         <button type="button" onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
         <button type="button" onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
           {pitch === 0 ? "Perspective" : "Top"}
@@ -256,7 +270,7 @@ export function SimulationCamera3D({
           <span>{activeScene.vehicles.length} vehicles · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
       </div>
-      {!editing && <span className="sim3d-hint">Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
+      {!editing && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · coarse agents · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
       {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );

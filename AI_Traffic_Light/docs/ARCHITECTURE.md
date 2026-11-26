@@ -197,3 +197,8 @@ Audit results are time-specific and do not establish absence of all vulnerabilit
 ### Opt-in SUMO runtime integration (0_5_67 candidate)
 
 The existing CameraFrameService remains the sole authoritative simulator/camera owner and forwards committed virtual phase observations only to an opt-in ShadowRuntime. A bounded worker drives a separate libsumo child on local IPC; no native imports in the parent, no new network listener, no changes to physical camera or signal decision state. Default off (unset MESH_SUMO_SHADOW); controlled native and dependency CI gates passed on 22f; exact release commit CI and owner acceptance pending. Read-only synthetic diagnostics remain separate, with reset/stop/failure invalidation. Restricted generated four-arm geometry and east-west demand are not equivalent to the legacy cyclic single-crosswalk scene. No field or matched comparative performance evidence.
+
+
+### Optional road renderer (S03 preparation)
+
+`SimulationCamera3D` retains camera controls, scene polling, source match and legacy overlay/editor plane. `ThreeRoadView` owns only WebGL lifecycle and viewport resize; `RoadRenderer` consumes immutable snapshots and canonical `roadGeometry.ts` reference pixels. Trial imports the same renderer. Opt-in, fallback on unsupported view/context failure; no simulator or signal authority. See [integration evidence](S03_RENDERER_INTEGRATION.md).
