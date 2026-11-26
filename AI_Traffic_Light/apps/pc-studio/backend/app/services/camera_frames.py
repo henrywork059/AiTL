@@ -511,6 +511,13 @@ class CameraFrameService:
             return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
         return self._shadow.projection_bundle(scene_only=scene_only)
 
+    def native_projection_frame(self, source_id: str, *, generation: int, tick: int) -> CameraFrame | None:
+        if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
+            raise ValueError("Unknown native simulation view")
+        if self._shadow is None:
+            return None
+        return self._shadow.projection_frame(source_id, generation=generation, tick=tick)
+
     def close_shadow(self) -> None:
         if self._shadow is not None:
             self._shadow.close()

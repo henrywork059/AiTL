@@ -146,11 +146,21 @@ def arm(enabled):
                     assert scene_only["snapshot"]["agents"] == projection["snapshot"]["agents"]
                     assert scene_only["snapshot"]["lanes"] and "views_png_base64" not in scene_only
                     assert scene_only["snapshot"]["tick"] == projection["snapshot"]["tick"]
-                    for encoded in projection["views_png_base64"].values():
+                    for sid, encoded in projection["views_png_base64"].items():
                         image = cv2.imdecode(np.frombuffer(base64.b64decode(encoded), np.uint8), cv2.IMREAD_COLOR)
                         assert image.shape == (720, 1280, 3)
+                        params = {"source_id":sid, "generation":projection["generation"], "tick":projection["snapshot"]["tick"]}
+                        first = client.get("/api/camera/simulation/native-frame", params=params)
+                        second = client.get("/api/camera/simulation/native-frame", params=params)
+                        assert first.status_code == second.status_code == 200
+                        assert first.content == second.content == base64.b64decode(encoded)
+                        assert first.headers["x-received-at-ms"] == second.headers["x-received-at-ms"] == str(scene_only["snapshot"]["received_at_ms"])
+                        assert first.headers["x-observation-origin"] == "synthetic_sumo_projection"
+                        assert first.headers["x-camera-source"].startswith("native_eval_g")
+                    assert_envelope(client.get("/api/camera/simulation/native-frame", params={**params,"tick":params["tick"]-1}), expected_status=409)
                 else:
                     assert projection["status"] == "disabled" and projection["snapshot"] is None
+                    assert_envelope(client.get("/api/camera/simulation/native-frame", params={"source_id":"simulation_camera","generation":0,"tick":0}), expected_status=409)
                 # Pause must freeze both clocks; native state stays diagnostic.
                 paused = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": True}))["data"]
                 assert paused["simulation_paused"]
@@ -185,6 +195,7 @@ def arm(enabled):
                 if shadow:
                     assert shadow.status()["snapshot"] is None and shadow.status()["status"] == "idle"
                     assert assert_envelope(client.get("/api/camera/simulation/native-projection"))["data"]["snapshot"] is None
+                    assert_envelope(client.get("/api/camera/simulation/native-frame", params=params), expected_status=409)
                 else:
                     assert service.shadow_diagnostics()["status"] == "disabled"
                 resource = {"wall_s": wall_s, "before": before, "after": after,
@@ -196,6 +207,7 @@ def arm(enabled):
                         "native_max_agents": max_native_agents, "captures": 4,
                         "zone_round_trip": True, "pause_resume_reset_stop": True,
                         "native_projection_api": "verified" if enabled else "disabled_verified",
+                        "native_binary_frame_api": "four exact cached views and stale rejection" if enabled else "disabled_verified",
                         "resources": resource}
             finally:
                 service.set_simulation(False)

@@ -238,3 +238,7 @@ See [Patch 0_5_71](PATCH_0_5_71.md).
 The optional `CorridorSession(seed)` generates a trusted two-junction SUMO fixture with centres 45 m apart and directed vehicle route WA → AB → BE. It reuses the pinned native child process, lane-leader exit-space admission and validated per-junction phase mapping. SUMO owns continuous vehicle motion and persistent IDs. `set_junction_phases` requires explicit virtual phases for both A and B; independently validated permissions, internal vehicle occupancy and pedestrian crossing occupancy restrict each junction. The downstream exit-space gate prevents upstream admission during observed spillback. No new dependency, saved topology integration, HTTP endpoint, frontend selection, physical output or live signal authority; standard shadow and legacy defaults remain unchanged.
 
 See [Patch 0_5_72](PATCH_0_5_72.md).
+
+### Native diagnostic frame publishing (Update 28 preparation)
+
+The optional ShadowRuntime owns native observations from committed legacy phase steps. NativeProjection provides independent network geometry; NativeFramePublisher caches only one validated current-generation tick for diagnostic bundle and exact binary frame reads, with encoding outside the camera/worker condition lock and revalidation before publication. Scene-only reads avoid PNG work. Native IDs and explicit synthetic provenance never enter selected camera, saved sources, detector, editor or signal authority. Legacy remains authoritative; see [migration gates](SIMULATOR_MIGRATION_GATES.md).

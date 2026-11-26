@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Condition, Lock, Thread
+import time
 
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import PHASES, generate_controlled_fixture
@@ -53,6 +54,8 @@ class ShadowRuntime:
         self._projection_enabled = projection_enabled
         self._projection = None
         self._projection_lock = Lock()
+        self._frame_cache = None
+        self._snapshot_received_at_ms = None
         self._max_backlog = max_backlog
         self._cv = Condition()
         self._events = deque()
@@ -73,6 +76,8 @@ class ShadowRuntime:
         self._phases.clear()
         self._snapshot = self._permission = self._requested_phase = None
         self._projection = None
+        self._frame_cache = None
+        self._snapshot_received_at_ms = None
         self._legacy_steps = 0
         self._state, self._reason = state, reason
 
@@ -143,38 +148,89 @@ class ShadowRuntime:
             'agents': [dict(asdict(a), id=a.id) for a in snap.agents]}
         return result
 
+    def _cached_publisher(self, generation, snap, projection, received_at_ms):
+        """Called only under the encoder lock; cache exactly one current tick."""
+        with self._cv:
+            cached = self._frame_cache
+            if cached is not None and cached[0] == generation and cached[1] is snap:
+                return cached[2]
+        # Lazy import avoids importing CameraFrameService during module setup.
+        from app.services.sumo_frame_publisher import NativeFramePublisher
+        publisher = NativeFramePublisher()
+        publisher.begin(generation)
+        meta, views = projection.render(snap)
+        publisher.publish(meta, views, received_at_ms=received_at_ms)
+        with self._cv:
+            if generation != self._generation or self._snapshot is not snap or self._state != "running":
+                return None
+            self._frame_cache = (generation, snap, publisher)
+        return publisher
+
+    def projection_frame(self, source_id: str, *, generation: int, tick: int):
+        """Exact current diagnostic observation only; no fallback to another tick."""
+        if not self._projection_enabled:
+            return None
+        with self._cv:
+            snap, projection = self._snapshot, self._projection
+            received_at_ms = self._snapshot_received_at_ms
+            if (self._state != "running" or generation != self._generation or
+                    snap is None or snap.tick != tick or projection is None):
+                return None
+        if not self._projection_lock.acquire(blocking=False):
+            return None
+        try:
+            publisher = self._cached_publisher(generation, snap, projection, received_at_ms)
+            frame = None if publisher is None else publisher.frame_for(source_id)
+        except Exception:
+            return None
+        finally:
+            self._projection_lock.release()
+        with self._cv:
+            if generation != self._generation or self._snapshot is not snap or self._state != "running":
+                return None
+            return frame
+
     def projection_bundle(self, *, scene_only: bool = False) -> dict:
-        """Read one coherent, generation-scoped diagnostic snapshot; never step."""
+        """Read one coherent generation-scoped diagnostic snapshot; never step."""
         if not self._projection_enabled:
             return {"status": "disabled", "provenance": "synthetic_sumo_projection", "snapshot": None}
         with self._cv:
             generation = self._generation
             snap, projection = self._snapshot, self._projection
+            received_at_ms = self._snapshot_received_at_ms
             state = self._state
         empty = {"status": state, "provenance": "synthetic_sumo_projection",
                  "generation": generation, "snapshot": None}
         if snap is None or projection is None or state != "running":
             return empty
-        # One bounded encoder at a time; never block the camera/worker on PNG I/O.
-        if not self._projection_lock.acquire(blocking=False):
-            return {**empty, "status": "busy"}
-        try:
-            from app.services.sumo_projection import export_csv
-            if scene_only:
-                bundle = {**empty, "snapshot": projection.scene(snap)}
-            else:
-                meta, views = projection.render(snap)
-                bundle = {**empty, "snapshot": meta,
-                          "views_png_base64": {sid: b64encode(data).decode("ascii") for sid, data in views.items()},
-                          "agents_csv": export_csv(meta)}
-        except Exception:
-            bundle = {**empty, "status": "unavailable"}
-        finally:
-            self._projection_lock.release()
+        if scene_only:
+            try:
+                bundle = {**empty, "snapshot": {**projection.scene(snap), "received_at_ms": received_at_ms}}
+            except Exception:
+                bundle = {**empty, "status": "unavailable"}
+        else:
+            if not self._projection_lock.acquire(blocking=False):
+                return {**empty, "status": "busy"}
+            try:
+                from app.services.sumo_projection import export_csv, VIEW_FLIPS
+                publisher = self._cached_publisher(generation, snap, projection, received_at_ms)
+                if publisher is None:
+                    bundle = {**empty, "status": "busy"}
+                else:
+                    meta = {**projection.metadata(snap), "received_at_ms": received_at_ms}
+                    bundle = {**empty, "snapshot": meta,
+                              "views_png_base64": {sid: b64encode(publisher.frame_for(sid).content).decode("ascii") for sid in VIEW_FLIPS},
+                              "agents_csv": export_csv(meta)}
+            except Exception:
+                bundle = {**empty, "status": "unavailable"}
+            finally:
+                self._projection_lock.release()
         with self._cv:
             if generation != self._generation or self._state != "running":
                 return {"status": self._state, "provenance": "synthetic_sumo_projection",
                         "generation": self._generation, "snapshot": None}
+            if self._snapshot is not snap:
+                return {**empty, "status": "busy"}
         return bundle
 
     def _run(self) -> None:
@@ -214,6 +270,8 @@ class ShadowRuntime:
                 with self._cv:
                     if generation == self._generation:
                         self._snapshot, self._permission = snap, permission
+                        self._snapshot_received_at_ms = time.time_ns() // 1_000_000
+                        self._frame_cache = None
                         self._projection = projection
                         self._requested_phase = arg if action == 'step' else None
                         self._state = 'running'

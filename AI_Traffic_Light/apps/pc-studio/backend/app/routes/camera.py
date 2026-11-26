@@ -136,6 +136,26 @@ def simulation_native_projection(request: Request, format: Literal["bundle", "sc
     return ok(camera_frame_service.native_projection_diagnostics(scene_only=format == "scene"), request_id=request.state.request_id)
 
 
+@router.get("/simulation/native-frame")
+def simulation_native_frame(request: Request, source_id: str,
+                            generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    """Return only the requested current diagnostic tick; never a selected camera."""
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Unknown native simulation view.", status_code=422)
+    frame = camera_frame_service.native_projection_frame(source_id, generation=generation, tick=tick)
+    if frame is None:
+        raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED, "Native observation is disabled, busy or no longer current.", status_code=409)
+    return Response(content=frame.content, media_type=frame.content_type, headers={
+        "Cache-Control": "no-store, max-age=0",
+        "X-Request-ID": request.state.request_id,
+        "X-Camera-Source": frame.source_id,
+        "X-Frame-Number": str(frame.frame_number),
+        "X-Native-Generation": str(generation),
+        "X-Received-At-Ms": str(frame.received_at_ms),
+        "X-Observation-Origin": frame.origin,
+    })
+
+
 @router.get("/live.mjpeg")
 def live_camera_mjpeg(request: Request, source_id: str | None = Query(default=None)) -> StreamingResponse:
     """Low-latency preview with per-camera views for the simulated pair."""

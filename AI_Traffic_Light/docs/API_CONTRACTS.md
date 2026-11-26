@@ -474,3 +474,7 @@ No HTTP, saved topology or diagnostic schema change. `CorridorSession(seed)` own
 ### Update 28d scene-only projection (not a release)
 
 Optional `format=scene` on the existing experimental projection GET returns the same status/provenance/generation and snapshot metadata/agents plus canonical A pixel `lanes` (id, kind, points, width_px). No PNG or CSV encoding in this mode. Default `bundle` response preserved. The frontend uses a separately opted-in diagnostic SVG view; no capture, saved source, editor, detector or signal authority change.
+
+### Update 28g exact native binary frame (not a release)
+
+`GET /api/camera/simulation/native-frame?source_id=simulation_camera&generation=1&tick=0` requires a current opted-in shadow observation. Returns PNG bytes, `X-Camera-Source` (native_eval generation namespace), `X-Frame-Number`, `X-Native-Generation`, `X-Received-At-Ms`, `X-Observation-Origin: synthetic_sumo_projection`, request ID and no-store. Both projection formats add snapshot received_at_ms. Exact snapshot only; disabled/busy/stale/retired 409; invalid view 422. Bundle and binary requests share a single current validated publication; scene-only does not encode. No selected/saved camera, capture, AI or signal authority change.
