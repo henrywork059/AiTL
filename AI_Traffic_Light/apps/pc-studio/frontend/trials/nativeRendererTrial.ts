@@ -30,6 +30,10 @@ async function run(){
     if(renderer.renderer.info.render.triangles<=0)throw Error("Native detail draw missing");
     renderer.render(false);
     if(renderer.renderer.info.render.triangles<=0||renderer.renderer.info.render.calls<=0)throw Error("No WebGL draw");
+    const triangles=renderer.renderer.info.render.triangles;
+    renderer.update({...scene,generation:scene.generation-1,agents:[],lanes:[]});
+    renderer.render(false);
+    if(renderer.renderer.info.render.triangles!==triangles)throw Error("Retired generation replaced active scene");
     source.textContent=(actual?"Executed SUMO capture":"Illustrative native scene fixture")+
       ` · seed ${scene.seed} · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents`;
     result.textContent="MESH_NATIVE_RENDERER_PASS";

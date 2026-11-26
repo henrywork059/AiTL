@@ -25,7 +25,7 @@ from app.services.simulation_gate_metrics import GateMetrics, STEP_S
 from app.services.sumo_frame_publisher import NativeFramePublisher
 from app.services.sumo_projection import NativeProjection, Projection, PROVENANCE, VIEW_FLIPS, export_csv
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
-from app.services.sumo_shadow_fixture import DENSITY_COUNTS, PHASES, PhaseMap
+from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
@@ -50,6 +50,7 @@ class NativeEvaluationService:
         self._paused = False
         self._policy = None
         self._demand_digest = None
+        self._geometry = None
 
     @staticmethod
     def _conflict(message):
@@ -76,6 +77,7 @@ class NativeEvaluationService:
         self._paused = False
         self._policy = None
         self._demand_digest = None
+        self._geometry = None
         self._state = state
         try:
             if adapter is not None:
@@ -91,10 +93,10 @@ class NativeEvaluationService:
             pass
         return AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Native evaluation failed and was retired.", status_code=503)
 
-    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None):
+    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard'):
         with self._lock:
             self._require(epoch, generation, running=False)
-            if density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
+            if geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
                 raise AppError(ErrorCode.INVALID_REQUEST, "Invalid native evaluation settings.", status_code=422)
             try:
                 self._retire()
@@ -110,7 +112,10 @@ class NativeEvaluationService:
                 self._policy = self._controller.save_config(config)
                 self._controller.reset_runtime(0.)
                 def open_session(value):
-                    self._session = self._factory(value, density=density)
+                    kwargs = {'density': density}
+                    if geometry != 'standard':
+                        kwargs['geometry'] = geometry
+                    self._session = self._factory(value, **kwargs)
                     return self._session
                 self._adapter = SumoShadowAdapter(open_session)
                 self._adapter.reset(seed=seed)
@@ -124,6 +129,7 @@ class NativeEvaluationService:
                 self._publisher.begin(self.generation)
                 self._received_at_ms = time.time_ns() // 1_000_000
                 self._density, self._mode = density, mode
+                self._geometry = geometry
                 self._state = "running"
                 return self.scene()
             except Exception as exc:
@@ -200,12 +206,12 @@ class NativeEvaluationService:
             if self._state == "running":
                 snap = self._adapter.snapshot()
                 snapshot = {**self._projection.scene(snap, source_id),"received_at_ms":self._received_at_ms,
-                    "paused":self._paused,"density":self._density,"signal":deepcopy(self._signal),
+                    "paused":self._paused,"density":self._density,"geometry":self._geometry,"signal":deepcopy(self._signal),
                     "epoch":self.epoch,"profile":self._policy["active_profile"],
                     "legacy_editor_compatible":False}
             return {"status":self._state,"provenance":PROVENANCE,"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
-                "density":self._density,"max_ticks":MAX_TICKS,"native_only":True,
+                "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":True,
                 "profile":self._policy["active_profile"] if self._policy else None,"physical_output_allowed":False}
 
     def _ensure_frames(self):
@@ -254,7 +260,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,tick)
             return {"schema_version":1,"provenance":"synthetic_native_gate_evaluation",
                 "metric_contract":"normalized_physical_service_gate_v1","seed":self._adapter.snapshot().seed,
-                "mode":self._mode,"density":self._density,"step_s":STEP_S,"summary":self._metrics.summary(),
+                "mode":self._mode,"density":self._density,"geometry":self._geometry,"step_s":STEP_S,"summary":self._metrics.summary(),
                 "timeline":deepcopy(self._timeline),"observed_routes":deepcopy(self._routes.seen_roads),
                 "layout_id":self._projection.layout_id,"coordinate_space":"native_projection_v1",
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
@@ -288,7 +294,7 @@ class NativeEvaluationService:
                     "coordinate_space":coordinate_space,"layout_id":layout_id,**result,
                     "provenance":"synthetic_native_region_evaluation","persisted":False,"physical_output_allowed":False}
 
-    def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None):
+    def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard'):
         """Run a bounded pair with one immutable copy of the saved policy.
 
         Only when standalone evaluation is idle. No changes to the saved profile,
@@ -299,7 +305,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,running=False)
             if self._state == "running":
                 raise self._conflict("Stop the active native evaluation before comparing policies.")
-            if density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
+            if geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
                 raise AppError(ErrorCode.INVALID_REQUEST,"Invalid native comparison settings.",status_code=422)
             policy=deepcopy(signal_rules_service.get_config())
             selected=profile or policy.get("active_profile")
@@ -312,7 +318,7 @@ class NativeEvaluationService:
             try:
                 for mode in ("fixed","adaptive"):
                     initial=child.start(epoch=child.epoch,generation=child.generation,density=density,
-                        seed=seed,mode=mode,policy_config=policy,profile=selected)
+                        seed=seed,mode=mode,policy_config=policy,profile=selected,geometry=geometry)
                     gen=initial["generation"]
                     horizon=duration_seconds*5
                     for tick in range(0,horizon,MAX_BATCH):
@@ -327,7 +333,7 @@ class NativeEvaluationService:
                 raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=409) from exc
             meta={"schema_version":1,"evidence":"executed_synthetic_native_comparison",
                 "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
-                "layout_id":pair["fixed"]["layout_id"],"profile":selected,"density":density,"seed":seed,
+                "layout_id":pair["fixed"]["layout_id"],"geometry":geometry,"profile":selected,"density":density,"seed":seed,
                 "duration_seconds":duration_seconds,"demand_digest":pair["fixed"]["demand_digest"],"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
                 "production_experiment_parity":False,"physical_output_allowed":False,
                 "limitations":"Same native finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained."}

@@ -18,7 +18,7 @@ def summarize_timeline(timeline,summary):
 
 
 def validate_pair(fixed,adaptive):
-    keys=("seed","density","layout_id","demand_digest","metric_contract","step_s")
+    keys=("seed","density","geometry","layout_id","demand_digest","metric_contract","step_s")
     if any(fixed.get(k)!=adaptive.get(k) or fixed.get(k) is None for k in keys):
         raise ValueError("Native comparison arms are not matched")
     if fixed["mode"]!="fixed" or adaptive["mode"]!="adaptive":

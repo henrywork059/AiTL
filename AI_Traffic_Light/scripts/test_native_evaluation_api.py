@@ -71,7 +71,9 @@ class Tests(unittest.TestCase):
                  patch.object(routes,"native_evaluation_service",service), TestClient(build_test_app()) as client:
                 state=assert_envelope(client.get(BASE))["data"]
                 identity={k:state[k] for k in ("epoch","generation")}
+                assert_envelope(client.post(BASE+"/start",json={**identity,"geometry":"unknown"}),expected_status=422)
                 state=assert_envelope(client.post(BASE+"/start",json={**identity,"density":"busy","mode":"adaptive"}))["data"]
+                self.assertEqual(state["geometry"],"standard")
                 identity={k:state[k] for k in ("epoch","generation")}
                 step={**identity,"tick":0,"steps":5}
                 state=assert_envelope(client.post(BASE+"/step",json=step))["data"]
@@ -144,6 +146,7 @@ class Tests(unittest.TestCase):
                 with ZipFile(io.BytesIO(archive)) as z:
                     m=json.loads(z.read("manifest.json"))
                     self.assertFalse(m["production_experiment_parity"])
+                    self.assertEqual(m["geometry"],"standard")
                     self.assertEqual(len(m["demand_digest"]),64)
                     self.assertIn("deltas.json",z.namelist())
                     self.assertEqual(m["profile"],policy.get_config()["active_profile"])

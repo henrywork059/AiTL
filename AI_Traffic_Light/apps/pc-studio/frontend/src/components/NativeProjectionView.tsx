@@ -39,6 +39,7 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
   const [failed,setFailed]=useState(false);
   const [pending,setPending]=useState(false);
   const [density,setDensity]=useState("normal");
+  const [geometry,setGeometry]=useState("standard");
   const [mode,setMode]=useState("fixed");
   const latest=useRef({epoch:"",generation:-1,tick:-1});
   const active=useRef<AbortController|null>(null);
@@ -103,7 +104,7 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
     const controller=new AbortController();active.current=controller;setPending(true);setComparisonUrl(null);
     try{
       await polling.waitForIdle();if(controller.signal.aborted)return;
-      const blob=await runNativeComparison(state,density,controller.signal,seed,duration,profile);
+      const blob=await runNativeComparison(state,density,controller.signal,seed,duration,profile,geometry);
       if(!controller.signal.aborted)setComparisonUrl(URL.createObjectURL(blob));
     }catch{if(!controller.signal.aborted)setStatus("Native comparison failed");}
     finally{active.current=null;if(!controller.signal.aborted)setPending(false);}
@@ -128,10 +129,11 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
         {three&&<><button type="button" onClick={()=>setTop(!top)}>{top?"Native perspective":"Native top"}</button><button type="button" onClick={()=>setDetail(!detail)}>{detail?"Native overview":"Native detail"}</button></>}
         {standalone&&<button type="button" onClick={()=>{setRegion(false);setThree(false);setImage(!image);}}>{image?"Native scene":"Native PNG"}</button>}</>}
       {standalone&&state&&state.status!=="disabled"&&<>
+        <select aria-label="Native geometry" value={geometry} disabled={pending} onChange={e=>setGeometry(e.target.value)}><option value="standard">Standard junction</option><option value="compact">Compact junction</option><option value="elongated">Elongated junction</option></select>
         <select aria-label="Native density" value={density} disabled={pending} onChange={e=>setDensity(e.target.value)}><option>light</option><option>normal</option><option>busy</option></select>
         <select aria-label="Native policy" value={mode} disabled={pending} onChange={e=>setMode(e.target.value)}><option>fixed</option><option>adaptive</option></select>
         <label>Seed <input aria-label="Native seed" type="number" min={0} max={2147483647} value={seed} disabled={pending} onChange={e=>setSeed(Number(e.target.value))} style={{width:90}}/></label>
-        <button type="button" disabled={pending||!validSeed} onClick={()=>void command("start",{density,mode,seed})}>{scene?"Reset native evaluation":"Start native evaluation"}</button>
+        <button type="button" disabled={pending||!validSeed} onClick={()=>void command("start",{density,mode,seed,geometry})}>{scene?"Reset native evaluation":"Start native evaluation"}</button>
         {!scene&&<><label>Duration <select value={duration} disabled={pending} onChange={e=>setDuration(Number(e.target.value))}>{[30,60,180,300,500].map(v=><option key={v} value={v}>{v}s</option>)}</select></label><button type="button" disabled={pending||!validSeed} onClick={()=>void compare()}>Compare fixed/adaptive</button>
           {comparisonUrl&&<a href={comparisonUrl} download="mesh-native-comparison.zip">Comparison ZIP</a>}</>}
         {scene&&<>
@@ -148,7 +150,7 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
         </>}
       </>}
     </div>
-    <span role="status">{status}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene?" · Separate native coordinate plane":""}</span>
+    <span role="status">{status}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene?" · Separate native coordinate plane":""}</span>
   </div>;
 }
 

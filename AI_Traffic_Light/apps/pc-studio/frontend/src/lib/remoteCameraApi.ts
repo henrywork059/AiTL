@@ -317,7 +317,7 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   );
 }
 
-export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;native_only:true;physical_output_allowed:false};
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|null;native_only:true;physical_output_allowed:false};
 const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
 export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
@@ -340,10 +340,10 @@ export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:st
 export function nativeEvaluationExportUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
 }
-export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string):Promise<Blob>{
+export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string,geometry="standard"):Promise<Blob>{
   const response=await fetch(`${API_BASE}/api/traffic/native-experiments`,{
     method:"POST",headers:{"Content-Type":"application/json"},signal,
-    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null}),
+    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null,geometry}),
   });
   if(!response.ok||!response.headers.get("content-type")?.includes("application/zip"))
     throw new Error("Native comparison rejected or unavailable");

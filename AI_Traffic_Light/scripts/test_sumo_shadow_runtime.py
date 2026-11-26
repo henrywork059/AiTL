@@ -98,6 +98,23 @@ class Tests(unittest.TestCase):
             write_scenario(root)
             self.assertEqual({r.get('edges') for r in ET.parse(root / 'routes.xml').getroot().findall('route')}, {'WC CE', 'NC CS'})
 
+    def test_bounded_geometry_presets_preserve_demand_and_topology(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            write_scenario(root, controlled=True, density="normal")
+            routes=(root/"routes.xml").read_bytes()
+            edges=(root/"edges.xml").read_bytes()
+            for geometry,expected in (("compact",("60","60")),("elongated",("100","60"))):
+                write_scenario(root, controlled=True, density="normal", geometry=geometry)
+                self.assertEqual((root/"routes.xml").read_bytes(),routes)
+                self.assertEqual((root/"edges.xml").read_bytes(),edges)
+                nodes=ET.parse(root/"nodes.xml").getroot()
+                self.assertEqual((nodes.find("node[@id='E']").get("x"),nodes.find("node[@id='N']").get("y")),expected)
+            with self.assertRaises(ValueError):
+                write_scenario(root, controlled=True, density="normal", geometry="unknown")
+            with self.assertRaises(ValueError):
+                write_scenario(root, geometry="compact")
+
     def test_fixed_step_reset_stop_and_phase_mapping(self):
         sessions = []
         def factory(seed):

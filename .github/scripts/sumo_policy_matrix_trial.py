@@ -26,29 +26,31 @@ def main(out):
         service = NativeEvaluationService(enabled=True)
         try:
             with patch("app.services.native_evaluation.signal_rules_service", policy):
-                for seed in (42, 73):
-                    for density in ("light", "normal", "busy"):
-                        start = time.perf_counter()
-                        archive = service.compare(epoch=service.epoch,
-                            generation=service.generation, seed=seed,
-                            density=density, duration_seconds=120)
-                        elapsed = time.perf_counter()-start
-                        name = f"{seed}-{density}.zip"
-                        (out/name).write_bytes(archive)
-                        with ZipFile(io.BytesIO(archive)) as z:
-                            manifest = json.loads(z.read("manifest.json"))
-                            deltas = json.loads(z.read("deltas.json"))
-                            summaries = {}
-                            for mode in ("fixed", "adaptive"):
-                                arm = json.loads(z.read(mode+".json"))
-                                assert len(arm["timeline"]) == 600
-                                assert arm["seed"] == seed and arm["density"] == density
-                                for kind, waits in arm["waiting_episodes"].items():
-                                    assert waits["observed_agent_seconds"] == arm["summary"][kind+"_wait_agent_s"]
-                                summaries[mode] = arm["summary"]
-                            rows.append({"archive":name,"seed":seed,"density":density,
-                                "wall_s":elapsed,"demand_digest":manifest["demand_digest"],
-                                "summaries":summaries,"deltas":deltas})
+                cases=[(seed,density,"standard") for seed in (42,73) for density in ("light","normal","busy")]
+                cases += [(42,"normal",geometry) for geometry in ("compact","elongated")]
+                for seed,density,geometry in cases:
+                    start = time.perf_counter()
+                    archive = service.compare(epoch=service.epoch,
+                        generation=service.generation, seed=seed,
+                        density=density, duration_seconds=120, geometry=geometry)
+                    elapsed = time.perf_counter()-start
+                    name = f"{seed}-{density}-{geometry}.zip"
+                    (out/name).write_bytes(archive)
+                    with ZipFile(io.BytesIO(archive)) as z:
+                        manifest = json.loads(z.read("manifest.json"))
+                        deltas = json.loads(z.read("deltas.json"))
+                        summaries = {}
+                        for mode in ("fixed", "adaptive"):
+                            arm = json.loads(z.read(mode+".json"))
+                            assert len(arm["timeline"]) == 600
+                            assert arm["seed"] == seed and arm["density"] == density and arm["geometry"] == geometry
+                            for kind, waits in arm["waiting_episodes"].items():
+                                assert waits["observed_agent_seconds"] == arm["summary"][kind+"_wait_agent_s"]
+                            summaries[mode] = arm["summary"]
+                        rows.append({"archive":name,"seed":seed,"density":density,"geometry":geometry,"layout_id":manifest["layout_id"],
+                            "wall_s":elapsed,"demand_digest":manifest["demand_digest"],
+                            "summaries":summaries,"deltas":deltas})
+            assert len({row["layout_id"] for row in rows}) == 3
             assert policy.config_path.read_bytes() == original
         finally:
             service.close()

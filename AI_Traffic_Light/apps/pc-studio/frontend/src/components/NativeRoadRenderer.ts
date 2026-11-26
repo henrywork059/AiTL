@@ -20,6 +20,7 @@ export class NativeRoadRenderer {
   private tracks=new Map<string,Track>();
   private generation=-1;
   private tick=-1;
+  private layoutId:string|undefined;
   private closed=false;
   private w=0;
   private h=0;
@@ -41,22 +42,37 @@ export class NativeRoadRenderer {
     if(t.kind==="vehicle")disposeVehicleVisual(t.visual as VehicleVisual);
     else disposePedestrianVisual(t.visual as PedestrianVisual);
   }
-  private clear(){for(const t of this.tracks.values())this.remove(t);this.tracks.clear();this.roadGroup.clear();}
+  private clear(){for(const t of this.tracks.values())this.remove(t);this.tracks.clear();for(const mesh of this.roadGroup.children)if(mesh instanceof THREE.InstancedMesh)mesh.dispose();this.roadGroup.clear();}
   update(s:NativeProjectionScene,now=performance.now()){
-    if(this.closed)return;
+    if(this.closed||s.generation<this.generation)return;
     const reset=s.generation!==this.generation;
+    if(!reset&&s.layout_id!==this.layoutId)throw new Error("Native layout changed without a generation reset");
     if(reset){
-      this.clear();this.generation=s.generation;this.tick=-1;
+      this.clear();this.generation=s.generation;this.tick=-1;this.layoutId=s.layout_id;
+      // Static road surfaces use one draw group per material; zebra bands are
+      // based on the actual crossing segment, not invented signal permissions.
+      const transform=new THREE.Object3D();
       for(const [index,kind] of (["road","walk","crossing"] as const).entries()){
+        const matrices:THREE.Matrix4[]=[];
         for(const lane of s.lanes.filter(l=>l.kind===kind)){
           for(let i=1;i<lane.points.length;i++){
             const a=point(...lane.points[i-1],this.source),b=point(...lane.points[i],this.source);
             const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(!len)continue;
-            const mesh=new THREE.Mesh(this.box,this.mats[index]);
-            mesh.position.set((a.x+b.x)/2,index*.5,(a.z+b.z)/2);
-            mesh.scale.set(len+lane.width_px*.08,1,lane.width_px);
-            mesh.rotation.y=-Math.atan2(dz,dx);this.roadGroup.add(mesh);
+            const count=kind==="crossing"?Math.min(24,Math.max(1,Math.round(len/Math.max(2,(s.pixels_per_m??3.2)*.8)))):1;
+            for(let j=0;j<count;j++){
+              const along=(j+.5)/count;
+              transform.position.set(a.x+dx*along,index*.5,a.z+dz*along);
+              transform.scale.set(kind==="crossing"?len/count*.55:len+lane.width_px*.08,1,lane.width_px);
+              transform.rotation.set(0,-Math.atan2(dz,dx),0);transform.updateMatrix();
+              matrices.push(transform.matrix.clone());
+            }
           }
+        }
+        if(matrices.length){
+          const mesh=new THREE.InstancedMesh(this.box,this.mats[index],matrices.length);
+          matrices.forEach((matrix,i)=>mesh.setMatrixAt(i,matrix));
+          mesh.instanceMatrix.needsUpdate=true;
+          this.roadGroup.add(mesh);
         }
       }
     }
@@ -88,7 +104,7 @@ export class NativeRoadRenderer {
     for(const [id,t] of this.tracks)if(!ids.has(id)){this.remove(t);this.tracks.delete(id);}
     this.tick=s.tick;
   }
-  isAnimating(now=performance.now()){return !this.closed&&[...this.tracks.values()].some(t=>t.duration>0&&now<t.start+t.duration);}
+  isAnimating(now=performance.now()){if(this.closed)return false;for(const t of this.tracks.values())if(t.duration>0&&now<t.start+t.duration)return true;return false;}
   render(top:boolean,now=performance.now(),detail=false){
     if(this.closed)return;
     const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);

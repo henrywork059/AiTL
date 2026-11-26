@@ -14,15 +14,21 @@ PIN = '1.28.0'
 # Finite synthetic offered demand, not the legacy recirculating slot population.
 DENSITY_COUNTS = {'light': (4, 4), 'normal': (8, 7), 'busy': (12, 11)}
 SLOW_WALK_M_S = 0.65
+# Trusted synthetic approach lengths (east/west, north/south) in metres.
+# These are not saved production crossing geometry or calibrated camera poses.
+GEOMETRY_PRESETS = {'standard': (100, 100), 'compact': (60, 60), 'elongated': (100, 60)}
 
 
-def write_scenario(root: Path, *, controlled: bool = False, density: str | None = None) -> None:
+def write_scenario(root: Path, *, controlled: bool = False, density: str | None = None, geometry: str = 'standard') -> None:
+    if geometry not in GEOMETRY_PRESETS or (geometry != 'standard' and (not controlled or density is None)):
+        raise ValueError('Invalid controlled geometry preset')
     if density is not None and (not controlled or density not in DENSITY_COUNTS):
         raise ValueError('Invalid controlled density preset')
     nodes = ET.Element('nodes')
     ET.SubElement(nodes, 'node', id='C', x='0', y='0', type='traffic_light')
     edges = ET.Element('edges')
-    for name, x, y in [('W', -100, 0), ('E', 100, 0), ('N', 0, 100), ('S', 0, -100)]:
+    ew, ns = GEOMETRY_PRESETS[geometry]
+    for name, x, y in [('W', -ew, 0), ('E', ew, 0), ('N', 0, ns), ('S', 0, -ns)]:
         ET.SubElement(nodes, 'node', id=name, x=str(x), y=str(y))
         for a, b in [(name, 'C'), ('C', name)]:
             ET.SubElement(edges, 'edge', {'id': a+b, 'from': a, 'to': b,
@@ -113,7 +119,7 @@ def native_netconvert() -> Path:
     return matches[0]
 
 
-def generate_controlled_fixture(root: Path, *, density: str | None = None) -> None:
+def generate_controlled_fixture(root: Path, *, density: str | None = None, geometry: str = 'standard') -> None:
     native = native_netconvert()
     binary = str(native)
     env = {**os.environ, "SUMO_HOME": str(native.parent.parent)}
@@ -121,7 +127,7 @@ def generate_controlled_fixture(root: Path, *, density: str | None = None) -> No
     banner = version.stdout.splitlines()[0] if version.stdout else ''
     if banner.strip() not in (f'Eclipse SUMO netconvert {PIN}', f'Eclipse SUMO netconvert Version {PIN}'):
         raise RuntimeError('Unexpected netconvert version')
-    write_scenario(root, controlled=True, density=density)
+    write_scenario(root, controlled=True, density=density, geometry=geometry)
     subprocess.run([binary, '--node-files', 'nodes.xml', '--edge-files', 'edges.xml',
                     '--crossings.guess', 'true', '--output-file', 'network.xml'],
                    cwd=root, env=env, capture_output=True, check=True, timeout=15)
