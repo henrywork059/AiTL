@@ -56,7 +56,8 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs){
       socket.send(JSON.stringify({id:requestId,method,params}));
     });
     await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-    await call('Page.navigate',{url:workspaceUrl});
+    const navigation=await call('Page.navigate',{url:workspaceUrl});
+    if(navigation.errorText)throw Error('Review navigation failed: '+navigation.errorText);
     let outcome='',details='';
     const deadline=Date.now()+35000;
     while(Date.now()<deadline){
@@ -64,7 +65,7 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs){
       if(response.result?.value){
         const observed=JSON.parse(response.result.value);
         outcome=observed.result;details=JSON.stringify(observed);
-        if(outcome.startsWith('MESH_WORKSPACE_'))break;
+        if(outcome.startsWith('MESH_WORKSPACE_PASS')||outcome.startsWith('MESH_WORKSPACE_FAIL'))break;
       }
       await delay(100);
     }
