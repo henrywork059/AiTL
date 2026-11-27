@@ -47,6 +47,8 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_metrics.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_adapters.py'
       - 'AI_Traffic_Light/scripts/test_simulation_gate_metrics.py'
+      - 'AI_Traffic_Light/scripts/verify_wait_trace.py'
+      - 'AI_Traffic_Light/scripts/verify_s04_evidence.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_frame_publisher.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/experiment_timeline_csv.py'
       - 'AI_Traffic_Light/scripts/test_sumo_frame_publisher.py'

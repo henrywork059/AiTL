@@ -19,6 +19,9 @@ from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.simulation_gate_metrics import GateMetrics, STEP_S
 from app.services.simulation_gate_adapters import legacy_observations, NativeGateAdapter
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "AI_Traffic_Light" / "scripts"))
+from verify_wait_trace import record_rows, retain, comparison
+
 SEED=42
 TICKS=2500
 CYCLE=["vehicle_green"]*100+["vehicle_yellow"]*15+["all_red"]*10+["pedestrian_green"]*150+["pedestrian_flashing"]*50+["all_red"]*10
@@ -37,6 +40,7 @@ def arm(native):
         start=time.perf_counter()
         metrics=GateMetrics()
         timeline=[]
+        wait_trace=[]
         for tick in range(1,TICKS+1):
             phase=CYCLE[(tick-1)%len(CYCLE)]
             if native:
@@ -50,6 +54,7 @@ def arm(native):
                     service._advance_vehicles_locked(.05,phase)
                     service._advance_pedestrians_locked(.05,phase)
                 rows=legacy_observations(service._vehicles,service._pedestrians)
+            wait_trace.append(record_rows(rows))
             timeline.append({**metrics.sample(tick,rows),"requested_phase":phase})
         wall=time.perf_counter()-start
         after=processes(pids)
@@ -57,7 +62,7 @@ def arm(native):
         assert summary["samples"]==TICKS and summary["vehicle_passages"]>0
         assert summary["pedestrian_crossings"]>0, summary
         result={"engine":"native" if native else "legacy","summary":summary,
-                "timeline":timeline,"digest":hashlib.sha256(json.dumps(timeline,sort_keys=True).encode()).hexdigest(),
+                "timeline":timeline,"wait_trace":wait_trace,"wait_episodes":metrics.waiting_episodes(),"digest":hashlib.sha256(json.dumps(timeline,sort_keys=True).encode()).hexdigest(),
                 "resources":{"wall_s":wall,"cpu_delta_s":sum(after[k]["cpu_s"]-before[k]["cpu_s"] for k in before),
                              "end_combined_working_set_bytes":sum(v["working_set_bytes"] for v in after.values())}}
         if session:
@@ -81,6 +86,8 @@ def main(output):
             runs.append(json.loads(path.read_text(encoding="utf-8")))
         assert runs[0]["digest"]==runs[1]["digest"],runs[0]["engine"]
         for i,run in enumerate(runs):
+            retain(out,run["engine"],i,run)
+            (out/f"arm-{int(native)}-{i}.json").write_text(json.dumps(run),encoding="utf-8")
             rows=run.pop("timeline")
             with (out/f"{run['engine']}-{i}.csv").open("w",newline="",encoding="utf-8") as f:
                 writer=csv.DictWriter(f,fieldnames=list(rows[0]))
@@ -89,6 +96,7 @@ def main(output):
         results.extend(runs)
     result={"evidence":"executed actual motion, normalized gate definitions, repeated seed",
             "seed":SEED,"step_s":STEP_S,"horizon_s":TICKS*STEP_S,"runs":results,
+            "wait_comparison":comparison(results,"legacy","native",False),
             "physical_geometry_matched":False,"demand_matched":False,"replacement_parity":False,
             "default_migration_allowed":False,
             "limitations":"Shared normalized gate coordinate and stop threshold only. Legacy recirculating slots differ from finite native trips; native pedestrian approach uses nearest curb and can censor ambiguous visits. Requested phases matched; native occupancy may restrict applied permissions. Legacy motion helper is not an independent safety controller. Motion and measurement only; no camera rendering, HTTP, GPU or owner benchmark."}

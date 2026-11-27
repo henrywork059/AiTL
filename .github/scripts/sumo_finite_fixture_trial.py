@@ -12,6 +12,9 @@ from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.simulation_finite_fixture import load_trips,FiniteReference,RouteGateAdapter
 from app.services.simulation_gate_metrics import GateMetrics,STEP_S
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "AI_Traffic_Light" / "scripts"))
+from verify_wait_trace import record_rows, retain, comparison
+
 SEED=42
 TICKS=2500
 CYCLE=["vehicle_green"]*100+["vehicle_yellow"]*15+["all_red"]*10+["pedestrian_green"]*150+["pedestrian_flashing"]*50+["all_red"]*10
@@ -26,6 +29,7 @@ def execute(trips,session=None):
     before=processes(pids)
     start=time.perf_counter()
     timeline=[]
+    wait_trace=[]
     seen=set()
     for tick in range(1,TICKS+1):
         phase=CYCLE[(tick-1)%len(CYCLE)]
@@ -36,7 +40,9 @@ def execute(trips,session=None):
         else:
             agents=reference.advance(phase)
         seen.update(a.engine_id for a in agents)
-        timeline.append({**metrics.sample(tick,adapter.observations(agents)),"requested_phase":phase})
+        rows=adapter.observations(agents)
+        wait_trace.append(record_rows(rows))
+        timeline.append({**metrics.sample(tick,rows),"requested_phase":phase})
     wall=time.perf_counter()-start
     after=processes(pids)
     arrived=(session.arrived|session.person_arrived) if native else reference.arrived
@@ -51,7 +57,7 @@ def execute(trips,session=None):
     # traverses a different route or sampling misses a short segment.
     summary=metrics.summary()
     return {"engine":"native" if native else "finite_reference","summary":summary,
-            "timeline":timeline,"digest":hashlib.sha256(json.dumps(timeline,sort_keys=True).encode()).hexdigest(),
+            "timeline":timeline,"wait_trace":wait_trace,"wait_episodes":metrics.waiting_episodes(),"digest":hashlib.sha256(json.dumps(timeline,sort_keys=True).encode()).hexdigest(),
             "arrived":sorted(arrived),"completion_ok":completion_ok,"seen":sorted(seen),
             "route_mismatches":route_mismatches,"unsupported_routes":unsupported,
             "unknown_roads":sorted(adapter.unknown_roads),
@@ -83,6 +89,7 @@ def main(output):
             assert not session.proc.is_alive()
         # Native process is reaped before reference measurements.
         for result in (run,execute(trips)):
+            retain(out,result["engine"],repeat,result)
             rows=result.pop("timeline")
             with (out/f"{result['engine']}-{repeat}.csv").open("w",newline="",encoding="utf-8") as f:
                 writer=csv.DictWriter(f,fieldnames=list(rows[0]))
@@ -93,6 +100,7 @@ def main(output):
     (out/"manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     result={"evidence":"executed finite-demand reference and native route-aware measurement",
             "seed":SEED,"step_s":STEP_S,"horizon_s":TICKS*STEP_S,"runs":results,
+            "wait_comparison":comparison(results,"finite_reference","native",True),
             "offered_demand_matched":True,
             "observed_road_sequence_matched":all(not r["route_mismatches"] and not r["unknown_roads"] for r in results),
             "allowed_route_sequences_verified":all(not r["unsupported_routes"] and not r["unknown_roads"] for r in results),

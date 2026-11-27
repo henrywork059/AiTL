@@ -52,6 +52,7 @@ def csv_rows(read, name):
 
 
 def audit_metrics(read):
+    from verify_wait_trace import CONTRACT, qualify, comparison
     total = 0
     pairs = {}
     for group, engines in (("mesh-sumo-gate-metrics", ("legacy", "native")),
@@ -59,12 +60,19 @@ def audit_metrics(read):
         result = load(read, group + "/result.json")
         check(result["replacement_parity"] is False and result["default_migration_allowed"] is False, "Metric migration authority")
         check(len(result["runs"]) == 4, "Metric repeat count")
+        has_trace = "wait_comparison" in result
+        check(has_trace == any("wait_audit" in run for run in result["runs"]), "Wait evidence schema mismatch")
         for engine in engines:
             runs = [r for r in result["runs"] if r["engine"] == engine]
             check(len(runs) == 2, "Metric engine repeat count")
             for repeat, run in enumerate(runs):
                 rows = csv_rows(read, f"{group}/{engine}-{repeat}.csv")
                 total += verify_metric_rows(rows, run, result["step_s"], result["horizon_s"])
+                if has_trace:
+                    trace = load(read, f"{group}/{engine}-{repeat}-wait-trace.json")
+                    check(trace["contract"] == CONTRACT and trace["step_s"] == result["step_s"], "Wait trace contract")
+                    audit = qualify(trace["frames"], rows, run["summary"], trace["episodes"])
+                    check(audit == trace["audit"] == run["wait_audit"], "Wait trace replay differs")
                 if group.endswith("finite-fixture"):
                     check(load(read, f"{group}/{engine}-{repeat}-summary.json") == run, "Finite summary differs")
                     check(run["completion_ok"] and not run["route_mismatches"] and not run["unsupported_routes"] and not run["unknown_roads"], "Finite route qualification")
@@ -74,6 +82,9 @@ def audit_metrics(read):
                     check(raw["timeline"] == rows and all(raw[k] == run[k] for k in run), "Metric raw JSON differs")
             check(runs[0]["digest"] == runs[1]["digest"], "Metric deterministic repeat differs")
             pairs[group + "/" + engine] = runs[0]["summary"]
+        if has_trace:
+            left = "finite_reference" if group.endswith("finite-fixture") else "legacy"
+            check(result["wait_comparison"] == comparison(result["runs"], left, "native", left == "finite_reference"), "Wait comparison verdict differs")
     return total, pairs
 
 
