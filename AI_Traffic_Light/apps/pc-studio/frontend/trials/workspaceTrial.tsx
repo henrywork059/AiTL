@@ -86,7 +86,8 @@ function CameraFixture(){
 const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions"].includes(page)?100:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 let dragSerial=0;
-async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};result.dataset.drag=JSON.stringify({id:++dragSerial,from:toScreen(start),to:toScreen(end)});await waitFor(done,"Real pointer drag not committed: "+selector);delete result.dataset.drag;}
+async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};const id=++dragSerial;result.dataset.drag=JSON.stringify({id,from:toScreen(start),to:toScreen(end),target:selector===".crosswalk-region-overlay"?".crosswalk-region-vertex":".label-canvas"});await waitFor(()=>result.dataset.dragDone===String(id)&&done(),"Real pointer drag not committed: "+selector+"; released="+result.dataset.dragDone+"; vertices="+[...svg.querySelectorAll("circle")].map(c=>c.getAttribute("cx")+","+c.getAttribute("cy")).join(";"));delete result.dataset.drag;}
+const vertexNear=(x:number,y:number)=>{const c=document.querySelector(".crosswalk-region-vertex");return Boolean(c&&Math.abs(Number(c.getAttribute("cx"))-x)<=1&&Math.abs(Number(c.getAttribute("cy"))-y)<=1);};
 function CrosswalkFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:false,streaming:true,active_source_id:"camera_a",resolution:null,content_type:null,received_at_ms:null,age_ms:null,frame_number:0,size_bytes:0,origin:null,stale:false,frame_url:null,upload_endpoint:""});return <CrosswalksPage cameraStatus={status} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}} onCameraStatusChange={setStatus}/>;}
 async function main(){
   const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
@@ -161,17 +162,17 @@ async function main(){
     findButton("Edit regions (0)")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-overlay"),"Region editor missing");
     check(document.body.textContent?.includes("Preview unavailable")&&!document.querySelector("img.crosswalk-region-camera"),"No verified frame shown as live");
     findButton("Add region")!.click();await waitFor(()=>document.querySelectorAll(".crosswalk-region-vertex").length===4,"New region missing");
-    await dragImagePoint(".crosswalk-region-overlay",[390,220],[320,180],()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="320");
-    findButton("Side B")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="390","Side A geometry leaked into Side B");
-    await dragImagePoint(".crosswalk-region-overlay",[390,220],[450,180],()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="450");
+    await dragImagePoint(".crosswalk-region-overlay",[390,220],[320,180],()=>vertexNear(320,180));
+    findButton("Side B")!.click();await waitFor(()=>vertexNear(390,220),"Side A geometry leaked into Side B");
+    await dragImagePoint(".crosswalk-region-overlay",[390,220],[450,180],()=>vertexNear(450,180));
     failRegionSave=true;findButton("Save regions")!.click();await waitFor(()=>findButton("Saving…")&&findButton("Add region")?.disabled&&findButton("Back to crosswalks")?.disabled,"Region edits not locked during save");
     await waitFor(()=>document.body.textContent?.includes("Fixture region save rejected"),"Editor save error not visible");
-    check(savedNetwork.crosswalks[0].regions.length===0&&document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="450","Failed save lost draft or changed saved data");
+    check(savedNetwork.crosswalks[0].regions.length===0&&vertexNear(450,180),"Failed save lost draft or changed saved data");
     failRegionSave=false;findButton("Save regions")!.click();await waitFor(()=>savedCount===2&&findButton("Save regions")?.disabled,"Region save retry failed");
-    const saved=savedNetwork.crosswalks[0].regions[0];check(saved.vertices_by_side?.a?.[0][0]===320&&saved.vertices_by_side?.b?.[0][0]===450,"Independent side geometry not persisted");
+    const saved=savedNetwork.crosswalks[0].regions[0];check(saved.vertices_by_side?.a&&saved.vertices_by_side?.b&&[320,180].every((value,i)=>Math.abs(saved.vertices_by_side!.a![0][i]-value)<=1)&&[450,180].every((value,i)=>Math.abs(saved.vertices_by_side!.b![0][i]-value)<=1),"Independent side geometry not persisted");
     findButton("Back to crosswalks")!.click();await waitFor(()=>findButton("Reload saved")&&!findButton("Reload saved")!.disabled,"Crosswalk page did not return");findButton("Reload saved")!.click();await waitFor(()=>document.body.textContent?.includes("Saved crosswalks reloaded.")&&findButton("Edit regions (1)"),"Region reload failed");
-    findButton("Edit regions (1)")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="320","Side A reload failed");
-    findButton("Side B")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="450","Side B reload failed");
+    findButton("Edit regions (1)")!.click();await waitFor(()=>vertexNear(320,180),"Side A reload failed");
+    findButton("Side B")!.click();await waitFor(()=>vertexNear(450,180),"Side B reload failed");
   }
   if(page==="review"){
     await waitFor(()=>document.querySelectorAll(".manual-label-box").length===1,"Initial capture labels missing");

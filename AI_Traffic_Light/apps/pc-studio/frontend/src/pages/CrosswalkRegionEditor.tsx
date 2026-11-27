@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CameraStatus, Zone } from "../types";
 import { liveCameraMjpegUrl, refreshCameraAfterRemoteChange, selectRemoteCamera, type RemoteCameraProfile } from "../lib/remoteCameraApi";
@@ -51,7 +51,7 @@ export function CrosswalkRegionEditor({
   const [selectedId, setSelectedId] = useState<string | null>(crosswalk.regions[0]?.id ?? null);
   const [perspectiveView, setPerspectiveView] = useState(true);
   const [side, setSide] = useState<Side>("camera_side_a_id");
-  const [drag, setDrag] = useState<{ id: string; index: number } | null>(null);
+  const dragRef = useRef<{ id: string; index: number; pointerId: number; side: "a" | "b" } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,16 +93,19 @@ export function CrosswalkRegionEditor({
   }
 
   function onVertexDown(event: ReactPointerEvent<SVGCircleElement>, id: string, index: number) {
-    if (saving) return;
+    if (saving || event.button !== 0 || dragRef.current) return;
     event.preventDefault();
     event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    svg.setPointerCapture(event.pointerId);
+    dragRef.current = { id, index, pointerId: event.pointerId, side: sideKey };
     setSelectedId(id);
-    setDrag({ id, index });
-    event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId);
   }
 
   function moveVertex(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!drag || saving) return;
+    const drag = dragRef.current;
+    if (!drag || saving || drag.pointerId !== event.pointerId || drag.side !== sideKey) return;
     const transform = event.currentTarget.getScreenCTM();
     if (!transform) return;
     const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
@@ -116,10 +119,16 @@ export function CrosswalkRegionEditor({
   }
 
   function endDrag(event: ReactPointerEvent<SVGSVGElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    setDrag(null);
+  }
+
+  function selectSide(next: Side) {
+    dragRef.current = null;
+    setSide(next);
   }
 
   async function previewPhysicalCamera() {
@@ -200,9 +209,9 @@ export function CrosswalkRegionEditor({
             <>
               <div className="crosswalk-region-side-toggle" role="group" aria-label="Camera side">
                 <button type="button" aria-pressed={side === "camera_side_a_id"}
-                  onClick={() => setSide("camera_side_a_id")} disabled={busy || saving}>Side A</button>
+                  onClick={() => selectSide("camera_side_a_id")} disabled={busy || saving}>Side A</button>
                 <button type="button" aria-pressed={side === "camera_side_b_id"}
-                  onClick={() => setSide("camera_side_b_id")} disabled={busy || saving}>Side B</button>
+                  onClick={() => selectSide("camera_side_b_id")} disabled={busy || saving}>Side B</button>
               </div>
               {!simulated && <button type="button" onClick={() => void previewPhysicalCamera()}
                 disabled={busy || saving || changingMode || !selectedCamera}>
@@ -245,6 +254,7 @@ export function CrosswalkRegionEditor({
               onPointerMove={moveVertex}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
+              onLostPointerCapture={endDrag}
             >
               {visibleRegions.map((region) => (
                 <g key={region.id}>
