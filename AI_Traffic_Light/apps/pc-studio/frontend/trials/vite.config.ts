@@ -7,9 +7,6 @@ const syntheticFrame = '<svg xmlns="http://www.w3.org/2000/svg" width="1280" hei
 
 export default defineConfig({
   root:resolve(process.cwd(),'trials'),
-  // The isolated browser trial and its synthetic image HTTP route share one origin.
-  // Production Vite config and backend camera transport are unaffected.
-  define:{'import.meta.env.VITE_API_BASE_URL':JSON.stringify('http://127.0.0.1:4179')},
   plugins:[{
     name:'mesh-synthetic-frame-preview-trial-only',
     configurePreviewServer(server){
