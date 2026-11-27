@@ -1,5 +1,5 @@
-version: 0_5_76
-status: Independent P3/P4/P5 capture integrity, managed training and S04 evidence candidate (partial 30/33/37/38)
-previous_version: 0_5_75
+version: 0_5_77
+status: Update 28A independently qualified common waiting-time measurement candidate
+previous_version: 0_5_76
 passed_baseline: 0_5_0
-notes: Application/browser/native evidence qualified; exact release CI and owner PASS pending; S04 gates remain open; legacy default preserved.
+notes: Exact application/native CI passed and raw wait trace replay qualified; production historical wait parity not established; legacy default unchanged; release CI and owner PASS pending.
