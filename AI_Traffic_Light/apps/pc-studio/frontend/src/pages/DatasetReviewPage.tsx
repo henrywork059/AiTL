@@ -73,7 +73,8 @@ export function DatasetReviewPage() {
   }
 
   async function refreshCaptureList() {
-    if (busy || dirty) return;
+    if (busy || (dirty && listAvailable)) return;
+    if (dirty && !window.confirm("The capture state is unverified. Discard unsaved edits and reload?")) return;
     setRefreshing(true);
     try {
       await refreshCaptures(selectedCaptureId);
@@ -183,8 +184,7 @@ export function DatasetReviewPage() {
         setListAvailable(false);
         setDecodedImage(null);
         setLoadedLabelRevision(null);
-        // Keep edits visible in state until the user explicitly reloads; do not allow another save.
-        setDirty(false);
+        // Preserve the unsaved draft until explicit reload confirmation; no further save is allowed.
         throw new Error("Saved label identity mismatch; reload before editing.");
       }
       setLabelDocument(saved);
@@ -214,7 +214,6 @@ export function DatasetReviewPage() {
         setListAvailable(false);
         setDecodedImage(null);
         setLoadedLabelRevision(null);
-        setDirty(false);
         throw new Error("Delete response capture identity mismatch; reload before editing.");
       }
       setLabelDocument(null);
@@ -259,7 +258,7 @@ export function DatasetReviewPage() {
             </div>
             <span className="status-pill muted">{listAvailable ? `${captures.length} saved` : "Unavailable"}</span>
           </div>
-          <button onClick={() => void refreshCaptureList()} disabled={busy || dirty}>Refresh list</button>
+          <button onClick={() => void refreshCaptureList()} disabled={busy || (dirty && listAvailable)}>Refresh list</button>
           <div className="capture-browser-list">
             {captures.map((capture) => (
               <button

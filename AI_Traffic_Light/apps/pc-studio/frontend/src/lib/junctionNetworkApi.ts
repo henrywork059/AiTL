@@ -2,8 +2,8 @@ import { API_BASE } from "../api";
 import type { JunctionNetworkConfig, JunctionNetworkOverview } from "../types/junctionNetwork";
 import { requestJsonStrict } from "./apiClient";
 
-export async function fetchJunctionNetworkOverview(): Promise<JunctionNetworkOverview> {
-  return requestJsonStrict<JunctionNetworkOverview>(`${API_BASE}/api/traffic/network/overview`);
+export async function fetchJunctionNetworkOverview(signal?: AbortSignal): Promise<JunctionNetworkOverview> {
+  return requestJsonStrict<JunctionNetworkOverview>(`${API_BASE}/api/traffic/network/overview`, { signal });
 }
 
 export async function saveJunctionNetwork(config: JunctionNetworkConfig): Promise<JunctionNetworkConfig> {

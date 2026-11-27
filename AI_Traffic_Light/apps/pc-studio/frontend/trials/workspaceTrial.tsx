@@ -10,6 +10,9 @@ import {CameraDiagnosticsPage} from "../src/pages/CameraDiagnosticsPage";
 import {CrosswalkNetworkPanel} from "../src/components/CrosswalkNetworkPanel";
 import {DatasetReviewPage} from "../src/pages/DatasetReviewPage";
 import {CrosswalksPage} from "../src/pages/CrosswalksPage";
+import {JunctionNetworkPage} from "../src/pages/JunctionNetworkPage";
+import {fallbackJunctionNode} from "../src/lib/junctionNetworkView";
+import type {JunctionNetworkConfig,JunctionNetworkOverview,JunctionCameraView} from "../src/types/junctionNetwork";
 import {ModelRegistryPage} from "../src/pages/ModelRegistryPage";
 import {fetchCrosswalks} from "../src/lib/crosswalksApi";
 import {fallbackRuntimeSettings} from "../src/api";
@@ -18,7 +21,7 @@ import type {CrosswalkConfig} from "../src/types/crosswalks";
 import "../src/styles.css";
 
 const page=new URLSearchParams(location.search).get("page")??"dashboard";
-const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review"};
+const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",junctions:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review"};
 const fixture:CrosswalkConfig={schema_version:1,crosswalks:["North crossing","South crossing"].map((label,i)=>({id:"crossing_"+i,label,location:"Synthetic fixture",camera_side_a_id:i===0?"fixture_a":null,camera_side_b_id:null,regions:[]}))};
 const model={model_id:"fixture_model",model_path:"outputs/training/fixture_model/weights/best.pt",modified_at_ms:0,size_bytes:1048576,is_active:false,is_default:true,is_latest:true};
 const classes=[{id:0,name:"vehicle"}];
@@ -33,6 +36,12 @@ const validFixtureImage=fixtureImage(), wrongSizeFixtureImage=fixtureImage(640,3
 let activeModel=false, modelFailure=false, savedNetwork=fixture;
 let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true, failRegionSave=false;
 const profiles=["camera_a","camera_b"].map((source_id,i)=>({source_id,host:"192.168.1."+(80+i),kind:"esp32",selected:i===0,connected:false,streaming:false,device_reachable:false,target_fps:15,settings:DEFAULT_REMOTE_CAMERA_SETTINGS,last_error:null as string|null,stream_connected:false,measured_fps:0,paused_for_simulation:false}));
+if(page==="crosswalks")Object.assign(profiles[0],{connected:true,streaming:true,device_reachable:true,stream_connected:true});
+let junctionFailure=false, junctionSaves=0;
+let junctionConfig:JunctionNetworkConfig={schema_version:1,active_intersection_id:"j_a",intersections:["a","b"].map((id,i)=>({id:"j_"+id,label:"Junction "+id.toUpperCase(),enabled:true,source_ids:["camera_"+id],primary_source_id:"camera_"+id,zone_ids:[],crosswalk_edges:{north:null,east:null,south:null,west:null},signal_profile:"Normal",position:{x:30+40*i,y:45}})),links:[]};
+const junctionCameras:JunctionCameraView[]=profiles.map(p=>({source_id:p.source_id,kind:"esp32_cam",saved:true,host:p.host,selected:p.selected,connected:true,device_reachable:true,streaming:true,stream_connected:true,measured_fps:12,last_success_at_ms:Date.now(),last_error:null,state:"streaming"}));
+const junctionOverview=():JunctionNetworkOverview=>{const nodes=junctionConfig.intersections.map(c=>{const node=fallbackJunctionNode(c,junctionConfig.active_intersection_id);if(c.id==="j_a"){node.live={...node.live,available:true,pipeline_source_active:true,source_id:"camera_a",source_mapping_matched:true,observation_provenance:"ai_detection",phase:"vehicle_green",vehicle:{total:9,waiting:4,load:"moderate"},pedestrian:{total:2,waiting:2,crossing:0,load:"light"}};}return node;});return {schema_version:1,generated_at_ms:Date.now(),network:junctionConfig,available_cameras:junctionCameras,active_source_id:"camera_a",current_frame_source_id:"camera_a",observation_intersection_id:"j_a",observation_provenance:"ai_detection",source_mapping_matched:true,simulation_enabled:false,junctions:nodes,links:[],warnings:[],summary:{junction_count:2,enabled_junction_count:2,link_count:0,saved_esp_camera_count:2,assigned_esp_camera_count:2,reachable_esp_camera_count:2,streaming_esp_camera_count:2,warning_junction_count:0,event_count:0,heavy_vehicle_junction_count:0,heavy_pedestrian_junction_count:0},multi_camera_assignment:true,simultaneous_multi_junction_inference:false,prototype_only:true,scope_note:"Synthetic fixture; no physical authority."};};
+if(page==="junctions")savedNetwork={...fixture,crosswalks:fixture.crosswalks.map((c,i)=>({...c,camera_side_a_id:i===0?"camera_a":null}))};
 const remoteState=()=>({cameras:profiles.map(p=>({...p,selected:p.source_id===selectedCamera})),active_source_id:selectedCamera,camera_count:2,max_saved_cameras:12,source_id:selectedCamera,host:profiles.find(p=>p.source_id===selectedCamera)?.host});
 const fixtureError=(message:string)=>new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message}}),{status:503,headers:{"Content-Type":"application/json"}});
 window.fetch=async (input,init)=>{
@@ -54,6 +63,8 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/inference/load"){check(JSON.parse(String(init?.body)).model_id===model.model_id,"Wrong load model");activeModel=true;data={model_loaded:true,backend_available:true,active_model_id:model.model_id};}
   else if(path==="/api/crosswalks"){if(init?.method==="PUT"){const next=JSON.parse(String(init.body)).config;if(page==="crosswalks"&&next.crosswalks[0]?.regions.length){await new Promise(r=>setTimeout(r,350));if(failRegionSave)return fixtureError("Fixture region save rejected");}savedNetwork=next;savedCount++;}else{readCount++;}data=savedNetwork;}
   else if(path==="/api/inference/status")data={model_loaded:activeModel,backend_available:true,active_model_id:activeModel?model.model_id:null};
+  else if(path==="/api/traffic/network/overview"){if(junctionFailure)return fixtureError("Fixture junction observation unavailable");data=junctionOverview();}
+  else if(path==="/api/traffic/network"&&init?.method==="PUT"){const next:JunctionNetworkConfig=JSON.parse(String(init.body)).config;check(next.intersections[0].source_ids.join(",")==="camera_a,camera_b"&&next.intersections[1].source_ids.length===0&&next.intersections[1].primary_source_id===null,"Camera ownership transfer invalid");junctionConfig=next;junctionSaves++;data=junctionConfig;}
   else if(path==="/api/traffic/crosswalk-signals")data={simulation_only:true,simulation_enabled:false,hardware_actuation_enabled:false,crosswalks:{}};
   else throw Error("Unexpected fixture request "+path);
   return new Response(JSON.stringify({ok:true,data}),{headers:{"Content-Type":"application/json"}});
@@ -72,13 +83,13 @@ function CameraFixture(){
   const [status,setStatus]=useState<CameraStatus|null>(null);
   return <CameraSettingsPage status={status} showSimulationTools={false} onSimulationChange={()=>{}} onStatusChange={setStatus} changingMode={false}/>;
 }
-const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks"].includes(page)?100:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
+const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions"].includes(page)?100:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 let dragSerial=0;
 async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};result.dataset.drag=JSON.stringify({id:++dragSerial,from:toScreen(start),to:toScreen(end)});await waitFor(done,"Real pointer drag not committed: "+selector);delete result.dataset.drag;}
 function CrosswalkFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:false,streaming:true,active_source_id:"camera_a",resolution:null,content_type:null,received_at_ms:null,age_ms:null,frame_number:0,size_bytes:0,origin:null,stale:false,frame_url:null,upload_endpoint:""});return <CrosswalksPage cameraStatus={status} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}} onCameraStatusChange={setStatus}/>;}
 async function main(){
-  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
+  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
   flushSync(()=>root.render(<AppShell activePage={routes[page]} apiState={apiState} cameraStatus={null} onPageChange={id=>{selected=id;}} showSimulationTools={false} onSimulationToolsToggle={()=>{}}>{content}</AppShell>));
   for(let i=0;i<20;i++){if((page!=="models"||document.body.textContent?.includes("fixture_model"))&&(page!=="cameras"||document.body.textContent?.includes("camera_b")))break;await pause();}
   await pause();
@@ -126,6 +137,19 @@ async function main(){
     for(const [id,edge] of [["crossing_0","2"],["crossing_1","4"]]){document.querySelector(`[data-crosswalk-id="${id}"][data-crosswalk-edge="${edge}"]`)!.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));await pause();}
     save.click();await waitFor(()=>savedCount===4&&save.disabled&&document.querySelectorAll(".crossing-network-link-row").length===1,"Recreation after removal failed");
   }
+  if(page==="junctions"){
+    await waitFor(()=>document.querySelector<HTMLDetailsElement>(".junction-advanced-config"),"Junction config not loaded");document.querySelector<HTMLDetailsElement>(".junction-advanced-config")!.open=true;
+    await waitFor(()=>document.querySelector(".junction-live-grid")?.textContent?.includes("9 total")&&document.querySelectorAll(".junction-camera-row input").length===2,"Live fixture observation missing");
+    const other=()=>document.querySelectorAll<HTMLInputElement>(".junction-camera-row input")[1];window.confirm=()=>false;other().click();await pause();check(!other().checked,"Cancelled camera transfer changed draft");
+    window.confirm=()=>true;other().click();await waitFor(()=>other().checked&&findButton("Save junction configuration")&&!findButton("Save junction configuration")!.disabled,"Camera transfer draft missing");
+    junctionFailure=true;await waitFor(()=>document.body.textContent?.includes("Live junction status unavailable")&&!document.querySelector(".junction-live-grid"),"Old observation remained current after poll failure");
+    check(other().checked&&!findButton("Save junction configuration")!.disabled&&document.querySelector(".junction-camera-fps")?.textContent==="Unavailable","Failed poll erased draft or retained live camera status");
+    check(document.body.textContent?.includes("Not currently observed"),"Crosswalk retained failed observation");
+    junctionFailure=false;await waitFor(()=>document.querySelector(".junction-live-grid")?.textContent?.includes("9 total"),"Junction observation did not recover");
+    check(other().checked,"Recovered poll erased draft");findButton("Save junction configuration")!.click();await waitFor(()=>junctionSaves===1&&findButton("Save junction configuration")?.disabled,"Junction assignment save failed");
+    junctionFailure=true;await waitFor(()=>document.body.textContent?.includes("Live junction status unavailable")&&!document.querySelector(".junction-live-grid"),"Post-save stale observation remained");
+    check(junctionConfig.intersections[0].source_ids.length===2&&junctionConfig.intersections[1].primary_source_id===null,"Saved source ownership lost");
+  }
   if(page==="crosswalks"){
     await waitFor(()=>document.querySelectorAll(".crosswalk-camera-select select").length===2&&document.querySelector(".crosswalk-camera-select select option[value=camera_a]"),"Saved camera choices unavailable");
     const choose=(index:number,value:string)=>{const select=document.querySelectorAll<HTMLSelectElement>(".crosswalk-camera-select select")[index];select.value=value;select.dispatchEvent(new Event("change",{bubbles:true}));};
@@ -145,7 +169,7 @@ async function main(){
     check(savedNetwork.crosswalks[0].regions.length===0&&document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="450","Failed save lost draft or changed saved data");
     failRegionSave=false;findButton("Save regions")!.click();await waitFor(()=>savedCount===2&&findButton("Save regions")?.disabled,"Region save retry failed");
     const saved=savedNetwork.crosswalks[0].regions[0];check(saved.vertices_by_side?.a?.[0][0]===320&&saved.vertices_by_side?.b?.[0][0]===450,"Independent side geometry not persisted");
-    findButton("Back to crosswalks")!.click();findButton("Reload saved")!.click();await waitFor(()=>document.body.textContent?.includes("Saved crosswalks reloaded."),"Region reload failed");
+    findButton("Back to crosswalks")!.click();await waitFor(()=>findButton("Reload saved")&&!findButton("Reload saved")!.disabled,"Crosswalk page did not return");findButton("Reload saved")!.click();await waitFor(()=>document.body.textContent?.includes("Saved crosswalks reloaded.")&&findButton("Edit regions (1)"),"Region reload failed");
     findButton("Edit regions (1)")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="320","Side A reload failed");
     findButton("Side B")!.click();await waitFor(()=>document.querySelector(".crosswalk-region-vertex")?.getAttribute("cx")==="450","Side B reload failed");
   }
