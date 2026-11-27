@@ -169,6 +169,11 @@ jobs:
       - name: Score qualified midblock capture batch (palette control, not trained model)
         if: "!cancelled() && steps.midblock_trial.outcome == 'success'"
         run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$env:RUNNER_TEMP/mesh-sumo-midblock" --output "$env:RUNNER_TEMP/mesh-native-detector-batch.json"
+      - name: Independently reconcile retained S04 metric, resource and coordinate evidence
+        if: "success() && steps.midblock_trial.outcome == 'success'"
+        run: |
+          python AI_Traffic_Light/scripts/verify_s04_evidence.py "$env:RUNNER_TEMP" --tamper-check | Tee-Object -FilePath "$env:RUNNER_TEMP/mesh-s04-independent-audit.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-node@v4
         if: "!cancelled() && (steps.http_compatibility.outcome == 'success' || steps.midblock_trial.outcome == 'success')"
         with:
@@ -226,5 +231,6 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-policy-matrix/
             ${{ runner.temp }}/mesh-sumo-midblock/
             ${{ runner.temp }}/mesh-native-detector-batch.json
+            ${{ runner.temp }}/mesh-s04-independent-audit.json
             ${{ runner.temp }}/mesh-midblock-actual.png
             ${{ runner.temp }}/mesh-midblock-actual-detail.png
