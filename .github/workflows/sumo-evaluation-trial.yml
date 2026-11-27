@@ -26,6 +26,7 @@ on:
       - '.github/scripts/sumo_http_compatibility_trial.py'
       - '.github/scripts/sumo_policy_matrix_trial.py'
       - 'AI_Traffic_Light/scripts/native_detector_batch.py'
+      - '.github/scripts/native_unscored_holdout_trial.py'
       - 'AI_Traffic_Light/scripts/native_detector_holdout.py'
       - 'AI_Traffic_Light/scripts/test_native_detector_holdout.py'
       - 'AI_Traffic_Light/scripts/test_native_detector_batch.py'
@@ -144,6 +145,9 @@ jobs:
         id: midblock_trial
         if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
         run: python .github/scripts/sumo_midblock_trial.py "$env:RUNNER_TEMP/mesh-sumo-midblock"
+      - name: Freeze fresh unscored detector cohort (no model access)
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/native_unscored_holdout_trial.py "$env:RUNNER_TEMP/mesh-native-unscored-holdout"
       - name: Execute matched camera and native shadow resource trial
         if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
         run: python .github/scripts/sumo_migration_trial.py "$env:RUNNER_TEMP/mesh-sumo-migration.json"
@@ -237,6 +241,7 @@ jobs:
             ${{ runner.temp }}/mesh-sumo-policy-matrix/
             ${{ runner.temp }}/mesh-sumo-midblock/
             ${{ runner.temp }}/mesh-native-detector-batch.json
+            ${{ runner.temp }}/mesh-native-unscored-holdout/
             ${{ runner.temp }}/mesh-s04-independent-audit.json
             ${{ runner.temp }}/mesh-midblock-actual.png
             ${{ runner.temp }}/mesh-midblock-actual-detail.png

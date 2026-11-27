@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/native-reference-detector.yml'
       - '.github/scripts/native_reference_detector_trial.py'
+      - '.github/scripts/native_detector_positive_control.py'
 permissions:
   contents: read
   actions: read
@@ -51,6 +52,14 @@ jobs:
         run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$RUNNER_TEMP/reference-captures" --model "$RUNNER_TEMP/yolo11n.pt" --confidence .1 --iou .5 --output "$RUNNER_TEMP/reference-evidence/reference-detector.json"
       - name: Independently reconcile raw model outputs with frozen annotations
         run: python .github/scripts/native_reference_detector_trial.py verify --root "$RUNNER_TEMP/reference-captures" --evidence "$RUNNER_TEMP/reference-evidence"
+      - name: Retrieve pinned publisher positive-control photograph
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 137419 -o "$RUNNER_TEMP/reference-bus.jpg" https://raw.githubusercontent.com/ultralytics/ultralytics/6e43d1e1e5db72afbf686dee6745669bcb124b0a/ultralytics/assets/bus.jpg
+      - name: Positive control on known photograph and independent box conversion
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: python .github/scripts/native_detector_positive_control.py --model "$RUNNER_TEMP/yolo11n.pt" --photo "$RUNNER_TEMP/reference-bus.jpg" --output "$RUNNER_TEMP/reference-evidence/positive-control.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
