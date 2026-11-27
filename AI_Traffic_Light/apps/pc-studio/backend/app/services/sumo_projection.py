@@ -35,6 +35,7 @@ class LaneShape:
     kind: str
     points: tuple[tuple[float, float], ...]
     width_m: float
+    surface: str = "stroke"
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ class Projection:
     lanes: tuple[LaneShape, ...]
 
     @classmethod
-    def load(cls, path: Path) -> Projection:
+    def load(cls, path: Path, *, walking_area_polygons=False) -> Projection:
         root = ET.parse(path).getroot()
         lanes = []
         for edge in root.findall("edge"):
@@ -59,7 +60,9 @@ class Projection:
                     raise ValueError("Invalid native lane geometry")
                 kind = "crossing" if function == "crossing" else (
                     "walk" if function == "walkingarea" or lane.get("allow") == "pedestrian" else "road")
-                lanes.append(LaneShape(lane.attrib["id"], kind, points, width))
+                # netconvert walkingarea shape is a boundary polygon, not a lane centreline.
+                surface="polygon" if walking_area_polygons and function=="walkingarea" else "stroke"
+                lanes.append(LaneShape(lane.attrib["id"], kind, points, width,surface))
         if not lanes or len({lane.ident for lane in lanes}) != len(lanes):
             raise ValueError("Missing or duplicate native lanes")
         # Include lane extents in bounds, not only the centre lines.
@@ -101,7 +104,12 @@ class Projection:
                 if lane.kind != kind:
                     continue
                 points = np.array([tuple(round(v) for v in self.pixel(*pt)) for pt in lane.points], np.int32)
-                cv2.polylines(canvas, [points], False, color, max(1, round(lane.width_m * self.scale)), cv2.LINE_8)
+                if lane.surface=="polygon":
+                    # Zero-area terminal walking areas are not thickened into fictitious roads.
+                    if cv2.contourArea(points)>0:
+                        cv2.fillPoly(canvas,[points],color,lineType=cv2.LINE_8)
+                else:
+                    cv2.polylines(canvas, [points], False, color, max(1, round(lane.width_m * self.scale)), cv2.LINE_8)
         return canvas
 
 
@@ -121,12 +129,15 @@ class NativeProjection:
         self._lanes_by_view = {
             sid: [{"id": lane.ident, "kind": lane.kind,
                    "points": [layout.pixel(*pt, sid) for pt in lane.points],
-                   "width_px": lane.width_m * layout.scale} for lane in layout.lanes]
+                   "width_px": lane.width_m * layout.scale,
+                   **({"surface":"polygon"} if lane.surface=="polygon" else {})} for lane in layout.lanes]
             for sid in VIEW_FLIPS
         }
         manifest = {"schema":1,"width":WIDTH,"height":HEIGHT,"bounds":layout.bounds,
                     "scale":layout.scale,"offsets":[layout.offset_x,layout.offset_y],
                     "lanes":[(lane.ident,lane.kind,lane.points,lane.width_m) for lane in layout.lanes]}
+        if any(lane.surface=="polygon" for lane in layout.lanes):
+            manifest["walking_area_surfaces"]="native_boundary_polygon_v1"
         if self._slot_profiles is not None:
             # Rendering contract is qualified independently of density/seed.
             manifest["agent_anchor"]="native_front_center_footprints_v1"

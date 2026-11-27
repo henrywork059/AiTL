@@ -310,7 +310,7 @@ export type NativeProjectionScene = {
   signal?: {phase:string;vehicle_go:boolean;pedestrian_walk:boolean;applied_permission:string;applied_vehicle_go?:boolean;applied_pedestrian_walk?:boolean}|null;
   width: 1280;
   height: 720;
-  lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number}>;
+  lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number;surface?:"polygon"}>;
   agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number;
     slot_id?:string;visit?:number;vehicle_type?:"car"|"suv"|"van"|"bus";length_m?:number;width_m?:number;eastbound?:boolean}>;
 };
@@ -351,6 +351,30 @@ export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:st
   }
   return `${nativeEvaluationBase}/frame?${params}`;
 }
+export async function fetchExactNativeFrame(state:NativeEvaluationState,sourceId:string,signal:AbortSignal):Promise<Blob>{
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id||snapshot.coordinate_space!=="native_projection_v1"||state.status!=="running"||!Number.isSafeInteger(snapshot.received_at_ms))
+    throw new Error("Native frame coordinate contract unavailable");
+  const engine=state.engine??"native";
+  const response=await fetch(nativeEvaluationFrameUrl(state,sourceId),{signal,cache:"no-store"});
+  const expected:Record<string,string>={
+    "X-Camera-Source":`${engine==="reference"?"reference_eval":"native_eval"}_g${state.generation}_${sourceId}`,
+    "X-Frame-Number":String(snapshot.tick),
+    "X-Received-At-Ms":String(snapshot.received_at_ms),
+    "X-Observation-Origin":state.provenance,
+    "X-Simulation-Engine":engine,
+    "X-Layout-ID":snapshot.layout_id,
+    "X-Observation-Epoch":state.epoch,
+    "X-Observation-Generation":String(state.generation)
+  };
+  if(!response.ok||!response.headers.get("content-type")?.startsWith("image/png")||
+      Object.entries(expected).some(([name,value])=>response.headers.get(name)!==value))
+    throw new Error("Retired or inconsistent native camera frame");
+  const blob=await response.blob();
+  if(!blob.size)throw new Error("Empty native camera frame");
+  return blob;
+}
+
 export function nativeEvaluationExportUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
 }
@@ -364,9 +388,9 @@ export async function runNativeComparison(state:NativeEvaluationState,density:st
   return response.blob();
 }
 
-export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false};
-export function evaluateNativeRegion(state:NativeEvaluationState,sourceId:string,polygon:[number,number][],signal:AbortSignal):Promise<NativeRegionResult>{
+export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false;views?:Record<string,{polygon:[number,number][];counts:{vehicle:number;pedestrian:number};agent_ids:string[]}>;canonical_polygon?:[number,number][];count_basis?:string};
+export function evaluateNativeRegion(state:NativeEvaluationState,sourceId:string,polygon:[number,number][],signal:AbortSignal,allViews=false):Promise<NativeRegionResult>{
   const snapshot=state.snapshot;
   if(snapshot?.coordinate_space!=="native_projection_v1"||!snapshot.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
-  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,coordinate_space:snapshot.coordinate_space,layout_id:snapshot.layout_id,polygon}),signal});
+  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region${allViews?"/views":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,coordinate_space:snapshot.coordinate_space,layout_id:snapshot.layout_id,polygon}),signal});
 }

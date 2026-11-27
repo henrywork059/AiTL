@@ -121,7 +121,9 @@ class NativeFramePublisher:
             frame = CameraFrame(content=content, content_type="image/png",
                 source_id=evaluation_source_id(self._provenance,self._generation,source), width=WIDTH, height=HEIGHT,
                 received_at_ms=self._received_at_ms, frame_number=self._meta["tick"],
-                origin=self._provenance, mode_generation=self._generation)
+                origin=self._provenance, mode_generation=self._generation,
+                simulation_engine="native" if self._meta.get("demand_model")=="native_cyclic_slots_v1" else None,
+                simulation_demand_digest=self._meta.get("demand_digest"))
             self._frames[source] = frame
             if len(self._frames) == len(VIEW_FLIPS):
                 self._pixels = None  # all validated views cached; release the raster

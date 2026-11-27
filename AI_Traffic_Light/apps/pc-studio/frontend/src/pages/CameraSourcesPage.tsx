@@ -3,6 +3,7 @@ import { API_BASE } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { SimulationControls } from "../components/SimulationControls";
 import { SimulationCamera3D } from "../components/SimulationCamera3D";
+import { NativeProjectionView } from "../components/NativeProjectionView";
 import {
   connectRemoteCamera,
   DEFAULT_REMOTE_CAMERA_SETTINGS,
@@ -117,6 +118,9 @@ function cameraIndicator(camera: RemoteCameraProfile): { label: string; tone: st
 
 export function CameraSourcesPage({ status, showSimulationTools, onSimulationChange, onStatusChange, changingMode, view = "sources" }: Props) {
   const cameraSettingsView = view === "settings";
+  const [nativePreview,setNativePreview]=useState(false);
+  const [nativeSource,setNativeSource]=useState("simulation_camera");
+  const isolatedNative=showSimulationTools&&!cameraSettingsView&&nativePreview;
   const [remote, setRemote] = useState<RemoteCameraStatus | null>(null);
   const [selectedId, setSelectedId] = useState(NEW_CAMERA);
   const [host, setHost] = useState("");
@@ -508,12 +512,18 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               )}
             </div>
             <span className={`status-pill ${cameraSettingsView ? (selectedActive ? selectedIndicator?.tone ?? "muted" : "muted") : status?.stale ? "status-planned" : selectedFrameAvailable ? "status-implemented" : ""}`}>
-              {statusLabel}
+              {isolatedNative?"Isolated native evaluation":statusLabel}
             </span>
           </div>
 
+          {!cameraSettingsView&&showSimulationTools&&<div className="button-row">
+            <button type="button" aria-pressed={isolatedNative} onClick={()=>setNativePreview(v=>!v)}>{isolatedNative?"Return to selected camera":"Native evaluation camera"}</button>
+            {isolatedNative&&<label>Evaluation view <select value={nativeSource} onChange={e=>setNativeSource(e.target.value)}>{["simulation_camera","simulation_camera_b","simulation_camera_c","simulation_camera_d"].map((sid,i)=><option key={sid} value={sid}>{["A","B","C","D"][i]}</option>)}</select></label>}
+          </div>}
           <div className="camera-frame-wrapper">
-            {use3dPreview ? (
+            {isolatedNative ? (
+              <div className="sim3d-viewport" style={{position:"relative",width:"100%",height:"100%"}} data-native-camera-workspace="true"><NativeProjectionView sourceId={nativeSource} standaloneOnly initialGeometry="midblock"/></div>
+            ) : use3dPreview ? (
               <SimulationCamera3D key={sceneSourceId} sourceId={sceneSourceId} />
             ) : imageUrl ? (
               <img
@@ -536,7 +546,8 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             )}
           </div>
 
-          {!cameraSettingsView && showSimulationTools && (
+          {isolatedNative&&<p className="small-note">Independent native preview. The selected camera and AI source are unchanged. Stop evaluation to release its session.</p>}
+          {!isolatedNative && !cameraSettingsView && showSimulationTools && (
             <>
           <div className="button-row">
             <button

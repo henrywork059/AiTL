@@ -465,6 +465,11 @@ def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) 
     return ok(native_evaluation_service.evaluate_region(**payload.model_dump()),request_id=request.state.request_id)
 
 
+@router.post("/simulation/native-evaluation/region/views")
+def native_evaluation_region_views(payload: NativeEvaluationRegion, request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region_views(**payload.model_dump()),request_id=request.state.request_id)
+
+
 @router.get("/simulation/observation")
 def simulation_observation(request: Request, engine: Literal["legacy","protected","native","reference"] = "legacy",
                            source_id: str = "simulation_camera") -> dict:

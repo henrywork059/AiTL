@@ -31,7 +31,7 @@ from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
-    REFERENCE_EVALUATION_ORIGIN)
+    REFERENCE_EVALUATION_ORIGIN, simulation_view_point)
 from app.services.simulation_reference_session import GeneratedReferenceSession
 from app.services.sumo_midblock_session import CyclicMidblockSession
 from app.services.sumo_midblock_fixture import LENGTHS, WIDTHS
@@ -156,7 +156,7 @@ class NativeEvaluationService:
                         "length_m":LENGTHS[slot.type_id],"width_m":WIDTHS[slot.type_id],
                         "eastbound":slot.route==("WC","CE")} if slot.kind=="vehicle" else {})}
                         for slot in self._session.ledger.slots.values()}
-                self._projection = NativeProjection(Projection.load(network), self.generation, provenance=ENGINES[engine],slot_profiles=profiles)
+                self._projection = NativeProjection(Projection.load(network,walking_area_polygons=cyclic), self.generation, provenance=ENGINES[engine],slot_profiles=profiles)
                 trips = (self._session.trips if engine=="reference" or cyclic else
                          self._trip_loader(network, network.parent/"routes.xml"))
                 self._trips = tuple(trips)
@@ -283,6 +283,8 @@ class NativeEvaluationService:
         snap = self._adapter.snapshot()
         if not self._publisher.has_tick(snap.tick):
             meta, pixels = self._projection.render_pixels(snap)
+            if self._geometry=="midblock":
+                meta.update(demand_model="native_cyclic_slots_v1",demand_digest=self._demand_digest)
             self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True)
 
     def frame(self, *, epoch, generation, tick, source_id):
@@ -386,6 +388,8 @@ class NativeEvaluationService:
                 coordinate_space=scene["coordinate_space"],layout_id=scene["layout_id"],
                 width=scene["width"],height=scene["height"],provenance=ENGINES[self._engine],
                 tick_kind="native_fixed_step" if self._engine=="native" else "reference_fixed_step")
+            if self._geometry=="midblock":
+                identity.update(simulation_engine="native",demand_model=scene["demand_model"],demand_digest=scene["demand_digest"],agent_anchor="native_front_center_footprints_v1")
             return {**scene,"view_id":source_id,"source_id":identity["source_id"],
                     "frame_number":tick,"legacy_editor_compatible":False,"observation":identity}
 
@@ -406,6 +410,30 @@ class NativeEvaluationService:
                     "coordinate_space":coordinate_space,"layout_id":layout_id,**result,
                     "polygon_world_m":world,"observation":scene["observation"],
                     "provenance":"synthetic_native_region_evaluation" if self._engine=="native" else "synthetic_reference_region_evaluation","engine":self._engine,"persisted":False,"physical_output_allowed":False}
+
+    def evaluate_region_views(self, *, epoch,generation,tick,source_id,coordinate_space,layout_id,polygon):
+        """One draft, one exact native tick, four mirrored image planes.
+
+        Never persist or translate a saved legacy zone. Point counts use the
+        existing front/centre anchor contract, not body intersection.
+        """
+        with self._lock:
+            original=self.evaluate_region(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
+                coordinate_space=coordinate_space,layout_id=layout_id,polygon=polygon)
+            if any(not (0<=x<=1279 and 0<=y<=719) for x,y in original["polygon"]):
+                raise AppError(ErrorCode.INVALID_REQUEST,"Draft vertices must lie within mirrorable pixel centres.",status_code=422)
+            canonical=[simulation_view_point(x,y,1280,720,source_id) for x,y in original["polygon"]]
+            views={}
+            for sid in VIEW_FLIPS:
+                mirrored=[simulation_view_point(x,y,1280,720,sid) for x,y in canonical]
+                result=self.evaluate_region(epoch=epoch,generation=generation,tick=tick,source_id=sid,
+                    coordinate_space=coordinate_space,layout_id=layout_id,polygon=mirrored)
+                if result["agent_ids"]!=original["agent_ids"] or result["counts"]!=original["counts"]:
+                    raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED,"Native draft view identity mismatch.",status_code=503)
+                views[sid]={"polygon":result["polygon"],"counts":result["counts"],
+                            "agent_ids":result["agent_ids"],"observation":result["observation"]}
+            return {**original,"canonical_polygon":canonical,"views":views,"count_basis":"observed_agent_anchor",
+                    "legacy_editor_compatible":False}
 
     def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard', engine='native'):
         """Run a bounded pair with one immutable copy of the saved policy.

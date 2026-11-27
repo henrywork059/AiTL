@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { SimulationCamera3D } from "../src/components/SimulationCamera3D";
-import type { SimulationScene } from "../src/lib/remoteCameraApi";
+import { fetchExactNativeFrame, type NativeEvaluationState, type SimulationScene } from "../src/lib/remoteCameraApi";
 import type { Zone } from "../src/types";
 
 const host = document.getElementById("root")!;
@@ -14,19 +14,27 @@ let nativeTick = 1;
 let nativeStatus = "running";
 let nativeCalls = 0;
 let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
+let wrongFrameHeader=false;
 const layoutId="b".repeat(64);
 const originalFetch = window.fetch;
 window.fetch = async (input,init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+  if(url.pathname==="/api/camera/simulation/observation/frame"){
+    const sid=url.searchParams.get("source_id");
+    if(url.searchParams.get("engine")!=="native"||url.searchParams.get("layout_id")!==layoutId)throw Error("Unqualified native frame read");
+    return new Response(Uint8Array.from([137,80,78,71,13,10,26,10]),{headers:{"Content-Type":"image/png","X-Camera-Source":`native_eval_g${evalGeneration}_${sid}`,
+      "X-Frame-Number":String(wrongFrameHeader?evalTick-1:evalTick),"X-Received-At-Ms":"123","X-Observation-Origin":"synthetic_sumo_projection",
+      "X-Simulation-Engine":"native","X-Layout-ID":layoutId,"X-Observation-Epoch":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","X-Observation-Generation":String(evalGeneration)}});
+  }
   if(url.pathname.startsWith("/api/camera/simulation/native-evaluation")){
     evalCalls++;
     const command=url.pathname.split("/").pop();
     if(init?.method==="POST"){
       const body=JSON.parse(String(init.body));
       if(body.generation!==evalGeneration||body.epoch!=="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")throw Error("Wrong evaluation identity");
-      if(command==="region"){
+      if(command==="region"||command==="views"){
         if(body.layout_id!==layoutId||body.coordinate_space!=="native_projection_v1"||body.tick!==evalTick||body.polygon.length!==4)throw Error("Wrong region identity");
-        return new Response(JSON.stringify({ok:true,data:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false}}),{headers:{"Content-Type":"application/json"}});
+        return new Response(JSON.stringify({ok:true,data:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false,views:{"simulation_camera":{},"simulation_camera_b":{},"simulation_camera_c":{},"simulation_camera_d":{}}}}),{headers:{"Content-Type":"application/json"}});
       }
       if(command==="start"){evalGeneration++;evalTick=0;evalRunning=true;evalPaused=false;}
       if(command==="step"){if(evalPaused||body.tick!==evalTick)throw Error("Wrong step");evalTick+=body.steps;}
@@ -155,7 +163,14 @@ async function run(){
       await wait(()=>editor.querySelectorAll("circle").length===i+1,"Draft vertex not recorded");
     }
     button("Evaluate draft")!.click();
-    await wait(()=>Boolean(host.textContent?.includes("Vehicles 0 · Pedestrians 1")),"Native draft result missing");
+    await wait(()=>Boolean(host.textContent?.includes("Vehicles 0 · Pedestrians 1")&&host.textContent?.includes("4 matched views")),"Native multiview draft result missing");
+    const frameState={status:"running",engine:"native",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,
+      snapshot:{tick:evalTick,received_at_ms:123,layout_id:layoutId,coordinate_space:"native_projection_v1"}} as NativeEvaluationState;
+    const signal=new AbortController().signal;
+    check((await fetchExactNativeFrame(frameState,"simulation_camera_b",signal)).size===8,"Exact native frame refused");
+    wrongFrameHeader=true;
+    let rejected=false;try{await fetchExactNativeFrame(frameState,"simulation_camera_b",signal);}catch{rejected=true;}
+    check(rejected,"Retired native image accepted");wrongFrameHeader=false;
     button("Close draft")!.click();
     await wait(()=>!host.querySelector("[data-native-region-editor]"),"Native draft retirement failed");
     await wait(()=>Boolean(button("Stop evaluation")&&!button("Stop evaluation")!.disabled),"Standalone stop unavailable");

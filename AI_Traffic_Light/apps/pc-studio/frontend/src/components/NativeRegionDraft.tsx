@@ -22,7 +22,7 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
     if(points.length!==4||busy||!state.snapshot)return;
     const controller=new AbortController();request.current=controller;setBusy(true);setError("");
     try{
-      const value=await evaluateNativeRegion(state,sourceId,points,controller.signal);
+      const value=await evaluateNativeRegion(state,sourceId,points,controller.signal,true);
       if(!controller.signal.aborted&&value.tick===state.snapshot.tick&&value.generation===state.generation&&value.epoch===state.epoch&&value.layout_id===state.snapshot.layout_id&&value.persisted===false&&value.source_id===sourceId)setResult(value);
     }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Region evaluation failed");}
     finally{if(!controller.signal.aborted){setBusy(false);request.current=null;}}
@@ -44,7 +44,7 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
       <span>{points.length}/4 vertices · native draft only</span>
       <button type="button" onClick={()=>changed([])}>Clear draft</button>
       <button type="button" disabled={points.length!==4||busy} onClick={()=>void evaluate()}>Evaluate draft</button>
-      {result&&<span role="status">Vehicles {result.counts.vehicle} · Pedestrians {result.counts.pedestrian} · tick {result.tick}</span>}
+      {result&&<span role="status">Vehicles {result.counts.vehicle} · Pedestrians {result.counts.pedestrian} · tick {result.tick}{result.views?` · ${Object.keys(result.views).length} matched views`:""}</span>}
       {error&&<span role="alert">{error}</span>}
     </div>
   </>;

@@ -133,9 +133,22 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
             with ZipFile(io.BytesIO(capture.content)) as z:
                 scene=json.loads(z.read("scene.json"))
                 assert scene["demand_model"]=="native_cyclic_slots_v1"
+                assert any(l["kind"]=="walk" and l.get("surface")=="polygon" for l in scene["lanes"])
                 assert "slot_id,visit" in z.read("agents.csv").decode()
                 for sid in VIEW_FLIPS:
                     assert z.read(sid+".png")==client.get(BASE+"/frame",params={**params,"source_id":sid}).content
+                    meta=json.loads(z.read(sid+".json"))
+                    assert meta["simulation_engine"]=="native" and meta["simulation_demand_digest"]==scene["demand_digest"]
+                    exact=client.get("/api/camera/simulation/observation/frame",params={**params,"engine":"native","layout_id":scene["layout_id"],"source_id":sid})
+                    assert exact.status_code==200 and exact.content==z.read(sid+".png")
+                    assert exact.headers["x-layout-id"]==scene["layout_id"] and exact.headers["x-observation-origin"]=="synthetic_sumo_projection"
+                draft={**params,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":scene["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
+                regions=assert_envelope(client.post(BASE+"/region/views",json=draft))["data"]
+                assert set(regions["views"])==set(VIEW_FLIPS) and not regions["persisted"]
+                assert regions["agent_ids"]==sorted(a["id"] for a in scene["agents"])
+                assert all(v["counts"]==regions["counts"] and v["agent_ids"]==regions["agent_ids"] and not v["observation"]["detector_input_eligible"] for v in regions["views"].values())
+                (out/"multiview-region.json").write_text(json.dumps(regions,indent=2),encoding="utf-8")
+                assert_envelope(client.post(BASE+"/region/views",json={**draft,"layout_id":"0"*64}),expected_status=409)
             try:
                 InferenceService().detect_frame(svc.frame(**params,source_id="simulation_camera"))
             except AppError as exc:

@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from "react";
-import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,nativeEvaluationFrameUrl,nativeEvaluationExportUrl,runNativeComparison,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
+import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,fetchExactNativeFrame,nativeEvaluationExportUrl,runNativeComparison,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
 import {useSerialPolling} from "../lib/useSerialPolling";
 import {NativeRoad3D} from "./NativeRoad3D";
 import {NativeRegionDraft} from "./NativeRegionDraft";
@@ -15,11 +15,30 @@ function validScene(s:NativeProjectionScene){
     Number.isFinite(s.time_s)&&s.time_s>=0&&Array.isArray(s.lanes)&&s.lanes.length<=2000&&
     Array.isArray(s.agents)&&s.agents.length<=2000&&new Set(s.agents.map(a=>a.id)).size===s.agents.length&&
     s.agents.every(a=>typeof a.id==="string"&&["vehicle","pedestrian"].includes(a.kind)&&[a.x,a.y,a.speed_m_s].every(Number.isFinite)&&a.x>=0&&a.x<1280&&a.y>=0&&a.y<720&&a.speed_m_s>=0)&&
-    s.lanes.every(l=>["road","walk","crossing"].includes(l.kind)&&Number.isFinite(l.width_px)&&l.width_px>0&&Array.isArray(l.points)&&l.points.length>=2&&l.points.length<=1000&&l.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))&&
+    s.agents.every(a=>a.length_m===undefined&&a.width_m===undefined&&a.eastbound===undefined||a.kind==="vehicle"&&typeof a.length_m==="number"&&Number.isFinite(a.length_m)&&a.length_m>0&&a.length_m<=20&&typeof a.width_m==="number"&&Number.isFinite(a.width_m)&&a.width_m>0&&a.width_m<=4&&typeof a.eastbound==="boolean"&&["car","suv","van","bus"].includes(a.vehicle_type??""))&&
+    s.lanes.every(l=>["road","walk","crossing"].includes(l.kind)&&(l.surface===undefined||l.kind==="walk"&&l.surface==="polygon")&&Number.isFinite(l.width_px)&&l.width_px>0&&Array.isArray(l.points)&&l.points.length>=2&&l.points.length<=1000&&l.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))&&
     (s.pixels_per_m===undefined||Number.isFinite(s.pixels_per_m)&&s.pixels_per_m>0&&s.pixels_per_m<100);
 }
 
-function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone:boolean;profile?:string}){
+function ExactNativeImage({state,sourceId}:{state:NativeEvaluationState;sourceId:string}){
+  const [url,setUrl]=useState<string|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    const controller=new AbortController();
+    let owned:string|null=null;
+    setUrl(null);setError("");
+    void fetchExactNativeFrame(state,sourceId,controller.signal).then(blob=>{
+      if(controller.signal.aborted)return;
+      owned=URL.createObjectURL(blob);setUrl(owned);
+    }).catch(()=>{if(!controller.signal.aborted)setError("Exact PNG unavailable for this tick");});
+    return ()=>{controller.abort();if(owned)URL.revokeObjectURL(owned);};
+  },[state.epoch,state.generation,state.snapshot?.tick,state.snapshot?.layout_id,state.snapshot?.received_at_ms,state.engine,sourceId]);
+  return url?<img src={url} alt="Exact synthetic native PNG; original editor coordinates are separate"
+    style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain"}} onError={()=>{setUrl(null);setError("Native PNG could not be decoded");}}/>:
+    <span role="status" style={{position:"absolute",left:8,bottom:65}}>{error||"Loading exact PNG"}</span>;
+}
+
+function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:string;standalone:boolean;profile?:string;initialGeometry?:string}){
   const [scene,setScene]=useState<NativeProjectionScene|null>(null);
   const [state,setState]=useState<NativeEvaluationState|null>(null);
   const [status,setStatus]=useState("Loading native preview");
@@ -39,7 +58,7 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
   const [failed,setFailed]=useState(false);
   const [pending,setPending]=useState(false);
   const [density,setDensity]=useState("normal");
-  const [geometry,setGeometry]=useState("standard");
+  const [geometry,setGeometry]=useState(initialGeometry??"standard");
   const [engine,setEngine]=useState<"native"|"reference">("native");
   const [mode,setMode]=useState("fixed");
   const latest=useRef({epoch:"",generation:-1,tick:-1});
@@ -111,17 +130,24 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
     finally{active.current=null;if(!controller.signal.aborted)setPending(false);}
   };
   return <div className="native-projection-view" data-native-status={scene?"running":"unavailable"}>
-    {scene&&image&&standalone&&state?<img key={`${state.epoch}:${state.generation}:${scene.tick}:${sourceId}`} src={nativeEvaluationFrameUrl(state,sourceId)} alt="Exact synthetic native PNG; original editor coordinates are separate" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain"}}/>:
+    {scene&&image&&standalone&&state?<ExactNativeImage key={`${state.epoch}:${state.generation}:${scene.tick}:${sourceId}`} state={state} sourceId={sourceId}/>:
       scene&&three?<NativeRoad3D key={latest.current.epoch+scene.generation} sourceId={sourceId} scene={scene} top={top} detail={detail} onFailure={onFailure}/>:
       scene&&<svg viewBox="0 0 1280 720" role="img" aria-label={state?.engine==="reference"?"Synthetic finite reference road and agents":"Synthetic native SUMO road and agents"}
         data-native-generation={scene.generation} data-native-tick={scene.tick}>
         <rect width="1280" height="720" fill="#1d2125"/>
         <g transform={SOURCE_TRANSFORM[sourceId]??""} key={scene.generation}>
           {(["road","walk","crossing"] as const).flatMap(kind=>scene.lanes.filter(l=>l.kind===kind).map(lane=>
+            lane.surface==="polygon"?<polygon key={lane.id} data-native-lane={lane.id} points={lane.points.map(p=>p.join(",")).join(" ")} fill="#8e8982"/>:
             <polyline key={lane.id} data-native-lane={lane.id} points={lane.points.map(p=>p.join(",")).join(" ")} fill="none"
               stroke={kind==="road"?"#56504b":kind==="walk"?"#8e8982":"#e1e1e1"} strokeWidth={lane.width_px} strokeLinejoin="round" strokeLinecap="round"/>))}
-          {scene.agents.map(agent=><circle key={agent.id} data-native-agent={agent.id} cx={agent.x} cy={agent.y}
-            r={agent.kind==="vehicle"?4:3} fill={agent.kind==="vehicle"?"#41aaff":"#f5dc41"}/>)}
+          {scene.agents.map(agent=>{
+            const ppm=scene.pixels_per_m??3.2;
+            if(agent.kind==="vehicle"&&agent.length_m!==undefined&&agent.width_m!==undefined&&agent.eastbound!==undefined){
+              const length=agent.length_m*ppm,width=agent.width_m*ppm;
+              return <rect key={agent.id} data-native-agent={agent.id} x={agent.x-(agent.eastbound?length:0)} y={agent.y-width/2} width={length} height={width} fill="#41aaff"/>;
+            }
+            return <circle key={agent.id} data-native-agent={agent.id} cx={agent.x} cy={agent.y} r={agent.kind==="vehicle"?4:3} fill={agent.kind==="vehicle"?"#41aaff":"#f5dc41"}/>;
+          })}
         </g>
       </svg>}
     {scene&&state&&region&&!three&&!image&&scene.coordinate_space==="native_projection_v1"&&scene.layout_id&&<NativeRegionDraft key={`${state.epoch}:${scene.generation}:${scene.layout_id}:${sourceId}`} sourceId={sourceId} state={state}/>}
@@ -157,10 +183,10 @@ function NativeContent({sourceId,standalone,profile}:{sourceId:string;standalone
 }
 
 /** Separate shadow and manually stepped native-only evaluation; neither is a saved camera. */
-export function NativeProjectionView({sourceId,standaloneOnly=false,profile}:{sourceId:string;standaloneOnly?:boolean;profile?:string}){
+export function NativeProjectionView({sourceId,standaloneOnly=false,profile,initialGeometry}:{sourceId:string;standaloneOnly?:boolean;profile?:string;initialGeometry?:string}){
   const [standalone,setStandalone]=useState(standaloneOnly);
   return <div style={{position:"absolute",inset:0}}>
-    <NativeContent key={String(standalone)} sourceId={sourceId} standalone={standalone} profile={profile}/>
+    <NativeContent key={String(standalone)} sourceId={sourceId} standalone={standalone} profile={profile} initialGeometry={initialGeometry}/>
     {!standaloneOnly&&<button type="button" style={{position:"absolute",right:8,top:8,zIndex:6}} onClick={()=>setStandalone(!standalone)}>
       {standalone?"Shadow preview":"Standalone evaluation"}
     </button>}

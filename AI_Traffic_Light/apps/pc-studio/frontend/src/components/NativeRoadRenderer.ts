@@ -42,7 +42,7 @@ export class NativeRoadRenderer {
     if(t.kind==="vehicle")disposeVehicleVisual(t.visual as VehicleVisual);
     else disposePedestrianVisual(t.visual as PedestrianVisual);
   }
-  private clear(){for(const t of this.tracks.values())this.remove(t);this.tracks.clear();for(const mesh of this.roadGroup.children)if(mesh instanceof THREE.InstancedMesh)mesh.dispose();this.roadGroup.clear();}
+  private clear(){for(const t of this.tracks.values())this.remove(t);this.tracks.clear();for(const mesh of this.roadGroup.children){if(mesh instanceof THREE.InstancedMesh)mesh.dispose();else if(mesh instanceof THREE.Mesh)mesh.geometry.dispose();}this.roadGroup.clear();}
   update(s:NativeProjectionScene,now=performance.now()){
     if(this.closed||s.generation<this.generation)return;
     const reset=s.generation!==this.generation;
@@ -55,6 +55,17 @@ export class NativeRoadRenderer {
       for(const [index,kind] of (["road","walk","crossing"] as const).entries()){
         const matrices:THREE.Matrix4[]=[];
         for(const lane of s.lanes.filter(l=>l.kind===kind)){
+          if(lane.surface==="polygon"){
+            const contour=lane.points.map(p=>{const v=point(...p,this.source);return new THREE.Vector2(v.x,-v.z);});
+            if(Math.abs(THREE.ShapeUtils.area(contour))>1e-6){
+              const surface=new THREE.ShapeGeometry(new THREE.Shape(contour));
+              surface.rotateX(-Math.PI/2);
+              const mesh=new THREE.Mesh(surface,this.mats[index]);
+              mesh.position.y=index*.8+.2;
+              this.roadGroup.add(mesh);
+            }
+            continue;
+          }
           for(let i=1;i<lane.points.length;i++){
             const a=point(...lane.points[i-1],this.source),b=point(...lane.points[i],this.source);
             const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(!len)continue;

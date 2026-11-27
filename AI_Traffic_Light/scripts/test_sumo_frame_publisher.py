@@ -93,6 +93,24 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_walking_area_polygon_not_thickened(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id=":C_w0" function="walkingarea"><lane id=":C_w0_0" allow="pedestrian" width="4" shape="0,0 10,0 10,10 0,10"/></edge></net>')
+            old=Projection.load(path)
+            native=Projection.load(path,walking_area_polygons=True)
+            self.assertEqual(old.scale,native.scale)
+            self.assertEqual(old.lanes[0].surface,"stroke")
+            self.assertEqual(native.lanes[0].surface,"polygon")
+            x,y=native.pixel(5.,5.)
+            self.assertEqual(tuple(native.geometry_canvas()[round(y),round(x)]),(130,137,142))
+            self.assertEqual(tuple(old.geometry_canvas()[round(y),round(x)]),(29,33,37))
+            x,y=native.pixel(-1.,5.)
+            self.assertEqual(tuple(native.geometry_canvas()[round(y),round(x)]),(29,33,37))
+            scene=NativeProjection(native,1).scene(ShadowSnapshot(42,1,False,()))
+            self.assertEqual(scene["lanes"][0]["surface"],"polygon")
+            self.assertNotEqual(scene["layout_id"],NativeProjection(old,1).layout_id)
+
     def test_midblock_vehicle_footprint_and_mirror(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"net.xml"

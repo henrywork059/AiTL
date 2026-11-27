@@ -21,6 +21,7 @@ async function run(){
       const response=await fetch("./native-scene.json",{cache:"no-store"});
       if(!response.ok)throw Error("Actual native capture scene missing");
       scene=await response.json() as NativeProjectionScene;
+      if((scene as NativeProjectionScene & {geometry?:string}).geometry==="midblock"&&!scene.lanes.some(l=>l.surface==="polygon"))throw Error("Midblock walking-area polygons missing");
       if(scene.provenance!=="synthetic_sumo_projection"||scene.coordinate_space!=="native_projection_v1"||
          !scene.layout_id||!scene.agents.length||!scene.lanes.length)throw Error("Actual scene identity invalid");
     }

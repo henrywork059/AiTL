@@ -69,11 +69,13 @@ export function SimulationCamera3D({
     };
   }, [scene, sourceId]);
 
-  useSerialPolling(async () => {
+  useSerialPolling(async ({isCurrent}) => {
     const next = await fetchSimulationScene(sourceId);
+    if(!isCurrent())return;
     setScene(next);
     setError(null);
   }, 450, {
+    enabled: !nativeRequested || editing || (showRegions&&zones.length>0) || (showBoxes&&detections.length>0),
     restartKey: sourceId,
     onError: (reason) => {
       setScene(null);

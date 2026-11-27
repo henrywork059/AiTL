@@ -101,9 +101,36 @@ class Tests(unittest.TestCase):
                 self.assertEqual(first["snapshot"]["agents"][0]["vehicle_type"],"car")
                 self.assertEqual(first["snapshot"]["agents"][0]["length_m"],4.5)
                 self.assertTrue(first["snapshot"]["agents"][0]["eastbound"])
+                layout=first["snapshot"]["layout_id"]
+                payload={**identity,"tick":1,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":layout,
+                         "polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
+                all_views=assert_envelope(client.post(BASE+"/region/views",json=payload))["data"]
+                self.assertEqual(set(all_views["views"]),set(VIEW_FLIPS))
+                self.assertEqual(all_views["count_basis"],"observed_agent_anchor")
+                self.assertFalse(all_views["persisted"])
+                for sid,view in all_views["views"].items():
+                    self.assertEqual(view["counts"],{"vehicle":1,"pedestrian":0})
+                    self.assertEqual(view["agent_ids"],all_views["agent_ids"])
+                    self.assertEqual(view["observation"]["view_id"],sid)
+                    self.assertEqual(view["observation"]["demand_digest"],first["snapshot"]["demand_digest"])
+                    self.assertFalse(view["observation"]["detector_input_eligible"])
+                self.assertEqual(all_views["canonical_polygon"],[[1279,0],[0,0],[0,719],[1279,719]])
+                for bad in ({**payload,"layout_id":"0"*64},{**payload,"coordinate_space":"legacy_pixels"},{**payload,"tick":0}):
+                    assert_envelope(client.post(BASE+"/region/views",json=bad),expected_status=409)
+                assert_envelope(client.post(BASE+"/region/views",json={**payload,"polygon":[[0,0],[1279.5,0],[1279.5,719],[0,719]]}),expected_status=422)
+                exact=client.get("/api/camera/simulation/observation/frame",params={**identity,"engine":"native","tick":1,"source_id":"simulation_camera_c","layout_id":layout})
+                self.assertEqual(exact.status_code,200)
+                self.assertEqual(exact.headers["x-observation-epoch"],identity["epoch"])
+                self.assertEqual(exact.headers["x-layout-id"],layout)
                 with ZipFile(io.BytesIO(service.capture(**identity,tick=1))) as z:
                     self.assertIn("slot_id,visit",z.read("agents.csv").decode())
                     self.assertEqual(json.loads(z.read("coordinate_contract.json"))["demand_digest"],first["snapshot"]["demand_digest"])
+                    for sid in VIEW_FLIPS:
+                        metadata=json.loads(z.read(sid+".json"))
+                        self.assertEqual(metadata["simulation_engine"],"native")
+                        self.assertEqual(metadata["simulation_demand_digest"],first["snapshot"]["demand_digest"])
+                        self.assertEqual(metadata["origin"],"synthetic_sumo_projection")
+                    self.assertEqual(exact.content,z.read("simulation_camera_c.png"))
                 paused=assert_envelope(client.post(BASE+"/pause",json={**identity,"tick":1,"paused":True}))["data"]
                 self.assertTrue(paused["snapshot"]["paused"])
                 assert_envelope(client.post(BASE+"/step",json={**identity,"tick":1,"steps":1}),expected_status=409)
@@ -118,6 +145,7 @@ class Tests(unittest.TestCase):
                 assert_envelope(client.post(BASE+"/stop",json=identity))
                 self.assertTrue(sessions[0].closed)
                 assert_envelope(client.get(BASE+"/frame",params={**identity,"tick":2,"source_id":"simulation_camera"}),expected_status=409)
+                assert_envelope(client.post(BASE+"/region/views",json=payload),expected_status=409)
 
     def test_reference_switch_and_production_rollback(self):
         from app.services.simulation_reference_session import FiniteReferenceSession

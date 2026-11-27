@@ -73,6 +73,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID","X-Camera-Source","X-Frame-Number","X-Received-At-Ms",
+                        "X-Observation-Origin","X-Simulation-Engine","X-Layout-ID",
+                        "X-Observation-Epoch","X-Observation-Generation","X-Native-Generation"],
     )
 
     app.add_exception_handler(AppError, app_error_handler)
