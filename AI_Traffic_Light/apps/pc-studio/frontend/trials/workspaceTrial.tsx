@@ -176,6 +176,15 @@ async function main(){
     findButton("Add region")!.click();await waitFor(()=>document.querySelectorAll(".crosswalk-region-vertex").length===4,"New region missing");
     await dragImagePoint(".crosswalk-region-overlay",[390,220],[320,180],()=>vertexNear(320,180));
     findButton("Side B")!.click();await waitFor(()=>vertexNear(390,220),"Side A geometry leaked into Side B");
+    await waitFor(()=>{
+      const svg=document.querySelector<SVGSVGElement>(".crosswalk-region-overlay");
+      const circle=[...document.querySelectorAll<SVGCircleElement>(".crosswalk-region-vertex")].find(el=>Number(el.getAttribute("cx"))===390&&Number(el.getAttribute("cy"))===220);
+      const matrix=svg?.getScreenCTM();
+      if(!circle||!matrix)return false;
+      const expected=new DOMPoint(390,220).matrixTransform(matrix);
+      const rect=circle.getBoundingClientRect();
+      return Math.abs(rect.x+rect.width/2-expected.x)<3&&Math.abs(rect.y+rect.height/2-expected.y)<3;
+    },"Side B vertex DOM attributes changed without repainting pointer hit geometry");
     await dragImagePoint(".crosswalk-region-overlay",[390,220],[450,180],()=>vertexNear(450,180));
     failRegionSave=true;findButton("Save regions")!.click();await waitFor(()=>findButton("Saving…")&&findButton("Add region")?.disabled&&findButton("Back to crosswalks")?.disabled,"Region edits not locked during save");
     await waitFor(()=>document.body.textContent?.includes("Fixture region save rejected"),"Editor save error not visible");
