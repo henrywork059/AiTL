@@ -27,6 +27,7 @@ CAPTURE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,160}$")
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".svg"}
 MAX_LABELS_PER_FRAME = 500
+MANAGED_YAML_MARKER = "# aitl-managed-yolo-v1"
 
 _MANAGED_DATASET_LOCK = RLock()
 
@@ -457,6 +458,7 @@ class DatasetLabelingService:
         )
         return self.training_dataset_status()
 
+    @serialize_managed_dataset
     def verify_managed_dataset(self) -> str:
         """Reconcile copied dataset bytes and provenance before optional training.
 
@@ -677,6 +679,7 @@ class DatasetLabelingService:
     def _dataset_yaml(self, classes: list[dict[str, Any]]) -> str:
         final_path = json.dumps(self._managed_yolo_root.as_posix())
         lines = [
+            MANAGED_YAML_MARKER,
             f"path: {final_path}",
             "train: images/train",
             "val: images/val",
@@ -693,7 +696,7 @@ class DatasetLabelingService:
             return "Labels are ready. Build the managed YOLO dataset before starting training with yolo/data.yaml."
         if stale:
             return "Capture labels, provenance, classes or integrity metadata changed. Rebuild the managed YOLO dataset before training."
-        return "Managed YOLO dataset is current and ready for the optional training runner."
+        return "Managed YOLO metadata is current. Source and generated file integrity will be verified before training."
 
 
 dataset_labeling_service = DatasetLabelingService()

@@ -158,6 +158,7 @@ export function TrainExportPage() {
             <div><span>Progress</span><strong>{status?.progress ?? 0}%</strong></div>
             <div><span>Epochs completed</span><strong>{status?.completed_epochs ?? 0} / {status?.config?.epochs ?? config.epochs}</strong></div>
             <div><span>Run ID</span><strong>{status?.active_run_id ?? "none"}</strong></div>
+            {status?.dataset_integrity_sha256 && <div><span>Verified dataset</span><strong title={status.dataset_integrity_sha256}>{status.dataset_integrity_sha256.slice(0, 12)}</strong></div>}
             <div><span>Best epoch</span><strong>{early?.best_epoch ?? "n/a"}</strong></div>
             <div><span>Without improvement</span><strong>{early ? `${early.epochs_without_improvement} / ${early.patience}` : "n/a"}</strong></div>
             <div><span>Output directory</span><strong>{status?.output_path ?? "none"}</strong></div>

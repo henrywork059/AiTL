@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -14,7 +15,8 @@ sys.path.insert(0, str(BACKEND_ROOT))
 from app.core.error_codes import ErrorCode  # noqa: E402
 from app.core.exceptions import AppError  # noqa: E402
 from app.services.dataset_labeling import DatasetLabelingService, evaluation_only_record  # noqa: E402
-from app.services.training import training_service  # noqa: E402
+from app.services.training import training_service, TrainingService
+from test_training_service import FakeYoloModel  # noqa: E402
 
 
 CLASSES = {
@@ -150,8 +152,42 @@ def main() -> int:
         original_source.write_bytes(source_bytes + b"tamper")
         assert_rejected()
         original_source.write_bytes(source_bytes)
-        assert len(service.verify_managed_dataset()) == 64
-        manifest_before = (dataset_root / "yolo" / "manifest.json").read_bytes()
+        expected_digest = service.verify_managed_dataset()
+        assert len(expected_digest) == 64
+        # Exercise the real TrainingService admission with a deterministic fake
+        # trainer. No Ultralytics weights or actual training are used.
+        model = FakeYoloModel()
+        trainer = TrainingService(dataset_root=dataset_root, output_root=root / "training",
+                                  yolo_factory=lambda _: model)
+        args = dict(dataset_yaml="yolo/../yolo/data.yaml", base_model="yolo26n.pt",
+                    epochs=4, image_size=640, batch=1, device="cpu", patience=2)
+        copied_images[0].write_bytes(original_image + b"tamper")
+        try:
+            trainer.start(**args)
+        except AppError as exc:
+            assert exc.code == ErrorCode.DATASET_TRAINING_NOT_READY
+        else:
+            raise AssertionError("Training admitted a corrupted managed dataset")
+        assert trainer.status()["status"] == "idle" and not model.last_train_kwargs
+        copied_images[0].write_bytes(original_image)
+        manifest_path = dataset_root / "yolo" / "manifest.json"
+        manifest_before = manifest_path.read_bytes()
+        manifest_path.unlink()
+        try:
+            trainer.start(**args)
+        except AppError as exc:
+            assert exc.code == ErrorCode.DATASET_TRAINING_NOT_READY
+        else:
+            raise AssertionError("Training bypassed a missing managed manifest")
+        manifest_path.write_bytes(manifest_before)
+        started = trainer.start(**args)
+        assert started["dataset_integrity_sha256"] == expected_digest
+        deadline = time.monotonic() + 3
+        while trainer.status()["status"] == "running" and time.monotonic() < deadline:
+            time.sleep(.02)
+        assert trainer.status()["status"] in {"completed", "early_stopped"}
+        assert trainer.status()["dataset_integrity_sha256"] == expected_digest
+        assert model.last_train_kwargs["data"] == str((dataset_root / "yolo/data.yaml").resolve())
         with patch.object(training_service, "status", return_value={"status": "running"}):
             try:
                 service.build_training_dataset(validation_fraction=0.2)

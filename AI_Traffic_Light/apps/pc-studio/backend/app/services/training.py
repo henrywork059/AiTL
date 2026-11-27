@@ -12,7 +12,7 @@ from uuid import uuid4
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
-from app.services.dataset_labeling import DatasetLabelingService, serialize_managed_dataset
+from app.services.dataset_labeling import DatasetLabelingService, MANAGED_YAML_MARKER, serialize_managed_dataset
 
 logger = get_logger(__name__)
 
@@ -128,7 +128,16 @@ class TrainingService:
         normalized_dataset_yaml = dataset_path.relative_to(self._dataset_root).as_posix()
         dataset_integrity_sha256 = None
         managed_manifest = self._dataset_root / "yolo" / "manifest.json"
-        if normalized_dataset_yaml == MANAGED_DATASET_YAML and managed_manifest.exists():
+        managed_yaml_marked = False
+        if normalized_dataset_yaml == MANAGED_DATASET_YAML and dataset_path.is_file():
+            try:
+                with dataset_path.open("r", encoding="utf-8") as stream:
+                    managed_yaml_marked = stream.readline().rstrip() == MANAGED_YAML_MARKER
+            except OSError as exc:
+                raise AppError(ErrorCode.DATASET_READ_FAILED, "Cannot read dataset YAML.", status_code=500) from exc
+        # Preserve explicitly supplied unmanaged YAMLs, but deleting a generated
+        # managed manifest cannot silently downgrade a marked build to unmanaged.
+        if normalized_dataset_yaml == MANAGED_DATASET_YAML and (managed_manifest.exists() or managed_yaml_marked):
             managed_service = DatasetLabelingService(dataset_root=self._dataset_root)
             managed_status = managed_service.training_dataset_status()
             if not managed_status["ready"]:

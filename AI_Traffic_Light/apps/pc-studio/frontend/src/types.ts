@@ -419,6 +419,7 @@ export type CaptureRecord = {
   height: number;
   source_frame_number: number;
   source_received_at_ms: number;
+  content_sha256?: string;
   captured_at_ms: number;
   size_bytes: number;
   quality_tag: CaptureQualityTag;
@@ -511,6 +512,7 @@ export type TrainingStatus = {
   training_available: boolean;
   backend: string;
   active_run_id: string | null;
+  dataset_integrity_sha256?: string | null;
   progress: number;
   status: "idle" | "running" | "completed" | "early_stopped" | "failed" | string;
   message: string;
