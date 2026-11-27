@@ -1,3 +1,18 @@
+# V0573 — Independent P4 hardware-first workspace candidate
+
+Candidate `0_5_73`; previous `0_5_72`; accepted baseline `0_5_0`. Update 29 / U01 delivered as candidate; Updates 30–31 / U02 and 33 / U02 partial. Owner PASS pending.
+
+- [x] Application revision standard CI, 126 offline regression scripts, frontend tests, typecheck, build, blocking audit.
+- [x] Browser CI; navigation, camera state transitions, keyboard link/save/reload, model activation/failure/recovery.
+- [x] Verified artifact checksum and inspected corrected camera/network screenshots.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP and manual editor/visual PASS; partial Updates 30, 31 and 33 acceptance.
+- [ ] S04 migration gates, legacy default and physical restrictions unchanged.
+
+See [Patch 0_5_73](PATCH_0_5_73.md).
+
+---
+
 # V0572 — Isolated SUMO two-junction corridor and spillback
 
 Candidate `0_5_72`; previous `0_5_71`; accepted baseline `0_5_0`; Update 27 / S04. Owner PASS pending.

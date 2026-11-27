@@ -1,5 +1,5 @@
-version: 0_5_72
-status: Isolated SUMO two-junction corridor and spillback candidate (Update 27 / S04)
-previous_version: 0_5_71
+version: 0_5_73
+status: Independent P4 hardware-first workspace candidate (Update 29; partial 30-31/33)
+previous_version: 0_5_72
 passed_baseline: 0_5_0
-notes: 27a standard and native SUMO CI passed; actual corridor evidence inspected; release commit CI and owner PASS pending.
+notes: Application standard/browser CI passed; corrected camera and saved-network screenshots inspected; release commit CI and owner PASS pending; S04 migration remains open.

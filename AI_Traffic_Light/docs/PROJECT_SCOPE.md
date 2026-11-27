@@ -201,3 +201,7 @@ Verified native fixed/adaptive trial, seed 42 normal density: 15/15 journeys per
 ### Reconciliation boundaries
 
 Native Lab region drafts are non-persistent, center-based synthetic observations and not detector boxes. Native overview/detail camera framing is illustrative display only. Actual native read workload used more resources than legacy; no approved replacement resource budget. Full production coordinate equivalence, saved-region/AI admission, legacy per-visit metric parity and Windows owner acceptance remain open. No default switch or publication.
+
+## V0573 independent P4 candidate
+
+Hardware-first navigation and partial device, crossing-network and AI model workflows are software candidates. Actual browser fixtures use synthetic API responses, not evidence of physical ESP or trusted-model inference. S04 migration, full dataset/training workflow acceptance and physical control restrictions remain unchanged.
