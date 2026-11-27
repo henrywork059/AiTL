@@ -82,6 +82,10 @@ def main() -> int:
         assert not common["geometry_demand_matched_to_native"]
         assert not common["normalized_report_metrics"]["production_experiment_parity"]
         assert common["normalized_report_metrics"]["duration_seconds"]==30.
+        actual=common["actual_legacy_wait"]
+        for kind,wait in actual["waiting"].items():
+            assert abs(sum(wait["completed_seconds"]+wait["censored_observed_seconds"])-wait["observed_agent_seconds"])<1e-5
+            assert abs(wait["observed_agent_seconds"]-ordinary["metrics"]["queues"][kind]["queue_seconds"])<.011
         for kind,waits in common["waiting_episodes"].items():
             assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
         first = service.run(

@@ -31,6 +31,7 @@ from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts, legacy_rectangle_preview, footprint_center_counts
+from app.services.legacy_region_compatibility import legacy_region_projection
 from app.services.camera_frames import LEGACY_LAYOUT_ID
 from app.services.legacy_world import ROAD_TOP, ROAD_BOTTOM, CROSSING_LEFT, CROSSING_RIGHT
 from app.services.native_detector_validation import footprint_annotations
@@ -599,15 +600,34 @@ class NativeEvaluationService:
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
             try:
-                mapping=legacy_rectangle_preview(self.scene()["snapshot"],polygon,source_id)
+                canonical_scene=self.scene()["snapshot"]
+                mapping=legacy_rectangle_preview(canonical_scene,polygon,source_id)
             except (ValueError,TypeError) as exc:
                 raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
             result=self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
                 coordinate_space="native_projection_v1",layout_id=layout_id,polygon=mapping["polygon"])
-            annotations=footprint_annotations(self.scene()["snapshot"])
+            annotations=footprint_annotations(canonical_scene)
             box_counts=footprint_center_counts(annotations,mapping["polygon"],source_id)
-            return {"mapping":mapping,"evaluation":result,"synthetic_box_center_evaluation":box_counts,"legacy_layout_id":legacy_layout_id,
+            bottom=legacy_region_projection(canonical_scene,source_id,[{"id":"preview","polygon":polygon}],annotations["views"][source_id])
+            return {"mapping":mapping,"evaluation":result,"synthetic_box_center_evaluation":box_counts,
+                    "synthetic_legacy_ui_region_evaluation":bottom,"legacy_layout_id":legacy_layout_id,
                     "native_layout_id":layout_id,"production_coordinate_parity":False}
+
+    def preview_legacy_regions(self,*,epoch,generation,tick,source_id,legacy_layout_id,layout_id,regions):
+        """Explicit ordered legacy quadrilateral set; never a production write."""
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if legacy_layout_id!=LEGACY_LAYOUT_ID or layout_id!=self._projection.layout_id:
+                raise self._conflict("Legacy or native preview layout mismatch.")
+            if source_id not in VIEW_FLIPS:
+                raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
+            scene=self.scene()["snapshot"]
+            try:
+                annotations=footprint_annotations(scene)
+                result=legacy_region_projection(scene,source_id,regions,annotations["views"][source_id])
+            except (ValueError,TypeError,KeyError) as exc:
+                raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
+            return {**result,"epoch":epoch,"generation":generation,"tick":tick,"legacy_layout_id":legacy_layout_id}
 
     def evaluate_region_profile(self,*,epoch,generation,tick,source_id,profile):
         """Explicitly reuse a native-only profile across equivalent layouts.

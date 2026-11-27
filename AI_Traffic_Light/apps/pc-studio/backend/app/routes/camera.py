@@ -507,6 +507,24 @@ def preview_legacy_rectangle(payload: LegacyRectanglePreview, request: Request) 
     return ok(native_evaluation_service.preview_legacy_rectangle(**payload.model_dump()),request_id=request.state.request_id)
 
 
+class LegacyRegionDraft(BaseModel):
+    id: str = Field(min_length=1,max_length=128)
+    polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+
+
+class LegacyRegionsPreview(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    legacy_layout_id: str = Field(min_length=64,max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    regions: list[LegacyRegionDraft] = Field(min_length=1,max_length=32)
+
+
+@router.post("/simulation/native-evaluation/region/legacy-regions-preview")
+def preview_legacy_regions(payload: LegacyRegionsPreview,request: Request) -> dict:
+    return ok(native_evaluation_service.preview_legacy_regions(**payload.model_dump()),request_id=request.state.request_id)
+
+
 class NativeRegionProfile(BaseModel):
     schema_version: Literal[1]
     coordinate_space: str = Field(max_length=64)

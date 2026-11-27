@@ -22,6 +22,7 @@ from test_camera_simulation_api import build_test_app, assert_envelope
 from app.routes import camera as routes
 from app.services.camera_frames import CameraFrameService, LEGACY_LAYOUT_ID
 from app.services.native_detector_validation import footprint_annotations, palette_predictions, score_footprints, qualified_capture
+from app.services.observation_identity import simulation_view_point
 from app.services.native_evaluation import NativeEvaluationService
 from app.services.sumo_midblock_fixture import generate_midblock
 from app.services.sumo_midblock_session import CyclicMidblockSession
@@ -188,6 +189,21 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                 converted=assert_envelope(client.post(BASE+"/region/legacy-preview",json=preview))["data"]
                 assert not converted["production_coordinate_parity"] and not converted["mapping"]["persisted"]
                 assert not converted["synthetic_box_center_evaluation"]["detector_observation"]
+                assert converted["synthetic_legacy_ui_region_evaluation"]["contract"]=="legacy_ui_bottom_center_first_match_semantic_v1"
+                from app.services.legacy_region_compatibility import legacy_region_projection
+                report={}
+                for sid in VIEW_FLIPS:
+                    ordered=[{"id":"crossing","polygon":[list(simulation_view_point(x,y,1280,720,sid)) for x,y in preview["polygon"]]},
+                             {"id":"slanted","polygon":[[100,100],[1100,300],[1000,680],[80,500]]}]
+                    payload={k:v for k,v in preview.items() if k!="polygon"}
+                    payload.update(source_id=sid,regions=ordered)
+                    truth=assert_envelope(client.post(BASE+"/region/legacy-regions-preview",json=payload))["data"]
+                    assert truth["contract"]=="legacy_ui_bottom_center_first_match_semantic_v1" and not truth["persisted"]
+                    assert len(truth["regions"][1]["native_outline"])>4
+                    assert len(truth["assignments"])==len(annotations["views"][sid])
+                    predicted=legacy_region_projection(scene,sid,ordered,palette_predictions(qualified_images[sid]))
+                    report[sid]={"truth":truth,"palette":predicted}
+                (out/"legacy-ui-region-comparison.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
                 assert converted["mapping"]["original_polygon"]==preview["polygon"]
                 assert_envelope(client.post(BASE+"/region/legacy-preview",json={**preview,"legacy_layout_id":"0"*64}),expected_status=409)
                 (out/"legacy-rectangle-preview.json").write_text(json.dumps(converted,indent=2),encoding="utf-8")

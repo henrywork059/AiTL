@@ -243,3 +243,6 @@ Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect
 
 
 | 2026-11-27 | 28 / S04 legacy-inspired wait and capture acceptance | Shared blocked predicate, explicit native approach episodes/censoring, synthetic box-centre preview counts, offline detector per-class evidence, interleaved full/light read benchmark and browser preview regression. | Native metric calibration, actual weights, matched budget and owner acceptance remain gated; no new candidate. |
+
+
+| 2026-11-27 | 28 / S04 migration closure | Exact 1d269325 all CI passed; audited actual episode/region/palette evidence. Corrected production UI assignment semantics, added qualified multi-region preview and offline detector region comparison, actual legacy substep waits and browser/actual native regression. Freeze optional simulation refinements. | Verify exact CI, complete owner-supplied weights/calibration/metric and resource acceptance; no candidate release until gates pass. |

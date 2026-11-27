@@ -149,6 +149,25 @@ class Tests(unittest.TestCase):
         self.assertIn(ann["views"]["simulation_camera"][0]["agent_id"],result["agent_ids"])
         self.assertFalse(result["detector_observation"])
 
+    def test_legacy_ui_bottom_center_first_match_and_slanted_outline(self):
+        from app.services.legacy_region_compatibility import legacy_region_projection,point_in_region
+        scene=self.scene()
+        rectangle=[[520,179],[760,179],[760,625],[520,625]]
+        self.assertTrue(point_in_region((520,179),rectangle))
+        self.assertFalse(point_in_region((760,625),rectangle))
+        regions=[{"id":"first","polygon":rectangle},{"id":"second","polygon":[[0,0],[1279,0],[1279,719],[0,719]]}]
+        boxes=[{"agent_id":"p","kind":"pedestrian","box_xyxy":[638,346,642,354]},
+               {"agent_id":"v","kind":"vehicle","box_xyxy":[638,380,642,390]}]
+        result=legacy_region_projection(scene,"simulation_camera",regions,boxes)
+        self.assertEqual(result["kind_counts"]["first"]["pedestrian"],1)
+        self.assertEqual(result["kind_counts"]["second"]["vehicle"],1)
+        self.assertEqual([r["region_id"] for r in result["assignments"]],["first","second"])
+        self.assertFalse(result["persisted"])
+        slanted=[{"id":"s","polygon":[[100,100],[1100,300],[1000,680],[80,500]]}]
+        outline=legacy_region_projection(scene,"simulation_camera",slanted,[])["regions"][0]["native_outline"]
+        self.assertGreater(len(outline),4)
+        with self.assertRaises(ValueError): legacy_region_projection(scene,"simulation_camera",regions+regions,boxes)
+
     def test_normalized_report_censoring(self):
         rows=[{"vehicle_queue":1,"pedestrian_queue":0},{"vehicle_queue":2,"pedestrian_queue":1}]
         summary={"vehicle_wait_agent_s":.6,"pedestrian_wait_agent_s":.2,"vehicle_passages":1,

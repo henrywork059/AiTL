@@ -94,3 +94,57 @@ class NativeApproachWait:
             "vehicle_displacement_tolerance_m":.05/11,"pedestrian_entry_distance_m":.5,
             "pedestrian_stationary_speed_m_s":.1,"native_acceleration_may_count_as_delay":True,
             "production_experiment_parity":False,"physical_output_allowed":False,"waiting":result}
+
+
+
+class LegacyWaitSamples:
+    """Observe the existing legacy blocked/curb predicates at actual substeps.
+
+    Keep the original historical metrics (which include open waits) unchanged.
+    This report separates sampled completed and censored episodes and integrates
+    queues on the exact same dt; no claim that native motion matches legacy.
+    """
+    def __init__(self):
+        self.active={}
+        self.completed={"vehicle":[],"pedestrian":[]}
+        self.censored={"vehicle":[],"pedestrian":[]}
+        self.integrals={"vehicle":0.,"pedestrian":0.}
+        self.occupied={"vehicle":0.,"pedestrian":0.}
+        self.duration=0.
+        self.steps=0
+
+    def sample(self,dt,queued,retired):
+        if not math.isfinite(dt) or dt<=0:
+            raise ValueError("Invalid legacy wait step")
+        # The reported queue still includes any final queued sample before a
+        # respawn. Retire the old visit after that sample, not as a completion.
+        for key,seconds in self.active.items():
+            if key not in queued:
+                target=self.censored if key in retired else self.completed
+                target[key[0]].append(seconds)
+        self.active={key:self.active.get(key,0.)+dt for key in queued}
+        for key in retired:
+            if key in self.active:
+                self.censored[key[0]].append(self.active.pop(key))
+        for kind in self.integrals:
+            count=sum(key[0]==kind for key in queued)
+            self.integrals[kind]+=count*dt
+            self.occupied[kind]+=dt if count else 0.
+        self.duration+=dt
+        self.steps+=1
+
+    def report(self):
+        from app.services.simulation_experiments import _distribution
+        result={}
+        for kind in self.integrals:
+            completed=self.completed[kind]
+            censored=self.censored[kind]+[v for k,v in self.active.items() if k[0]==kind]
+            if not math.isclose(sum(completed)+sum(censored),self.integrals[kind],abs_tol=1e-6):
+                raise ValueError("Legacy substep queue integral mismatch")
+            result[kind]={"completed_seconds":[round(v,6) for v in completed],
+                "censored_observed_seconds":[round(v,6) for v in censored],
+                "completed":_distribution(completed),"censored_observed":_distribution(censored),
+                "observed_agent_seconds":round(self.integrals[kind],6),
+                "occupied_seconds":round(self.occupied[kind],6)}
+        return {"contract":"legacy_actual_substep_wait_v1","duration_seconds":round(self.duration,6),
+                "samples":self.steps,"waiting":result,"production_experiment_parity":False}

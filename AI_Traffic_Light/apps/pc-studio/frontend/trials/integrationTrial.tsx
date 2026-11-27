@@ -3,7 +3,8 @@ import { flushSync } from "react-dom";
 import { SimulationCamera3D } from "../src/components/SimulationCamera3D";
 import { NativeProjectionView } from "../src/components/NativeProjectionView";
 import { fetchExactNativeFrame, type NativeEvaluationState, type SimulationScene } from "../src/lib/remoteCameraApi";
-import type { Zone } from "../src/types";
+import type { Zone, Detection } from "../src/types";
+import {pointInRegion,regionClassCounts} from "../src/lib/regionCounts";
 
 const host = document.getElementById("root")!;
 const result = document.getElementById("result")!;
@@ -84,6 +85,11 @@ const mount = (sourceId="simulation_camera",editing=false,overlay=false) =>
   flushSync(()=>root.render(<SimulationCamera3D sourceId={sourceId} editing={editing} zones={overlay?zones:[]} />));
 async function run(){
   try{
+    const regionFixture:Zone[]=[{id:"first",label:"first",type:"counting_region",polygon:[[520,179],[760,179],[760,625],[520,625]]},{id:"second",label:"second",type:"counting_region",polygon:[[0,0],[1279,0],[1279,719],[0,719]]}];
+    check(pointInRegion([520,179],regionFixture[0].polygon)&&!pointInRegion([760,625],regionFixture[0].polygon),"Production boundary convention changed");
+    const fixture=[{box_xyxy:[600,220,680,300],class_name:"person"},{box_xyxy:[600,600,680,650],class_name:"car"}] as Detection[];
+    const assigned=regionClassCounts(regionFixture,fixture,1280,720);
+    check(assigned.first.person===1&&assigned.second.car===1&&!assigned.second.person,"Production bottom-centre/first-match contract changed");
     mount();
     await wait(()=>Boolean(button("Three.js preview")&&!button("Three.js preview")!.disabled),"Scene did not load");
     check(mode()==="legacy"&&!canvas(),"Default must be legacy");

@@ -20,7 +20,7 @@ from app.services.signal_rules import SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
 from app.services.experiment_timeline_csv import serialize_experiment_timeline
 from app.services.protected_crosswalk import ProtectedCrosswalk
-from app.services.simulation_wait_metrics import blocked_motion
+from app.services.simulation_wait_metrics import blocked_motion, LegacyWaitSamples
 from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
     CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
     TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
@@ -191,6 +191,8 @@ class _ModeSimulation:
         self._sample_at_s = 0.0
         self._gate_metrics = None
         self._gate_timeline = []
+        self._wait_ledger=LegacyWaitSamples() if normalized_gate_evidence else None
+        self._wait_retired=set()
         if normalized_gate_evidence:
             from app.services.simulation_gate_metrics import GateMetrics
             self._gate_metrics = GateMetrics()
@@ -273,11 +275,16 @@ class _ModeSimulation:
             last_signal = signal
 
             self._record_signal_time(signal, dt)
+            self._wait_retired.clear()
             vehicle_waiting, applied = self._advance_world(dt,clock,signal)
 
             ped_waiting_count = sum(1 for item in self.pedestrians if self._pedestrian_waiting(item))
             self.vehicle_queue_seconds += len(vehicle_waiting) * dt
             self.pedestrian_queue_seconds += ped_waiting_count * dt
+            if self._wait_ledger is not None:
+                queued={("vehicle",i) for i in vehicle_waiting}
+                queued.update(("pedestrian",p.pedestrian_id) for p in self.pedestrians if self._pedestrian_waiting(p))
+                self._wait_ledger.sample(dt,queued,self._wait_retired)
             if vehicle_waiting:
                 self.vehicle_queue_occupied_seconds += dt
             if ped_waiting_count:
@@ -323,6 +330,7 @@ class _ModeSimulation:
                 "waiting_episodes":self._gate_metrics.waiting_episodes(),
                 "normalized_report_metrics":normalized_report_metrics(self._gate_timeline,self._gate_metrics.summary(),self._gate_metrics.waiting_episodes()),
                 "timeline":self._gate_timeline,
+                "actual_legacy_wait":self._wait_ledger.report(),
                 "geometry_demand_matched_to_native":False,
                 "demand_model":"protected_slots_v2" if self.protected_world else ("production_live_slots" if self.live_slot_demand else "historical_benchmark_slots"),
                 "movement_step_seconds":self.step_seconds}
@@ -358,6 +366,8 @@ class _ModeSimulation:
                 vehicle.passed_centre = True
 
         def respawn(vehicle):
+            if self._wait_ledger is not None:
+                self._wait_retired.add(("vehicle",vehicle.vehicle_id))
             vehicle.passed_centre = False
             vehicle.wait_started_s = None
 
@@ -371,6 +381,8 @@ class _ModeSimulation:
 
     def _pedestrian_callback(self, clock):
         def record(pedestrian, old_y, completed):
+            if self._wait_ledger is not None and abs(pedestrian.y-old_y)>pedestrian.speed*self.step_seconds+1e-6:
+                self._wait_retired.add(("pedestrian",pedestrian.pedestrian_id))
             curb = TOP_PEDESTRIAN_WAIT_Y if pedestrian.direction>0 else BOTTOM_PEDESTRIAN_WAIT_Y
             was_waiting = abs(old_y-curb)<=.5
             is_waiting = self._pedestrian_waiting(pedestrian)
