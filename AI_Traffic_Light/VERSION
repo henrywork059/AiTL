@@ -1,5 +1,5 @@
-version: 0_5_78
-status: Update 28B independently qualified synthetic editor-edge coordinate compatibility candidate
-previous_version: 0_5_77
-passed_baseline: 0_5_0
-notes: Exact standard/native CI and independent fresh coordinate evidence qualified; production calibration not established; legacy default preserved; release/PR CI and owner PASS pending.
+version: 0_6_0
+status: Stable - owner accepted
+previous_version: 0_5_78
+passed_baseline: 0_6_0
+notes: Owner explicitly accepted 0_5_78; exact release and PR CI passed; PR #8 merged. Metadata-only promotion; legacy default and all safety/migration gates unchanged; exact promotion CI pending.

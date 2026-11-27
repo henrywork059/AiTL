@@ -1,3 +1,8 @@
+## 0_6_0 — Stable owner-accepted baseline
+
+- Owner explicitly accepted 0_5_78 as PASS and authorized stable promotion. Exact release CI 46042804089 and PR CI 46042810610 passed; PR #8 merged as 9b93a9e653e9e4b5d3b0d96b5c2bb5a3db288a59 with no file differences versus the qualified candidate.
+- Metadata-only promotion; previous 0_5_78, passed baseline 0_6_0. No new functionality, default change, production calibration claim, or physical actuation authority. See [PATCH_0_6_0](docs/PATCH_0_6_0.md). Exact promotion CI is separately verified.
+
 ## 0_5_78 — Update 28B qualified editor-edge coordinate compatibility
 
 - Correct inclusive saved editor bounds and separate continuous edge mirroring from raster pixel-centre mirrors in isolated legacy-region preview. Preserve native profiles, historical rectangle preview, production saved data and control. Add mapping contract and landmarks, retain first-match bottom-centre assignment and explicit out-of-domain exclusion.

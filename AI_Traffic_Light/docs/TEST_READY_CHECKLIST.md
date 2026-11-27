@@ -1,3 +1,18 @@
+# 0_6_0 — Owner-accepted stable release
+
+Stable `0_6_0`; previous `0_5_78`; accepted baseline `0_6_0`.
+
+- [x] Explicit owner PASS and stable promotion authorization.
+- [x] Exact 0_5_78 release CI 46042804089 and PR CI 46042810610 passed.
+- [x] PR #8 merged; candidate and merged application trees identical.
+- [x] Release metadata and frontend version synchronized atomically.
+- [ ] Exact stable-promotion CI independently checked.
+- [ ] Outstanding S04 migration and physical calibration gates (not waived by stable release).
+
+See [PATCH_0_6_0](PATCH_0_6_0.md).
+
+---
+
 # V0578 — Qualified simulator editor-edge coordinate compatibility (Update 28B)
 
 Candidate `0_5_78`; previous `0_5_77`; passed baseline `0_5_0`.

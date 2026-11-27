@@ -18,3 +18,8 @@ Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
 ```
 
 Verify footer `0_5_78 Candidate`, legacy default and unchanged saved regions. Check both camera-side polygons and reload; isolated preview must not modify saved data or grant detector/control authority. Focused test: `python AI_Traffic_Light/scripts/test_native_compatibility.py`. Audit retained ZIP: `python AI_Traffic_Light/scripts/verify_s04_evidence.py <archive-path> --sha256 b0a8a8220924ecd01d44e9ecc35d6c905fba21db3ee1fca22ea3e6e6a0d2cdf5 --tamper-check`. Physical calibration and owner Windows acceptance remain separate.
+
+
+## Subsequent owner acceptance and promotion (28 November 2026)
+
+The owner explicitly accepted 0_5_78 as PASS. Exact release CI 46042804089 and PR CI 46042810610 passed; PR #8 merged as 9b93a9e653e9e4b5d3b0d96b5c2bb5a3db288a59. Stable promotion to 0_6_0 with accepted baseline 0_6_0 was authorized; see PATCH_0_6_0.md. This supersedes historical pending acceptance wording above without changing the recorded technical limitations.
