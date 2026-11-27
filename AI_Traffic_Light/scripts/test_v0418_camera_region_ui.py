@@ -41,8 +41,13 @@ def main() -> None:
     assert 'aria-pressed={side === "camera_side_a_id"}' in editor
     assert 'aria-pressed={side === "camera_side_b_id"}' in editor
     # One logical region remains selected while switching camera perspectives.
-    assert 'onClick={() => setSide("camera_side_a_id")}' in editor
-    assert 'onClick={() => setSide("camera_side_b_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_a_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_b_id")}' in editor
+    side_handler = editor.split("function selectSide(next: Side) {", 1)[1].split("\n  }", 1)[0]
+    assert "dragRef.current = null;" in side_handler
+    assert "setSide(next);" in side_handler
+    assert "drag.pointerId !== event.pointerId || drag.side !== sideKey" in editor
+    assert "onLostPointerCapture={endDrag}" in editor
     assert "verticesForSide(region, sideKey)" in editor
     assert "<label>Camera side" not in editor
     assert 'fill="none"' not in editor
