@@ -26,6 +26,8 @@ on:
       - '.github/scripts/sumo_http_compatibility_trial.py'
       - '.github/scripts/sumo_policy_matrix_trial.py'
       - 'AI_Traffic_Light/scripts/native_detector_batch.py'
+      - 'AI_Traffic_Light/scripts/native_detector_holdout.py'
+      - 'AI_Traffic_Light/scripts/test_native_detector_holdout.py'
       - 'AI_Traffic_Light/scripts/test_native_detector_batch.py'
       - '.github/scripts/sumo_midblock_trial.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_fixture.py'
