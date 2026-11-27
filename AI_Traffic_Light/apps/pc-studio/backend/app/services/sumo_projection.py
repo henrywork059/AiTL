@@ -20,12 +20,13 @@ import cv2
 import numpy as np
 
 from app.services.sumo_shadow_adapter import ShadowSnapshot
-from app.services.observation_identity import SIMULATION_VIEW_FLIPS, simulation_view_point
+from app.services.observation_identity import (SIMULATION_VIEW_FLIPS, simulation_view_point,
+    SUMO_EVALUATION_ORIGIN, EVALUATION_ORIGINS)
 
 WIDTH, HEIGHT = 1280, 720
 MARGIN = 24
 VIEW_FLIPS = SIMULATION_VIEW_FLIPS
-PROVENANCE = "synthetic_sumo_projection"
+PROVENANCE = SUMO_EVALUATION_ORIGIN
 
 
 @dataclass(frozen=True)
@@ -106,7 +107,10 @@ class Projection:
 
 class NativeProjection:
     """One immutable layout per generation; callers own native session lifecycle."""
-    def __init__(self, layout: Projection, generation: int):
+    def __init__(self, layout: Projection, generation: int, *, provenance=PROVENANCE):
+        if provenance not in EVALUATION_ORIGINS:
+            raise ValueError("Invalid isolated projection provenance")
+        self.provenance = provenance
         self.layout = layout
         self.generation = generation
         # Scene-only runs do not allocate the full raster.
@@ -134,7 +138,7 @@ class NativeProjection:
                    "x_m": a.x_m, "y_m": a.y_m, "speed_m_s": a.speed_m_s,
                    "x": x, "y": y}
             rows.append(row)
-        return {"schema_version": 1, "provenance": PROVENANCE, "generation": self.generation,
+        return {"schema_version": 1, "provenance": self.provenance, "generation": self.generation,
                 "coordinate_space": "native_projection_v1", "layout_id": self.layout_id,
                 "seed": snapshot.seed, "tick": snapshot.tick, "time_s": snapshot.time_s,
                 "paused": snapshot.paused, "width": WIDTH, "height": HEIGHT,
@@ -178,8 +182,8 @@ class NativeProjection:
 
 
 def export_csv(meta: dict) -> str:
-    if meta.get("provenance") != PROVENANCE:
-        raise ValueError("Not a native projection export")
+    if meta.get("provenance") not in EVALUATION_ORIGINS:
+        raise ValueError("Not an isolated evaluation projection export")
     output = io.StringIO(newline="")
     fields = ("provenance", "generation", "seed", "tick", "time_s", "id", "kind", "road_id",
               "x_m", "y_m", "speed_m_s", "x", "y")

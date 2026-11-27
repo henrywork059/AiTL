@@ -53,6 +53,98 @@ class Tests(unittest.TestCase):
             self.assertEqual(data["status"],"disabled")
             assert_envelope(client.post(BASE+"/start",json={"epoch":data["epoch"],"generation":data["generation"]}),expected_status=409)
 
+    def test_reference_switch_and_production_rollback(self):
+        from app.services.simulation_reference_session import FiniteReferenceSession
+        from app.services.observation_identity import REFERENCE_EVALUATION_ORIGIN
+        from app.services.inference import InferenceService
+        from app.core.exceptions import AppError
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            network=root/"network.xml"
+            network.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            trips=(Trip("v0","vehicle",0.,10.,(Segment("WC","road",((0.,0.),(20.,0.))),)),)
+            mapping=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset())
+            sessions=[]
+            def factory(seed,*,density):
+                session=FakeSession(network)
+                sessions.append(session)
+                return session
+            def reference_factory(seed,*,density):
+                session=FiniteReferenceSession(network,trips,mapping)
+                sessions.append(session)
+                return session
+            service=NativeEvaluationService(enabled=True,factory=factory,
+                trip_loader=lambda *args:trips,phase_loader=lambda _:mapping,
+                reference_factory=reference_factory)
+            self.addCleanup(service.close)
+            legacy=CameraFrameService(simulation_seed=42,simulation_monotonic=lambda:0.)
+            policy=SignalRulesService(config_path=root/"legacy-policy.json",history_path=root/"history.jsonl",respect_environment=False)
+            policy.save_config(policy.defaults())
+            with patch("app.services.camera_frames.signal_rules_service",policy), \
+                 patch.object(routes,"camera_frame_service",legacy), \
+                 patch.object(routes,"native_evaluation_service",service),TestClient(build_test_app()) as client:
+                legacy.set_simulation(True)
+                legacy.configure_simulation(paused=True)
+                frame=legacy.latest_frame()
+                token=legacy.observation_mode_token
+                def start(engine):
+                    identity={k:service.scene()[k] for k in ("epoch","generation")}
+                    return assert_envelope(client.post(BASE+"/start",json={**identity,"engine":engine}))["data"]
+                def advance(state,steps):
+                    identity={k:state[k] for k in ("epoch","generation")}
+                    return assert_envelope(client.post(BASE+"/step",json={**identity,"tick":state["snapshot"]["tick"],"steps":steps}))["data"]
+                native=advance(start("native"),3)
+                native_id={k:native[k] for k in ("epoch","generation")}
+                native_result=service.export(**native_id,tick=3)
+                native_frame=service.frame(**native_id,tick=3,source_id="simulation_camera")
+                self.assertEqual(native_frame.origin,"synthetic_sumo_projection")
+                ref=start("reference")
+                self.assertTrue(sessions[0].closed)
+                self.assertEqual(ref["snapshot"]["tick"],0)
+                self.assertEqual(ref["snapshot"]["layout_id"],native["snapshot"]["layout_id"])
+                self.assertEqual(ref["provenance"],REFERENCE_EVALUATION_ORIGIN)
+                self.assertFalse(ref["native_only"])
+                assert_envelope(client.get(BASE+"/frame",params={**native_id,"tick":3,"source_id":"simulation_camera"}),expected_status=409)
+                ref=advance(ref,3)
+                ref_id={k:ref[k] for k in ("epoch","generation")}
+                ref_result=service.export(**ref_id,tick=3)
+                self.assertEqual(ref_result["demand_digest"],native_result["demand_digest"])
+                self.assertEqual(ref_result["demand_manifest"],native_result["demand_manifest"])
+                self.assertEqual(ref_result["engine"],"reference")
+                view=assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"reference"}))["data"]
+                self.assertEqual(view["observation"]["provenance"],REFERENCE_EVALUATION_ORIGIN)
+                self.assertFalse(view["observation"]["detector_input_eligible"])
+                self.assertTrue(view["agents"][0]["id"].startswith("reference:"))
+                exact={**ref_id,"engine":"reference","tick":3,"source_id":"simulation_camera","layout_id":ref["snapshot"]["layout_id"]}
+                binary=client.get("/api/camera/simulation/observation/frame",params=exact)
+                self.assertEqual(binary.status_code,200)
+                self.assertEqual(binary.headers["x-observation-origin"],REFERENCE_EVALUATION_ORIGIN)
+                self.assertTrue(binary.headers["x-camera-source"].startswith("reference_eval_"))
+                assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"engine":"native"}),expected_status=409)
+                assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"native"}),expected_status=409)
+                with self.assertRaises(AppError):
+                    InferenceService().detect_frame(service.frame(**ref_id,tick=3,source_id="simulation_camera"))
+                with ZipFile(io.BytesIO(service.capture(**ref_id,tick=3))) as z:
+                    self.assertEqual(json.loads(z.read("coordinate_contract.json"))["engine"],"reference")
+                    self.assertEqual(json.loads(z.read("simulation_camera.json"))["origin"],REFERENCE_EVALUATION_ORIGIN)
+                    self.assertEqual(z.read("simulation_camera.png"),binary.content)
+                self.assertIs(legacy.latest_frame(),frame)
+                self.assertEqual(legacy.observation_mode_token,token)
+                restored=start("native")
+                self.assertTrue(sessions[1].closed)
+                self.assertEqual(restored["snapshot"]["tick"],0)
+                self.assertEqual(restored["snapshot"]["layout_id"],native["snapshot"]["layout_id"])
+                assert_envelope(client.get("/api/camera/simulation/observation/frame",params=exact),expected_status=409)
+                restored=advance(restored,3)
+                self.assertEqual(restored["snapshot"]["agents"],native["snapshot"]["agents"])
+                with patch.object(sessions[-1],"advance",side_effect=RuntimeError("fixture failure")):
+                    assert_envelope(client.post(BASE+"/step",json={"epoch":restored["epoch"],"generation":restored["generation"],"tick":3,"steps":1}),expected_status=503)
+                self.assertTrue(sessions[-1].closed)
+                self.assertIsNone(service.scene()["snapshot"])
+                self.assertIs(legacy.latest_frame(),frame)
+                self.assertEqual(legacy.observation_mode_token,token)
+                legacy.set_simulation(False)
+
     def test_lifecycle_capture_isolation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)

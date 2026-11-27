@@ -29,16 +29,22 @@ from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, P
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
-from app.services.observation_identity import synthetic_scene_identity
+from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
+    REFERENCE_EVALUATION_ORIGIN)
+from app.services.simulation_reference_session import GeneratedReferenceSession
+
+ENGINES = {"native": PROVENANCE, "reference": REFERENCE_EVALUATION_ORIGIN}
 
 MAX_TICKS = 2500
 MAX_BATCH = 25
 
 
 class NativeEvaluationService:
-    def __init__(self, *, enabled=False, factory=GeneratedSession, trip_loader=load_trips, phase_loader=PhaseMap.load):
+    def __init__(self, *, enabled=False, factory=GeneratedSession, trip_loader=load_trips, phase_loader=PhaseMap.load,
+                 reference_factory=GeneratedReferenceSession):
         self.enabled = enabled
         self._factory, self._trip_loader, self._phase_loader = factory, trip_loader, phase_loader
+        self._reference_factory = reference_factory
         self._lock = RLock()
         self._comparison = None
         self.epoch = uuid4().hex
@@ -53,6 +59,7 @@ class NativeEvaluationService:
         self._policy = None
         self._demand_digest = None
         self._geometry = None
+        self._engine = None
         self._trips = ()
         self._seen_trips = set()
 
@@ -84,6 +91,7 @@ class NativeEvaluationService:
         self._policy = None
         self._demand_digest = None
         self._geometry = None
+        self._engine = None
         self._trips = ()
         self._seen_trips = set()
         self._state = state
@@ -101,10 +109,10 @@ class NativeEvaluationService:
             pass
         return AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Native evaluation failed and was retired.", status_code=503)
 
-    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard'):
+    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard', engine='native'):
         with self._lock:
             self._require(epoch, generation, running=False)
-            if geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
+            if engine not in ENGINES or geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
                 raise AppError(ErrorCode.INVALID_REQUEST, "Invalid native evaluation settings.", status_code=422)
             try:
                 self._retire()
@@ -119,23 +127,26 @@ class NativeEvaluationService:
                 config["dry_run"] = False
                 self._policy = self._controller.save_config(config)
                 self._controller.reset_runtime(0.)
+                self._engine = engine
+                factory = self._factory if engine=="native" else self._reference_factory
                 def open_session(value):
                     kwargs = {'density': density}
                     if geometry != 'standard':
                         kwargs['geometry'] = geometry
-                    self._session = self._factory(value, **kwargs)
+                    self._session = factory(value, **kwargs)
                     return self._session
                 self._adapter = SumoShadowAdapter(open_session)
                 self._adapter.reset(seed=seed)
                 network = self._session.network_path
-                self._projection = NativeProjection(Projection.load(network), self.generation)
-                trips = self._trip_loader(network, network.parent/"routes.xml")
+                self._projection = NativeProjection(Projection.load(network), self.generation, provenance=ENGINES[engine])
+                trips = (self._session.trips if engine=="reference" else
+                         self._trip_loader(network, network.parent/"routes.xml"))
                 self._trips = tuple(trips)
                 self._routes = RouteGateAdapter(trips)
                 self._demand_digest = hashlib.sha256(json.dumps([asdict(t) for t in trips],sort_keys=True,separators=(",",":")).encode()).hexdigest()
-                self._phase_map = self._phase_loader(network)
+                self._phase_map = self._session.phase_map if engine=="reference" else self._phase_loader(network)
                 self._metrics = GateMetrics()
-                self._publisher.begin(self.generation)
+                self._publisher.begin(self.generation,provenance=ENGINES[engine])
                 self._received_at_ms = time.time_ns() // 1_000_000
                 self._density, self._mode = density, mode
                 self._geometry = geometry
@@ -223,12 +234,13 @@ class NativeEvaluationService:
             if self._state == "running":
                 snap = self._adapter.snapshot()
                 snapshot = {**self._projection.scene(snap, source_id),"received_at_ms":self._received_at_ms,
-                    "paused":self._paused,"density":self._density,"geometry":self._geometry,"signal":deepcopy(self._signal),
+                    "paused":self._paused,"density":self._density,"geometry":self._geometry,"engine":self._engine,"signal":deepcopy(self._signal),
                     "epoch":self.epoch,"profile":self._policy["active_profile"],
                     "legacy_editor_compatible":False}
-            return {"status":self._state,"provenance":PROVENANCE,"epoch":self.epoch,
+            return {"status":self._state,"provenance":ENGINES.get(self._engine,PROVENANCE),"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
-                "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":True,
+                "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":self._engine!="reference","engine":self._engine,
+                "evaluation_only":True,"available_engines":list(ENGINES) if self.enabled else [],
                 "profile":self._policy["active_profile"] if self._policy else None,"physical_output_allowed":False}
 
     def _ensure_frames(self):
@@ -248,17 +260,19 @@ class NativeEvaluationService:
             except Exception as exc:
                 raise self._failure() from exc
 
-    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id):
+    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id, engine="native"):
         """Same read seam as the legacy frame owner; no authority transfer."""
         with self._lock:
             self._require(epoch,generation,tick)
-            if layout_id != self._projection.layout_id:
-                raise self._conflict("Native publication layout mismatch.")
+            if engine != self._engine or layout_id != self._projection.layout_id:
+                raise self._conflict("Evaluation engine or publication layout mismatch.")
             return self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
 
-    def current_simulation_scene(self, source_id):
+    def current_simulation_scene(self, source_id, *, engine="native"):
         with self._lock:
             self._require(self.epoch,self.generation)
+            if engine != self._engine:
+                raise self._conflict("Evaluation engine mismatch.")
             return self.view_scene(epoch=self.epoch,generation=self.generation,
                                    tick=self._adapter.snapshot().tick,source_id=source_id)
 
@@ -274,12 +288,12 @@ class NativeEvaluationService:
                     with ZipFile(stream,"w") as z:
                         for sid in VIEW_FLIPS:
                             frame=self._publisher.frame_for(sid)
-                            rec=writer.capture_frame(frame,session_id="native_evaluation")
+                            rec=writer.capture_frame(frame,session_id="native_evaluation" if self._engine=="native" else "reference_evaluation")
                             z.writestr(sid+".png",(writer.dataset_root/rec.image_path).read_bytes())
                             z.writestr(sid+".json",(writer.dataset_root/rec.metadata_path).read_bytes())
                         meta=self.scene()["snapshot"]
                         z.writestr("scene.json",json.dumps(meta,indent=2))
-                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False},indent=2))
+                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
                         z.writestr("observations.json",json.dumps([self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS],indent=2))
                     return stream.getvalue()
@@ -304,7 +318,7 @@ class NativeEvaluationService:
     def export(self, *, epoch, generation, tick):
         with self._lock:
             self._require(epoch,generation,tick)
-            return {"schema_version":1,"provenance":"synthetic_native_gate_evaluation",
+            return {"schema_version":1,"engine":self._engine,"provenance":"synthetic_native_gate_evaluation" if self._engine=="native" else "synthetic_finite_reference_gate_evaluation",
                 "metric_contract":"normalized_physical_service_gate_v1","seed":self._adapter.snapshot().seed,
                 "mode":self._mode,"density":self._density,"geometry":self._geometry,"step_s":STEP_S,"summary":self._metrics.summary(),
                 "timeline":deepcopy(self._timeline),"observed_routes":deepcopy(self._routes.seen_roads),
@@ -327,11 +341,11 @@ class NativeEvaluationService:
             scene=self.scene(source_id=source_id)["snapshot"]
             identity = synthetic_scene_identity(
                 epoch=epoch,generation=generation,tick=tick,
-                source_id=f"native_eval_g{generation}_{source_id}",view_id=source_id,
+                source_id=evaluation_source_id(ENGINES[self._engine],generation,source_id),view_id=source_id,
                 frame_number=tick,received_at_ms=self._received_at_ms,
                 coordinate_space=scene["coordinate_space"],layout_id=scene["layout_id"],
-                width=scene["width"],height=scene["height"],provenance=PROVENANCE,
-                tick_kind="native_fixed_step")
+                width=scene["width"],height=scene["height"],provenance=ENGINES[self._engine],
+                tick_kind="native_fixed_step" if self._engine=="native" else "reference_fixed_step")
             return {**scene,"view_id":source_id,"source_id":identity["source_id"],
                     "frame_number":tick,"legacy_editor_compatible":False,"observation":identity}
 
@@ -351,9 +365,9 @@ class NativeEvaluationService:
             return {"epoch":epoch,"generation":generation,"tick":tick,"source_id":source_id,
                     "coordinate_space":coordinate_space,"layout_id":layout_id,**result,
                     "polygon_world_m":world,"observation":scene["observation"],
-                    "provenance":"synthetic_native_region_evaluation","persisted":False,"physical_output_allowed":False}
+                    "provenance":"synthetic_native_region_evaluation" if self._engine=="native" else "synthetic_reference_region_evaluation","engine":self._engine,"persisted":False,"physical_output_allowed":False}
 
-    def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard'):
+    def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard', engine='native'):
         """Run a bounded pair with one immutable copy of the saved policy.
 
         Only when standalone evaluation is idle. No changes to the saved profile,
@@ -364,7 +378,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,running=False)
             if self._state == "running":
                 raise self._conflict("Stop the active native evaluation before comparing policies.")
-            if geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
+            if engine not in ENGINES or geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
                 raise AppError(ErrorCode.INVALID_REQUEST,"Invalid native comparison settings.",status_code=422)
             policy=deepcopy(signal_rules_service.get_config())
             selected=profile or policy.get("active_profile")
@@ -373,7 +387,7 @@ class NativeEvaluationService:
             policy["active_profile"]=selected
             pair={}
             child=NativeEvaluationService(enabled=True,factory=self._factory,
-                trip_loader=self._trip_loader,phase_loader=self._phase_loader)
+                trip_loader=self._trip_loader,phase_loader=self._phase_loader,reference_factory=self._reference_factory)
             cancelled=Event()
             reservation=(cancelled,child)
             previous_state=self._state
@@ -388,7 +402,7 @@ class NativeEvaluationService:
                         if cancelled.is_set():
                             raise self._conflict("Native comparison cancelled.")
                         initial=child.start(epoch=child.epoch,generation=child.generation,density=density,
-                            seed=seed,mode=mode,policy_config=policy,profile=selected,geometry=geometry)
+                            seed=seed,mode=mode,policy_config=policy,profile=selected,geometry=geometry,engine=engine)
                     gen=initial["generation"]
                     horizon=duration_seconds*5
                     for tick in range(0,horizon,MAX_BATCH):
@@ -405,12 +419,12 @@ class NativeEvaluationService:
                 deltas=validate_pair(pair["fixed"],pair["adaptive"])
             except ValueError as exc:
                 raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=409) from exc
-            meta={"schema_version":1,"evidence":"executed_synthetic_native_comparison",
+            meta={"schema_version":1,"engine":engine,"evidence":"executed_synthetic_native_comparison" if engine=="native" else "executed_synthetic_reference_comparison",
                 "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
                 "layout_id":pair["fixed"]["layout_id"],"geometry":geometry,"profile":selected,"density":density,"seed":seed,
                 "duration_seconds":duration_seconds,"demand_digest":pair["fixed"]["demand_digest"],"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
                 "production_experiment_parity":False,"physical_output_allowed":False,
-                "limitations":"Same native finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained."}
+                "limitations":"Same finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained. Reference uses constant-speed/gap model, not SUMO or production legacy."}
             stream=BytesIO()
             with ZipFile(stream,"w") as z:
                 z.writestr("manifest.json",json.dumps(meta,indent=2))

@@ -292,7 +292,7 @@ export async function refreshCameraAfterRemoteChange(): Promise<CameraStatus> {
 
 export type NativeProjectionScene = {
   schema_version: 1;
-  provenance: "synthetic_sumo_projection";
+  provenance: "synthetic_sumo_projection" | "synthetic_finite_reference_projection";
   generation: number;
   seed: number;
   tick: number;
@@ -311,7 +311,7 @@ export type NativeProjectionScene = {
 };
 export type NativeProjectionResponse = {
   status: "disabled" | "idle" | "starting" | "running" | "busy" | "unavailable";
-  provenance: "synthetic_sumo_projection";
+  provenance: "synthetic_sumo_projection" | "synthetic_finite_reference_projection";
   generation?: number;
   snapshot: NativeProjectionScene | null;
 };
@@ -321,7 +321,7 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   );
 }
 
-export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|null;native_only:true;physical_output_allowed:false};
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
 const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
 export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
@@ -341,7 +341,7 @@ export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:st
   const params=evaluationQuery(state);params.set("source_id",sourceId);
   // New shared exact publication path; no implicit selection or fallback to legacy.
   if(state.snapshot?.layout_id){
-    params.set("engine","native");params.set("layout_id",state.snapshot.layout_id);
+    params.set("engine",state.engine??"native");params.set("layout_id",state.snapshot.layout_id);
     return `${API_BASE}/api/camera/simulation/observation/frame?${params}`;
   }
   return `${nativeEvaluationBase}/frame?${params}`;
@@ -349,10 +349,10 @@ export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:st
 export function nativeEvaluationExportUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
 }
-export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string,geometry="standard"):Promise<Blob>{
+export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string,geometry="standard",engine:"native"|"reference"="native"):Promise<Blob>{
   const response=await fetch(`${API_BASE}/api/traffic/native-experiments`,{
     method:"POST",headers:{"Content-Type":"application/json"},signal,
-    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null,geometry}),
+    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null,geometry,engine}),
   });
   if(!response.ok||!response.headers.get("content-type")?.includes("application/zip"))
     throw new Error("Native comparison rejected or unavailable");

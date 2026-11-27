@@ -23,6 +23,8 @@ def validate_pair(fixed,adaptive):
     keys=("seed","density","geometry","layout_id","demand_digest","metric_contract","step_s")
     if any(fixed.get(k)!=adaptive.get(k) or fixed.get(k) is None for k in keys):
         raise ValueError("Native comparison arms are not matched")
+    if fixed.get("engine") != adaptive.get("engine"):
+        raise ValueError("Comparison engines differ")
     if fixed["mode"]!="fixed" or adaptive["mode"]!="adaptive":
         raise ValueError("Incorrect comparison mode")
     if len(fixed["timeline"])!=len(adaptive["timeline"]) or not fixed["timeline"]:

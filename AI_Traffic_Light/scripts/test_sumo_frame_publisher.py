@@ -93,6 +93,34 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_engine_provenance_bound_to_generation(self):
+        from app.services.observation_identity import REFERENCE_EVALUATION_ORIGIN
+        from app.services.simulation_reference_session import ReferenceAgent
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            layout=Projection.load(path)
+            pub=NativeFramePublisher()
+            native=NativeProjection(layout,1)
+            ref=NativeProjection(layout,2,provenance=REFERENCE_EVALUATION_ORIGIN)
+            self.assertEqual(native.layout_id,ref.layout_id)
+            snap=ShadowSnapshot(42,1,False,(ReferenceAgent("vehicle","v0",5.,0.,1.,"WC"),))
+            meta,pixels=ref.render_pixels(snap)
+            pub.begin(2,provenance=REFERENCE_EVALUATION_ORIGIN)
+            with self.assertRaises(ValueError):
+                pub.prepare({**meta,"provenance":PROVENANCE},pixels,received_at_ms=42)
+            pub.prepare(meta,pixels,received_at_ms=42)
+            for sid in VIEW_FLIPS:
+                frame=pub.frame_for(sid)
+                self.assertEqual(frame.origin,REFERENCE_EVALUATION_ORIGIN)
+                self.assertTrue(frame.source_id.startswith("reference_eval_"))
+                self.assertEqual(pub.scene_for(sid)["provenance"],REFERENCE_EVALUATION_ORIGIN)
+                self.assertEqual(frame.observation.provenance,"unknown")
+            pub.begin(3)
+            self.assertIsNone(pub.frame_for("simulation_camera"))
+            with self.assertRaises(ValueError):
+                pub.prepare({**meta,"generation":3},pixels,received_at_ms=43)
+
     def test_export_contract(self):
         timeline = {"fixed":{"timeline":[{"t":1,"phase":"vehicle_green","vehicle_queue":3,
                     "pedestrian_queue":2,"vehicle_passages":1,"pedestrian_crossings":0,"active_rules":["a","b"]}]},

@@ -16,6 +16,44 @@ def path(prefix,kind,y):
 
 
 class Tests(unittest.TestCase):
+    def test_reference_session_lifecycle(self):
+        from app.services.simulation_reference_session import FiniteReferenceSession
+        from app.services.sumo_shadow_fixture import PhaseMap
+        vpath=(Segment("v_in","road",((0.,0.),(10.,0.))),
+               Segment(":C_0","vehicle_gate",((10.,0.),(20.,0.))),
+               Segment("v_out","road",((20.,0.),(30.,0.))))
+        ppath=(Segment("p_in","walk",((0.,1.),(10.,1.))),
+               Segment(":C_c0","pedestrian_gate",((10.,1.),(20.,1.))),
+               Segment("p_out","walk",((20.,1.),(30.,1.))))
+        trips=(Trip("v0","vehicle",0.,5.,vpath),Trip("p0","pedestrian",0.,2.,ppath))
+        mapping=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset({":C_c0"}))
+        def run():
+            session=FiniteReferenceSession(Path("fixture.xml"),trips,mapping)
+            trace=[]
+            stationary=False
+            for tick in range(200):
+                phase="all_red" if tick<30 else "vehicle_green" if tick<41 else "pedestrian_green"
+                session.set_phase(phase)
+                before=session.agents()
+                session.advance()
+                rows=session.agents()
+                self.assertEqual(session.last_permission,mapping.state(phase,
+                    vehicle_inside=any(a.road_id==":C_0" for a in before),
+                    pedestrian_inside=any(a.road_id==":C_c0" for a in before)))
+                self.assertFalse({":C_0",":C_c0"} <= {a.road_id for a in rows})
+                self.assertTrue(all(a.id.startswith("reference:") and a.speed_m_s>=0 for a in rows))
+                stationary=stationary or any(a.speed_m_s==0 for a in rows)
+                trace.append((session.last_permission,rows))
+            self.assertTrue(stationary)
+            self.assertEqual(session.arrived,{"v0"})
+            self.assertEqual(session.person_arrived,{"p0"})
+            session.close()
+            with self.assertRaises(RuntimeError): session.advance()
+            with self.assertRaises(RuntimeError): session.agents()
+            with self.assertRaises(ValueError): session.set_phase("vehicle_green")
+            return trace
+        self.assertEqual(run(),run())
+
     def test_finite_protected_schedule(self):
         trips=(Trip("v0","vehicle",0.,5.,path("v","vehicle",0.)),
                Trip("p0","pedestrian",0.,2.,path("p","pedestrian",1.)))

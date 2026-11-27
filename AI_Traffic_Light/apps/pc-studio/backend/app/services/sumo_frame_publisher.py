@@ -12,6 +12,7 @@ from app.services.camera_frames import CameraFrame
 
 from app.services.sumo_projection import VIEW_FLIPS, PROVENANCE, WIDTH, HEIGHT
 from app.services.sumo_projection_capture import evaluation_frames
+from app.services.observation_identity import EVALUATION_ORIGINS, evaluation_source_id
 
 
 class NativeFramePublisher:
@@ -22,11 +23,14 @@ class NativeFramePublisher:
         self._pixels = None
         self._received_at_ms = None
 
-    def begin(self, generation: int) -> None:
+    def begin(self, generation: int, *, provenance=PROVENANCE) -> None:
+        if provenance not in EVALUATION_ORIGINS:
+            raise ValueError("Invalid evaluation publication provenance")
         if type(generation) is not int or generation <= self._generation:
             raise ValueError("Native generation must advance")
         self.invalidate()
         self._generation = generation
+        self._provenance = provenance
         self._active = True
 
     def invalidate(self) -> None:
@@ -39,6 +43,8 @@ class NativeFramePublisher:
     def _check_next(self, meta):
         if not getattr(self, "_active", False) or meta.get("generation") != self._generation:
             raise ValueError("Inactive or retired native generation")
+        if meta.get("provenance") != self._provenance:
+            raise ValueError("Evaluation provenance changed within generation")
         tick = meta.get("tick")
         if self._meta is not None and (type(tick) is not int or tick <= self._meta["tick"]):
             raise ValueError("Native frame tick must advance")
@@ -67,7 +73,7 @@ class NativeFramePublisher:
         """
         self._check_next(meta)
         try:
-            if (meta.get("provenance") != PROVENANCE or
+            if (meta.get("provenance") != self._provenance or
                 (meta.get("width"), meta.get("height")) != (WIDTH, HEIGHT) or
                 type(meta.get("tick")) is not int or meta["tick"] < 0 or
                 type(received_at_ms) is not int or received_at_ms < 0 or
@@ -98,9 +104,9 @@ class NativeFramePublisher:
             if not content.startswith(b"\x89PNG\r\n\x1a\n") or decoded is None or not np.array_equal(decoded, expected):
                 raise ValueError("Native encoded view differs from raster")
             frame = CameraFrame(content=content, content_type="image/png",
-                source_id=f"native_eval_g{self._generation}_{source}", width=WIDTH, height=HEIGHT,
+                source_id=evaluation_source_id(self._provenance,self._generation,source), width=WIDTH, height=HEIGHT,
                 received_at_ms=self._received_at_ms, frame_number=self._meta["tick"],
-                origin=PROVENANCE, mode_generation=self._generation)
+                origin=self._provenance, mode_generation=self._generation)
             self._frames[source] = frame
             if len(self._frames) == len(VIEW_FLIPS):
                 self._pixels = None  # all validated views cached; release the raster
@@ -123,4 +129,4 @@ class NativeFramePublisher:
         return {**meta, "source_id": frame.source_id,
                 "view_id": source, "frame_number": frame.frame_number,
                 "received_at_ms": frame.received_at_ms,
-                "provenance": PROVENANCE}
+                "provenance": self._provenance}

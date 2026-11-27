@@ -135,6 +135,7 @@ def delete_network_simulation_experiment(run_id: str, request: Request) -> dict:
 
 
 class NativeComparisonRequest(BaseModel):
+    engine: Literal["native","reference"] = "native"
     geometry: Literal["standard","compact","elongated"] = "standard"
     epoch: str=Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
     generation: int=Field(ge=0)

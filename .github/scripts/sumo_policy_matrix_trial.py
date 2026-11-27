@@ -45,6 +45,7 @@ def replay_reference(arm):
 def main(out):
     out.mkdir(parents=True, exist_ok=True)
     rows = []
+    reference_runtime = []
     with tempfile.TemporaryDirectory(prefix="mesh-policy-matrix-") as tmp:
         root = Path(tmp)
         policy = SignalRulesService(config_path=root/"policy.json",
@@ -105,13 +106,39 @@ def main(out):
                         rows.append({"archive":name,"seed":seed,"density":density,"geometry":geometry,"layout_id":manifest["layout_id"],
                             "wall_s":elapsed,"demand_digest":manifest["demand_digest"],
                             "summaries":summaries,"deltas":deltas})
+                # Execute two independent-policy arms via the same actual lifecycle,
+                # not a replay of native phase schedules. Both manifests must match.
+                native_case=next(row for row in rows if row["seed"]==42 and row["density"]=="normal" and row["geometry"]=="standard")
+                start=time.perf_counter()
+                archive=service.compare(epoch=service.epoch,generation=service.generation,
+                    seed=42,density="normal",duration_seconds=120,geometry="standard",engine="reference")
+                (out/"42-normal-standard-reference-runtime.zip").write_bytes(archive)
+                with ZipFile(io.BytesIO(archive)) as z, ZipFile(out/native_case["archive"]) as native_zip:
+                    manifest=json.loads(z.read("manifest.json"))
+                    assert manifest["engine"]=="reference"
+                    assert manifest["layout_id"]==native_case["layout_id"] and manifest["demand_digest"]==native_case["demand_digest"]
+                    for mode in ("fixed","adaptive"):
+                        arm=json.loads(z.read(mode+".json"))
+                        native_arm=json.loads(native_zip.read(mode+".json"))
+                        assert arm["engine"]=="reference" and len(arm["timeline"])==600
+                        assert arm["demand_manifest"]==native_arm["demand_manifest"]
+                        assert arm["policy_config"]==native_arm["policy_config"]
+                        assert not arm["unknown_roads"]
+                        parts=arm["trip_accounting"]
+                        groups=[set(parts[k]) for k in ("active","arrived","not_observed_due","not_yet_due","retired_without_arrival")]
+                        assert sum(map(len,groups))==len(set().union(*groups))==len(parts["offered"])
+                        assert set().union(*groups)==set(parts["offered"])
+                        for kind,waits in arm["waiting_episodes"].items():
+                            assert waits["observed_agent_seconds"]==arm["summary"][kind+"_wait_agent_s"]
+                        reference_runtime.append({"mode":mode,"summary":arm["summary"],"trip_accounting":parts})
+                assert service.scene()["status"]=="idle"
             assert len({row["layout_id"] for row in rows}) == 3
             assert policy.config_path.read_bytes() == original
         finally:
             service.close()
     result = {"evidence":"executed synthetic native policy matrix",
               "duration_seconds":120,"step_seconds":.2,"pairs":rows,
-              "reference_replays":16,"production_legacy_arms":12,"live_slot_legacy_arms":6,"production_experiment_parity":False,"physical_output_allowed":False}
+              "reference_replays":16,"production_legacy_arms":12,"live_slot_legacy_arms":6,"reference_runtime_arms":2,"reference_runtime":reference_runtime,"production_experiment_parity":False,"physical_output_allowed":False}
     (out/"matrix.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     print(json.dumps(result,indent=2))
 

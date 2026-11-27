@@ -83,7 +83,14 @@ def arm(native):
                             assert scene["frame_number"] == frame.frame_number
                             assert scene["source_id"] == frame.source_id and scene["received_at_ms"] == frame.received_at_ms
                             assert frame.width == 1280 and frame.height == 720
-                            assert abs(scene["time_s" if native else "simulation_time_seconds"]-now[0]) < 1e-6
+                            if native:
+                                assert abs(scene["time_s"]-now[0]) < 1e-6
+                            else:
+                                assert -1e-6 <= now[0]-scene["simulation_time_seconds"] <= .5+1e-6
+                                assert abs(legacy._simulation_clock_s-now[0]) < 1e-6
+                                exact = legacy.exact_simulation_frame(**{k:scene["observation"][k] for k in
+                                    ("epoch","generation","tick","layout_id","source_id")})
+                                assert exact is frame
                             digest.update(frame.content)
                     wall = time.perf_counter()-start
                     after = processes(pids)

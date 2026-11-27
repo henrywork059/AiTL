@@ -275,3 +275,6 @@ The common simulation observation route dispatches explicit legacy or native rea
 
 ### S04 shared legacy motion owner (unreleased)
 Pure legacy_world module owns fixed pixel geometry, density counts/seed offsets, initial slot specs and deterministic movement/recirculation. Camera and isolated production benchmark retain their own locks, policy clocks, observation owners and metrics; both call the same movement functions. Opt-in live-slot benchmark initialization matches the camera, historical default unchanged. Native finite physical geometry remains explicitly different.
+
+### S04 replaceable finite-session owner (unreleased)
+NativeEvaluationService now selects GeneratedSession (SUMO) or GeneratedReferenceSession (finite constant-speed reference) through the same protected lifecycle. Both use trusted network and trip manifests, phase maps, GateMetrics, projection and exact publication. Reference has distinct provenance and source IDs, no libsumo child, and never becomes a live detector input. Engine switch retires the previous generation before reset. This is actual interchangeable evaluation execution, not a production geometry/demand migration; legacy_world remains production slot motion.

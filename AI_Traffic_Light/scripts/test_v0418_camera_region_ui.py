@@ -66,8 +66,11 @@ def main() -> None:
     source = (BACKEND / "camera_frames.py").read_text(encoding="utf-8")
     render = source.split("def _refresh_simulation_locked(", 1)[1].split('encoded_ok, encoded = cv2.imencode(".png", canvas)', 1)[0]
     agents = source.split("def _initialize_agents_locked(", 1)[1].split("def _advance_simulation_locked(", 1)[0]
-    assert 'vehicle_type = ("car", "suv", "van", "bus")[index % 4]' in agents
-    assert '"bus": (220, 255)' in agents
+    world = (BACKEND / "legacy_world.py").read_text(encoding="utf-8")
+    assert 'kind = ("car", "suv", "van", "bus")[index % 4]' in world
+    assert '"bus": (220, 255)' in world
+    assert "vehicle_specs(self._simulation_density,self._simulation_rng)" in agents
+    assert "vehicle_type=v.vehicle_type" in agents
     assert "cv2.putText(" not in render
     assert "_draw_signal_heads(" not in render
     # Both agent types receive the same controller phase per integration step.

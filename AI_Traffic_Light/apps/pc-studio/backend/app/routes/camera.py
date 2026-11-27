@@ -377,6 +377,7 @@ class NativeEvaluationIdentity(BaseModel):
 
 
 class NativeEvaluationStart(NativeEvaluationIdentity):
+    engine: Literal["native","reference"] = "native"
     geometry: Literal["standard","compact","elongated"] = "standard"
     density: Literal["light","normal","busy"] = "normal"
     seed: int = Field(default=42, ge=0, le=2147483647)
@@ -465,7 +466,7 @@ def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) 
 
 
 @router.get("/simulation/observation")
-def simulation_observation(request: Request, engine: Literal["legacy","native"] = "legacy",
+def simulation_observation(request: Request, engine: Literal["legacy","native","reference"] = "legacy",
                            source_id: str = "simulation_camera") -> dict:
     """Common read-only scene interface, explicit engine and image plane."""
     if source_id not in SIMULATION_SOURCE_IDS:
@@ -477,7 +478,7 @@ def simulation_observation(request: Request, engine: Literal["legacy","native"] 
         agents = scene["view_agents"]
         time_s = scene["simulation_time_seconds"]
     else:
-        scene = native_evaluation_service.current_simulation_scene(source_id)
+        scene = native_evaluation_service.current_simulation_scene(source_id,engine=engine)
         agents = scene["agents"]
         time_s = scene["time_s"]
     return ok({"engine":engine,"observation":scene["observation"],"agents":agents,
@@ -487,15 +488,15 @@ def simulation_observation(request: Request, engine: Literal["legacy","native"] 
 
 
 @router.get("/simulation/observation/frame")
-def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","native"],
+def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","native","reference"],
                                        source_id: str, epoch: str,
                                        generation: int=Query(ge=0),tick: int=Query(ge=0),
                                        layout_id: str=Query(min_length=64,max_length=64)) -> Response:
     if source_id not in SIMULATION_SOURCE_IDS:
         raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
     owner = camera_frame_service if engine=="legacy" else native_evaluation_service
-    frame = owner.exact_simulation_frame(epoch=epoch,generation=generation,tick=tick,
-                                        layout_id=layout_id,source_id=source_id)
+    identity = dict(epoch=epoch,generation=generation,tick=tick,layout_id=layout_id,source_id=source_id)
+    frame = owner.exact_simulation_frame(**identity) if engine=="legacy" else owner.exact_simulation_frame(**identity,engine=engine)
     return Response(content=frame.content,media_type=frame.content_type,headers={
         "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
         "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),

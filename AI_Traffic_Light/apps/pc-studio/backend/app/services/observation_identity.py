@@ -61,3 +61,16 @@ def synthetic_scene_identity(*, epoch, generation, tick, source_id, view_id,
             "detector_observation": False, "authoritative": False,
             "detector_input_eligible": detector_input_eligible,
             "physical_output_allowed": False}
+
+
+# Distinct origins are mandatory for isolated evaluation frames.
+SUMO_EVALUATION_ORIGIN = "synthetic_sumo_projection"
+REFERENCE_EVALUATION_ORIGIN = "synthetic_finite_reference_projection"
+EVALUATION_ORIGINS = frozenset({SUMO_EVALUATION_ORIGIN, REFERENCE_EVALUATION_ORIGIN})
+
+
+def evaluation_source_id(origin, generation, view_id):
+    if origin not in EVALUATION_ORIGINS or view_id not in SIMULATION_VIEW_FLIPS:
+        raise ValueError("Invalid isolated evaluation identity")
+    prefix = "native_eval" if origin == SUMO_EVALUATION_ORIGIN else "reference_eval"
+    return f"{prefix}_g{generation}_{view_id}"

@@ -7,13 +7,14 @@ evaluation dataset. Native metadata/CSV remain separate from dataset metadata.
 from __future__ import annotations
 
 from app.services.camera_frames import CameraFrame
-from app.services.sumo_projection import HEIGHT, WIDTH, PROVENANCE, VIEW_FLIPS
+from app.services.sumo_projection import HEIGHT, WIDTH, VIEW_FLIPS
+from app.services.observation_identity import EVALUATION_ORIGINS, evaluation_source_id
 import cv2
 import numpy as np
 
 
 def evaluation_frames(meta: dict, views: dict[str, bytes], *, received_at_ms: int) -> tuple[CameraFrame, ...]:
-    if meta.get("provenance") != PROVENANCE or meta.get("width") != WIDTH or meta.get("height") != HEIGHT:
+    if meta.get("provenance") not in EVALUATION_ORIGINS or meta.get("width") != WIDTH or meta.get("height") != HEIGHT:
         raise ValueError("Unexpected native capture provenance or dimensions")
     generation, tick = meta.get("generation"), meta.get("tick")
     if type(generation) is not int or generation < 0 or type(tick) is not int or tick < 0 or type(received_at_ms) is not int or received_at_ms < 0:
@@ -32,7 +33,7 @@ def evaluation_frames(meta: dict, views: dict[str, bytes], *, received_at_ms: in
         elif not np.array_equal(image, cv2.flip(canonical, flip)):
             raise ValueError("Native capture views differ from canonical frame")
         frames.append(CameraFrame(content=content, content_type="image/png",
-                                  source_id=f"native_eval_g{generation}_{source}",
+                                  source_id=evaluation_source_id(meta["provenance"],generation,source),
                                   width=WIDTH, height=HEIGHT, received_at_ms=received_at_ms,
-                                  frame_number=tick, origin=PROVENANCE, mode_generation=generation))
+                                  frame_number=tick, origin=meta["provenance"], mode_generation=generation))
     return tuple(frames)
