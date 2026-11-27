@@ -253,6 +253,13 @@ def main(out):
         state=lease.start(epoch=lease.epoch,generation=lease.generation,density="normal",seed=42,mode="fixed",geometry="midblock",camera_owner=owner)
         proc=lease._session.proc
         assert state["camera_owned"] and proc.is_alive()
+        prior_generation=lease.generation
+        prior_proc=proc
+        state=lease.start(epoch=lease.epoch,generation=prior_generation,density="normal",seed=42,mode="fixed",geometry="midblock",camera_owner=owner)
+        proc=lease._session.proc
+        assert not prior_proc.is_alive() and proc.is_alive() and state["camera_owned"]
+        assert lease.release_camera(epoch=lease.epoch,generation=prior_generation,camera_owner=owner)=={"released":False}
+        assert proc.is_alive() and lease.generation!=prior_generation
         profile=json.loads((out/"42-normal-fixed"/"native-region-profile.json").read_text())
         reused=lease.evaluate_region_profile(epoch=lease.epoch,generation=lease.generation,tick=0,source_id="simulation_camera_d",profile=profile)
         assert reused["region_profile"]==profile and not reused["persisted"] and not reused["agent_ids"], (reused["region_profile"],profile,reused["agent_ids"])
@@ -261,7 +268,7 @@ def main(out):
         deadline=time.monotonic()+10
         while proc.is_alive() and time.monotonic()<deadline: time.sleep(.05)
         assert not proc.is_alive() and lease.scene()["status"]=="idle" and not lease.scene()["camera_owned"]
-        (out/"camera-lease.json").write_text(json.dumps({"actual_native_child_reaped":True,"lease_seconds":2,"production_camera_selected":False,"region_profile_reused_across_sessions":True},indent=2))
+        (out/"camera-lease.json").write_text(json.dumps({"actual_native_child_reaped":True,"reset_child_reaped":True,"stale_release_rejected":True,"lease_seconds":2,"production_camera_selected":False,"region_profile_reused_across_sessions":True},indent=2))
     finally:
         lease.close()
     # Actual saved-policy pair uses the same cyclic evaluation lifecycle.

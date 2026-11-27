@@ -71,7 +71,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   const locked=Boolean(state?.status==="running"&&(cameraWorkspace?!owned:state.camera_owned));
   useEffect(()=>()=>{
     play.current=null;active.current?.abort();
-    if(owner.current&&ownerEpoch.current)void releaseNativeCamera(ownerEpoch.current,owner.current);
+    if(owner.current&&ownerEpoch.current&&ownedGeneration.current!==null)void releaseNativeCamera(ownerEpoch.current,ownedGeneration.current,owner.current);
   },[]);
   const onFailure=useCallback(()=>{setThree(false);setFailed(true);},[]);
   const accept=(response:NativeProjectionResponse)=>{
@@ -140,7 +140,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
       if(cameraWorkspace&&response.camera_owned&&action==="start"){ownedGeneration.current=response.generation;lastRenew.current=Date.now();}
       if(action==="stop"){ownedGeneration.current=null;owner.current=null;ownerEpoch.current=null;}
       if(!controller.signal.aborted)accept(response);
-      else if(cameraWorkspace&&owner.current&&ownerEpoch.current)void releaseNativeCamera(ownerEpoch.current,owner.current);
+      else if(cameraWorkspace&&owner.current&&ownerEpoch.current&&ownedGeneration.current!==null)void releaseNativeCamera(ownerEpoch.current,ownedGeneration.current,owner.current);
     }catch{if(!controller.signal.aborted)setStatus("Native evaluation command rejected; refreshing");}
     finally{active.current=null;if(!controller.signal.aborted){setPending(false);void polling.runNow();}}
   };

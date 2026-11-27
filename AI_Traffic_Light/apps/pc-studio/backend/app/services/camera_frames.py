@@ -296,6 +296,9 @@ class CameraFrameService:
 
     def publish_cached_upload(self, frame: CameraFrame) -> CameraFrame:
         """Promote an already validated receiver frame without allocating a new observation."""
+        if frame.evaluation_only:
+            raise AppError(ErrorCode.CAMERA_FRAME_INVALID,
+                "Evaluation frames cannot be selected camera uploads.",status_code=409)
         with self._lock:
             self._uploaded_frame = frame
             return frame
@@ -497,7 +500,7 @@ class CameraFrameService:
     def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id, engine=None):
         """Read the requested current publication without stepping or selecting."""
         with self._lock:
-            if (not self._simulation_enabled or self._simulation_frame is None or
+            if (not self._simulation_enabled or self._simulation_fault or self._simulation_frame is None or
                 epoch != self._simulation_epoch or generation != self._observation_mode_generation or
                 tick != self._simulation_frame.frame_number or layout_id != LEGACY_LAYOUT_ID or
                 (engine is not None and engine != self._simulation_engine)):

@@ -302,3 +302,8 @@ Windows multiprocessing spawn can import the full caller entry point before libs
 
 ### S04 qualified camera publication and worker diagnostics (unreleased)
 Native exact frame identity now belongs to the immutable CameraFrame, not just HTTP request context. Shared read checks generation, epoch, source, layout, coordinate plane, timestamp, dimensions, type, provenance and midblock demand digest against the active session; mismatch retires the isolated generation. Detector exclusion is defense-in-depth across origin, engine and native coordinate marker, and the temporary capture metadata carries qualification. Production camera registry, detector input authority and legacy coordinates remain unchanged. Native profile service normalizes JSON array representation and preserves fractional canonical coordinates after validated mirrored evaluation. Lean worker drains stderr into a bounded tail independent of protocol stdout; post-reap cleanup joins both readers. Parent observes consecutive speed samples for the same journey to quantify severe braking without changing protected admissions, engine dynamics or actual controller permissions.
+
+
+### S04 native workspace lifecycle hardening
+
+A generation-qualified release cannot retire a reset session under the same workspace token. Status reads synchronously enforce lease expiry in addition to watchdog cleanup. All native evaluation image paths use one owner qualification check, including temporary capture ZIP creation; invalid qualification fails closed. CameraFrameService refuses evaluation-only frames at cached-upload promotion and faulted legacy exact reads. This does not grant detector or signal authority or establish production geometry equivalence.

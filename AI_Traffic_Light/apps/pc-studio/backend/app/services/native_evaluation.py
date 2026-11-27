@@ -89,8 +89,7 @@ class NativeEvaluationService:
     def _require(self, epoch, generation, tick=None, *, running=True):
         if not self.enabled:
             raise self._conflict("Standalone native evaluation is disabled.")
-        if self._camera_owner is not None and time.monotonic()>=self._camera_deadline:
-            self._retire()
+        if self._expire_camera_if_due():
             raise self._conflict("Native camera ownership expired.")
         if epoch != self.epoch or generation != self.generation:
             raise self._conflict("Retired native evaluation generation.")
@@ -157,11 +156,18 @@ class NativeEvaluationService:
             if remaining>0:
                 self._arm_camera_timer(generation,remaining)
                 return
-            try:
-                self._retire()
-            except Exception:
-                logger.exception("Native camera lease retirement failed")
-                self._state="unavailable"
+            self._expire_camera_if_due()
+
+    def _expire_camera_if_due(self):
+        """Under the owner lock, expire even when the watchdog is delayed."""
+        if self._camera_owner is None or time.monotonic()<self._camera_deadline:
+            return False
+        try:
+            self._retire()
+        except Exception:
+            logger.exception("Native camera lease retirement failed")
+            self._state="unavailable"
+        return True
 
     def _renew_camera(self):
         if self._camera_owner is not None:
@@ -176,9 +182,12 @@ class NativeEvaluationService:
             self._renew_camera()
             return {"epoch":self.epoch,"generation":self.generation,"camera_owned":True}
 
-    def release_camera(self,*,epoch,camera_owner):
+    def release_camera(self,*,epoch,camera_owner,generation=None):
         with self._lock:
-            if epoch!=self.epoch or self._camera_owner is None:
+            self._expire_camera_if_due()
+            # A delayed keepalive from a previous reset must not close a new
+            # session, even if the same workspace owns both generations.
+            if epoch!=self.epoch or generation!=self.generation or self._camera_owner is None:
                 return {"released":False}
             self._require_camera_owner(camera_owner)
             self._retire()
@@ -345,6 +354,7 @@ class NativeEvaluationService:
 
     def scene(self, *, source_id="simulation_camera"):
         with self._lock:
+            self._expire_camera_if_due()
             snapshot = None
             if self._state == "running":
                 snap = self._adapter.snapshot()
@@ -378,11 +388,26 @@ class NativeEvaluationService:
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Unknown native evaluation view.", status_code=422)
             try:
-                self._ensure_frames()
-                return self._publisher.frame_for(source_id)
+                return self._qualified_frame(tick,source_id)
             except Exception as exc:
                 logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
+
+    def _qualified_frame(self,tick,source_id):
+        """Validate every binary or capture publication against its owner."""
+        self._ensure_frames()
+        frame=self._publisher.frame_for(source_id)
+        origin=ENGINES[self._engine]
+        if (frame is None or frame.observation_epoch!=self.epoch or
+            frame.mode_generation!=self.generation or frame.frame_number!=tick or
+            frame.layout_id!=self._projection.layout_id or frame.coordinate_space!="native_projection_v1" or
+            frame.source_id!=evaluation_source_id(origin,self.generation,source_id) or
+            frame.origin!=origin or not frame.evaluation_only or
+            (frame.width,frame.height)!=(1280,720) or frame.content_type!="image/png" or
+            frame.received_at_ms!=self._received_at_ms or
+            (self._geometry=="midblock" and frame.simulation_demand_digest!=self._demand_digest)):
+            raise ValueError("Native frame identity mismatch")
+        return frame
 
     def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id, engine="native"):
         """Same read seam as the legacy frame owner; no authority transfer."""
@@ -390,17 +415,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,tick)
             if engine != self._engine or layout_id != self._projection.layout_id:
                 raise self._conflict("Evaluation engine or publication layout mismatch.")
-            frame=self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
-            if (frame.observation_epoch!=epoch or frame.mode_generation!=generation or frame.frame_number!=tick or
-                frame.layout_id!=layout_id or frame.coordinate_space!="native_projection_v1" or
-                frame.source_id!=evaluation_source_id(ENGINES[engine],generation,source_id) or
-                frame.origin!=ENGINES[engine] or not frame.evaluation_only or
-                (frame.width,frame.height)!=(1280,720) or frame.content_type!="image/png" or
-                frame.received_at_ms!=self._received_at_ms or
-                (self._geometry=="midblock" and frame.simulation_demand_digest!=self._demand_digest)):
-                logger.error("Native frame identity mismatch; retiring session")
-                raise self._failure()
-            return frame
+            return self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
 
     def current_simulation_scene(self, source_id, *, engine="native"):
         with self._lock:
@@ -421,7 +436,7 @@ class NativeEvaluationService:
                     stream=BytesIO()
                     with ZipFile(stream,"w") as z:
                         for sid in VIEW_FLIPS:
-                            frame=self._publisher.frame_for(sid)
+                            frame=self._qualified_frame(tick,sid)
                             rec=writer.capture_frame(frame,session_id="native_evaluation" if self._engine=="native" else "reference_evaluation")
                             z.writestr(sid+".png",(writer.dataset_root/rec.image_path).read_bytes())
                             z.writestr(sid+".json",(writer.dataset_root/rec.metadata_path).read_bytes())

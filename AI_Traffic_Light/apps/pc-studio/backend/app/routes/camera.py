@@ -386,6 +386,7 @@ class NativeCameraHeartbeat(NativeEvaluationIdentity):
 
 class NativeCameraRelease(BaseModel):
     epoch: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+    generation: int | None = Field(default=None,ge=0)
     camera_owner: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
 
 

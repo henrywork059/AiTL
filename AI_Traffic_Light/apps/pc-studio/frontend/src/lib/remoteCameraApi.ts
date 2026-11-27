@@ -338,11 +338,11 @@ export function renewNativeCamera(state:NativeEvaluationState,camera_owner:strin
   return requestJsonStrict<{epoch:string;generation:number;camera_owned:true}>(`${nativeEvaluationBase}/camera-heartbeat`,{
     method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,camera_owner}),signal});
 }
-export function releaseNativeCamera(epoch:string,camera_owner:string){
+export function releaseNativeCamera(epoch:string,generation:number,camera_owner:string){
   // Best-effort cleanup on navigation. Server lease expiry also handles
   // closed tabs, lost connections and a start whose response never arrived.
   return fetch(`${nativeEvaluationBase}/camera-release`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({epoch,camera_owner}),keepalive:true}).catch(()=>undefined);
+    body:JSON.stringify({epoch,generation,camera_owner}),keepalive:true}).catch(()=>undefined);
 }
 export function nativeEvaluationCaptureUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/capture?${new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)})}`;

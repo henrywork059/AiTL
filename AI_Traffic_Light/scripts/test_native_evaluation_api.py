@@ -95,7 +95,8 @@ class Tests(unittest.TestCase):
                     post("pause",{**owned,"tick":0,"paused":True,**bad},409)
                     post("stop",{**owned,**bad},409)
                 post("camera-heartbeat",{**owned,"camera_owner":b},409)
-                post("camera-release",{"epoch":owned["epoch"],"camera_owner":b},409)
+                post("camera-release",{**owned,"camera_owner":b},409)
+                self.assertFalse(post("camera-release",{"epoch":owned["epoch"],"camera_owner":a})["data"]["released"])
                 post("camera-heartbeat",{**owned,"camera_owner":a})
                 post("step",{**owned,"tick":0,"steps":1,"camera_owner":a})
                 post("pause",{**owned,"tick":1,"paused":True,"camera_owner":a})
@@ -103,11 +104,34 @@ class Tests(unittest.TestCase):
                 self.assertFalse(frame.origin=="simulation")
                 self.assertIs(legacy.latest_frame(),baseline)
                 self.assertEqual(legacy.observation_mode_token,token)
-                post("camera-release",{"epoch":owned["epoch"],"camera_owner":a})
+                from app.core.exceptions import AppError
+                uploaded_before=legacy._uploaded_frame
+                with self.assertRaises(AppError):
+                    legacy.publish_cached_upload(frame)
+                self.assertIs(legacy._uploaded_frame,uploaded_before)
+                # Same token across reset: delayed release/heartbeat cannot
+                # retire or extend the new generation.
+                prior=owned
+                post("start",{**owned,"camera_owner":a})
+                owned=ident()
+                self.assertNotEqual(prior,owned)
+                self.assertTrue(sessions[-2].closed)
+                self.assertFalse(post("camera-release",{**prior,"camera_owner":a})["data"]["released"])
+                post("camera-heartbeat",{**prior,"camera_owner":a},409)
+                self.assertFalse(sessions[-1].closed)
+                post("camera-release",{**owned,"camera_owner":a})
                 self.assertTrue(sessions[-1].closed)
                 self.assertEqual(service.scene()["status"],"idle")
                 post("camera-heartbeat",{**owned,"camera_owner":a},409)
-                self.assertFalse(post("camera-release",{"epoch":owned["epoch"],"camera_owner":a})["data"]["released"])
+                self.assertFalse(post("camera-release",{**owned,"camera_owner":a})["data"]["released"])
+                # Status reads must expire leases even if the timer callback
+                # has not yet been scheduled by the OS.
+                post("start",{**ident(),"camera_owner":a})
+                with service._lock:
+                    service._camera_timer.cancel()
+                    service._camera_deadline=time.monotonic()-1.
+                    self.assertEqual(service.scene()["status"],"idle")
+                self.assertTrue(sessions[-1].closed)
                 # Exercise actual timer-driven cleanup, including no subsequent client request.
                 service._camera_lease_seconds=.2
                 state=post("start",{**ident(),"camera_owner":b})["data"]
@@ -457,6 +481,20 @@ class Tests(unittest.TestCase):
                 self.assertIsNone(stopped["snapshot"])
                 self.assertTrue(sessions[0].closed)
                 assert_envelope(client.post(BASE+"/start",json=identity),expected_status=409)
+                # Direct frame and ZIP paths must reject the same corrupted
+                # publication that the shared exact observation route rejects.
+                from dataclasses import replace
+                for endpoint in ("frame","capture"):
+                    active=assert_envelope(client.post(BASE+"/start",json={k:service.scene()[k] for k in ("epoch","generation")}))["data"]
+                    current_identity={k:active[k] for k in ("epoch","generation")}
+                    good=service.frame(**current_identity,tick=0,source_id="simulation_camera")
+                    with patch.object(service._publisher,"frame_for",return_value=replace(good,layout_id="0"*64)):
+                        query={**current_identity,"tick":0}
+                        if endpoint=="frame": query["source_id"]="simulation_camera"
+                        assert_envelope(client.get(BASE+"/"+endpoint,params=query),expected_status=503)
+                    self.assertEqual(service.scene()["status"],"unavailable")
+                    self.assertTrue(sessions[-1].closed)
+                stopped=assert_envelope(client.post(BASE+"/stop",json={k:service.scene()[k] for k in ("epoch","generation")}))["data"]
                 # Both comparison arms copy one saved policy, never modify its bytes.
                 policy=SignalRulesService(config_path=root/"policy.json",history_path=root/"policy-history.json",respect_environment=False)
                 policy.save_config(policy.defaults())
