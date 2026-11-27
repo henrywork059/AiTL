@@ -86,6 +86,23 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             model_predictions(png.tobytes(),{**ann,"detector_input_eligible":True},"simulation_camera",Model())
 
+    def test_body_centerline_uses_consecutive_journey(self):
+        from app.services.native_evaluation_experiments import vehicle_centerline_events
+        from app.services.sumo_midblock_fixture import slots_for,LENGTHS
+        from app.services.sumo_shadow_adapter import ShadowAgent
+        slots={slot.ident:slot for slot in slots_for(42,"light")}
+        half=LENGTHS[slots["v0"].type_id]/2
+        old=ShadowAgent("vehicle","v0_0",half-.5,0.,5.,"WC")
+        new=ShadowAgent("vehicle","v0_0",half+.5,0.,5.,":C_0")
+        self.assertEqual(vehicle_centerline_events((old,),(new,),slots,(-2.,2.),set()),["v0_0"])
+        self.assertEqual(vehicle_centerline_events((),(new,),slots,(-2.,2.),set()),[])
+        self.assertEqual(vehicle_centerline_events((old,),(new,),slots,(-2.,2.),{"v0_0"}),[])
+        self.assertEqual(vehicle_centerline_events((old,),(ShadowAgent("vehicle","v0_0",50.,0.,5.,"CE"),),slots,(-2.,2.),set()),[])
+        half=LENGTHS[slots["v1"].type_id]/2
+        old=ShadowAgent("vehicle","v1_0",-half+.5,0.,5.,"EC")
+        new=ShadowAgent("vehicle","v1_0",-half-.5,0.,5.,":C_1")
+        self.assertEqual(vehicle_centerline_events((old,),(new,),slots,(-2.,2.),set()),["v1_0"])
+
     def test_normalized_report_censoring(self):
         rows=[{"vehicle_queue":1,"pedestrian_queue":0},{"vehicle_queue":2,"pedestrian_queue":1}]
         summary={"vehicle_wait_agent_s":.6,"pedestrian_wait_agent_s":.2,"vehicle_passages":1,

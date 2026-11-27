@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 from test_camera_simulation_api import build_test_app, assert_envelope
 from app.routes import camera as routes
 from app.services.camera_frames import CameraFrameService, LEGACY_LAYOUT_ID
-from app.services.native_detector_validation import footprint_annotations, palette_predictions, score_footprints
+from app.services.native_detector_validation import footprint_annotations, palette_predictions, score_footprints, qualified_capture
 from app.services.native_evaluation import NativeEvaluationService
 from app.services.sumo_midblock_fixture import generate_midblock
 from app.services.sumo_midblock_session import CyclicMidblockSession
@@ -33,8 +33,14 @@ BASE="/api/camera/simulation/native-evaluation"
 
 
 def verify_export(result,expected_slots,horizon):
-    assert result["geometry"]=="midblock" and result["demand_model"]=="native_cyclic_slots_v1"
+    assert result["geometry"] in {"midblock","midblock_compact","midblock_wide"} and result["demand_model"]=="native_cyclic_slots_v1"
     assert len(result["timeline"])==horizon and not result["unknown_roads"]
+    events=[i for row in result["timeline"] for i in row["vehicle_centerline_event_ids"]]
+    projection=result["legacy_event_projection"]
+    assert len(events)==len(set(events))==projection["vehicle_passages"]
+    assert sorted(events)==projection["vehicle_journey_ids"]
+    assert set(result["arrived_vehicles"])<=set(events)
+    assert not projection["production_experiment_parity"]
     assert len(result["current_visits"])==expected_slots==len(result["demand_manifest"])
     assert len(set(result["current_visits"].values()))==expected_slots
     a=result["trip_accounting"]
@@ -67,12 +73,12 @@ def verify_export(result,expected_slots,horizon):
     assert {trips[i]["path"][0]["road_id"] for i in result["arrived_pedestrians"]}=={"NC","CS"}
 
 
-def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean_worker=True):
+def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean_worker=True,geometry="midblock"):
     out.mkdir(parents=True,exist_ok=True)
     sessions=[]
-    def factory(seed,*,density):
+    def factory(seed,*,density,geometry="midblock"):
         try:
-            session=CyclicMidblockSession(seed,density=density,lean_worker=lean_worker)
+            session=CyclicMidblockSession(seed,density=density,lean_worker=lean_worker,geometry=geometry)
         except Exception:
             import traceback
             (out/"startup-failure.txt").write_text(traceback.format_exc(),encoding="utf-8")
@@ -91,7 +97,7 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
         with patch.object(routes,"native_evaluation_service",svc),patch.object(routes,"camera_frame_service",legacy),TestClient(build_test_app()) as client:
             init=svc.scene()
             identity={k:init[k] for k in ("epoch","generation")}
-            response=client.post(BASE+"/start",json={**identity,"geometry":"midblock","seed":seed,"mode":mode,"density":density})
+            response=client.post(BASE+"/start",json={**identity,"geometry":geometry,"seed":seed,"mode":mode,"density":density})
             if response.status_code!=200 and (out/"startup-failure.txt").exists():
                 print((out/"startup-failure.txt").read_text(),flush=True)
             state=assert_envelope(response)["data"]
@@ -163,8 +169,10 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                     assert exact.status_code==200 and exact.content==z.read(sid+".png")
                     assert exact.headers["x-layout-id"]==scene["layout_id"] and exact.headers["x-observation-origin"]=="synthetic_sumo_projection"
                     assert exact.headers["x-detector-input-eligible"]=="false" and exact.headers["x-coordinate-space"]=="native_projection_v1"
-                annotations=json.loads(z.read("synthetic_footprints.json"))
+                annotations,qualified_images,integrity=qualified_capture(z)
+                assert integrity["hash_manifest_verified"] and not integrity["capture_authenticated"]
                 assert annotations==footprint_annotations(scene)
+                assert all(qualified_images[sid]==z.read(sid+".png") for sid in VIEW_FLIPS)
                 scores={sid:score_footprints(annotations["views"][sid],palette_predictions(z.read(sid+".png"))) for sid in VIEW_FLIPS}
                 assert all(x["truth_count"]==len(scene["agents"]) and not x["production_detector_validated"] for x in scores.values())
                 (out/"palette-detector-evaluation.json").write_text(json.dumps({"method":"exact_palette_components_not_trained_model","views":scores},indent=2),encoding="utf-8")
@@ -175,6 +183,9 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                 assert converted["mapping"]["original_polygon"]==preview["polygon"]
                 assert_envelope(client.post(BASE+"/region/legacy-preview",json={**preview,"legacy_layout_id":"0"*64}),expected_status=409)
                 (out/"legacy-rectangle-preview.json").write_text(json.dumps(converted,indent=2),encoding="utf-8")
+                full=svc.view_scene(**params,source_id="simulation_camera")
+                light=svc.view_scene(**params,source_id="simulation_camera",_include_lanes=False)
+                assert {k:v for k,v in full.items() if k!="lanes"}==light and "lanes" not in light
                 draft={**params,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":scene["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
                 regions=assert_envelope(client.post(BASE+"/region/views",json=draft))["data"]
                 assert set(regions["views"])==set(VIEW_FLIPS) and not regions["persisted"]
@@ -234,6 +245,13 @@ def main(out):
         f,a=(results[f"{seed}-{density}-{mode}"] for mode in ("fixed","adaptive"))
         assert f["layout_id"]==a["layout_id"] and f["demand_manifest"]==a["demand_manifest"]
         assert f["demand_digest"]==a["demand_digest"]
+    # Two new actual geometry variants; distinct layouts, unchanged slot manifest.
+    for geometry in ("midblock_compact","midblock_wide"):
+        key=f"42-normal-fixed-{geometry}"
+        results[key]=run_arm(out/key,42,"normal","fixed",geometry=geometry)
+        assert results[key]["layout_id"]!=results["42-normal-fixed"]["layout_id"]
+        assert results[key]["demand_digest"]==results["42-normal-fixed"]["demand_digest"]
+    assert results["42-normal-fixed-midblock_compact"]["layout_id"]!=results["42-normal-fixed-midblock_wide"]["layout_id"]
     repeat=run_arm(out/"42-normal-fixed-repeat",42,"normal","fixed",read_workload=True)
     assert repeat==results["42-normal-fixed"]
     # Same actual seed, mode, density, time horizon, camera workload and pixel

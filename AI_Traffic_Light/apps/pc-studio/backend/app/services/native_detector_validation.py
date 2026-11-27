@@ -142,3 +142,73 @@ def model_predictions(content,annotations,view_id,model,confidence_threshold=.1)
         else:
             mapped.append({**row,"kind":kind})
     return mapped,unmapped
+
+
+def qualified_capture(archive):
+    """Qualify a retained capture before offline inference; never authenticate it.
+
+    Existing captures without a hash manifest are supported if all provenance,
+    observation, annotation and pixel-mirror checks succeed.
+    """
+    import hashlib
+    import json
+    from app.services.observation_identity import evaluation_source_id
+    names=archive.namelist()
+    if len(names)!=len(set(names)):
+        raise ValueError("Duplicate capture member")
+    def read(name):
+        info=archive.getinfo(name)
+        if info.file_size>8*1024*1024:
+            raise ValueError("Capture member too large")
+        return archive.read(info)
+    scene_bytes=read("scene.json")
+    scene=json.loads(scene_bytes)
+    annotations=footprint_annotations(scene)
+    if "synthetic_footprints.json" in names and json.loads(read("synthetic_footprints.json"))!=annotations:
+        raise ValueError("Retained annotation differs from scene reconstruction")
+    coordinate=json.loads(read("coordinate_contract.json"))
+    identity={k:scene[k] for k in ("epoch","generation","tick","layout_id","coordinate_space","provenance","width","height","engine")}
+    if any(coordinate.get(k)!=v for k,v in identity.items()) or coordinate.get("views")!=list(VIEW_FLIPS) or coordinate.get("legacy_editor_compatible") is not False:
+        raise ValueError("Capture coordinate identity mismatch")
+    observations=json.loads(read("observations.json"))
+    detector=json.loads(read("detector_contract.json"))
+    flags=("detector_input_eligible","detector_observation","authoritative","physical_output_allowed")
+    if (detector.get("observations")!=observations or detector.get("layout_id")!=identity["layout_id"] or
+        detector.get("coordinate_space")!=identity["coordinate_space"] or any(detector.get(k) is not False for k in flags)):
+        raise ValueError("Capture detector contract mismatch")
+    by_view={row["view_id"]:row for row in observations}
+    if len(observations)!=len(VIEW_FLIPS) or set(by_view)!=set(VIEW_FLIPS):
+        raise ValueError("Capture view identity mismatch")
+    images={}
+    hashes={"scene.json":hashlib.sha256(scene_bytes).hexdigest()}
+    canonical=None
+    for sid,flip in VIEW_FLIPS.items():
+        obs=by_view[sid]
+        if (any(obs.get(k)!=identity[k] for k in identity if k!="engine") or
+            any(obs.get(k) is not False for k in flags) or obs.get("frame_number")!=identity["tick"] or
+            obs.get("received_at_ms")!=scene["received_at_ms"] or
+            obs.get("source_id")!=evaluation_source_id(identity["provenance"],identity["generation"],sid)):
+            raise ValueError("Capture observation mismatch")
+        metadata=json.loads(read(sid+".json"))
+        expected={"observation_epoch":identity["epoch"],"layout_id":identity["layout_id"],
+                  "coordinate_space":identity["coordinate_space"],"source_frame_number":identity["tick"],
+                  "source_id":obs["source_id"],"source_received_at_ms":obs["received_at_ms"],
+                  "origin":identity["provenance"],"width":WIDTH,"height":HEIGHT,
+                  "content_type":"image/png","detector_input_eligible":False}
+        content=read(sid+".png")
+        expected["size_bytes"]=len(content)
+        if any(metadata.get(k)!=v for k,v in expected.items()):
+            raise ValueError("Capture frame metadata mismatch")
+        image=cv2.imdecode(np.frombuffer(content,np.uint8),cv2.IMREAD_COLOR)
+        if not content.startswith(b"\x89PNG\r\n\x1a\n") or image is None or image.shape!=(HEIGHT,WIDTH,3):
+            raise ValueError("Capture PNG mismatch")
+        if flip is None: canonical=image
+        elif not np.array_equal(image,cv2.flip(canonical,flip)):
+            raise ValueError("Capture view is not an exact mirror")
+        images[sid]=content
+        hashes[sid+".png"]=hashlib.sha256(content).hexdigest()
+    manifest_present="capture_integrity.json" in names
+    if manifest_present and json.loads(read("capture_integrity.json"))!={"schema_version":1,"sha256":hashes}:
+        raise ValueError("Capture integrity hash mismatch")
+    return annotations,images,{"hash_manifest_verified":manifest_present,"sha256":hashes,
+                              "capture_authenticated":False}

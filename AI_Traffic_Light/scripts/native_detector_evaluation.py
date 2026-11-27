@@ -7,7 +7,7 @@ import sys
 from zipfile import ZipFile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"apps/pc-studio/backend"))
-from app.services.native_detector_validation import footprint_annotations,palette_predictions,model_predictions,score_footprints
+from app.services.native_detector_validation import qualified_capture,palette_predictions,model_predictions,score_footprints
 from app.services.sumo_projection import VIEW_FLIPS
 
 
@@ -31,13 +31,10 @@ def main():
         from ultralytics import YOLO
         model=YOLO(str(path))
     with ZipFile(args.capture) as archive:
-        scene=json.loads(archive.read("scene.json"))
-        ann=footprint_annotations(scene)
-        if "synthetic_footprints.json" in archive.namelist() and json.loads(archive.read("synthetic_footprints.json"))!=ann:
-            raise ValueError("Retained annotation differs from scene reconstruction")
+        ann,images,integrity=qualified_capture(archive)
         views={}
         for sid in VIEW_FLIPS:
-            image=archive.read(sid+".png")
+            image=images[sid]
             unmapped=[]
             if model is None:
                 predictions=palette_predictions(image)
@@ -48,7 +45,7 @@ def main():
     print(json.dumps({"method":"offline_local_yolo" if model is not None else "exact_palette_components_not_trained_model",
         "model_sha256":model_digest,"confidence":args.confidence if model is not None else None,
         "layout_id":ann["layout_id"],"generation":ann["generation"],"tick":ann["tick"],
-        "production_detector_validated":False,"physical_output_allowed":False,
+        "production_detector_validated":False,"physical_output_allowed":False,"capture_integrity":integrity,
         "limitations":"One synthetic capture, four correlated mirrors, full raster footprints, greedy IoU matching; not field accuracy or mAP.",
         "views":views},indent=2))
 

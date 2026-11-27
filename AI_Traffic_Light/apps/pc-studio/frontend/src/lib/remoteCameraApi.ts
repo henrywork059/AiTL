@@ -310,6 +310,8 @@ export type NativeProjectionScene = {
   signal?: {phase:string;vehicle_go:boolean;pedestrian_walk:boolean;applied_permission:string;applied_vehicle_go?:boolean;applied_pedestrian_walk?:boolean}|null;
   width: 1280;
   height: 720;
+  legacy_preview_layout_id?:string;
+  legacy_preview_crossing?:[number,number][];
   lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number;surface?:"polygon"}>;
   agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number;
     slot_id?:string;visit?:number;vehicle_type?:"car"|"suv"|"van"|"bus";length_m?:number;width_m?:number;eastbound?:boolean}>;
@@ -326,7 +328,7 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   );
 }
 
-export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|"midblock_compact"|"midblock_wide"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
 const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
 export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
@@ -413,4 +415,19 @@ export function evaluateNativeRegionProfile(state:NativeEvaluationState,sourceId
   const snapshot=state.snapshot;
   if(!snapshot?.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
   return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region/profile`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,profile}),signal});
+}
+
+
+export function previewLegacyCrossing(state:NativeEvaluationState,sourceId:string,signal:AbortSignal){
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id||!snapshot.legacy_preview_layout_id||snapshot.legacy_preview_crossing?.length!==4)
+    return Promise.reject(new Error("Qualified legacy crossing preview unavailable"));
+  const polygon=snapshot.legacy_preview_crossing.map(([x,y])=>[
+    sourceId==="simulation_camera_c"||sourceId==="simulation_camera_d"?1279-x:x,
+    sourceId==="simulation_camera_b"||sourceId==="simulation_camera_d"?719-y:y
+  ]);
+  return requestJsonStrict<{mapping:{calibrated:false;persisted:false};evaluation:NativeRegionResult;production_coordinate_parity:false}>(
+    `${nativeEvaluationBase}/region/legacy-preview`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,
+        legacy_layout_id:snapshot.legacy_preview_layout_id,layout_id:snapshot.layout_id,polygon}),signal});
 }

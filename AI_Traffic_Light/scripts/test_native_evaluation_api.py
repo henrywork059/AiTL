@@ -160,6 +160,7 @@ class Tests(unittest.TestCase):
                 def __init__(self):
                     super().__init__(path)
                     self.ledger=CyclicLedger(slots)
+                    self.bounds=(9.,11.)
                     self.phase_map=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset())
                     self.trips=(Trip("v0_0","vehicle",0.,5.,(Segment("WC","road",((0.,0.),(20.,0.))),)),)
                 @property
@@ -243,7 +244,19 @@ class Tests(unittest.TestCase):
                         self.assertEqual(metadata["observation_epoch"],identity["epoch"])
                         self.assertFalse(metadata["detector_input_eligible"])
                     self.assertEqual(exact.content,z.read("simulation_camera_c.png"))
+                    from app.services.native_detector_validation import qualified_capture
+                    qualified,images,integrity=qualified_capture(z)
+                    self.assertTrue(integrity["hash_manifest_verified"])
+                    self.assertEqual(images["simulation_camera_c"],exact.content)
                     footprints=json.loads(z.read("synthetic_footprints.json"))
+                    self.assertEqual(qualified,footprints)
+                    # Corrupt the manifest, retaining exact original frames.
+                    tampered=io.BytesIO()
+                    with ZipFile(tampered,"w") as target:
+                        for member in z.namelist():
+                            target.writestr(member,b"{}" if member=="capture_integrity.json" else z.read(member))
+                    with ZipFile(tampered) as invalid:
+                        with self.assertRaises(ValueError): qualified_capture(invalid)
                     self.assertEqual(footprints["layout_id"],layout)
                     self.assertEqual(set(footprints["views"]),set(VIEW_FLIPS))
                     self.assertFalse(footprints["detector_input_eligible"])

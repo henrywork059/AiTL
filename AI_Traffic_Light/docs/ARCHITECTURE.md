@@ -316,3 +316,10 @@ Native midblock evaluation supports read-only landmark-based legacy rectangle pr
 The same normalized report generator is now consumed by the existing opt-in legacy/protected benchmark evidence and native evaluation export; original legacy metrics and CSVs remain unchanged. Snapshot metadata cache publishes an atomic (snapshot, metadata) pair for overlapping diagnostic reads.
 
 Offline `scripts/native_detector_evaluation.py --capture <zip>` scores palette components; optional `--model <trusted-existing-local.pt>` executes that explicit model on CPU through the existing box converter without creating a live inference service or updating any cache. Reports model SHA-256, mapped and unmapped classes, one-to-one IoU matching and limitations. No trained model available in this development environment; mock conversion regression only, no YOLO accuracy claim.
+
+
+### S04 configurable midblock and event projection
+
+Three trusted metre-domain midblock presets retain identical protected topology and slot generation; generated lane/crossing geometry controls projection and occupancy. No physical calibration or saved zone changes. Native body-centre passage diagnostics use consecutive same-journey positions and the actual crossing midpoint; they are separate from normalized gate counts. Region-only internal reads avoid copying static lane polylines and duplicate requested-view evaluation. No production detector or signal authority.
+
+Native region draft now offers explicit legacy crossing preview using server-supplied legacy landmarks and layout identity. Capture ZIP adds SHA-256 integrity for scene and four images; offline detector qualification checks scene, capture metadata, observations, exclusions, exact mirrors and manifest before scoring. Old qualified archives without a hash manifest remain readable and report it absent. Hashes detect accidental mismatches, not authenticate capture origin. No actual trained model or live inference authority.

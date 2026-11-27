@@ -37,7 +37,8 @@ def legacy_rectangle_preview(scene, polygon, view_id):
     """
     from app.services.legacy_world import ROAD_TOP, ROAD_BOTTOM, CROSSING_LEFT, CROSSING_RIGHT
     from app.services.observation_identity import simulation_view_point
-    if scene.get("geometry") != "midblock" or scene.get("engine") != "native":
+    from app.services.sumo_midblock_fixture import MIDBLOCK_GEOMETRIES
+    if scene.get("geometry") not in MIDBLOCK_GEOMETRIES or scene.get("engine") != "native":
         raise ValueError("Legacy preview requires native midblock geometry")
     points=region_counts({"agents":[]},polygon)["polygon"]
     if any(not (0<=x<=WIDTH-1 and 0<=y<=HEIGHT-1) for x,y in points):

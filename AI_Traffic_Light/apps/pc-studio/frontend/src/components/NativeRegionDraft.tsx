@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type PointerEvent} from "react";
-import {evaluateNativeRegion,evaluateNativeRegionProfile,type NativeEvaluationState,type NativeRegionResult} from "../lib/remoteCameraApi";
+import {evaluateNativeRegion,evaluateNativeRegionProfile,previewLegacyCrossing,type NativeEvaluationState,type NativeRegionResult} from "../lib/remoteCameraApi";
 
 type Point=[number,number];
 /** Draft-only native pixel geometry. Never writes the production zone registry. */
@@ -34,6 +34,21 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
     }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Region profile rejected");}
     finally{if(!controller.signal.aborted){setBusy(false);request.current=null;}}
   };
+  const previewCrossing=async()=>{
+    if(busy||!state.snapshot)return;
+    const controller=new AbortController();request.current=controller;setBusy(true);setError("");
+    try{
+      const response=await previewLegacyCrossing(state,sourceId,controller.signal),value=response.evaluation;
+      if(!controller.signal.aborted&&response.production_coordinate_parity===false&&response.mapping.calibrated===false&&
+        response.mapping.persisted===false&&value.tick===state.snapshot.tick&&value.generation===state.generation&&
+        value.epoch===state.epoch&&value.layout_id===state.snapshot.layout_id&&value.persisted===false&&value.source_id===sourceId){
+        const polygon=value.views?.[sourceId]?.polygon;
+        if(!polygon||polygon.length!==4)throw new Error("Preview polygon unavailable");
+        setPoints(polygon);setResult(value);
+      }
+    }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Legacy preview rejected");}
+    finally{if(!controller.signal.aborted){setBusy(false);request.current=null;}}
+  };
   const exportProfile=()=>{
     if(!result?.region_profile)return;
     const url=URL.createObjectURL(new Blob([JSON.stringify(result.region_profile,null,2)],{type:"application/json"}));
@@ -64,6 +79,7 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
     <div style={{position:"absolute",bottom:36,left:8,zIndex:5,background:"rgba(28,29,32,.9)",padding:8,borderRadius:4,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
       <span>{points.length}/4 vertices · native draft only</span>
       <button type="button" onClick={()=>changed([])}>Clear draft</button>
+      {state.snapshot?.legacy_preview_layout_id&&<button type="button" disabled={busy} title="Semantic synthetic rectangle, not camera calibration" onClick={()=>void previewCrossing()}>Preview legacy crossing</button>}
       <button type="button" disabled={points.length!==4||busy} onClick={()=>void evaluate()}>Evaluate draft</button>
       <label>Load native profile <input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void importProfile(file);}} style={{maxWidth:180}}/></label>
       {result?.region_profile&&<button type="button" onClick={exportProfile}>Export native profile</button>}

@@ -32,18 +32,19 @@ from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, P
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts, legacy_rectangle_preview
 from app.services.camera_frames import LEGACY_LAYOUT_ID
+from app.services.legacy_world import ROAD_TOP, ROAD_BOTTOM, CROSSING_LEFT, CROSSING_RIGHT
 from app.services.native_detector_validation import footprint_annotations
-from app.services.native_evaluation_experiments import summarize_timeline, validate_pair, vehicle_braking_sample, summarize_braking
+from app.services.native_evaluation_experiments import summarize_timeline, validate_pair, vehicle_braking_sample, summarize_braking, vehicle_centerline_events
 from app.services.simulation_gate_reporting import normalized_report_metrics
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
     REFERENCE_EVALUATION_ORIGIN, simulation_view_point)
 from app.services.simulation_reference_session import GeneratedReferenceSession
 from app.services.sumo_midblock_session import CyclicMidblockSession
-from app.services.sumo_midblock_fixture import LENGTHS, WIDTHS
+from app.services.sumo_midblock_fixture import LENGTHS, WIDTHS, MIDBLOCK_GEOMETRIES
 
 
 def valid_geometry(engine,geometry):
-    return geometry in GEOMETRY_PRESETS or (engine=="native" and geometry=="midblock")
+    return geometry in GEOMETRY_PRESETS or (engine=="native" and geometry in MIDBLOCK_GEOMETRIES)
 
 ENGINES = {"native": PROVENANCE, "reference": REFERENCE_EVALUATION_ORIGIN}
 
@@ -84,6 +85,7 @@ class NativeEvaluationService:
         self._engine = None
         self._trips = ()
         self._seen_trips = set()
+        self._centerline_seen = set()
 
     @staticmethod
     def _conflict(message):
@@ -124,6 +126,7 @@ class NativeEvaluationService:
         self._engine = None
         self._trips = ()
         self._seen_trips = set()
+        self._centerline_seen = set()
         self._state = state
         try:
             if adapter is not None:
@@ -218,11 +221,11 @@ class NativeEvaluationService:
                 self._policy = self._controller.save_config(config)
                 self._controller.reset_runtime(0.)
                 self._engine = engine
-                cyclic = geometry=="midblock"
+                cyclic = geometry in MIDBLOCK_GEOMETRIES
                 factory = self._midblock_factory if cyclic else (self._factory if engine=="native" else self._reference_factory)
                 def open_session(value):
                     kwargs = {'density': density}
-                    if geometry != 'standard' and not cyclic:
+                    if geometry not in ('standard','midblock'):
                         kwargs['geometry'] = geometry
                     self._session = factory(value, **kwargs)
                     return self._session
@@ -287,7 +290,7 @@ class NativeEvaluationService:
                     permission = self._session.last_permission
                     vehicle_inside=any(a.kind=="vehicle" and a.road_id.startswith(":C_") for a in before.agents)
                     pedestrian_inside=bool(crossing)
-                    if self._geometry=="midblock":
+                    if self._geometry in MIDBLOCK_GEOMETRIES:
                         vehicle_inside,pedestrian_inside=self._session.occupied(before.agents)
                         self._session.occupied(snap.agents)
                         trips=self._session.trips
@@ -304,10 +307,17 @@ class NativeEvaluationService:
                         grants.intersection(self._phase_map.pedestrians) and phase!="pedestrian_green"):
                         raise RuntimeError("Invalid native permission")
                     measured = self._metrics.sample(snap.tick,self._routes.observations(snap.agents))
-                    if self._geometry=="midblock" and self._routes.unknown_roads:
+                    if self._geometry in MIDBLOCK_GEOMETRIES and self._routes.unknown_roads:
                         raise RuntimeError("Cyclic agent left its validated route")
-                    braking=vehicle_braking_sample(before.agents,snap.agents) if self._geometry=="midblock" else {}
-                    self._timeline.append({**measured,**braking,"phase":phase,"t":measured["t_seconds"],
+                    braking=vehicle_braking_sample(before.agents,snap.agents) if self._geometry in MIDBLOCK_GEOMETRIES else {}
+                    centerline={}
+                    if self._geometry in MIDBLOCK_GEOMETRIES:
+                        events=vehicle_centerline_events(before.agents,snap.agents,self._session.ledger.slots,
+                            self._session.bounds,self._centerline_seen)
+                        self._centerline_seen.update(events)
+                        centerline={"vehicle_centerline_event_ids":events,
+                                    "vehicle_centerline_passages":len(self._centerline_seen)}
+                    self._timeline.append({**measured,**braking,**centerline,"phase":phase,"t":measured["t_seconds"],
                         "active_rules":list(signal.get("active_rules",[])),"applied_permission":permission,
                         "vehicle_trip_arrivals":len(self._session.arrived),"pedestrian_trip_arrivals":len(self._session.person_arrived)})
                     self._signal = {"phase":phase,"vehicle_go":signal["vehicle_go"],
@@ -355,17 +365,20 @@ class NativeEvaluationService:
             # comparison checks cancellation before starting another batch.
             comparison[1].close()
 
-    def scene(self, *, source_id="simulation_camera"):
+    def scene(self, *, source_id="simulation_camera", _include_lanes=True):
         with self._lock:
             self._expire_camera_if_due()
             snapshot = None
             if self._state == "running":
                 snap = self._adapter.snapshot()
-                snapshot = {**self._projection.scene(snap, source_id),"received_at_ms":self._received_at_ms,
+                snapshot = {**self._projection.scene(snap, source_id,include_lanes=_include_lanes),"received_at_ms":self._received_at_ms,
                     "paused":self._paused,"density":self._density,"geometry":self._geometry,"engine":self._engine,"signal":deepcopy(self._signal),
                     "epoch":self.epoch,"profile":self._policy["active_profile"],
                     "legacy_editor_compatible":False}
-                if self._geometry=="midblock":
+                if self._geometry in MIDBLOCK_GEOMETRIES:
+                    snapshot["legacy_preview_layout_id"]=LEGACY_LAYOUT_ID
+                    snapshot["legacy_preview_crossing"]=[[CROSSING_LEFT,ROAD_TOP],[CROSSING_RIGHT,ROAD_TOP],
+                        [CROSSING_RIGHT,ROAD_BOTTOM],[CROSSING_LEFT,ROAD_BOTTOM]]
                     snapshot["demand_model"]="native_cyclic_slots_v1"
                     snapshot["demand_digest"]=self._demand_digest
                     # Slot and vehicle geometry metadata is owned by the shared projection.
@@ -378,10 +391,10 @@ class NativeEvaluationService:
     def _ensure_frames(self):
         snap = self._adapter.snapshot()
         if not self._publisher.has_tick(snap.tick):
-            indexed=self._geometry=="midblock" and self._indexed_frames
+            indexed=self._geometry in MIDBLOCK_GEOMETRIES and self._indexed_frames
             meta, pixels = self._projection.render_pixels(snap,indexed=indexed)
             meta.update(epoch=self.epoch)
-            if self._geometry=="midblock":
+            if self._geometry in MIDBLOCK_GEOMETRIES:
                 meta.update(demand_model="native_cyclic_slots_v1",demand_digest=self._demand_digest)
             self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True,indexed=indexed)
 
@@ -408,7 +421,7 @@ class NativeEvaluationService:
             frame.origin!=origin or not frame.evaluation_only or
             (frame.width,frame.height)!=(1280,720) or frame.content_type!="image/png" or
             frame.received_at_ms!=self._received_at_ms or
-            (self._geometry=="midblock" and frame.simulation_demand_digest!=self._demand_digest)):
+            (self._geometry in MIDBLOCK_GEOMETRIES and frame.simulation_demand_digest!=self._demand_digest)):
             raise ValueError("Native frame identity mismatch")
         return frame
 
@@ -438,14 +451,19 @@ class NativeEvaluationService:
                     writer=DatasetCaptureService(dataset_root=Path(tmp),respect_environment=False)
                     stream=BytesIO()
                     with ZipFile(stream,"w") as z:
+                        image_hashes={}
                         for sid in VIEW_FLIPS:
                             frame=self._qualified_frame(tick,sid)
+                            image_hashes[sid+".png"]=hashlib.sha256(frame.content).hexdigest()
                             rec=writer.capture_frame(frame,session_id="native_evaluation" if self._engine=="native" else "reference_evaluation")
                             z.writestr(sid+".png",(writer.dataset_root/rec.image_path).read_bytes())
                             z.writestr(sid+".json",(writer.dataset_root/rec.metadata_path).read_bytes())
                         meta=self.scene()["snapshot"]
-                        z.writestr("scene.json",json.dumps(meta,indent=2))
-                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False,**({"demand_model":meta["demand_model"],"demand_digest":meta["demand_digest"]} if self._geometry=="midblock" else {})},indent=2))
+                        scene_bytes=json.dumps(meta,indent=2).encode("utf-8")
+                        z.writestr("scene.json",scene_bytes)
+                        z.writestr("capture_integrity.json",json.dumps({"schema_version":1,"sha256":{
+                            **image_hashes,"scene.json":hashlib.sha256(scene_bytes).hexdigest()}},indent=2))
+                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False,**({"demand_model":meta["demand_model"],"demand_digest":meta["demand_digest"]} if self._geometry in MIDBLOCK_GEOMETRIES else {})},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
                         observations=[self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS]
                         z.writestr("observations.json",json.dumps(observations,indent=2))
@@ -489,19 +507,25 @@ class NativeEvaluationService:
                 "demand_manifest":deepcopy(self._demand_manifest),
                 **({"demand_model":"native_cyclic_slots_v1","journey_manifest":[asdict(t) for t in self._trips],
                     "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current),
-                    "braking_diagnostics":summarize_braking(self._timeline)} if self._geometry=="midblock" else {}),
+                    "braking_diagnostics":summarize_braking(self._timeline),
+                    "legacy_event_projection":{"contract":"observed_vehicle_body_centerline_v1",
+                        "vehicle_passages":len(self._centerline_seen),
+                        "vehicle_journey_ids":sorted(self._centerline_seen),
+                        "pedestrian_gate_crossings":self._metrics.summary()["pedestrian_crossings"],
+                        "legacy_queue_wait_equivalent":False,"matched_demand":False,
+                        "production_experiment_parity":False}} if self._geometry in MIDBLOCK_GEOMETRIES else {}),
                 "trip_accounting":self._trip_accounting(),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
                 "production_experiment_parity":False,"physical_output_allowed":False}
 
-    def view_scene(self, *, epoch, generation, tick, source_id):
+    def view_scene(self, *, epoch, generation, tick, source_id, _include_lanes=True):
         """Exact native scene in a requested image plane; canonical editor is untouched."""
         with self._lock:
             self._require(epoch,generation,tick)
             if source_id not in VIEW_FLIPS:
                 raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
-            scene=self.scene(source_id=source_id)["snapshot"]
+            scene=self.scene(source_id=source_id,_include_lanes=_include_lanes)["snapshot"]
             identity = synthetic_scene_identity(
                 epoch=epoch,generation=generation,tick=tick,
                 source_id=evaluation_source_id(ENGINES[self._engine],generation,source_id),view_id=source_id,
@@ -509,7 +533,7 @@ class NativeEvaluationService:
                 coordinate_space=scene["coordinate_space"],layout_id=scene["layout_id"],
                 width=scene["width"],height=scene["height"],provenance=ENGINES[self._engine],
                 tick_kind="native_fixed_step" if self._engine=="native" else "reference_fixed_step")
-            if self._geometry=="midblock":
+            if self._geometry in MIDBLOCK_GEOMETRIES:
                 identity.update(simulation_engine="native",demand_model=scene["demand_model"],demand_digest=scene["demand_digest"],agent_anchor="native_front_center_footprints_v1")
             return {**scene,"view_id":source_id,"source_id":identity["source_id"],
                     "frame_number":tick,"legacy_editor_compatible":False,"observation":identity}
@@ -519,7 +543,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,tick)
             if coordinate_space!="native_projection_v1" or layout_id!=self._projection.layout_id:
                 raise self._conflict("Region coordinate space or layout does not match native geometry.")
-            scene=self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+            scene=self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id,_include_lanes=False)
             try:
                 result=region_counts(scene,polygon)
             except (ValueError,TypeError) as exc:
@@ -547,7 +571,7 @@ class NativeEvaluationService:
             views={}
             for sid in VIEW_FLIPS:
                 mirrored=[simulation_view_point(x,y,1280,720,sid) for x,y in canonical]
-                result=self.evaluate_region(epoch=epoch,generation=generation,tick=tick,source_id=sid,
+                result=original if sid==source_id else self.evaluate_region(epoch=epoch,generation=generation,tick=tick,source_id=sid,
                     coordinate_space=coordinate_space,layout_id=layout_id,polygon=mirrored)
                 if result["agent_ids"]!=original["agent_ids"] or result["counts"]!=original["counts"]:
                     raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED,"Native draft view identity mismatch.",status_code=503)
@@ -658,10 +682,10 @@ class NativeEvaluationService:
             meta={"schema_version":1,"engine":engine,"evidence":"executed_synthetic_native_comparison" if engine=="native" else "executed_synthetic_reference_comparison",
                 "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
                 "layout_id":pair["fixed"]["layout_id"],"geometry":geometry,"profile":selected,"density":density,"seed":seed,
-                **({"demand_model":"native_cyclic_slots_v1"} if geometry=="midblock" else {}),
+                **({"demand_model":"native_cyclic_slots_v1"} if geometry in MIDBLOCK_GEOMETRIES else {}),
                 "duration_seconds":duration_seconds,"demand_digest":pair["fixed"]["demand_digest"],"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
                 "production_experiment_parity":False,"physical_output_allowed":False,
-                "limitations":("Same cyclic slot specification and saved policy, not matched journey counts or legacy pixel geometry. Reentry requires native arrival; unfinished visits retained." if geometry=="midblock" else "Same finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained. Reference uses constant-speed/gap model, not SUMO or production legacy.")}
+                "limitations":("Same cyclic slot specification and saved policy, not matched journey counts or legacy pixel geometry. Reentry requires native arrival; unfinished visits retained." if geometry in MIDBLOCK_GEOMETRIES else "Same finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained. Reference uses constant-speed/gap model, not SUMO or production legacy.")}
             stream=BytesIO()
             with ZipFile(stream,"w") as z:
                 z.writestr("manifest.json",json.dumps(meta,indent=2))

@@ -151,11 +151,11 @@ def _midblock_worker(pipe, root, seed):
 
 
 class CyclicMidblockSession(LibsumoSession):
-    def __init__(self,seed,*,density,lean_worker=True):
+    def __init__(self,seed,*,density,lean_worker=True,geometry="midblock"):
         self._temp=TemporaryDirectory(prefix="mesh-midblock-")
         root=Path(self._temp.name)
         try:
-            self.phase_map=generate_midblock(root,seed,density)
+            self.phase_map=generate_midblock(root,seed,density,geometry=geometry)
             self.bounds=crossing_bounds(root/"network.xml",self.phase_map)
             self.slots=load_slots(root)
             self.ledger=CyclicLedger(self.slots)

@@ -186,7 +186,7 @@ class NativeProjection:
         self._metadata_cache = (snapshot,meta)
         return deepcopy(meta)
 
-    def scene(self, snapshot: ShadowSnapshot, source_id: str = "simulation_camera") -> dict:
+    def scene(self, snapshot: ShadowSnapshot, source_id: str = "simulation_camera", *, include_lanes=True) -> dict:
         if source_id not in VIEW_FLIPS:
             raise ValueError("Unknown native view")
         meta = self.metadata(snapshot)
@@ -197,7 +197,7 @@ class NativeProjection:
                     row["x"] = WIDTH - 1 - row["x"]
                 if flip in (0, -1):
                     row["y"] = HEIGHT - 1 - row["y"]
-        return {**meta, "lanes": deepcopy(self._lanes_by_view[source_id])}
+        return {**meta, **({"lanes": deepcopy(self._lanes_by_view[source_id])} if include_lanes else {})}
 
     def render_pixels(self, snapshot: ShadowSnapshot, *, indexed=False) -> tuple[dict, np.ndarray]:
         """One canonical image; callers may encode individual mirrored views."""

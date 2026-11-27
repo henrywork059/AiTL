@@ -392,7 +392,7 @@ class NativeCameraRelease(BaseModel):
 
 class NativeEvaluationStart(NativeEvaluationMutation):
     engine: Literal["native","reference"] = "native"
-    geometry: Literal["standard","compact","elongated","midblock"] = "standard"
+    geometry: Literal["standard","compact","elongated","midblock","midblock_compact","midblock_wide"] = "standard"
     density: Literal["light","normal","busy"] = "normal"
     seed: int = Field(default=42, ge=0, le=2147483647)
     mode: Literal["fixed","adaptive"] = "fixed"

@@ -76,3 +76,37 @@ def summarize_braking(timeline):
             "by_requested_phase":dict(sorted(Counter(row["phase"] for row,_ in events).items())),
             "physical_safety_validated":False}
 
+
+
+def vehicle_centerline_events(before,after,slots,bounds,already_counted):
+    """Legacy-style body centre crossing at the actual native crossing midpoint.
+
+    A native vehicle position is its front. Require consecutive observations of
+    the same journey, a direction-consistent movement and a bounded step.
+    This is an observed event, not an estimate of a missing journey or legacy
+    queue equivalence. The protected engine remains the sole movement owner.
+    """
+    import math
+    from app.services.sumo_midblock_fixture import LENGTHS
+    centre=sum(bounds)/2
+    if not math.isfinite(centre) or bounds[0]>=bounds[1]:
+        raise ValueError("Invalid native crossing midpoint")
+    prior={a.engine_id:a for a in before if a.kind=="vehicle"}
+    events=[]
+    for a in after:
+        old=prior.get(a.engine_id)
+        if a.kind!="vehicle" or old is None or a.engine_id in already_counted:
+            continue
+        slot=slots[a.engine_id.rsplit("_",1)[0]]
+        direction=1 if slot.route==("WC","CE") else -1
+        half=LENGTHS[slot.type_id]/2
+        x0=old.x_m-direction*half
+        x1=a.x_m-direction*half
+        # Allow numerical tolerance and the configured maximum speed, not an
+        # insertion/teleport jump. The worker independently rejects teleports.
+        displacement=math.hypot(a.x_m-old.x_m,a.y_m-old.y_m)
+        if displacement>max(slot.speed,old.speed_m_s,a.speed_m_s)*STEP_S+0.05:
+            continue
+        if (direction>0 and x0<centre<=x1) or (direction<0 and x0>centre>=x1):
+            events.append(a.engine_id)
+    return sorted(events)

@@ -22,6 +22,27 @@ LENGTHS = {"car":4.5,"suv":4.9,"van":6.0,"bus":12.0}
 WIDTHS = {"car":1.8,"suv":1.95,"van":2.1,"bus":2.5}
 MAX_LENGTH = max(LENGTHS.values())
 
+@dataclass(frozen=True)
+class MidblockGeometry:
+    """Bounded, synthetic metre-domain configuration; no camera calibration."""
+    road_half_length_m: int
+    walk_half_length_m: int
+    crossing_width_m: int
+
+# Preserve the existing default generated XML exactly. Additional variants
+# retain the same conflict topology and lane widths, changing only extents
+# and crossing width. No arbitrary network or road-controller input.
+MIDBLOCK_GEOMETRIES = {
+    "midblock": MidblockGeometry(150,20,4),
+    "midblock_compact": MidblockGeometry(80,20,4),
+    "midblock_wide": MidblockGeometry(150,25,6),
+}
+
+def midblock_geometry(name):
+    if name not in MIDBLOCK_GEOMETRIES:
+        raise ValueError("Unknown native midblock geometry")
+    return MIDBLOCK_GEOMETRIES[name]
+
 
 @dataclass(frozen=True)
 class Slot:
@@ -51,10 +72,11 @@ def slots_for(seed, density):
     return tuple(slots)
 
 
-def write_midblock(root: Path, seed, density):
+def write_midblock(root: Path, seed, density, *, geometry="midblock"):
+    dimensions=midblock_geometry(geometry)
     slots = slots_for(seed,density)
     nodes=ET.Element("nodes")
-    for ident,x,y in (("W",-150,0),("E",150,0),("N",0,20),("S",0,-20),("C",0,0)):
+    for ident,x,y in (("W",-dimensions.road_half_length_m,0),("E",dimensions.road_half_length_m,0),("N",0,dimensions.walk_half_length_m),("S",0,-dimensions.walk_half_length_m),("C",0,0)):
         ET.SubElement(nodes,"node",id=ident,x=str(x),y=str(y),type="traffic_light" if ident=="C" else "priority")
     edges=ET.Element("edges")
     for ident in sorted(ROAD_EDGES | WALK_EDGES):
@@ -73,7 +95,7 @@ def write_midblock(root: Path, seed, density):
     connections=ET.Element("connections")
     for first,last in sorted(STRAIGHT):
         ET.SubElement(connections,"connection",{"from":first,"to":last,"fromLane":"1","toLane":"1"})
-    ET.SubElement(connections,"crossing",node="C",edges="WC CW",priority="true",width="4")
+    ET.SubElement(connections,"crossing",node="C",edges="WC CW",priority="true",width=str(dimensions.crossing_width_m))
     routes=ET.Element("routes")
     for slot in slots:
         if slot.kind=="vehicle":
@@ -165,8 +187,8 @@ def occupancy(agents,mapping,bounds):
     return vehicle,pedestrian
 
 
-def generate_midblock(root,seed,density):
-    write_midblock(root,seed,density)
+def generate_midblock(root,seed,density,*,geometry="midblock"):
+    write_midblock(root,seed,density,geometry=geometry)
     binary=native_netconvert()
     env={**os.environ,"SUMO_HOME":str(binary.parent.parent)}
     version=subprocess.run([str(binary),"--version"],cwd=root,env=env,capture_output=True,text=True,check=True,timeout=15)
