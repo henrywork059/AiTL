@@ -314,11 +314,13 @@ class _ModeSimulation:
                 "manifest":deepcopy(self.protected_world.demand_manifest),
                 "vehicle_reentries":sum(self.protected_world.vehicle_visits), "pedestrian_reentries":sum(self.protected_world.pedestrian_visits)}
         if self._gate_metrics is not None:
+            from app.services.simulation_gate_reporting import normalized_report_metrics
             result["normalized_gate_evidence"] = {
                 "engine":"production_protected_experiment" if self.protected_world else "production_legacy_experiment",
                 "metric_contract":"normalized_physical_service_gate_v1",
                 "summary":self._gate_metrics.summary(),
                 "waiting_episodes":self._gate_metrics.waiting_episodes(),
+                "normalized_report_metrics":normalized_report_metrics(self._gate_timeline,self._gate_metrics.summary(),self._gate_metrics.waiting_episodes()),
                 "timeline":self._gate_timeline,
                 "geometry_demand_matched_to_native":False,
                 "demand_model":"protected_slots_v2" if self.protected_world else ("production_live_slots" if self.live_slot_demand else "historical_benchmark_slots"),

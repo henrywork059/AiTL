@@ -80,6 +80,8 @@ def main() -> int:
         assert common["engine"]=="production_legacy_experiment"
         assert len(common["timeline"])==150
         assert not common["geometry_demand_matched_to_native"]
+        assert not common["normalized_report_metrics"]["production_experiment_parity"]
+        assert common["normalized_report_metrics"]["duration_seconds"]==30.
         for kind,waits in common["waiting_episodes"].items():
             assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
         first = service.run(
@@ -179,8 +181,11 @@ def main() -> int:
             common=arm["normalized_gate_evidence"]
             assert len(common["timeline"])==450
             assert all(row["applied_phase"] in {row["phase"],"all_red"} for row in common["timeline"])
+            report=common["normalized_report_metrics"]
+            assert report["duration_seconds"]==90. and not report["production_experiment_parity"]
             for kind,waits in common["waiting_episodes"].items():
                 assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
+                assert report["waiting"][kind]["observed_agent_seconds"]==waits["observed_agent_seconds"]
         assert "fixed_applied_phase,adaptive_applied_phase" in live_service.export_csv(protected_first["run_id"])
         assert "fixed_applied_phase" not in live_service.export_csv(live_first["run_id"])
         assert live_service.get(protected_first["run_id"])==protected_first

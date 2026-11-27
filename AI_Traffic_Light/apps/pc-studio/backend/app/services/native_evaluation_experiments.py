@@ -75,3 +75,4 @@ def summarize_braking(timeline):
             "affected_journeys":len({event["agent_id"] for _,event in events}),
             "by_requested_phase":dict(sorted(Counter(row["phase"] for row,_ in events).items())),
             "physical_safety_validated":False}
+

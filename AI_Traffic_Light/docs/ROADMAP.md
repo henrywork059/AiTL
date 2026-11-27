@@ -234,3 +234,6 @@ Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect
 
 
 | 2026-11-27 | 28 / S04 camera lifecycle and publication boundary | Exact 6675fa01 standard/native CI passed. Generation-qualified camera release, status expiry, common direct/exact/capture frame qualification, selected cache exclusion and legacy fault handling implemented with focused regressions. New integrated CI pending. | Verify exact standard/native/renderer CI and inspect actual evidence before further integration. No default or release change. |
+
+
+| 2026-11-27 | 28 / S04 compatibility evaluation | Exact 3716a084 all three workflows passed; audited 36 PNGs, 10800 direct samples, six identical fixed exports, actual native screenshots and lease evidence. Added qualified semantic rectangle preview, synthetic footprint and palette baseline, normalized report distributions and metadata cache; new CI pending. | Verify actual CI, coordinate/metric limitations and owner resource acceptance; retain default. |

@@ -243,6 +243,10 @@ class Tests(unittest.TestCase):
                         self.assertEqual(metadata["observation_epoch"],identity["epoch"])
                         self.assertFalse(metadata["detector_input_eligible"])
                     self.assertEqual(exact.content,z.read("simulation_camera_c.png"))
+                    footprints=json.loads(z.read("synthetic_footprints.json"))
+                    self.assertEqual(footprints["layout_id"],layout)
+                    self.assertEqual(set(footprints["views"]),set(VIEW_FLIPS))
+                    self.assertFalse(footprints["detector_input_eligible"])
                 paused=assert_envelope(client.post(BASE+"/pause",json={**identity,"tick":1,"paused":True}))["data"]
                 self.assertTrue(paused["snapshot"]["paused"])
                 assert_envelope(client.post(BASE+"/step",json={**identity,"tick":1,"steps":1}),expected_status=409)

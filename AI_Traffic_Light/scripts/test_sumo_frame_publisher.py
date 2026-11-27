@@ -70,6 +70,11 @@ class Tests(unittest.TestCase):
             expected=projection.render(snap)[1]
             pub=NativeFramePublisher()
             pub.begin(1)
+            # Cached canonical metadata must be detached and scoped to the exact snapshot object.
+            cached=projection.metadata(snap)
+            cached["agents"].clear()
+            self.assertEqual(len(projection.metadata(snap)["agents"]),1)
+            self.assertEqual(projection.metadata(ShadowSnapshot(42,1,False,()))["agents"],[])
             with patch("app.services.sumo_frame_publisher.cv2.imencode",wraps=cv2.imencode) as encoder:
                 pub.prepare(meta,pixels,received_at_ms=42)
                 pixels[:]=0

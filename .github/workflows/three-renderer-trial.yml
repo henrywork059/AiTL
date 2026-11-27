@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/three-renderer-trial.yml'
       - '.github/scripts/sumo_migration_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation_geometry.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation.py'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/trials/**'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/roadGeometry.ts'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/RoadRenderer.ts'

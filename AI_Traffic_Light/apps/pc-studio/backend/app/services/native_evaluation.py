@@ -30,8 +30,11 @@ from app.services.sumo_projection import NativeProjection, Projection, PROVENANC
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
-from app.services.native_evaluation_geometry import region_counts
+from app.services.native_evaluation_geometry import region_counts, legacy_rectangle_preview
+from app.services.camera_frames import LEGACY_LAYOUT_ID
+from app.services.native_detector_validation import footprint_annotations
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair, vehicle_braking_sample, summarize_braking
+from app.services.simulation_gate_reporting import normalized_report_metrics
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
     REFERENCE_EVALUATION_ORIGIN, simulation_view_point)
 from app.services.simulation_reference_session import GeneratedReferenceSession
@@ -446,6 +449,7 @@ class NativeEvaluationService:
                         z.writestr("agents.csv",export_csv(meta))
                         observations=[self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS]
                         z.writestr("observations.json",json.dumps(observations,indent=2))
+                        z.writestr("synthetic_footprints.json",json.dumps(footprint_annotations(meta),indent=2))
                         z.writestr("detector_contract.json",json.dumps({"schema_version":1,"observation_kind":"synthetic_ground_truth",
                             "detector_input_eligible":False,"detector_observation":False,"authoritative":False,
                             "physical_output_allowed":False,"coordinate_space":meta["coordinate_space"],"layout_id":meta["layout_id"],
@@ -481,6 +485,7 @@ class NativeEvaluationService:
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
                 "demand_digest":self._demand_digest,"derived_metrics":summarize_timeline(self._timeline,self._metrics.summary()),
                 "waiting_episodes":self._metrics.waiting_episodes(),
+                "normalized_report_metrics":normalized_report_metrics(self._timeline,self._metrics.summary(),self._metrics.waiting_episodes()),
                 "demand_manifest":deepcopy(self._demand_manifest),
                 **({"demand_model":"native_cyclic_slots_v1","journey_manifest":[asdict(t) for t in self._trips],
                     "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current),
@@ -552,6 +557,23 @@ class NativeEvaluationService:
                      "canonical_polygon":canonical,"count_basis":"observed_agent_anchor","detector_input_eligible":False}
             return {**original,"canonical_polygon":canonical,"views":views,"count_basis":"observed_agent_anchor",
                     "legacy_editor_compatible":False,"region_profile":profile}
+
+    def preview_legacy_rectangle(self,*,epoch,generation,tick,source_id,legacy_layout_id,layout_id,polygon):
+        """Read-only semantic preview; original saved geometry is never written."""
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if legacy_layout_id!=LEGACY_LAYOUT_ID or layout_id!=self._projection.layout_id:
+                raise self._conflict("Legacy or native preview layout mismatch.")
+            if source_id not in VIEW_FLIPS:
+                raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
+            try:
+                mapping=legacy_rectangle_preview(self.scene()["snapshot"],polygon,source_id)
+            except (ValueError,TypeError) as exc:
+                raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
+            result=self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
+                coordinate_space="native_projection_v1",layout_id=layout_id,polygon=mapping["polygon"])
+            return {"mapping":mapping,"evaluation":result,"legacy_layout_id":legacy_layout_id,
+                    "native_layout_id":layout_id,"production_coordinate_parity":False}
 
     def evaluate_region_profile(self,*,epoch,generation,tick,source_id,profile):
         """Explicitly reuse a native-only profile across equivalent layouts.

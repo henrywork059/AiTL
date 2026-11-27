@@ -20,7 +20,8 @@ from sumo_migration_trial import processes
 from fastapi.testclient import TestClient
 from test_camera_simulation_api import build_test_app, assert_envelope
 from app.routes import camera as routes
-from app.services.camera_frames import CameraFrameService
+from app.services.camera_frames import CameraFrameService, LEGACY_LAYOUT_ID
+from app.services.native_detector_validation import footprint_annotations, palette_predictions, score_footprints
 from app.services.native_evaluation import NativeEvaluationService
 from app.services.sumo_midblock_fixture import generate_midblock
 from app.services.sumo_midblock_session import CyclicMidblockSession
@@ -54,6 +55,8 @@ def verify_export(result,expected_slots,horizon):
     assert not braking["physical_safety_validated"]
     for kind in ("vehicle","pedestrian"):
         waits=result["waiting_episodes"][kind]
+        report=result["normalized_report_metrics"]
+        assert not report["production_experiment_parity"] and report["waiting"][kind]["observed_agent_seconds"]==waits["observed_agent_seconds"]
         assert abs(sum(row[kind+"_queue"] for row in result["timeline"])*.2-waits["observed_agent_seconds"])<1e-6
     # An arrival without the required gate in the observed route is not a
     # valid midblock journey. Validate BOTH pedestrian approach directions.
@@ -160,6 +163,18 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                     assert exact.status_code==200 and exact.content==z.read(sid+".png")
                     assert exact.headers["x-layout-id"]==scene["layout_id"] and exact.headers["x-observation-origin"]=="synthetic_sumo_projection"
                     assert exact.headers["x-detector-input-eligible"]=="false" and exact.headers["x-coordinate-space"]=="native_projection_v1"
+                annotations=json.loads(z.read("synthetic_footprints.json"))
+                assert annotations==footprint_annotations(scene)
+                scores={sid:score_footprints(annotations["views"][sid],palette_predictions(z.read(sid+".png"))) for sid in VIEW_FLIPS}
+                assert all(x["truth_count"]==len(scene["agents"]) and not x["production_detector_validated"] for x in scores.values())
+                (out/"palette-detector-evaluation.json").write_text(json.dumps({"method":"exact_palette_components_not_trained_model","views":scores},indent=2),encoding="utf-8")
+                preview={**params,"source_id":"simulation_camera","legacy_layout_id":LEGACY_LAYOUT_ID,
+                         "layout_id":scene["layout_id"],"polygon":[[520,179],[760,179],[760,625],[520,625]]}
+                converted=assert_envelope(client.post(BASE+"/region/legacy-preview",json=preview))["data"]
+                assert not converted["production_coordinate_parity"] and not converted["mapping"]["persisted"]
+                assert converted["mapping"]["original_polygon"]==preview["polygon"]
+                assert_envelope(client.post(BASE+"/region/legacy-preview",json={**preview,"legacy_layout_id":"0"*64}),expected_status=409)
+                (out/"legacy-rectangle-preview.json").write_text(json.dumps(converted,indent=2),encoding="utf-8")
                 draft={**params,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":scene["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
                 regions=assert_envelope(client.post(BASE+"/region/views",json=draft))["data"]
                 assert set(regions["views"])==set(VIEW_FLIPS) and not regions["persisted"]

@@ -307,3 +307,12 @@ Native exact frame identity now belongs to the immutable CameraFrame, not just H
 ### S04 native workspace lifecycle hardening
 
 A generation-qualified release cannot retire a reset session under the same workspace token. Status reads synchronously enforce lease expiry in addition to watchdog cleanup. All native evaluation image paths use one owner qualification check, including temporary capture ZIP creation; invalid qualification fails closed. CameraFrameService refuses evaluation-only frames at cached-upload promotion and faulted legacy exact reads. This does not grant detector or signal authority or establish production geometry equivalence.
+
+
+### S04 compatibility evaluation
+
+Native midblock evaluation supports read-only landmark-based legacy rectangle previews; scale is nonuniform and synthetic, not physical calibration. Offline raster footprint annotations and palette component scoring provide detector-coordinate validation, not trained-model accuracy; no production detector cache use. One immutable snapshot's canonical metadata is cached and returned detached, retiring it on replacement by a different snapshot object. Native normalized reports reuse legacy statistical distribution formatting without equating queue/visit semantics.
+
+The same normalized report generator is now consumed by the existing opt-in legacy/protected benchmark evidence and native evaluation export; original legacy metrics and CSVs remain unchanged. Snapshot metadata cache publishes an atomic (snapshot, metadata) pair for overlapping diagnostic reads.
+
+Offline `scripts/native_detector_evaluation.py --capture <zip>` scores palette components; optional `--model <trusted-existing-local.pt>` executes that explicit model on CPU through the existing box converter without creating a live inference service or updating any cache. Reports model SHA-256, mapped and unmapped classes, one-to-one IoU matching and limitations. No trained model available in this development environment; mock conversion regression only, no YOLO accuracy claim.

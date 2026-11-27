@@ -132,6 +132,7 @@ class NativeProjection:
         self._slot_profiles = deepcopy(slot_profiles) if slot_profiles is not None else None
         # Scene-only runs do not allocate the full raster.
         self._background = None
+        self._metadata_cache = None
         # Static geometry is projected once per generation and view. Public
         # scenes receive detached lane data, so consumers cannot mutate the cache.
         self._lanes_by_view = {
@@ -154,6 +155,11 @@ class NativeProjection:
     def metadata(self, snapshot: ShadowSnapshot) -> dict:
         if snapshot.provenance != "synthetic_sumo_shadow":
             raise ValueError("Unexpected observation provenance")
+        # The adapter owns immutable snapshots. Cache only the current object,
+        # never a tick key that could alias another seed or retired observation.
+        cached = self._metadata_cache
+        if cached is not None and snapshot is cached[0]:
+            return deepcopy(cached[1])
         rows = []
         for a in snapshot.agents:
             x, y = self.layout.pixel(a.x_m, a.y_m)
@@ -170,11 +176,15 @@ class NativeProjection:
                     row.update(vehicle_type=profile["vehicle_type"],length_m=profile["length_m"],
                                width_m=profile["width_m"],eastbound=profile["eastbound"])
             rows.append(row)
-        return {"schema_version": 1, "provenance": self.provenance, "generation": self.generation,
+        meta = {"schema_version": 1, "provenance": self.provenance, "generation": self.generation,
                 "coordinate_space": "native_projection_v1", "layout_id": self.layout_id,
                 "seed": snapshot.seed, "tick": snapshot.tick, "time_s": snapshot.time_s,
                 "paused": snapshot.paused, "width": WIDTH, "height": HEIGHT,
                 "bounds_m": self.layout.bounds, "pixels_per_m": self.layout.scale, "agents": rows}
+        # Publish snapshot and metadata together: shadow scene-only reads can
+        # overlap encoder reads. Never expose a mismatched pair.
+        self._metadata_cache = (snapshot,meta)
+        return deepcopy(meta)
 
     def scene(self, snapshot: ShadowSnapshot, source_id: str = "simulation_camera") -> dict:
         if source_id not in VIEW_FLIPS:
