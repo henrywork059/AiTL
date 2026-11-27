@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
       YOLO_AUTOINSTALL: 'false'
       HF_HUB_OFFLINE: '1'
       WANDB_MODE: disabled
@@ -47,6 +46,8 @@ jobs:
           curl --fail --location --proto '=https' --proto-redir '=https' --max-time 120 --max-filesize 5613764 -o "$RUNNER_TEMP/yolo11n.pt" https://huggingface.co/Ultralytics/YOLO11/resolve/5599de6f3b0ef95f98f37530ed0f3bf149c10b37/yolo11n.pt
           echo '0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1  '"$RUNNER_TEMP/yolo11n.pt" | sha256sum -c -
       - name: Execute actual pretrained reference inference (exploratory only)
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
         run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$RUNNER_TEMP/reference-captures" --model "$RUNNER_TEMP/yolo11n.pt" --confidence .1 --iou .5 --output "$RUNNER_TEMP/reference-evidence/reference-detector.json"
       - name: Independently reconcile raw model outputs with frozen annotations
         run: python .github/scripts/native_reference_detector_trial.py verify --root "$RUNNER_TEMP/reference-captures" --evidence "$RUNNER_TEMP/reference-evidence"
