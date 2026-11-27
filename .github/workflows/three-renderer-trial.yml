@@ -92,3 +92,4 @@ jobs:
             ${{ runner.temp }}/mesh-renderer.png
             ${{ runner.temp }}/mesh-native-fixture.png
             ${{ runner.temp }}/mesh-native-fixture-detail.png
+            ${{ runner.temp }}/mesh-workspace-*.png

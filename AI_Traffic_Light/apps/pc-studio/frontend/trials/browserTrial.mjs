@@ -17,6 +17,16 @@ try {
   const png=resolve(process.env.RUNNER_TEMP||'.','mesh-renderer.png');
   const shot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-shot','--screenshot='+png,url],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(shot.status!==0||!existsSync(png)||readFileSync(png).length<1000)throw new Error('Screenshot missing');
+  for(const [page,width,height] of [['dashboard',1440,1000],['diagnostics',600,900],['network',1440,1000],['models',600,900]]){
+    const workspaceUrl='http://127.0.0.1:4179/workspace.html?page='+page;
+    const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=3000'];
+    const dom=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-'+page,'--dump-dom',workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
+    if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
+    const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'.png');
+    const shot=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-shot-'+page,'--screenshot='+target,workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
+    if(shot.status!==0||!existsSync(target)||readFileSync(target).length<1000)throw Error('Workspace screenshot missing: '+page);
+  }
+  console.log('[PASS] desktop/mobile production workspace components with synthetic API fixtures and screenshot evidence');
   console.log('[PASS] actual headless WebGL draw, top view, context loss callback, repeated disposal and screenshot');
   const integration=spawnSync(edge,[...args,'--user-data-dir='+profile+'-integration','--dump-dom','http://127.0.0.1:4179/integration.html'],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(integration.status!==0||!integration.stdout.includes('<div id="result">MESH_INTEGRATION_PASS</div>'))throw new Error('Production integration trial failed: '+integration.stdout.slice(-2000)+' '+integration.stderr.slice(-1500));

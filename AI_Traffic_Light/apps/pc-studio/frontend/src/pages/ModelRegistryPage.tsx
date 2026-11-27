@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, saveRuntimeSettings, uploadInferenceModel, setDefaultModel, unloadInferenceModel } from "../api";
+import { deleteModel, fetchInferenceStatusStrict, fetchModelRegistryStrict, loadInferenceModel, saveRuntimeSettings, uploadInferenceModel, setDefaultModel, unloadInferenceModel } from "../api";
 import type { InferenceStatus, ModelRegistryStatus, RuntimeSettings } from "../types";
 
 function errorMessage(error: unknown): string {
@@ -29,12 +29,14 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadId, setUploadId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [modelFilter, setModelFilter] = useState("");
+  const visibleModels = (registry?.models ?? []).filter(model => model.model_id.toLowerCase().includes(modelFilter.trim().toLowerCase())).sort((a,b) => Number(b.is_active)-Number(a.is_active) || Number(b.is_default)-Number(a.is_default) || a.model_id.localeCompare(b.model_id));
 
   useEffect(() => setDefaultConfidence(runtimeSettings.default_confidence), [runtimeSettings.default_confidence]);
   useEffect(() => setInferenceInterval(runtimeSettings.inference_interval_ms), [runtimeSettings.inference_interval_ms]);
 
   const refresh = useCallback(async () => {
-    const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistry(), fetchInferenceStatus()]);
+    const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistryStrict(), fetchInferenceStatusStrict()]);
     setRegistry(nextRegistry);
     setInferenceStatus(nextInference);
   }, []);
@@ -170,10 +172,12 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
             <h2>Installed AI models</h2>
             <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
           </div>
-          <span className="status-pill muted">{registry?.total ?? 0} models</span>
+          <span className="status-pill muted">{registry ? `${registry.total} models` : "Unavailable"}</span>
         </div>
+        <label className="workspace-model-filter">Find model <input type="search" value={modelFilter} onChange={event => setModelFilter(event.target.value)} placeholder="Model ID" /></label>
+        {registry && registry.models.length > 0 && !visibleModels.length && <p role="status">No matching models.</p>}
         <div className="model-list-grid">
-          {(registry?.models ?? []).map((model) => (
+          {visibleModels.map((model) => (
             <article className="smoke-card" key={model.model_id}>
               <div className="panel-header compact-header">
                 <strong>{model.model_id}</strong>
@@ -196,6 +200,7 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
         </div>
       </section>
 
+      <div className="workspace-split">
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -245,7 +250,7 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
           </button>
         </div>
       </section>
-
+      </div>
     </div>
   );
 }

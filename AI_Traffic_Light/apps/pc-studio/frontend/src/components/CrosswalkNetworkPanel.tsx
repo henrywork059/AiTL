@@ -331,7 +331,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
       <div className="panel crossing-network-toolbar">
         <div className="panel-header">
           <div>
-            <h2>Network</h2>
+            <h2>Crossing topology</h2>
             <p className="placeholder-copy">Saved crossings appear automatically. Drag one numbered edge label to another crossing’s edge label to connect them.</p>
           </div>
           <div className="button-row">
@@ -348,7 +348,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
           <span><strong>{crosswalks.filter((item) => item.camera_side_a_id || item.camera_side_b_id).length}</strong> with assigned cameras</span>
           <span><strong>{countsByCrosswalk.size}</strong> currently observed</span>
         </div>
-        <p className="small-note">Each saved crosswalk has its own software-only controller. Real ESP cameras can drive a clearly labeled virtual signal preview, not a physical traffic light. Network links do not yet define conflicting movements or coordinate adjacent controllers.</p>
+        <p className="small-note">Each saved crosswalk has its own software-only controller. Real ESP cameras can drive a clearly labeled virtual signal preview, not a physical traffic light. Configured links are not measured traffic flow. Virtual coordination requires explicit movement conflicts.</p>
         {dirty && <p className="small-note" role="status">Unsaved Network changes</p>}
         {notice && <p className="success-message" role="status">{notice}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
@@ -357,7 +357,8 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
       <div className="crossing-network-layout">
         <div className="panel crossing-network-map">
           <div className="panel-header"><h3>Crossing map</h3><span className="small-note">Drag a title to move · Drag edge label to edge label to connect</span></div>
-          <div className="crossing-network-scroll">
+          <div className="workspace-network-controls"><label>Inspect crossing <select value={selected?.id ?? ""} onChange={event => setSelectedId(event.target.value)} disabled={!crosswalks.length}>{!crosswalks.length && <option value="">No crossings</option>}{crosswalks.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><p className="small-note">Scroll the map for all crossings. Use Enter or Space on two edge labels to connect them.</p></div>
+          <div className="crossing-network-scroll" tabIndex={0} role="region" aria-label="Scrollable crossing map">
             <div ref={canvasRef} className="crossing-network-canvas" style={{ height: canvasHeight }}
               onPointerMove={moveDrag}
               onPointerUp={(event) => { if (!finishConnection(event)) endDrag(event); }}
@@ -435,7 +436,7 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
                 );
               })}
               {crosswalks.length === 0 && <div className="crossing-network-empty">
-                No crossings yet. Add and save one under Traffic → Crosswalks; a new box appears here automatically.
+                No crossings yet. Add and save one under Network → Crosswalks; a new box appears here automatically.
               </div>}
             </div>
           </div>

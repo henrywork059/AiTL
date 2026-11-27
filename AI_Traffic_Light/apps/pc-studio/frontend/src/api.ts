@@ -312,6 +312,8 @@ export async function loadInferenceModel(modelId: string | null): Promise<Infere
   return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/load`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
 }
 export async function unloadInferenceModel(): Promise<InferenceStatus> { return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/unload`, { method: "POST" }); }
+export async function fetchModelRegistryStrict(): Promise<ModelRegistryStatus> { return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models`); }
+export async function fetchInferenceStatusStrict(): Promise<InferenceStatus> { return requestJsonStrict<InferenceStatus>(`${API_BASE}/api/inference/status`); }
 export async function fetchModelRegistry(): Promise<ModelRegistryStatus> { return requestJson<ModelRegistryStatus>(`${API_BASE}/api/models`, fallbackModelRegistryStatus); }
 export async function setDefaultModel(modelId: string): Promise<ModelRegistryStatus> {
   return requestJsonStrict<ModelRegistryStatus>(`${API_BASE}/api/models/default`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });

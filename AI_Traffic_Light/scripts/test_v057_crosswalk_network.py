@@ -77,7 +77,7 @@ def main() -> None:
     panel = (src / "components/CrosswalkNetworkPanel.tsx").read_text(encoding="utf-8")
     page = (src / "pages/JunctionNetworkPage.tsx").read_text(encoding="utf-8")
     assert 'label: "Network"' in nav
-    traffic = nav.split('id: "traffic", label: "Traffic"', 1)[1].split("] }", 1)[0]
+    traffic = nav.split('id: "traffic", label: "Network"', 1)[1].split("] }", 1)[0]
     assert traffic.index("PAGE_DETAILS.crosswalks") < traffic.index("PAGE_DETAILS.junction_network")
     assert "<CrosswalkNetworkPanel" in page
     assert "crosswalks.map((crosswalk" in panel

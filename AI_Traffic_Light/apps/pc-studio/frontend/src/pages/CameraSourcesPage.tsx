@@ -569,7 +569,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             </>
           )}
           {cameraSettingsView && (
-            <div className="camera-status-list">
+            <div className="camera-status-list" aria-label="Selected camera status">
               <div><span>Preview camera</span><strong>{selectedSaved ? selectedId : "Select a saved camera"}</strong></div>
               <div><span>IP address</span><strong>{selectedSimulation ? "Not required" : selectedSaved ? selectedProfile?.host ?? "—" : "—"}</strong></div>
               <div><span>Live connection</span><strong>{selectedActive ? selectedIndicator?.label ?? "—" : "Not active"}</strong></div>
@@ -580,7 +580,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         </section>
 
         {cameraSettingsView && (
-        <aside className="side-column">
+        <aside className="side-column workspace-device-controls">
           <section className="panel compact-panel training-form">
             <div className="panel-header">
               <div>

@@ -129,18 +129,14 @@ export function CameraDiagnosticsPage() {
 
   return (
     <div className="page-stack">
-      <div className="two-column-grid">
+      <div className="workspace-split">
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>Deep one-click camera test</h2>
-              <p className="placeholder-copy">
-                One button selects the correct diagnostic engine. Normal AiTL firmware runs production checks; R5 firmware runs the
-                transport matrix plus R7/R8 timing, payload and receiver isolation; R9 firmware compares the current manual sender with
-                the older esp_http_server architecture, a Pi-style latest-frame cache and camera-free TCP controls.
-              </p>
+              <h2>Camera diagnostic</h2>
+              <p className="placeholder-copy">Test the selected ESP camera, transport and stream stability.</p>
             </div>
-            <span className="status-pill status-info">V038 R9 architecture</span>
+            <span className="status-pill muted">{running ? "Running" : "On demand"}</span>
           </div>
 
           <div className="settings-list">
@@ -150,10 +146,10 @@ export function CameraDiagnosticsPage() {
             <div><span>Current state</span><code>{activeProfile?.streaming ? "streaming" : activeProfile?.connected ? "connected" : "idle"}</code></div>
           </div>
 
-          <p className="small-note">
+          <details className="workspace-disclosure"><summary>Diagnostic firmware and architecture options</summary><p className="small-note">
             R7/R8 reuse R5 firmware without another flash. The R9 architecture comparison is different: flash the dedicated
             <code> AiTL_ESP32_CAM_ARCH_DIAG </code> sketch first, then press Diagnose camera. R9 is diagnostic-only and does not replace production firmware.
-          </p>
+          </p></details>
 
           <div className="button-row">
             <button className="primary" type="button" onClick={() => void diagnose()} disabled={running || !activeProfile}>
@@ -161,8 +157,8 @@ export function CameraDiagnosticsPage() {
             </button>
           </div>
 
-          {!activeProfile && <p className="error-message">Save and select an ESP camera in Camera Sources first.</p>}
-          {error && <p className="error-message">{error}</p>}
+          {!activeProfile && <p className="error-message">Save and select an ESP camera in Devices → Cameras first.</p>}
+          {error && <p className="error-message" role="alert">{error}</p>}
 
           {running && progress && (
             <div className="settings-list">

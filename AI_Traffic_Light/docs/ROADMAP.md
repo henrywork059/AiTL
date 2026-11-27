@@ -248,3 +248,5 @@ Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect
 
 
 | 2026-11-27 | 28 / S04 migration closure | Exact 1d269325 all CI passed; audited actual episode/region/palette evidence. Corrected production UI assignment semantics, added qualified multi-region preview and offline detector region comparison, actual legacy substep waits and browser/actual native regression. Freeze optional simulation refinements. | Verify exact CI, complete owner-supplied weights/calibration/metric and resource acceptance; no candidate release until gates pass. |
+
+| 2026-11-27 | Independent P4 batch 2 | Prior native and renderer CI passed; standard failed stale Traffic group assertion. Correct navigation regression, responsive device/diagnostic and model layout, crossing inspector selector, model filtering and qualified workspace browser evidence. | New exact standard/browser CI required; S04 remains open and legacy default retained; no candidate increment until validation. |
