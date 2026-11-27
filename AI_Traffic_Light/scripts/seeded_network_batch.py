@@ -14,6 +14,8 @@ from app.services.network_simulation_experiments import NetworkSimulationExperim
 from app.services.signal_rules import SignalRulesService
 
 MODES = ("fixed", "adaptive", "cooperative")
+FAIRNESS_MODES = (*MODES, "pedestrian_aware_cooperative")
+DEFAULT_SEEDS = (42, 43, 73, 101)
 METRICS = ("total_vehicle_wait_seconds", "total_pedestrian_wait_seconds",
            "total_vehicle_queue_average", "total_pedestrian_queue_average",
            "corridor_completed", "max_observed_pedestrian_wait_seconds")
@@ -43,11 +45,36 @@ def deltas(metrics):
             for candidate, baseline in (("adaptive", "fixed"), ("cooperative", "fixed"), ("cooperative", "adaptive"))}
 
 
+def fairness(result):
+    """Keep per-junction outcomes and overlay activity separate from primary metrics."""
+    rows = []
+    for mode in FAIRNESS_MODES:
+        arm = result[mode]
+        net = arm["network_metrics"]
+        for intersection_id, intersection in sorted(arm["intersections"].items()):
+            metrics = intersection["metrics"]
+            waiting = metrics["waiting"]["pedestrian"]
+            throughput = metrics["throughput"]
+            rows.append({"mode": mode, "intersection_id": intersection_id,
+                         "pedestrian_arrivals": throughput["external_pedestrian_arrivals"],
+                         "pedestrians_served": throughput["pedestrians_served"],
+                         "pedestrian_wait_count": waiting["count"],
+                         "pedestrian_wait_person_seconds": waiting["total_seconds"],
+                         "pedestrian_max_wait_seconds": waiting["max_seconds"],
+                         "pedestrian_p95_wait_seconds": waiting["p95_seconds"],
+                         "vehicle_wait_vehicle_seconds": metrics["waiting"]["vehicle"]["total_seconds"],
+                         "vehicle_green_seconds": metrics["signal"]["phase_time_seconds"].get("vehicle_green", 0),
+                         "pedestrian_green_seconds": metrics["signal"]["phase_time_seconds"].get("pedestrian_green", 0),
+                         "network_coordination_seconds_added": net["coordination"]["timing_seconds_added"],
+                         "network_pedestrian_awareness_applied": net["pedestrian_awareness"]["applied"]})
+    return rows
+
+
 def write_json(path, data):
     path.write_text(json.dumps(data, indent=2, sort_keys=True, allow_nan=False), encoding="utf-8")
 
 
-def execute(output, seeds=(42, 43), densities=DENSITIES, duration=120):
+def execute(output, seeds=DEFAULT_SEEDS, densities=DENSITIES, duration=120):
     if os.environ.get("AITL_SIGNAL_RULES"):
         raise ValueError("Unset AITL_SIGNAL_RULES before isolated experiment")
     if not seeds or len(set(seeds)) != len(seeds) or not densities or len(set(densities)) != len(densities) or set(densities) - set(DENSITIES):
@@ -55,6 +82,7 @@ def execute(output, seeds=(42, 43), densities=DENSITIES, duration=120):
     output.mkdir(parents=True, exist_ok=False)
     network, zones = fixture()
     records = []
+    fairness_records = []
     with TemporaryDirectory(prefix="mesh_seeded_batch_") as temporary:
         root = Path(temporary)
         policy = SignalRulesService(config_path=root / "rules.json", history_path=root / "history.json",
@@ -76,13 +104,19 @@ def execute(output, seeds=(42, 43), densities=DENSITIES, duration=120):
                 write_json(output / (case + ".json"), result)
                 (output / (case + "-timeline.csv")).write_text(service.export_csv(result["run_id"]), encoding="utf-8")
                 (output / (case + "-decisions.csv")).write_text(service.export_evidence_csv(result["run_id"]), encoding="utf-8")
+                local_fairness = fairness(result)
+                fairness_records.extend({"density": density, "seed": seed, "demand_sha256": plan, **row} for row in local_fairness)
+                secondary = {key: result["pedestrian_aware_cooperative"]["network_metrics"][key] for key in METRICS}
                 records.append({"density": density, "seed": seed, "demand_sha256": plan,
+                                "pedestrian_aware_metrics": secondary,
+                                "pedestrian_aware_minus_cooperative": {key: round(secondary[key] - metrics["cooperative"][key], 6) for key in METRICS},
                                 "run_id": result["run_id"], "metrics": metrics, "paired_deltas": deltas(metrics)})
         first = records[0]
         repeat = run(first["seed"], first["density"])
         repeat_ok = primary(repeat) == first["metrics"] and repeat["scenario"]["arrival_plan"]["fingerprint_sha256"] == first["demand_sha256"]
+        repeat_fairness_ok = fairness(repeat) == fairness(json.loads((output / f"{first['density']}-{first['seed']}.json").read_text(encoding="utf-8")))
         write_json(output / "repeat.json", repeat)
-        if not repeat_ok:
+        if not repeat_ok or not repeat_fairness_ok:
             raise ValueError("Repeat demand or primary metrics differ")
     groups = {density: [r for r in records if r["density"] == density] for density in densities}
     summary = {density: {pair: {metric: {"mean": mean(values), "min": min(values), "max": max(values),
@@ -95,6 +129,10 @@ def execute(output, seeds=(42, 43), densities=DENSITIES, duration=120):
         for r in records:
             for mode in MODES:
                 writer.writerow([r["density"], r["seed"], r["demand_sha256"], mode, *[r["metrics"][mode][k] for k in METRICS]])
+    with (output / "intersection-fairness.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(fairness_records[0]))
+        writer.writeheader()
+        writer.writerows(fairness_records)
     manifest = {"schema_version": 1, "evidence_class": "actually_executed_synthetic_queue_model",
                 "physical_output_allowed": False, "settings": {"duration_seconds": duration,
                 "sample_interval_seconds": 2, "seeds": list(seeds), "densities": list(densities),
@@ -106,6 +144,9 @@ def execute(output, seeds=(42, 43), densities=DENSITIES, duration=120):
                           "corridor_completed": "vehicles", "max_observed_pedestrian_wait_seconds": "seconds"},
                 "records": records, "paired_summary_by_density": summary,
                 "repeat_primary_metrics_and_demand_equal": repeat_ok,
+                "repeat_intersection_fairness_equal": repeat_fairness_ok,
+                "fairness_modes": list(FAIRNESS_MODES),
+                "fairness_scope": "Per-intersection waits include unfinished waits at horizon. Network overlay columns repeat across intersections and must not be summed. Pedestrian-aware cooperative is a secondary existing policy, not a replacement or tuned winner.",
                 "limitations": "Restricted synthetic queue model; same exogenous arrivals across three primary policies; policy-dependent transfers. Other existing service arms retained in raw exports. Small seed sample, range not confidence interval; no native/legacy or field superiority claim.",
                 "sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(output.iterdir()) if p.is_file()}}
     write_json(output / "manifest.json", manifest)
@@ -117,5 +158,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--duration", type=int, default=120, choices=(30, 60, 120, 240))
+    parser.add_argument("--seeds", type=int, nargs="+", default=DEFAULT_SEEDS)
     args = parser.parse_args()
-    execute(args.output, duration=args.duration)
+    execute(args.output, seeds=tuple(args.seeds), duration=args.duration)

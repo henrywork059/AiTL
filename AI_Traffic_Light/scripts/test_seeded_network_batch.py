@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from seeded_network_batch import execute, MODES, METRICS
+from seeded_network_batch import execute, MODES, METRICS, FAIRNESS_MODES
 
 class SeededBatchTest(unittest.TestCase):
     def test_real_paired_smoke(self):
@@ -13,6 +13,7 @@ class SeededBatchTest(unittest.TestCase):
             out = Path(temporary) / "evidence"
             manifest = execute(out, seeds=(42,), densities=("normal",), duration=30)
             self.assertTrue(manifest["repeat_primary_metrics_and_demand_equal"])
+            self.assertTrue(manifest["repeat_intersection_fairness_equal"])
             self.assertFalse(manifest["physical_output_allowed"])
             row = manifest["records"][0]
             raw = json.loads((out / "normal-42.json").read_text(encoding="utf-8"))
@@ -23,6 +24,17 @@ class SeededBatchTest(unittest.TestCase):
             for item in rows:
                 for key in METRICS:
                     self.assertEqual(float(item[key]), raw[item["mode"]]["network_metrics"][key])
+            with (out / "intersection-fairness.csv").open(encoding="utf-8") as source:
+                fairness = list(csv.DictReader(source))
+            self.assertEqual(len(fairness), len(FAIRNESS_MODES) * 2)
+            self.assertEqual({r["mode"] for r in fairness}, set(FAIRNESS_MODES))
+            for item in fairness:
+                local = raw[item["mode"]]["intersections"][item["intersection_id"]]["metrics"]
+                self.assertEqual(float(item["pedestrian_wait_person_seconds"]), local["waiting"]["pedestrian"]["total_seconds"])
+                self.assertEqual(int(item["pedestrians_served"]), local["throughput"]["pedestrians_served"])
+                self.assertEqual(item["demand_sha256"], row["demand_sha256"])
+            for key in METRICS:
+                self.assertAlmostEqual(row["pedestrian_aware_minus_cooperative"][key], raw["pedestrian_aware_cooperative"]["network_metrics"][key] - raw["cooperative"]["network_metrics"][key])
             for name, digest in manifest["sha256"].items():
                 self.assertEqual(hashlib.sha256((out / name).read_bytes()).hexdigest(), digest)
             for key in METRICS:

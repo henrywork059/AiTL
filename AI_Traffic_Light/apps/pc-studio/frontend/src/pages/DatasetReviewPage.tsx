@@ -37,7 +37,8 @@ export function DatasetReviewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelRevision, setLabelRevision] = useState(0);
-  const [decodedImage, setDecodedImage] = useState<{captureId: string; revision: number; url: string} | null>(null);
+  const [loadedLabelRevision, setLoadedLabelRevision] = useState<number | null>(null);
+  const [decodedImage, setDecodedImage] = useState<{captureId: string; revision: number; width: number; height: number; url: string} | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [listAvailable, setListAvailable] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -49,9 +50,9 @@ export function DatasetReviewPage() {
   );
 
   const busy = loading || refreshing || saving || deleting || building;
-  const currentDocument = selectedCapture && labelDocument?.capture_id === selectedCapture.capture_id && labelDocument.width === selectedCapture.width && labelDocument.height === selectedCapture.height ? labelDocument : null;
+  const currentDocument = loadedLabelRevision === labelRevision && selectedCapture && labelDocument?.capture_id === selectedCapture.capture_id && labelDocument.width === selectedCapture.width && labelDocument.height === selectedCapture.height ? labelDocument : null;
 
-  const imageReady = Boolean(selectedCapture && decodedImage?.captureId === selectedCapture.capture_id && decodedImage.revision === labelRevision);
+  const imageReady = Boolean(selectedCapture && decodedImage?.captureId === selectedCapture.capture_id && decodedImage.revision === labelRevision && decodedImage.width === selectedCapture.width && decodedImage.height === selectedCapture.height && currentDocument);
 
   async function refreshCaptures(preferredCaptureId?: string | null) {
     const data = await fetchDatasetCapturesStrict();
@@ -76,10 +77,16 @@ export function DatasetReviewPage() {
     setRefreshing(true);
     try {
       await refreshCaptures(selectedCaptureId);
-      await refreshTrainingDataset();
+      // Invalidate the previous document and object URL before requesting the next revision.
+      setLabelDocument(null);
+      setLoadedLabelRevision(null);
       setDecodedImage(null);
+      setImageError(null);
       setLabelRevision(value => value + 1);
       setError(null);
+      // Dataset-build status is independent of the capture list and review retry.
+      try { await refreshTrainingDataset(); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : "Managed dataset status unavailable."); }
     } catch (nextError) {
       setListAvailable(false);
       setError(nextError instanceof Error ? nextError.message : "Capture list could not be refreshed.");
@@ -102,9 +109,10 @@ export function DatasetReviewPage() {
 
   useEffect(() => {
     setLabelDocument(null);
+    setLoadedLabelRevision(null);
     setLabels([]);
     setDirty(false);
-    if (!selectedCaptureId) { setLabelLoading(false); return; }
+    if (!selectedCaptureId || !selectedCapture) { setLabelLoading(false); return; }
     setLabelLoading(true);
     const scope = createPollingScope();
     setError(null);
@@ -112,7 +120,9 @@ export function DatasetReviewPage() {
       .then((document) => {
         if (!scope.isCurrent()) return;
         if (document.capture_id !== selectedCaptureId) throw new Error("Label response capture identity mismatch.");
+        if (document.width !== selectedCapture.width || document.height !== selectedCapture.height) throw new Error("Label response dimensions differ from capture.");
         setLabelDocument(document);
+        setLoadedLabelRevision(labelRevision);
         setLabels(document.labels);
         setDirty(false);
       })
@@ -121,7 +131,7 @@ export function DatasetReviewPage() {
         setError(nextError instanceof Error ? nextError.message : "Labels could not be loaded.");
       }).finally(() => { if (scope.isCurrent()) setLabelLoading(false); });
     return () => scope.retire();
-  }, [selectedCaptureId, labelRevision]);
+  }, [selectedCaptureId, selectedCapture?.width, selectedCapture?.height, labelRevision]);
 
   useEffect(() => {
     setDecodedImage(null);
@@ -141,17 +151,18 @@ export function DatasetReviewPage() {
         url = URL.createObjectURL(blob);
         const image = new Image();
         image.src = url;
-        await image.decode();
+        try { await image.decode(); }
+        catch { throw new Error("Captured image could not be decoded."); }
         if (!scope.isCurrent()) return;
         if (image.naturalWidth !== width || image.naturalHeight !== height) throw new Error("Captured image dimensions differ from labels.");
-        setDecodedImage({captureId, revision: labelRevision, url});
+        setDecodedImage({captureId, revision: labelRevision, width, height, url});
       } catch (reason) {
         if (scope.isCurrent()) setImageError(reason instanceof Error ? reason.message : "Captured image could not be decoded.");
         if (url) { URL.revokeObjectURL(url); url = null; }
       }
     }
     void loadImage();
-    return () => { scope.retire(); if (url) URL.revokeObjectURL(url); };
+    return () => { scope.retire(); if (url) { URL.revokeObjectURL(url); url = null; } };
   }, [selectedCaptureId, selectedCapture?.width, selectedCapture?.height, Boolean(currentDocument), listAvailable, labelRevision]);
 
   function updateLabels(nextLabels: DatasetLabelBox[]) {
@@ -247,6 +258,7 @@ export function DatasetReviewPage() {
                   if (dirty && !window.confirm("Discard unsaved label changes and switch images?")) return;
                   setDecodedImage(null);
                   setLabelDocument(null);
+                  setLoadedLabelRevision(null);
                   setLabels([]);
                   setDirty(false);
                   setSelectedCaptureId(capture.capture_id);

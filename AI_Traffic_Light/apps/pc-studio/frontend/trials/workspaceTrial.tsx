@@ -23,8 +23,11 @@ const model={model_id:"fixture_model",model_path:"outputs/training/fixture_model
 const classes=[{id:0,name:"vehicle"}];
 const captureList=["cap_a","cap_b"].map(id=>({capture_id:id,session_id:id,quality_tag:"good",origin:"synthetic",width:1280,height:720,labeled:false,label_count:0}));
 const labelDocs=Object.fromEntries(captureList.map(c=>[c.capture_id,{capture_id:c.capture_id,session_id:c.session_id,image_path:"fixture",width:c.width,height:c.height,reviewed:false,updated_at_ms:null,labels:c.capture_id==="cap_a"?[{class_id:0,class_name:"vehicle",box_xyxy:[10,10,20,20]}]:[]} ]));
-let labelFailure=true, imageFailure=true, labelSaves=0;
-const fixtureImage=async()=>{const canvas=document.createElement("canvas");canvas.width=1280;canvas.height=720;const ctx=canvas.getContext("2d")!;ctx.fillStyle="#dae4e8";ctx.fillRect(0,0,1280,720);ctx.fillStyle="#59636c";ctx.fillRect(0,250,1280,220);ctx.fillStyle="#ffffff";ctx.font="32px sans-serif";ctx.fillText("Synthetic empty road fixture",40,100);return await new Promise<Blob>((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error("Fixture PNG generation failed")),"image/png"));};
+let labelFailure=true, imageFailure=true, labelSaves=0, imageVariant:"valid"|"wrong-size"|"invalid"="valid";
+let captureBImageRequests=0;
+// Encode once synchronously: canvas.toBlob callbacks can be delayed by headless virtual time.
+const fixtureImage=(width=1280,height=720)=>{const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d")!;ctx.fillStyle="#dae4e8";ctx.fillRect(0,0,width,height);ctx.fillStyle="#59636c";ctx.fillRect(0,250,width,220);ctx.fillStyle="#ffffff";ctx.font="32px sans-serif";ctx.fillText("Synthetic empty road fixture",40,100);const bytes=Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]),char=>char.charCodeAt(0));return new Blob([bytes],{type:"image/png"});};
+const validFixtureImage=fixtureImage(), wrongSizeFixtureImage=fixtureImage(640,360), invalidFixtureImage=new Blob(["not an image"],{type:"image/png"});
 let activeModel=false, modelFailure=false, savedNetwork=fixture;
 let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true;
 const profiles=["camera_a","camera_b"].map((source_id,i)=>({source_id,host:"192.168.1."+(80+i),kind:"esp32",selected:i===0,connected:false,streaming:false,device_reachable:false,target_fps:15,settings:DEFAULT_REMOTE_CAMERA_SETTINGS,last_error:null as string|null,stream_connected:false,measured_fps:0,paused_for_simulation:false}));
@@ -40,7 +43,7 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");data=remoteState();}
   else if(path==="/api/camera/status")data={mode:"receiver",simulation_enabled:false,simulation_paused:false,frame_available:false,stale:true,streaming:profiles.find(p=>p.source_id===selectedCamera)?.streaming??false,active_source_id:selectedCamera,resolution:null,age_ms:null,frame_url:null};
   else if(path==="/api/dataset/captures")data={captures:captureList,total:2,classes};
-  else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/image")){const id=path.split("/")[4];if(id==="cap_b"&&imageFailure)return fixtureError("Fixture image unavailable");return new Response(await fixtureImage(),{headers:{"Content-Type":"image/png"}});}
+  else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/image")){const id=path.split("/")[4];if(id==="cap_b"){captureBImageRequests++;if(imageFailure)return fixtureError("Fixture image unavailable");}const blob=id!=="cap_b"||imageVariant==="valid"?validFixtureImage:imageVariant==="wrong-size"?wrongSizeFixtureImage:invalidFixtureImage;return new Response(blob,{headers:{"Content-Type":"image/png"}});}
   else if(path==="/api/dataset/training-dataset/status")data={ready:false,stale:false,eligible_frame_count:0,labeled_frame_count:0,label_box_count:0,train_count:0,val_count:0,message:"Synthetic fixture",classes};
   else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/labels")){const id=path.split("/")[4];if(init?.method==="PUT"){check(id==="cap_b","Wrong capture label save");const body=JSON.parse(String(init.body));check(Array.isArray(body.labels)&&body.labels.length===0,"Old capture labels leaked");labelSaves++;labelDocs[id]={...labelDocs[id],reviewed:true,labels:body.labels};const cap=captureList.find(x=>x.capture_id===id)!;cap.labeled=true;cap.label_count=body.labels.length;}else if(id==="cap_b"&&labelFailure){await new Promise(r=>setTimeout(r,150));return fixtureError("Fixture labels unavailable");}data=labelDocs[id];}
   else if(path==="/api/models"){if(modelFailure)return new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message:"Model registry unavailable"}}),{status:503,headers:{"Content-Type":"application/json"}});data={total:1,models:[{...model,is_active:activeModel}],default_model_id:model.model_id,active_model_id:activeModel?model.model_id:null};}
@@ -121,11 +124,21 @@ async function main(){
     [...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.textContent?.includes("cap_b"))!.click();
     await waitFor(()=>document.body.textContent?.includes("Fixture labels unavailable"),"Capture failure missing");
     check(!findButton("Save review")&&!document.querySelector(".label-canvas"),"Previous labels editable after capture switch failure");
-    labelFailure=false;findButton("Refresh list")!.click();
+    check(captureBImageRequests===0,"Image requested before matching labels");
+    const retry=async()=>{await waitFor(()=>Boolean(findButton("Refresh list")&&!findButton("Refresh list")!.disabled),"Refresh disabled");findButton("Refresh list")!.click();};
+    labelFailure=false;await retry();
     await waitFor(()=>document.body.textContent?.includes("Captured image unavailable."),"Missing image failure state");
     check(findButton("Save review")?.disabled&&!document.querySelector(".label-canvas"),"Unreadable capture can be marked negative");
-    imageFailure=false;findButton("Refresh list")!.click();
-    await waitFor(()=>Boolean(findButton("Save review")&&!findButton("Save review")!.disabled),"Image and label retry failed");
+    imageFailure=false;imageVariant="wrong-size";await retry();
+    await waitFor(()=>document.body.textContent?.includes("Captured image dimensions differ from labels."),"Wrong-size image was not rejected");
+    check(findButton("Save review")?.disabled&&!document.querySelector(".label-canvas"),"Wrong-size image enabled save");
+    imageVariant="invalid";await retry();
+    await waitFor(()=>document.body.textContent?.includes("Captured image could not be decoded."),"Invalid PNG was not rejected");
+    check(findButton("Save review")?.disabled&&!document.querySelector(".label-canvas"),"Invalid PNG enabled save");
+    imageVariant="valid";await retry();
+    try { await waitFor(()=>Boolean(findButton("Save review")&&!findButton("Save review")!.disabled),"Image and label retry failed"); }
+    catch (reason) { throw Error(String(reason)+"; image requests="+captureBImageRequests+"; "+document.querySelector(".label-empty-state")?.textContent); }
+    check(captureBImageRequests===4,"Refresh issued duplicate or missing image requests");
     check(document.querySelectorAll(".manual-label-box").length===0,"Old labels survived retry");
     findButton("Save review")!.click();
     await waitFor(()=>labelSaves===1&&document.body.textContent?.includes("reviewed negative example"),"Negative review save failed");
