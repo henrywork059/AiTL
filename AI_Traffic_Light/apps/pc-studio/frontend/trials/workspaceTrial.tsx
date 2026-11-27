@@ -175,12 +175,16 @@ async function main(){
     findButton("Side B")!.click();await waitFor(()=>vertexNear(450,180),"Side B reload failed");
   }
   if(page==="review"){
-    await waitFor(()=>document.querySelectorAll(".manual-label-box").length===1,"Initial capture labels missing");
-    [...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.textContent?.includes("cap_b"))!.click();
+    const activeCapture=()=>document.querySelector(".capture-browser-item.active strong")?.textContent;
+    const clickReady=async(label:string,ready:()=>unknown=()=>true)=>waitFor(()=>{const button=findButton(label);if(!button||button.disabled||!ready())return false;button.click();return true;},"Button not ready: "+label);
+    const clickCapture=async(id:string)=>waitFor(()=>{const button=[...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.querySelector("strong")?.textContent===id);if(!button||button.disabled)return false;button.click();return true;},"Capture not selectable: "+id);
+    const imageFor=(id:string,count:number)=>activeCapture()===id&&Boolean(document.querySelector(".label-canvas"))&&document.querySelectorAll(".manual-label-box:not(.draft)").length===count;
+    await waitFor(()=>imageFor("cap_a",1),"Initial capture labels missing");
+    await clickCapture("cap_b");
     await waitFor(()=>document.body.textContent?.includes("Fixture labels unavailable"),"Capture failure missing");
     check(!findButton("Save review")&&!document.querySelector(".label-canvas"),"Previous labels editable after capture switch failure");
     check(captureBImageRequests===0,"Image requested before matching labels");
-    const retry=async()=>{await waitFor(()=>Boolean(findButton("Refresh list")&&!findButton("Refresh list")!.disabled),"Refresh disabled");findButton("Refresh list")!.click();};
+    const retry=()=>clickReady("Refresh list",()=>activeCapture()==="cap_b");
     labelFailure=false;await retry();
     await waitFor(()=>document.body.textContent?.includes("Captured image unavailable."),"Missing image failure state");
     check(findButton("Save review")?.disabled&&!document.querySelector(".label-canvas"),"Unreadable capture can be marked negative");
@@ -195,19 +199,21 @@ async function main(){
     catch (reason) { throw Error(String(reason)+"; image requests="+captureBImageRequests+"; "+document.querySelector(".label-empty-state")?.textContent); }
     check(captureBImageRequests===4,"Refresh issued duplicate or missing image requests");
     check(document.querySelectorAll(".manual-label-box").length===0,"Old labels survived retry");
-    findButton("Save review")!.click();
+    await clickReady("Save review",()=>imageFor("cap_b",0));
     await waitFor(()=>labelSaves===1&&document.body.textContent?.includes("reviewed negative example"),"Negative review save failed");
     await waitFor(()=>document.querySelector(".capture-browser-item.active")?.textContent?.includes("0 boxes · reviewed")&&document.querySelector(".managed-dataset-metrics strong")?.textContent==="1","Saved review list or summary inconsistent");
-    [...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.textContent?.includes("cap_a"))!.click();await waitFor(()=>document.querySelectorAll(".manual-label-box").length===1&&findButton("Save review")&&!findButton("Save review")!.disabled,"Positive review unavailable");
+    await clickCapture("cap_a");await waitFor(()=>imageFor("cap_a",1)&&findButton("Save review")&&!findButton("Save review")!.disabled,"Positive review unavailable");
     await dragImagePoint(".label-canvas",[160,200],[400,360],()=>document.querySelectorAll(".manual-label-box:not(.draft)").length===2);
     check(findButton("Refresh list")?.disabled&&findButton("Build managed dataset")?.disabled,"Unsaved annotations did not block refresh/build");
-    findButton("Save review")!.click();await waitFor(()=>labelSaves===2&&document.querySelector(".capture-browser-item.active")?.textContent?.includes("2 boxes · reviewed")&&document.querySelector(".managed-dataset-metrics strong")?.textContent==="2","Positive review save/summary failed");
-    await waitFor(()=>Boolean(findButton("Build managed dataset")&&!findButton("Build managed dataset")!.disabled),"Build unavailable with two reviews");findButton("Build managed dataset")!.click();
+    await clickReady("Save review",()=>imageFor("cap_a",2));await waitFor(()=>labelSaves===2&&document.querySelector(".capture-browser-item.active")?.textContent?.includes("2 boxes · reviewed")&&document.querySelector(".managed-dataset-metrics strong")?.textContent==="2","Positive review save/summary failed");
+    await clickReady("Build managed dataset",()=>activeCapture()==="cap_a");
     await waitFor(()=>datasetBuilds===1&&document.body.textContent?.includes("Managed dataset ready: 1 train / 1 validation frames."),"Managed export build failed");
-    [...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.textContent?.includes("cap_b"))!.click();await waitFor(()=>document.querySelector(".label-canvas")&&findButton("Delete capture")&&!findButton("Delete capture")!.disabled,"Delete target unavailable");
-    window.confirm=()=>true;findButton("Delete capture")!.click();await waitFor(()=>captureDeletes===1&&document.querySelectorAll(".capture-browser-item").length===1&&document.body.textContent?.includes("rebuild required"),"Delete did not invalidate managed dataset");
+    await clickCapture("cap_b");
+    // Await the new decoded image and matching identity, not the still-mounted previous toolbar.
+    window.confirm=()=>false;await clickReady("Delete capture",()=>imageFor("cap_b",0));await pause();check(captureDeletes===0&&captureList.length===2,"Cancelled deletion changed data");
+    window.confirm=()=>true;await clickReady("Delete capture",()=>imageFor("cap_b",0));await waitFor(()=>captureDeletes===1&&document.querySelectorAll(".capture-browser-item").length===1&&document.body.textContent?.includes("rebuild required"),"Delete did not invalidate managed dataset");
+    await waitFor(()=>imageFor("cap_a",2)&&findButton("Save review")&&!findButton("Save review")!.disabled,"Remaining positive capture did not reload");
     check(findButton("Build managed dataset")?.disabled&&captureList[0].capture_id==="cap_a"&&labelDocs.cap_a.labels.length===2,"Deletion corrupted remaining capture or rebuild gate");
-    await waitFor(()=>document.querySelectorAll(".manual-label-box").length===2&&document.querySelector(".capture-browser-item.active")?.textContent?.includes("cap_a"),"Remaining positive capture did not reload");
   }
   if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;load.click();for(let i=0;i<20&&!load.disabled;i++)await pause();await pause();check(activeModel&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model activation");modelFailure=true;const refresh=[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")!;refresh.click();for(let i=0;i<20&&!document.body.textContent?.includes("Model registry unavailable or loading.");i++)await pause();check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")?.click();for(let i=0;i<20&&!document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model");i++)await pause();check(document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Model recovery");}
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";
