@@ -159,7 +159,7 @@ class ShadowRuntime:
         publisher = NativeFramePublisher()
         publisher.begin(generation)
         meta, pixels = projection.render_pixels(snap)
-        publisher.prepare(meta, pixels, received_at_ms=received_at_ms)
+        publisher.prepare(meta, pixels, received_at_ms=received_at_ms, transfer_owned=True)
         with self._cv:
             if generation != self._generation or self._snapshot is not snap or self._state != "running":
                 return None

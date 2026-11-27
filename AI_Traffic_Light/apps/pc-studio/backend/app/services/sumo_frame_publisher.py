@@ -64,7 +64,7 @@ class NativeFramePublisher:
     def has_tick(self, tick: int) -> bool:
         return self._meta is not None and self._meta["tick"] == tick
 
-    def prepare(self, meta: dict, pixels: np.ndarray, *, received_at_ms: int) -> None:
+    def prepare(self, meta: dict, pixels: np.ndarray, *, received_at_ms: int, transfer_owned: bool=False) -> None:
         """Publish a trusted canonical raster; encode only requested views.
 
         The owner serializes calls. Retain a detached, read-only raster and at
@@ -79,7 +79,11 @@ class NativeFramePublisher:
                 type(received_at_ms) is not int or received_at_ms < 0 or
                 pixels.shape != (HEIGHT, WIDTH, 3) or pixels.dtype != np.uint8):
                 raise ValueError("Invalid native raster identity")
-            self._pixels = pixels.copy()
+            # Only the internal renderer may transfer its newly allocated raster.
+            # Keep defensive copy as the default for all external/test callers.
+            if transfer_owned and (not pixels.flags.owndata or not pixels.flags.c_contiguous or not pixels.flags.writeable):
+                raise ValueError("Raster transfer requires exclusive contiguous owned pixels")
+            self._pixels = pixels if transfer_owned else pixels.copy()
             self._pixels.flags.writeable = False
             self._meta = deepcopy(meta)
             self._received_at_ms = received_at_ms

@@ -58,7 +58,7 @@ def pedestrian_specs(density, rng):
         yield PedestrianSpec(x, y, float(rng.randint(88, 106)), direction)
 
 
-def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=None, monotonic=False):
+def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=None, monotonic=False, rng_for=None):
     """Preserve legacy following/stop-line behavior; callbacks precede reentry."""
     for direction in (1, -1):
         group = sorted((v for v in vehicles if v.direction * direction > 0),
@@ -87,20 +87,22 @@ def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=
             ahead = vehicle
     for vehicle in vehicles:
         if vehicle.direction > 0 and vehicle.x > FRAME_WIDTH + 120:
+            reentry_rng = rng if rng_for is None else rng_for(vehicle)
             peers = [item.x for item in vehicles if item.direction > 0 and item is not vehicle]
-            vehicle.x = min(-vehicle.width - rng.randint(80, 180),
-                            min(peers, default=-120.0) - vehicle.width - rng.randint(70, 140))
+            vehicle.x = min(-vehicle.width - reentry_rng.randint(80, 180),
+                            min(peers, default=-120.0) - vehicle.width - reentry_rng.randint(70, 140))
         elif vehicle.direction < 0 and vehicle.x + vehicle.width < -120:
+            reentry_rng = rng if rng_for is None else rng_for(vehicle)
             peers = [item.x + item.width for item in vehicles if item.direction < 0 and item is not vehicle]
-            vehicle.x = max(float(FRAME_WIDTH + rng.randint(80, 180)),
-                            max(peers, default=float(FRAME_WIDTH + 120)) + rng.randint(70, 140))
+            vehicle.x = max(float(FRAME_WIDTH + reentry_rng.randint(80, 180)),
+                            max(peers, default=float(FRAME_WIDTH + 120)) + reentry_rng.randint(70, 140))
         else:
             continue
         if on_respawn is not None:
             on_respawn(vehicle)
 
 
-def advance_pedestrians(pedestrians, rng, dt, can_start_crossing, *, on_move=None):
+def advance_pedestrians(pedestrians, rng, dt, can_start_crossing, *, on_move=None, rng_for=None):
     for pedestrian in pedestrians:
         old_y = pedestrian.y
         if pedestrian.direction > 0:
@@ -112,7 +114,8 @@ def advance_pedestrians(pedestrians, rng, dt, can_start_crossing, *, on_move=Non
                 pedestrian.y += pedestrian.speed * dt
             completed = old_y < BOTTOM_PEDESTRIAN_WAIT_Y <= pedestrian.y
             if pedestrian.y > FRAME_HEIGHT + 25:
-                pedestrian.y = float(70 - rng.randint(0, 42))
+                reentry_rng = rng if rng_for is None else rng_for(pedestrian)
+                pedestrian.y = float(70 - reentry_rng.randint(0, 42))
         else:
             if pedestrian.y > BOTTOM_PEDESTRIAN_WAIT_Y:
                 pedestrian.y = max(BOTTOM_PEDESTRIAN_WAIT_Y, pedestrian.y - pedestrian.speed * dt)
@@ -122,6 +125,7 @@ def advance_pedestrians(pedestrians, rng, dt, can_start_crossing, *, on_move=Non
                 pedestrian.y -= pedestrian.speed * dt
             completed = old_y > TOP_PEDESTRIAN_WAIT_Y >= pedestrian.y
             if pedestrian.y < 20:
-                pedestrian.y = float(FRAME_HEIGHT - 10 + rng.randint(0, 36))
+                reentry_rng = rng if rng_for is None else rng_for(pedestrian)
+                pedestrian.y = float(FRAME_HEIGHT - 10 + reentry_rng.randint(0, 36))
         if on_move is not None:
             on_move(pedestrian, old_y, completed)

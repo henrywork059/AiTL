@@ -183,6 +183,50 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(service.latest_frame().content,original.content)
             service.set_simulation(False)
 
+    def test_protected_camera_benchmark_exact_motion(self):
+        from app.services.camera_frames import CameraFrameService
+        from app.services.simulation_experiments import _ModeSimulation
+        from app.services.signal_rules import signal_rules_service
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            for seed in (42,73):
+                for density in ("light","normal","busy"):
+                    clock=[0.]
+                    service=CameraFrameService(simulation_seed=seed,simulation_monotonic=lambda:clock[0])
+                    phase={"phase":"vehicle_green","vehicle_go":True,"pedestrian_walk":False,
+                           "seconds_remaining":12,"base_cycle_seconds":34,"mode":"fixed",
+                           "active_profile":"fixture","active_rules":[]}
+                    with patch.object(service,"_simulation_signal_state_locked",side_effect=lambda:dict(phase)):
+                        service.configure_simulation(density=density,engine="protected")
+                        service.set_simulation(True)
+                        benchmark=_ModeSimulation(mode="fixed",density=density,seed=seed,
+                            duration_seconds=120,sample_interval_seconds=1,
+                            policy_config=signal_rules_service.get_config(),zones=[],temp_root=Path(tmp),
+                            protected_slots=True)
+                        world=service._protected_world
+                        other=benchmark.protected_world
+                        self.assertEqual(world.demand_digest,other.demand_digest)
+                        self.assertEqual(world.demand_manifest,other.demand_manifest)
+                        self.assertEqual(service.latest_frame().simulation_demand_digest,other.demand_digest)
+                        self.assertEqual(service.simulation_scene_for("simulation_camera")["observation"]["demand_digest"],other.demand_digest)
+                        def state(w):
+                            return ([(v.x,v.y,v.width,v.speed,v.direction) for v in w.vehicles],
+                                    [(v.x,v.y,v.speed,v.direction) for v in w.pedestrians],
+                                    w.vehicle_visits,w.pedestrian_visits)
+                        self.assertEqual(state(world),state(other))
+                        for tick in range(2400):
+                            phase["phase"]=("vehicle_green","pedestrian_green","all_red","pedestrian_green","vehicle_green","pedestrian_flashing")[(tick//200)%6]
+                            phase["vehicle_go"]=phase["phase"]=="vehicle_green"
+                            phase["pedestrian_walk"]=phase["phase"]=="pedestrian_green"
+                            expected=world.permission(phase["phase"])
+                            service._advance_simulation_locked(.05)
+                            _,actual=benchmark._advance_world(.05,tick*.05,phase)
+                            self.assertEqual(actual,expected)
+                            self.assertEqual(state(world),state(other))
+                            self.assertNotEqual(world.occupancy(),(True,True))
+                        self.assertGreater(sum(world.vehicle_visits)+sum(world.pedestrian_visits),0)
+                        service.set_simulation(False)
+
     def test_shared_live_slot_motion(self):
         from app.services.camera_frames import CameraFrameService
         from app.services.simulation_experiments import _ModeSimulation

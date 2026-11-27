@@ -147,6 +147,44 @@ def main() -> int:
         assert "fixed_vehicle_queue" in live_service.export_csv(live_first["run_id"])
         assert "demand_model" not in first["scenario"]
 
+        protected_args={**live_args,"demand_model":"protected_slots","duration_seconds":90}
+        protected_first=live_service.run(**protected_args)
+        protected_second=live_service.run(**protected_args)
+        assert comparable(protected_first)==comparable(protected_second)
+        digest=protected_first["scenario"]["demand_digest"]
+        assert len(digest)==64
+        for mode in ("fixed","adaptive"):
+            arm=protected_first[mode]
+            assert arm["protected_demand"]["digest"]==digest
+            import hashlib, json
+            assert hashlib.sha256(json.dumps(arm["protected_demand"]["manifest"],sort_keys=True,separators=(",",":")).encode()).hexdigest()==digest
+            metrics=arm["metrics"]
+            assert abs(sum(metrics["signal"]["applied_phase_time_seconds"].values())-90)<1e-6
+            trace=arm["admission_trace"]
+            assert trace["step_seconds"]==.05
+            cursor=1
+            holds=0
+            totals={}
+            for span in trace["spans"]:
+                assert span["first_tick"]==cursor and span["last_tick"]>=cursor
+                n=span["last_tick"]-cursor+1
+                cursor+=n
+                totals[span["applied"]]=totals.get(span["applied"],0)+n
+                assert span["applied"] in {span["requested"],"all_red"}
+                if span["requested"] in {"vehicle_green","pedestrian_green"} and span["requested"]!=span["applied"]: holds+=n
+            assert cursor==1801
+            assert {k:round(n*.05,3) for k,n in totals.items()}==metrics["signal"]["applied_phase_time_seconds"]
+            assert round(holds*.05,3)==metrics["signal"]["admission_hold_seconds"]
+            assert not metrics["diagnostics"]["protected_overlap_detected"]
+            common=arm["normalized_gate_evidence"]
+            assert len(common["timeline"])==450
+            assert all(row["applied_phase"] in {row["phase"],"all_red"} for row in common["timeline"])
+            for kind,waits in common["waiting_episodes"].items():
+                assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
+        assert "fixed_applied_phase,adaptive_applied_phase" in live_service.export_csv(protected_first["run_id"])
+        assert "fixed_applied_phase" not in live_service.export_csv(live_first["run_id"])
+        assert live_service.get(protected_first["run_id"])==protected_first
+
         listing = service.list()
         assert listing["total"] == 2
         loaded = service.get(first["run_id"])

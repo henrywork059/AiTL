@@ -247,7 +247,7 @@ class NativeEvaluationService:
         snap = self._adapter.snapshot()
         if not self._publisher.has_tick(snap.tick):
             meta, pixels = self._projection.render_pixels(snap)
-            self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms)
+            self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True)
 
     def frame(self, *, epoch, generation, tick, source_id):
         with self._lock:

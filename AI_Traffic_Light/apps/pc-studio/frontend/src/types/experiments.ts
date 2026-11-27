@@ -29,6 +29,7 @@ export type ExperimentQueueDistribution = {
 export type ExperimentTimelinePoint = {
   t: number;
   phase: string;
+  applied_phase?: string;
   phase_key: string;
   vehicle_queue: number;
   pedestrian_queue: number;
@@ -61,6 +62,8 @@ export type ExperimentModeResult = {
     };
     signal: {
       phase_time_seconds: Record<string, number>;
+      applied_phase_time_seconds?: Record<string,number>;
+      admission_hold_seconds?: number;
       phase_share_percent: Record<string, number>;
       phase_transitions: number;
       cycles_completed: number;
@@ -86,7 +89,8 @@ export type SimulationExperiment = {
   created_at_ms: number;
   label: string;
   scenario: {
-    demand_model?: "historical" | "live_slots";
+    demand_model?: "historical" | "live_slots" | "protected_slots";
+    demand_digest?: string;
     movement_step_seconds?: number;
     geometry?: "legacy_camera_pixels_v1";
     native_demand_matched?: false;

@@ -19,6 +19,7 @@ from app.core.logging_config import get_logger
 from app.services.signal_rules import SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
 from app.services.experiment_timeline_csv import serialize_experiment_timeline
+from app.services.protected_crosswalk import ProtectedCrosswalk
 from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
     CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
     TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
@@ -140,6 +141,7 @@ class _ModeSimulation:
         temp_root: Path,
         normalized_gate_evidence: bool = False,
         live_slot_demand: bool = False,
+        protected_slots: bool = False,
     ) -> None:
         self.mode = mode
         self.density = density
@@ -147,8 +149,8 @@ class _ModeSimulation:
         self.duration_seconds = duration_seconds
         self.sample_interval_seconds = sample_interval_seconds
         self.zones = deepcopy(zones)
-        self.live_slot_demand = live_slot_demand
-        self.step_seconds = .05 if live_slot_demand else STEP_SECONDS
+        self.live_slot_demand = live_slot_demand or protected_slots
+        self.step_seconds = .05 if self.live_slot_demand else STEP_SECONDS
         density_offset = DENSITY_SEED_OFFSETS[density]
         self.rng = random.Random(seed + density_offset)
 
@@ -163,6 +165,11 @@ class _ModeSimulation:
 
         self.vehicles = self._make_vehicles()
         self.pedestrians = self._make_pedestrians()
+        self.protected_world = ProtectedCrosswalk(self.vehicles,self.pedestrians,self.rng) if protected_slots else None
+        self.applied_phase_seconds: dict[str,float] = {}
+        self.admission_hold_seconds = 0.0
+        self._admission_tick = 0
+        self._admission_trace = []
         self.vehicle_waits: list[float] = []
         self.pedestrian_waits: list[float] = []
         self.vehicle_passages = 0
@@ -265,8 +272,7 @@ class _ModeSimulation:
             last_signal = signal
 
             self._record_signal_time(signal, dt)
-            vehicle_waiting = self._advance_vehicles(dt, clock, signal)
-            self._advance_pedestrians(dt, clock, signal)
+            vehicle_waiting, applied = self._advance_world(dt,clock,signal)
 
             ped_waiting_count = sum(1 for item in self.pedestrians if self._pedestrian_waiting(item))
             self.vehicle_queue_seconds += len(vehicle_waiting) * dt
@@ -287,23 +293,35 @@ class _ModeSimulation:
                 if clock + 1e-9 >= tick * STEP_S:
                     self._gate_timeline.append({**self._gate_metrics.sample(tick,
                         legacy_observations(self.vehicles,self.pedestrians)),
-                        "phase":signal["phase"],"t":round(tick*STEP_S,6)})
+                        "phase":signal["phase"],"t":round(tick*STEP_S,6),
+                        **({"applied_phase":applied} if self.protected_world else {})})
             if clock + 1e-9 >= self._sample_at_s:
                 self._append_timeline(clock, signal, vehicle_waiting, ped_waiting_count)
+                if self.protected_world:
+                    self.timeline[-1]["applied_phase"] = applied
                 self._sample_at_s += self.sample_interval_seconds
 
         self._finalize_open_waits(self.duration_seconds)
         controller_stats = self._controller_stats()
         result = self._build_result(last_signal, controller_stats)
+        if self.protected_world:
+            result["metrics"]["signal"].update(applied_phase_time_seconds={k:round(v,3) for k,v in sorted(self.applied_phase_seconds.items())},
+                admission_hold_seconds=round(self.admission_hold_seconds,3))
+            green=self.applied_phase_seconds.get("vehicle_green",0.)
+            result["metrics"]["throughput"]["vehicle_passages_per_green_minute"]=round(self.vehicle_passages/(green/60),2) if green else 0.0
+            result["admission_trace"]={"step_seconds":self.step_seconds,"spans":self._admission_trace}
+            result["protected_demand"]={"digest":self.protected_world.demand_digest,"schema":"protected_slots_v2",
+                "manifest":deepcopy(self.protected_world.demand_manifest),
+                "vehicle_reentries":sum(self.protected_world.vehicle_visits), "pedestrian_reentries":sum(self.protected_world.pedestrian_visits)}
         if self._gate_metrics is not None:
             result["normalized_gate_evidence"] = {
-                "engine":"production_legacy_experiment",
+                "engine":"production_protected_experiment" if self.protected_world else "production_legacy_experiment",
                 "metric_contract":"normalized_physical_service_gate_v1",
                 "summary":self._gate_metrics.summary(),
                 "waiting_episodes":self._gate_metrics.waiting_episodes(),
                 "timeline":self._gate_timeline,
                 "geometry_demand_matched_to_native":False,
-                "demand_model":"production_live_slots" if self.live_slot_demand else "historical_benchmark_slots",
+                "demand_model":"protected_slots_v2" if self.protected_world else ("production_live_slots" if self.live_slot_demand else "historical_benchmark_slots"),
                 "movement_step_seconds":self.step_seconds}
         return result
 
@@ -317,8 +335,7 @@ class _ModeSimulation:
                 self.cycles_completed += 1
         self._previous_phase_key = phase_key
 
-    def _advance_vehicles(self, dt: float, clock: float, signal: dict[str, Any]) -> set[str]:
-        waiting_now: set[str] = set()
+    def _vehicle_callbacks(self, dt, clock, waiting_now):
 
         def record(vehicle, old_x, committed):
             blocked = abs(vehicle.x-old_x)+.05 < abs(vehicle.speed*dt) and not committed
@@ -341,11 +358,15 @@ class _ModeSimulation:
             vehicle.passed_centre = False
             vehicle.wait_started_s = None
 
-        advance_vehicles(self.vehicles,self.rng,dt,bool(signal.get("vehicle_go")),
-                         on_move=record,on_respawn=respawn)
+        return record,respawn
+
+    def _advance_vehicles(self, dt: float, clock: float, signal: dict[str, Any]) -> set[str]:
+        waiting_now: set[str] = set()
+        record,respawn=self._vehicle_callbacks(dt,clock,waiting_now)
+        advance_vehicles(self.vehicles,self.rng,dt,bool(signal.get("vehicle_go")),on_move=record,on_respawn=respawn)
         return waiting_now
 
-    def _advance_pedestrians(self, dt: float, clock: float, signal: dict[str, Any]) -> None:
+    def _pedestrian_callback(self, clock):
         def record(pedestrian, old_y, completed):
             curb = TOP_PEDESTRIAN_WAIT_Y if pedestrian.direction>0 else BOTTOM_PEDESTRIAN_WAIT_Y
             was_waiting = abs(old_y-curb)<=.5
@@ -358,7 +379,31 @@ class _ModeSimulation:
             if completed:
                 self.pedestrian_crossings += 1
 
-        advance_pedestrians(self.pedestrians,self.rng,dt,bool(signal.get("pedestrian_walk")),on_move=record)
+        return record
+
+    def _advance_pedestrians(self, dt: float, clock: float, signal: dict[str, Any]) -> None:
+        advance_pedestrians(self.pedestrians,self.rng,dt,bool(signal.get("pedestrian_walk")),on_move=self._pedestrian_callback(clock))
+
+    def _advance_world(self,dt,clock,signal):
+        if self.protected_world is None:
+            waiting=self._advance_vehicles(dt,clock,signal)
+            self._advance_pedestrians(dt,clock,signal)
+            return waiting,signal["phase"]
+        waiting=set()
+        record,respawn=self._vehicle_callbacks(dt,clock,waiting)
+        requested=signal["phase"]
+        applied=self.protected_world.step(dt,requested,on_vehicle_move=record,
+            on_vehicle_respawn=respawn,on_pedestrian_move=self._pedestrian_callback(clock))
+        self._admission_tick += 1
+        if self._admission_trace and (self._admission_trace[-1]["requested"],self._admission_trace[-1]["applied"])==(requested,applied):
+            self._admission_trace[-1]["last_tick"]=self._admission_tick
+        else:
+            self._admission_trace.append({"first_tick":self._admission_tick,"last_tick":self._admission_tick,
+                                          "requested":requested,"applied":applied})
+        self.applied_phase_seconds[applied]=self.applied_phase_seconds.get(applied,0.)+dt
+        if requested in {"vehicle_green","pedestrian_green"} and applied!=requested:
+            self.admission_hold_seconds+=dt
+        return waiting,applied
 
     def _record_overlap(self, signal: dict[str, Any], dt: float) -> None:
         if signal.get("phase") not in {"pedestrian_green", "pedestrian_flashing"}:
@@ -558,7 +603,7 @@ class SimulationExperimentService:
         label: str = "",
         demand_model: str = "historical",
     ) -> dict[str, Any]:
-        if demand_model not in {"historical","live_slots"}:
+        if demand_model not in {"historical","live_slots","protected_slots"}:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID,"Unknown experiment demand model.",status_code=422)
         density = density.strip().lower()
         if density not in DENSITIES:
@@ -595,6 +640,8 @@ class SimulationExperimentService:
                 zones=zones,
                 temp_root=temp_root,
                 live_slot_demand=demand_model=="live_slots",
+                protected_slots=demand_model=="protected_slots",
+                normalized_gate_evidence=demand_model=="protected_slots",
             ).run()
             adaptive = _ModeSimulation(
                 mode="adaptive",
@@ -606,6 +653,8 @@ class SimulationExperimentService:
                 zones=zones,
                 temp_root=temp_root,
                 live_slot_demand=demand_model=="live_slots",
+                protected_slots=demand_model=="protected_slots",
+                normalized_gate_evidence=demand_model=="protected_slots",
             ).run()
 
         result = {
@@ -635,6 +684,12 @@ class SimulationExperimentService:
         if demand_model=="live_slots":
             result["scenario"].update(demand_model="live_slots",movement_step_seconds=.05,
                 geometry="legacy_camera_pixels_v1",native_demand_matched=False)
+        if demand_model=="protected_slots":
+            if fixed["protected_demand"]["digest"]!=adaptive["protected_demand"]["digest"]:
+                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID,"Protected demand mismatch.",status_code=500)
+            result["scenario"].update(demand_model=demand_model,movement_step_seconds=.05,
+                geometry="legacy_camera_pixels_v1",native_demand_matched=False,
+                demand_digest=fixed["protected_demand"]["digest"])
         self._write_run(result)
         self._trim_old_runs()
         return result

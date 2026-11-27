@@ -6,6 +6,10 @@ No metre calibration, SUMO equivalence, or physical control is implied.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import random
+
 from app.services.legacy_world import (
     EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE, CROSSING_LEFT, CROSSING_RIGHT,
     TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, advance_vehicles,
@@ -36,6 +40,16 @@ class ProtectedCrosswalk:
                     limit = v.x + v.width + 22.0
         for p in pedestrians:
             p.y = min(p.y, TOP_PEDESTRIAN_WAIT_Y) if p.direction > 0 else max(p.y, BOTTOM_PEDESTRIAN_WAIT_Y)
+        # Independent streams: the nth reentry of each slot has identical random
+        # draws in both policy arms, regardless of the order of other reentries.
+        vehicle_seeds = [rng.getrandbits(64) for _ in vehicles]
+        pedestrian_seeds = [rng.getrandbits(64) for _ in pedestrians]
+        self._vehicle_rngs = [random.Random(seed) for seed in vehicle_seeds]
+        self._pedestrian_rngs = [random.Random(seed) for seed in pedestrian_seeds]
+        manifest = {"schema":"protected_slots_v2", "vehicles":[[v.x,v.y,v.width,v.speed,v.direction,seed] for v,seed in zip(vehicles,vehicle_seeds)],
+                    "pedestrians":[[p.x,p.y,p.speed,p.direction,seed] for p,seed in zip(pedestrians,pedestrian_seeds)]}
+        self.demand_manifest = manifest
+        self.demand_digest = hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
     def occupancy(self):
         # Once the front crosses its stop line, hold the opposing admission
@@ -57,15 +71,22 @@ class ProtectedCrosswalk:
             return "pedestrian_green"
         return "all_red"
 
-    def step(self, dt, requested):
+    def step(self, dt, requested, *, on_vehicle_move=None, on_vehicle_respawn=None, on_pedestrian_move=None):
         applied = self.permission(requested)
         def vehicle_reentry(vehicle):
             self.vehicle_visits[self._vehicle_slots[id(vehicle)]] += 1
+            if on_vehicle_respawn is not None:
+                on_vehicle_respawn(vehicle)
         def pedestrian_move(person, old_y, completed):
             if (person.direction > 0 and person.y < old_y) or (person.direction < 0 and person.y > old_y):
                 self.pedestrian_visits[self._pedestrian_slots[id(person)]] += 1
-        advance_vehicles(self.vehicles, self.rng, dt, applied == "vehicle_green", on_respawn=vehicle_reentry, monotonic=True)
-        advance_pedestrians(self.pedestrians, self.rng, dt, applied == "pedestrian_green", on_move=pedestrian_move)
+            if on_pedestrian_move is not None:
+                on_pedestrian_move(person,old_y,completed)
+        advance_vehicles(self.vehicles, self.rng, dt, applied == "vehicle_green", on_move=on_vehicle_move,
+                         on_respawn=vehicle_reentry, monotonic=True,
+                         rng_for=lambda v:self._vehicle_rngs[self._vehicle_slots[id(v)]])
+        advance_pedestrians(self.pedestrians, self.rng, dt, applied == "pedestrian_green", on_move=pedestrian_move,
+                            rng_for=lambda p:self._pedestrian_rngs[self._pedestrian_slots[id(p)]])
         # Assert the resulting state before the owner publishes it.
         self.permission("all_red")
         return applied

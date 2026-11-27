@@ -149,7 +149,7 @@ class SignalRulesPreviewRequest(BaseModel):
 
 
 class SimulationExperimentRunRequest(BaseModel):
-    demand_model: Literal["historical","live_slots"] = "historical"
+    demand_model: Literal["historical","live_slots","protected_slots"] = "historical"
     duration_seconds: int = Field(default=300, ge=30, le=1800)
     density: Literal["light", "normal", "busy"] = "normal"
     seed: int = Field(default=25025, ge=0, le=2_147_483_647)

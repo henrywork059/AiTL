@@ -58,6 +58,7 @@ class CameraFrame:
     source_epoch: int | None = None
     mode_generation: int | None = None
     simulation_engine: str | None = None
+    simulation_demand_digest: str | None = None
 
     @property
     def observation(self) -> ObservationIdentity:
@@ -81,6 +82,7 @@ class CameraFrame:
             "size_bytes": len(self.content),
             "origin": self.origin,
             **({"simulation_engine": self.simulation_engine} if self.simulation_engine else {}),
+            **({"simulation_demand_digest": self.simulation_demand_digest} if self.simulation_demand_digest else {}),
         }
 
 
@@ -460,6 +462,7 @@ class CameraFrameService:
                 source_id=source_id, width=original.width, height=original.height,
                 received_at_ms=original.received_at_ms, frame_number=original.frame_number,
                 origin="simulation", mode_generation=original.mode_generation, simulation_engine=original.simulation_engine,
+                simulation_demand_digest=original.simulation_demand_digest,
             )
             self._simulation_view_frames[source_id] = cached
         return cached
@@ -524,6 +527,9 @@ class CameraFrameService:
                 width=frame.width, height=frame.height, provenance="simulation",
                 tick_kind="published_frame", detector_input_eligible=True)
             scene["observation"]["simulation_engine"] = self._simulation_engine
+            if frame.simulation_demand_digest:
+                scene["observation"]["demand_digest"] = frame.simulation_demand_digest
+                scene["observation"]["demand_model"] = "protected_slots_v2"
             # Keep existing canonical vehicle/pedestrian arrays for the 3D
             # renderer; expose exact mirrored image-centres separately.
             scene["view_agents"] = [
@@ -788,6 +794,7 @@ class CameraFrameService:
             frame_number=self._frame_counter,
             origin="simulation", mode_generation=self._observation_mode_generation,
             simulation_engine=self._simulation_engine if self._simulation_engine=="protected" else None,
+            simulation_demand_digest=self._protected_world.demand_digest if self._protected_world else None,
         )
 
 

@@ -93,6 +93,28 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_exclusive_raster_transfer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            projection=NativeProjection(Projection.load(path),1)
+            snap=ShadowSnapshot(42,1,False,(ShadowAgent("vehicle","v0",5,0,1,"WC"),))
+            meta,pixels=projection.render_pixels(snap)
+            expected=projection.render(snap)[1]
+            pub=NativeFramePublisher()
+            pub.begin(1)
+            pub.prepare(meta,pixels,received_at_ms=42,transfer_owned=True)
+            self.assertIs(pub._pixels,pixels)
+            self.assertFalse(pixels.flags.writeable)
+            for sid in VIEW_FLIPS:
+                self.assertEqual(pub.frame_for(sid).content,expected[sid])
+            self.assertIsNone(pub._pixels)
+            nextmeta,newpixels=projection.render_pixels(ShadowSnapshot(42,2,False,snap.agents))
+            with self.assertRaises(ValueError):
+                pub.prepare(nextmeta,newpixels.view(),received_at_ms=43,transfer_owned=True)
+            self.assertFalse(pub.has_tick(2))
+            self.assertIsNone(pub.frame_for("simulation_camera"))
+
     def test_engine_provenance_bound_to_generation(self):
         from app.services.observation_identity import REFERENCE_EVALUATION_ORIGIN
         from app.services.simulation_reference_session import ReferenceAgent

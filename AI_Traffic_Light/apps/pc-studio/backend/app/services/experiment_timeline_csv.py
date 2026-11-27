@@ -9,11 +9,12 @@ def serialize_experiment_timeline(result: dict) -> str:
     rows = max(len(fixed_timeline), len(adaptive_timeline))
     output = StringIO()
     writer = csv.writer(output, lineterminator="\n")
+    protected = result.get("scenario",{}).get("demand_model") == "protected_slots"
     writer.writerow([
         "t_seconds",
         "fixed_phase", "fixed_vehicle_queue", "fixed_pedestrian_queue", "fixed_vehicle_passages", "fixed_pedestrian_crossings", "fixed_active_rules",
         "adaptive_phase", "adaptive_vehicle_queue", "adaptive_pedestrian_queue", "adaptive_vehicle_passages", "adaptive_pedestrian_crossings", "adaptive_active_rules",
-    ])
+    ] + (["fixed_applied_phase","adaptive_applied_phase"] if protected else []))
     for index in range(rows):
         fixed = fixed_timeline[index] if index < len(fixed_timeline) else {}
         adaptive = adaptive_timeline[index] if index < len(adaptive_timeline) else {}
@@ -21,5 +22,5 @@ def serialize_experiment_timeline(result: dict) -> str:
             fixed.get("t", adaptive.get("t", "")),
             fixed.get("phase", ""), fixed.get("vehicle_queue", ""), fixed.get("pedestrian_queue", ""), fixed.get("vehicle_passages", ""), fixed.get("pedestrian_crossings", ""), "|".join(fixed.get("active_rules", [])),
             adaptive.get("phase", ""), adaptive.get("vehicle_queue", ""), adaptive.get("pedestrian_queue", ""), adaptive.get("vehicle_passages", ""), adaptive.get("pedestrian_crossings", ""), "|".join(adaptive.get("active_rules", [])),
-        ])
+        ] + ([fixed.get("applied_phase",""),adaptive.get("applied_phase","")] if protected else []))
     return output.getvalue()

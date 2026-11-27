@@ -281,3 +281,6 @@ NativeEvaluationService now selects GeneratedSession (SUMO) or GeneratedReferenc
 
 ### S04 protected pixel-space migration bridge (unreleased)
 CameraFrameService selects legacy or ProtectedCrosswalk at explicit paused reset; both reuse legacy_world movement, camera raster, clock, region plane and inference transport. Protected checks opposing committed occupancy before and after each step, tracks slot reentry visits, fixes backwards stop-line movement without changing the historical legacy rule, and fails closed. Actual selected simulation camera is still synthetic; isolated SUMO/reference evaluation stays separate. Protected is not a metre-calibrated SUMO engine.
+
+### S04 production experiment integration (unreleased)
+ProtectedCrosswalk owns both camera and experiment motion/admission, with optional measurement callbacks invoked in the shared movement path. Protected slots use deterministic per-agent random streams; legacy default and historical shared RNG unchanged. Simulation Lab exposes the protected model and exact requested/applied phase evidence. The native frame publisher can take ownership of the renderer's fresh exclusive raster, retaining default defensive copies for other callers and exact PNG pixel verification. This removes one 2.64 MiB transient raster copy, not the native child working-set cost.
