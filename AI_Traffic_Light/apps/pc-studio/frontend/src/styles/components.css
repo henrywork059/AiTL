@@ -184,11 +184,11 @@
   max-width: 460px;
   padding: 28px;
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--color-overlay-label);
 }
 
 .camera-empty-state strong {
-  color: var(--color-text-primary);
+  color: var(--color-overlay-label);
   font-size: 18px;
 }
 

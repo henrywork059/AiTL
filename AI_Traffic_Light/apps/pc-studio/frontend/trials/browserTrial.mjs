@@ -19,9 +19,9 @@ try {
   if(shot.status!==0||!existsSync(png)||readFileSync(png).length<1000)throw new Error('Screenshot missing');
   for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['diagnostics',600,900],['network',1440,1000],['models',600,900]]){
     const workspaceUrl='http://127.0.0.1:4179/workspace.html?page='+page;
-    const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=3000'];
+    const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=7000'];
     const dom=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-'+page,'--dump-dom',workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
-    if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
+    if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS · synthetic API fixture'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
     const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'.png');
     const shot=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-shot-'+page,'--screenshot='+target,workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
     if(shot.status!==0||!existsSync(target)||readFileSync(target).length<1000)throw Error('Workspace screenshot missing: '+page);

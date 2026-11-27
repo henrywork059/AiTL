@@ -15,11 +15,16 @@ def main() -> None:
     css = read("components/crosswalkNetworkPanel.css")
     nav_sections = nav.split("export const APP_SECTIONS:", 1)[1]
 
-    assert 'id: "operate", label: "Operate"' in nav_sections
-    assert 'id: "ai", label: "AI"' in nav_sections
-    assert nav_sections.index('id: "operate"') < nav_sections.index('id: "ai"')
-    assert "PAGE_DETAILS.camera_settings" in nav_sections.split('id: "ai"', 1)[0]
-    assert 'pages: [PAGE_DETAILS.model_registry, PAGE_DETAILS.live_ai]' in nav_sections
+    assert 'id: "operate", label: "Overview"' in nav_sections
+    assert 'id: "devices", label: "Devices"' in nav_sections
+    assert 'id: "ai", label: "AI Lab"' in nav_sections
+    assert nav_sections.index('id: "operate"') < nav_sections.index('id: "devices"') < nav_sections.index('id: "ai"')
+    devices = nav_sections.split('id: "devices"', 1)[1].split("] }", 1)[0]
+    assert "PAGE_DETAILS.camera_settings" in devices and "PAGE_DETAILS.camera_diagnostics" in devices
+    ai = nav_sections.split('id: "ai"', 1)[1].split("] }", 1)[0]
+    for destination in ("model_registry", "live_ai", "dataset_capture", "dataset_review", "train_export"):
+        assert f"PAGE_DETAILS.{destination}" in ai
+        assert nav_sections.count(f"PAGE_DETAILS.{destination}") == 1
     assert nav_sections.index('id: "traffic"') < nav_sections.index('id: "ai"')
     assert "PAGE_DETAILS.settings" not in nav_sections
     assert nav_sections.count("PAGE_DETAILS.live_ai") == 1
@@ -56,7 +61,7 @@ def main() -> None:
     assert 'data-crosswalk-edge={edge}' in panel
     assert "<h4>Connect crossings</h4>" not in panel
     assert "cursor: crosshair" in css and ".crossing-network-edge.is-drop-target" in css
-    print("[PASS] Traffic-first navigation, camera AI preview regions, global model settings and APIs")
+    print("[PASS] Hardware-first workspace navigation, camera AI preview regions, global model settings and APIs")
     print("[PASS] Pointer/keyboard edge connections, preview, cancellation, duplicate handling and persistence")
 
 if __name__ == "__main__":
