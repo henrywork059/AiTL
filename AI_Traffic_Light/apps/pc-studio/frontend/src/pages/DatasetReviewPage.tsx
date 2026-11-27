@@ -366,6 +366,7 @@ export function DatasetReviewPage() {
           <div><span>Reviewed</span><strong>{trainingDataset?.labeled_frame_count ?? "—"}</strong></div>
           <div><span>Eligible</span><strong>{trainingDataset?.eligible_frame_count ?? "—"}</strong></div>
           <div><span>Boxes</span><strong>{trainingDataset?.label_box_count ?? "—"}</strong></div>
+          <div><span>Evaluation-only excluded</span><strong>{trainingDataset?.excluded_evaluation_count ?? 0}</strong></div>
           <div><span>Train / Val</span><strong>{trainingDataset?.train_count ?? "—"} / {trainingDataset?.val_count ?? "—"}</strong></div>
         </div>
         <p className="small-note">{trainingDataset?.message ?? "Checking managed dataset status..."}</p>

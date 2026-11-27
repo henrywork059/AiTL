@@ -468,6 +468,7 @@ export type TrainingDatasetStatus = {
   labeled_frame_count: number;
   eligible_frame_count: number;
   excluded_bad_count: number;
+  excluded_evaluation_count?: number;
   label_box_count: number;
   train_count: number;
   val_count: number;

@@ -65,6 +65,11 @@ def main() -> int:
         write_capture(dataset_root, "capture_positive", session="acceptance", quality="useful")
         write_capture(dataset_root, "capture_negative", session="acceptance", quality="unreviewed")
         write_capture(dataset_root, "capture_bad", session="acceptance", quality="bad")
+        write_capture(dataset_root, "capture_evaluation", session="acceptance", quality="useful")
+        evaluation_metadata_path = dataset_root / "captures" / "acceptance" / "metadata" / "capture_evaluation.json"
+        evaluation_metadata = json.loads(evaluation_metadata_path.read_text(encoding="utf-8"))
+        evaluation_metadata.update({"detector_input_eligible": False, "coordinate_space": "native_projection_v1"})
+        evaluation_metadata_path.write_text(json.dumps(evaluation_metadata), encoding="utf-8")
 
         service = DatasetLabelingService(dataset_root=dataset_root, class_schema_path=class_schema)
         positive = service.save_labels(
@@ -78,9 +83,10 @@ def main() -> int:
             "capture_bad",
             [{"class_id": 1, "box_xyxy": [20, 10, 70, 50]}],
         )
+        service.save_labels("capture_evaluation", [{"class_id": 0, "box_xyxy": [10, 8, 60, 48]}])
 
         capture_list = service.list_captures()
-        assert capture_list["total"] == 3
+        assert capture_list["total"] == 4
         assert len(capture_list["classes"]) == 6
         assert all(item["labeled"] for item in capture_list["captures"])
 
@@ -94,9 +100,10 @@ def main() -> int:
             assert exc.code == ErrorCode.DATASET_LABEL_INVALID
 
         before = service.training_dataset_status()
-        assert before["labeled_frame_count"] == 3
+        assert before["labeled_frame_count"] == 4
         assert before["eligible_frame_count"] == 2
         assert before["excluded_bad_count"] == 1
+        assert before["excluded_evaluation_count"] == 1
         assert before["ready"] is False
 
         built = service.build_training_dataset(validation_fraction=0.2)
@@ -106,7 +113,7 @@ def main() -> int:
         assert (dataset_root / "yolo" / "manifest.json").is_file()
         copied_images = list((dataset_root / "yolo" / "images").glob("*/*"))
         assert len(copied_images) == 2
-        assert all("capture_bad" not in path.name for path in copied_images)
+        assert all("capture_bad" not in path.name and "capture_evaluation" not in path.name for path in copied_images)
         label_files = list((dataset_root / "yolo" / "labels").glob("*/*.txt"))
         assert len(label_files) == 2
         label_text = "\n".join(path.read_text(encoding="utf-8") for path in label_files)
@@ -133,7 +140,7 @@ def main() -> int:
 
     print("[PASS] manual labels persist with shared class names")
     print("[PASS] reviewed zero-box negative frames remain eligible")
-    print("[PASS] bad-quality captures are excluded from YOLO builds")
+    print("[PASS] bad-quality and explicit evaluation-only captures are excluded from YOLO builds")
     print("[PASS] managed train/validation split and normalized labels are generated")
     print("[PASS] label edits mark the managed dataset stale until rebuilt")
     print("[PASS] managed dataset build is blocked during active training")

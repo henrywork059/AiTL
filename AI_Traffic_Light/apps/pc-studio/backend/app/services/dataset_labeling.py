@@ -259,8 +259,11 @@ class DatasetLabelingService:
 
     def training_dataset_status(self) -> dict[str, Any]:
         items = self._labeled_items()
-        eligible = [item for item in items if item["record"].get("quality_tag") != "bad"]
-        excluded_bad_count = len(items) - len(eligible)
+        eligible = [item for item in items if item["record"].get("quality_tag") != "bad"
+                    and item["record"].get("detector_input_eligible") is not False]
+        excluded_bad_count = sum(item["record"].get("quality_tag") == "bad" for item in items)
+        excluded_evaluation_count = sum(item["record"].get("quality_tag") != "bad"
+                                        and item["record"].get("detector_input_eligible") is False for item in items)
         box_count = sum(len(item["labels"].get("labels", [])) for item in eligible)
         signature = self._source_signature(eligible)
         manifest_path = self._managed_yolo_root / "manifest.json"
@@ -282,6 +285,7 @@ class DatasetLabelingService:
             "labeled_frame_count": len(items),
             "eligible_frame_count": len(eligible),
             "excluded_bad_count": excluded_bad_count,
+            "excluded_evaluation_count": excluded_evaluation_count,
             "label_box_count": box_count,
             "train_count": int(manifest.get("train_count", 0)) if manifest else 0,
             "val_count": int(manifest.get("val_count", 0)) if manifest else 0,
@@ -310,11 +314,13 @@ class DatasetLabelingService:
                 "validation_fraction must be greater than 0 and less than 0.5.",
                 status_code=422,
             )
-        items = [item for item in self._labeled_items() if item["record"].get("quality_tag") != "bad"]
+        items = [item for item in self._labeled_items()
+                 if item["record"].get("quality_tag") != "bad"
+                 and item["record"].get("detector_input_eligible") is not False]
         if len(items) < 2:
             raise AppError(
                 ErrorCode.DATASET_TRAINING_NOT_READY,
-                "At least two reviewed, non-bad captured frames are required to create distinct train and validation splits.",
+                "At least two reviewed, training-eligible captured frames are required to create distinct train and validation splits.",
                 status_code=409,
                 details={"eligible_frame_count": len(items)},
             )
