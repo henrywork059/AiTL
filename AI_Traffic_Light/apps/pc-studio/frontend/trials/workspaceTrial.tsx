@@ -230,6 +230,7 @@ async function main(){
 
   if(page==="capture"){
     await waitFor(()=>findButton("Capture frame")&&!findButton("Capture frame")!.disabled,"Available selected frame did not unlock capture");
+    await waitFor(()=>{const image=document.querySelector<HTMLImageElement>(".camera-preview-panel img");return image?.complete&&image.naturalWidth===1280;},"Synthetic HTTP capture preview was not decoded");
     document.querySelector<HTMLButtonElement>("#fixture-source-stale")!.click();
     await waitFor(()=>findButton("Capture frame")?.disabled,"Stale frame did not prevent capture");
     check(capturePostCount===0,"Stale frame was captured");
