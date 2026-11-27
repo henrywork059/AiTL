@@ -1,0 +1,59 @@
+name: Update 28C pinned historical reference detector
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-reference-detector.yml'
+      - '.github/scripts/native_reference_detector_trial.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exploratory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+      YOLO_AUTOINSTALL: 'false'
+      HF_HUB_OFFLINE: '1'
+      WANDB_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve pinned prior native artifact (read token scoped to this step)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/henrywork059/AiTL/actions/artifacts/15221111551/zip > "$RUNNER_TEMP/native-history.zip"
+          echo 'b0a8a8220924ecd01d44e9ecc35d6c905fba21db3ee1fca22ea3e6e6a0d2cdf5  '"$RUNNER_TEMP/native-history.zip" | sha256sum -c -
+      - name: Install isolated reference environment (not production dependency adoption)
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220
+          python -m pip check
+          mkdir -p "$RUNNER_TEMP/reference-evidence"
+          python -m pip freeze > "$RUNNER_TEMP/reference-evidence/python-packages.txt"
+      - name: Freeze exact deduplicated cohort
+        run: python .github/scripts/native_reference_detector_trial.py prepare --archive "$RUNNER_TEMP/native-history.zip" --root "$RUNNER_TEMP/reference-captures" --evidence "$RUNNER_TEMP/reference-evidence"
+      - name: Retrieve publisher-pinned reference checkpoint (disposable runner only)
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-time 120 --max-filesize 5613764 -o "$RUNNER_TEMP/yolo11n.pt" https://huggingface.co/Ultralytics/YOLO11/resolve/5599de6f3b0ef95f98f37530ed0f3bf149c10b37/yolo11n.pt
+          echo '0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1  '"$RUNNER_TEMP/yolo11n.pt" | sha256sum -c -
+      - name: Execute actual pretrained reference inference (exploratory only)
+        run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$RUNNER_TEMP/reference-captures" --model "$RUNNER_TEMP/yolo11n.pt" --confidence .1 --iou .5 --output "$RUNNER_TEMP/reference-evidence/reference-detector.json"
+      - name: Independently reconcile raw model outputs with frozen annotations
+        run: python .github/scripts/native_reference_detector_trial.py verify --root "$RUNNER_TEMP/reference-captures" --evidence "$RUNNER_TEMP/reference-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-reference-detector
+          retention-days: 14
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/reference-evidence/
