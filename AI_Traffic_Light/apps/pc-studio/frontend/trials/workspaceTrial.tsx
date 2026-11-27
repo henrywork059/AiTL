@@ -68,7 +68,7 @@ function CameraFixture(){
   const [status,setStatus]=useState<CameraStatus|null>(null);
   return <CameraSettingsPage status={status} showSimulationTools={false} onSimulationChange={()=>{}} onStatusChange={setStatus} changingMode={false}/>;
 }
-const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<30;i++){if(predicate())return;await pause();}throw Error(reason);};
+const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(page==="review"?100:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 async function main(){
   const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;

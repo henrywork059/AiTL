@@ -1,10 +1,86 @@
 import {spawn,spawnSync} from 'node:child_process';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync,readFileSync,writeFileSync,mkdtempSync} from 'node:fs';
 import {resolve} from 'node:path';
 const edge=resolve(process.env['ProgramFiles(x86)']||'C:/Program Files (x86)','Microsoft/Edge/Application/msedge.exe');
 if(!existsSync(edge))throw new Error('Edge unavailable');
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--config','trials/vite.config.ts','--host','127.0.0.1','--port','4179','--strictPort'],{stdio:'inherit'});
 const url='http://127.0.0.1:4179/renderer.html';
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+// Review is a real image-decode workflow. The dump-dom virtual-time clock can
+// advance JS retry timers before asynchronous browser decoding completes.
+// Use wall-clock CDP for this page, retaining every image/identity assertion.
+async function reviewWithRealTime(workspaceUrl,workspaceArgs){
+  const reviewProfile=mkdtempSync(resolve(process.env.RUNNER_TEMP||'.','mesh-edge-review-'));
+  const child=spawn(edge,[...workspaceArgs.filter(a=>!a.startsWith('--virtual-time-budget=')),
+    '--user-data-dir='+reviewProfile,'--remote-debugging-port=0',
+    '--remote-debugging-address=127.0.0.1','about:blank'],{stdio:'ignore',windowsHide:true});
+  let socket,launchError;
+  child.on('error',error=>{launchError=error;});
+  try {
+    const portFile=resolve(reviewProfile,'DevToolsActivePort');
+    let endpoint;
+    for(let i=0;i<150;i++){
+      if(launchError)throw launchError;
+      if(child.exitCode!==null)throw Error('Review Edge exited before CDP connection');
+      if(existsSync(portFile)){
+        const port=readFileSync(portFile,'utf8').split(/\r?\n/)[0];
+        try{
+          const pages=await (await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(1000)})).json();
+          endpoint=pages.find(p=>p.type==='page')?.webSocketDebuggerUrl;
+          if(endpoint)break;
+        }catch{}
+      }
+      await delay(100);
+    }
+    if(!endpoint)throw Error('Review CDP endpoint unavailable');
+    socket=new WebSocket(endpoint);
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Review CDP connection timeout')),5000);
+      socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});
+      socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('Review CDP connection failed'));},{once:true});
+    });
+    let id=0;
+    const pending=new Map();
+    socket.addEventListener('message',event=>{
+      const response=JSON.parse(String(event.data));
+      const waiter=pending.get(response.id);
+      if(!waiter)return;
+      pending.delete(response.id);clearTimeout(waiter.timer);
+      if(response.error)waiter.reject(Error(response.error.message));else waiter.resolve(response.result);
+    });
+    const call=(method,params={})=>new Promise((resolve,reject)=>{
+      const requestId=++id;
+      const timer=setTimeout(()=>{pending.delete(requestId);reject(Error('CDP timeout: '+method));},5000);
+      pending.set(requestId,{resolve,reject,timer});
+      socket.send(JSON.stringify({id:requestId,method,params}));
+    });
+    await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+    await call('Page.navigate',{url:workspaceUrl});
+    let outcome='',details='';
+    const deadline=Date.now()+35000;
+    while(Date.now()<deadline){
+      const response=await call('Runtime.evaluate',{expression:`JSON.stringify({result:document.querySelector('#result')?.textContent??'',state:document.querySelector('.label-empty-state')?.textContent??'',selected:document.querySelector('.capture-browser-item.active')?.textContent??'',save:[...document.querySelectorAll('button')].find(b=>b.textContent==='Save review')?.disabled??null})`,returnByValue:true});
+      if(response.result?.value){
+        const observed=JSON.parse(response.result.value);
+        outcome=observed.result;details=JSON.stringify(observed);
+        if(outcome.startsWith('MESH_WORKSPACE_'))break;
+      }
+      await delay(100);
+    }
+    const passed=outcome==='MESH_WORKSPACE_PASS · synthetic API fixture';
+    const target=resolve(process.env.RUNNER_TEMP||'.',passed?'mesh-workspace-review.png':'mesh-workspace-review-failed.png');
+    const screenshot=await call('Page.captureScreenshot',{format:'png',fromSurface:true});
+    const bytes=Buffer.from(screenshot.data,'base64');
+    if(bytes.length<1000)throw Error('Review screenshot missing');
+    writeFileSync(target,bytes);
+    if(!passed)throw Error('Workspace review failed (real clock): '+details);
+    console.log('[PASS] real-clock Dataset Review browser assertions and same-session screenshot');
+  }finally{
+    if(socket)socket.close();
+    child.kill();
+  }
+}
 try {
   let ready=false;
   for(let i=0;i<100;i++){try{if((await fetch(url)).ok){ready=true;break;}}catch{} await new Promise(r=>setTimeout(r,200));}
@@ -20,6 +96,7 @@ try {
   for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['diagnostics',600,900],['network',1440,1000],['models',600,900],['review',1440,1000]]){
     const workspaceUrl='http://127.0.0.1:4179/workspace.html?page='+page;
     const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=7000'];
+    if(page==='review'){await reviewWithRealTime(workspaceUrl,workspaceArgs);continue;}
     const dom=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-'+page,'--dump-dom',workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
     if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS · synthetic API fixture'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
     const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'.png');
