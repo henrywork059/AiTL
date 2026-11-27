@@ -1,3 +1,24 @@
+# V0575 — Independent source-qualified capture, training-safety and evidence-verification candidate
+
+Candidate 0_5_75; previous 0_5_74; accepted baseline 0_5_0. Independent concurrent P3/P4/P5 progress, partial Updates 30/33/37/38. Updates 31 and 36 remain delivered candidates from 0_5_74. 30/39 delivered candidate milestones (76.9%), not owner acceptance. Update 28 / S04 remains gated.
+
+From repository root:
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Check footer 0_5_75 Candidate, two physical sources and simulation-mode handoff (authorized test only); verify no stale preview, Side A/B polygon save/fail/reload and real pointer hit, capture source-switch rejection with no file write, status-error recovery, managed dataset exclusion of evaluation-only samples, training ready/stale/failure recovery and raw evidence integrity. Use disposable test data and back up saved profiles. Do not run real YOLO training or connect public-road controllers as part of CI. Owner must explicitly confirm PASS.
+
+P4 exact real-clock Windows Edge browser CI 46025031969 PASSED on application tree b6c0f1e2ca5584c81fd0758478e4f730cac959ce. It exercised actual pointer input, source-change capture rejection and recovery, decoded synthetic HTTP preview, stale/ready/error training transitions, saved crosswalk regions and side-specific vertex repaint, junction topology and source ownership, review labels/build/delete, render/rollback. Verified artifact 15210369050 SHA-256 6bf6a116c42999f2d226e3f0cdcb0473dbc3aff675920939278778ba964a1fba, with capture, training, crosswalk, junction and review screenshots actually inspected. Synthetic API and HTTP image fixtures only; not a physical ESP or trained detector. Standard CI 46022866121 PASSED full offline, seeded batch, build/audit at prior implementation tree; exact latest CI 46025214608 passed offline regressions including deterministic camera race correction, and was executing the seeded batch during release preparation. Release commit CI and owner Windows PASS remain pending.
+
+S04 remains OPEN. Existing native archive 15204881978 and CI 46012562415 qualified 11 synthetic captures/44 mirrored decoded views with a palette control, not a trusted trained detector. Native/reference finite passages each 8 vehicles and 14 pedestrians, but normalized waits remain different: native/reference 129.4/144 vehicle-agent-s and 15.4/57.2 pedestrian-agent-s. Production coordinate calibration or explicit synthetic-only contract, common wait estimand, trained holdout/detector proof, owner-PC Windows/resource budget and rollback acceptance remain missing. Freeze optional geometry polish. Legacy simulator stays default; native trial is opt-in. No public-road actuation, stored-data migration, accepted baseline promotion, main merge, or owner PASS claim.
+
+---
+
 # V0574 — Independent network, region, AI review and reproducible experiment candidate
 
 Candidate `0_5_74`; previous `0_5_73`; accepted baseline `0_5_0`. Updates 31 / U02 and 36 / E02 delivered as software candidate milestones. Updates 30, 33, 37 and 38 partial; Update 28 / S04 remains gated. Owner PASS pending.

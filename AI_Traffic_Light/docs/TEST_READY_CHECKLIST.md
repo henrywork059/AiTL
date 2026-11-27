@@ -1,3 +1,19 @@
+# V0575 — Independent source-qualified capture, training-safety and evidence-verification candidate
+
+Candidate 0_5_75; previous 0_5_74; accepted baseline 0_5_0. Independent concurrent P3/P4/P5 progress, partial Updates 30/33/37/38. Updates 31 and 36 remain delivered candidates from 0_5_74. 30/39 delivered candidate milestones (76.9%), not owner acceptance. Update 28 / S04 remains gated.
+
+- [x] Initial 0_5_74 exact release CI 46019581638 passed, including verifier and tampering regression.
+- [x] P3/P4/P5 application CI 46022866121 passed and newer 46025214608 completed offline regression checks, including source-switch race.
+- [x] Browser CI 46025031969 passed all real-clock capture, training, crosswalk, network, review and renderer fixtures; evidence ZIP checksum verified and screenshots inspected.
+- [x] Independent archive 15209410327 reconciled all member digests, local/primary rows, timeline samples, decisions and busy repeats.
+- [ ] Exact 0_5_75 release commit CI after VERSION synchronization.
+- [ ] Authorized Windows/ESP bench and owner manual editor/source-mode/physical integration PASS.
+- [ ] Qualified trusted holdout, production calibration/common waiting metric, owner resource budget and migration/rollback approval for S04.
+
+See [PATCH_0_5_75](PATCH_0_5_75.md).
+
+---
+
 # V0574 — Independent network, region, AI review and reproducible experiment candidate
 
 Candidate `0_5_74`; previous `0_5_73`; accepted baseline `0_5_0`. Updates 31 / U02 and 36 / E02 delivered as software candidate milestones. Updates 30, 33, 37 and 38 partial; Update 28 / S04 remains gated. Owner PASS pending.

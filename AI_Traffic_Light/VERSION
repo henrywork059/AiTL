@@ -1,5 +1,5 @@
-version: 0_5_74
-status: Independent P4/P5 network and reproducible evidence candidate (Updates 31/36; partial 30/33/37/38)
-previous_version: 0_5_73
+version: 0_5_75
+status: Independent concurrent P3/P4/P5 capture/training/evidence candidate (partial 30/33/37/38)
+previous_version: 0_5_74
 passed_baseline: 0_5_0
-notes: Application standard/browser CI passed; exact release CI and owner PASS pending; S04 gates and legacy default unchanged.
+notes: Qualified application/browser evidence; exact release CI and owner PASS pending; S04 gates remain open; legacy default preserved.

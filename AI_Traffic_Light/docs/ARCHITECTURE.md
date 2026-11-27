@@ -331,3 +331,8 @@ S04 closure: production frontend regionCounts.ts uses bottom-centre ground conta
 ## V0573 P4 workspace shell
 
 The existing AppShell and appNavigation own presentation and route grouping; the grouped mobile picker uses the same route inventory as desktop navigation. CameraSourcesPage retains profile/transport action ownership; CrosswalkNetworkPanel retains draft/persisted graph ownership and ModelRegistryPage uses strict API helpers for registry and inference status. No backend ownership, stored schema, signal authority or simulator default changes. See [PATCH_0_5_73.md](PATCH_0_5_73.md).
+
+
+## 0_5_75 — ARCHITECTURE addendum
+
+Capture identity is validated by the dataset FastAPI route against CameraFrameService under the existing source/mode abstraction; the browser page is an additional guard, not the authority. Training status and managed dataset are fetched strictly through centralized API helpers with scoped polling; error paths fail closed. Managed training builder explicitly excludes evaluation-only detector captures; stored captures, labels and previous data are not rewritten. CrosswalkRegionEditor owns side-specific vertex keys and dragRef pointer/side lifecycle. NativeProjectionView client remounts on source ID; it does not change native worker authority or simulator default. Browser trial HTTP synthetic image middleware exists only under frontend/trials and is never installed in production. Evidence verification remains a standalone stdlib reader of manifest/raw JSON/CSV with no simulator imports.

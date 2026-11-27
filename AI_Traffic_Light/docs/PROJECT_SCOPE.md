@@ -205,3 +205,8 @@ Native Lab region drafts are non-persistent, center-based synthetic observations
 ## V0573 independent P4 candidate
 
 Hardware-first navigation and partial device, crossing-network and AI model workflows are software candidates. Actual browser fixtures use synthetic API responses, not evidence of physical ESP or trusted-model inference. S04 migration, full dataset/training workflow acceptance and physical control restrictions remain unchanged.
+
+
+## 0_5_75 — PROJECT_SCOPE addendum
+
+0_5_75 is an independently qualified software candidate, not a physical or field deployment. The actual executed experiments are synthetic queue-model runs; the captured browser training status is a scripted API fixture, not executed YOLO training. Browser screenshot image states 'Synthetic browser capture fixture' and is served by isolated trial middleware. An evaluation-only false flag excludes a capture from managed training; it does not validate detector accuracy. Do not label any of these as measured road performance, actual trained model, pilot, partnership, S04 migration, owner PASS or public-road signal authority. Accepted baseline remains 0_5_0.
