@@ -326,13 +326,23 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   );
 }
 
-export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
 const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
 export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
 }
 export function nativeEvaluationCommand(action:"start"|"step"|"pause"|"stop",body:Record<string,unknown>,signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(`${nativeEvaluationBase}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal});
+}
+export function renewNativeCamera(state:NativeEvaluationState,camera_owner:string,signal:AbortSignal){
+  return requestJsonStrict<{epoch:string;generation:number;camera_owned:true}>(`${nativeEvaluationBase}/camera-heartbeat`,{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,camera_owner}),signal});
+}
+export function releaseNativeCamera(epoch:string,camera_owner:string){
+  // Best-effort cleanup on navigation. Server lease expiry also handles
+  // closed tabs, lost connections and a start whose response never arrived.
+  return fetch(`${nativeEvaluationBase}/camera-release`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({epoch,camera_owner}),keepalive:true}).catch(()=>undefined);
 }
 export function nativeEvaluationCaptureUrl(state:NativeEvaluationState){
   return `${nativeEvaluationBase}/capture?${new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)})}`;
@@ -365,7 +375,10 @@ export async function fetchExactNativeFrame(state:NativeEvaluationState,sourceId
     "X-Simulation-Engine":engine,
     "X-Layout-ID":snapshot.layout_id,
     "X-Observation-Epoch":state.epoch,
-    "X-Observation-Generation":String(state.generation)
+    "X-Observation-Generation":String(state.generation),
+    "X-Detector-Input-Eligible":"false",
+    "X-Observation-Kind":"synthetic_ground_truth",
+    "X-Coordinate-Space":"native_projection_v1"
   };
   if(!response.ok||!response.headers.get("content-type")?.startsWith("image/png")||
       Object.entries(expected).some(([name,value])=>response.headers.get(name)!==value))

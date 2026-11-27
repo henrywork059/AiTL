@@ -522,7 +522,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
           </div>}
           <div className="camera-frame-wrapper">
             {isolatedNative ? (
-              <div className="sim3d-viewport" style={{position:"relative",width:"100%",height:"100%"}} data-native-camera-workspace="true"><NativeProjectionView sourceId={nativeSource} standaloneOnly initialGeometry="midblock"/></div>
+              <div className="sim3d-viewport" style={{position:"relative",width:"100%",height:"100%"}} data-native-camera-workspace="true"><NativeProjectionView sourceId={nativeSource} standaloneOnly initialGeometry="midblock" cameraWorkspace/></div>
             ) : use3dPreview ? (
               <SimulationCamera3D key={sceneSourceId} sourceId={sceneSourceId} />
             ) : imageUrl ? (
@@ -546,7 +546,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             )}
           </div>
 
-          {isolatedNative&&<p className="small-note">Independent native preview. The selected camera and AI source are unchanged. Stop evaluation to release its session.</p>}
+          {isolatedNative&&<p className="small-note">Independent native preview. The selected camera and AI source are unchanged. Camera-owned sessions release on exit or expire after 30 seconds without renewal.</p>}
           {!isolatedNative && !cameraSettingsView && showSimulationTools && (
             <>
           <div className="button-row">

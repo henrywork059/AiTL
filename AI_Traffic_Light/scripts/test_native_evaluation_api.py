@@ -53,6 +53,77 @@ class Tests(unittest.TestCase):
             self.assertEqual(data["status"],"disabled")
             assert_envelope(client.post(BASE+"/start",json={"epoch":data["epoch"],"generation":data["generation"]}),expected_status=409)
 
+    def test_camera_workspace_lease_isolation_and_expiry(self):
+        import time
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"network.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            trips=(Trip("v0","vehicle",0.,10.,(Segment("WC","road",((0.,0.),(20.,0.))),)),)
+            mapping=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset())
+            sessions=[]
+            def factory(seed,*,density):
+                x=FakeSession(path);sessions.append(x);return x
+            service=NativeEvaluationService(enabled=True,factory=factory,trip_loader=lambda *args:trips,
+                phase_loader=lambda _:mapping,camera_lease_seconds=10.)
+            self.addCleanup(service.close)
+            legacy=CameraFrameService(simulation_seed=42,simulation_monotonic=lambda:0.)
+            legacy.set_simulation(True)
+            legacy.configure_simulation(paused=True)
+            self.addCleanup(legacy.set_simulation,False)
+            baseline=legacy.latest_frame()
+            token=legacy.observation_mode_token
+            a,b="a"*32,"b"*32
+            with patch.object(routes,"native_evaluation_service",service),patch.object(routes,"camera_frame_service",legacy),TestClient(build_test_app()) as client:
+                def ident():
+                    x=service.scene();return {k:x[k] for k in ("epoch","generation")}
+                def post(action,payload,expected_status=200):
+                    return assert_envelope(client.post(BASE+"/"+action,json=payload),expected_status=expected_status)
+                initial=ident()
+                post("start",initial)
+                standalone=ident()
+                post("start",{**standalone,"camera_owner":a},409)
+                self.assertFalse(sessions[-1].closed)
+                post("stop",standalone)
+                self.assertTrue(sessions[-1].closed)
+                state=post("start",{**ident(),"camera_owner":a})["data"]
+                self.assertTrue(state["camera_owned"])
+                self.assertNotIn(a,json.dumps(state))
+                owned=ident()
+                for bad in ({}, {"camera_owner":b}):
+                    post("start",{**owned,**bad},409)
+                    post("step",{**owned,"tick":0,"steps":1,**bad},409)
+                    post("pause",{**owned,"tick":0,"paused":True,**bad},409)
+                    post("stop",{**owned,**bad},409)
+                post("camera-heartbeat",{**owned,"camera_owner":b},409)
+                post("camera-release",{"epoch":owned["epoch"],"camera_owner":b},409)
+                post("camera-heartbeat",{**owned,"camera_owner":a})
+                post("step",{**owned,"tick":0,"steps":1,"camera_owner":a})
+                post("pause",{**owned,"tick":1,"paused":True,"camera_owner":a})
+                frame=service.frame(**owned,tick=1,source_id="simulation_camera")
+                self.assertFalse(frame.origin=="simulation")
+                self.assertIs(legacy.latest_frame(),baseline)
+                self.assertEqual(legacy.observation_mode_token,token)
+                post("camera-release",{"epoch":owned["epoch"],"camera_owner":a})
+                self.assertTrue(sessions[-1].closed)
+                self.assertEqual(service.scene()["status"],"idle")
+                post("camera-heartbeat",{**owned,"camera_owner":a},409)
+                self.assertFalse(post("camera-release",{"epoch":owned["epoch"],"camera_owner":a})["data"]["released"])
+                # Exercise actual timer-driven cleanup, including no subsequent client request.
+                service._camera_lease_seconds=.2
+                state=post("start",{**ident(),"camera_owner":b})["data"]
+                retired=ident()
+                deadline=time.monotonic()+3
+                while not sessions[-1].closed and time.monotonic()<deadline:
+                    time.sleep(.01)
+                self.assertTrue(sessions[-1].closed)
+                self.assertEqual(service.scene()["status"],"idle")
+                self.assertFalse(service.scene()["camera_owned"])
+                assert_envelope(client.get(BASE+"/frame",params={**retired,"tick":0,"source_id":"simulation_camera"}),expected_status=409)
+                self.assertIs(legacy.latest_frame(),baseline)
+                self.assertEqual(legacy.observation_mode_token,token)
+                post("start",ident())
+                self.assertFalse(service.scene()["camera_owned"])
+
     def test_midblock_lifecycle_and_dynamic_journey_export(self):
         from app.services.sumo_midblock_fixture import slots_for
         from app.services.sumo_midblock_session import CyclicLedger

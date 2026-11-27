@@ -93,6 +93,40 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_indexed_midblock_raster_exact_rgb_equivalence(self):
+        from app.services.sumo_projection import RASTER_PALETTE
+        from app.services.sumo_frame_publisher import encode_indexed_png,validate_indexed_png
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 100,0"/></edge><edge id=":C_w0" function="walkingarea"><lane id=":C_w0_0" width="4" shape="10,0 20,0 20,10 10,10"/></edge></net>')
+            projection=NativeProjection(Projection.load(path,walking_area_polygons=True),1,slot_profiles={
+                "v0":{"kind":"vehicle","vehicle_type":"bus","length_m":12.,"width_m":2.5,"eastbound":True},
+                "p0":{"kind":"pedestrian"}})
+            snap=ShadowSnapshot(42,1,False,(ShadowAgent("vehicle","v0_0",30.,0.,2.,"WC"),
+                ShadowAgent("pedestrian","p0_0",15.,5.,.65,":C_w0")))
+            meta,rgb=projection.render_pixels(snap)
+            imeta,indices=projection.render_pixels(snap,indexed=True)
+            self.assertEqual(meta,imeta)
+            self.assertEqual(rgb.nbytes,3*indices.nbytes)
+            self.assertTrue(np.array_equal(np.array(RASTER_PALETTE,np.uint8)[indices],rgb))
+            self.assertEqual(projection._background.nbytes,indices.nbytes)
+            pub=NativeFramePublisher()
+            pub.begin(1)
+            pub.prepare(meta,indices,received_at_ms=1,transfer_owned=True,indexed=True)
+            for sid,flip in VIEW_FLIPS.items():
+                frame=pub.frame_for(sid)
+                self.assertEqual(frame.content[25],3) # IHDR colour type: indexed
+                decoded=cv2.imdecode(np.frombuffer(frame.content,np.uint8),cv2.IMREAD_COLOR)
+                self.assertTrue(np.array_equal(decoded,rgb if flip is None else cv2.flip(rgb,flip)))
+            self.assertIsNone(pub._pixels)
+            nextmeta,nextpixels=projection.render_pixels(ShadowSnapshot(42,2,False,snap.agents),indexed=True)
+            pub.prepare(nextmeta,nextpixels,received_at_ms=2,indexed=True)
+            with patch("app.services.sumo_frame_publisher.encode_indexed_png",return_value=encode_indexed_png(np.zeros_like(nextpixels))):
+                with self.assertRaises(ValueError): pub.frame_for("simulation_camera")
+            self.assertIsNone(pub.frame_for("simulation_camera"))
+            bad=nextpixels.copy();bad[0,0]=255
+            with self.assertRaises(ValueError): encode_indexed_png(bad)
+
     def test_walking_area_polygon_not_thickened(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"net.xml"

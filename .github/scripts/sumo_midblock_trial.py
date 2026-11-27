@@ -60,7 +60,7 @@ def verify_export(result,expected_slots,horizon):
     assert {trips[i]["path"][0]["road_id"] for i in result["arrived_pedestrians"]}=={"NC","CS"}
 
 
-def run_arm(out,seed,density,mode,*,read_workload=False):
+def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True):
     out.mkdir(parents=True,exist_ok=True)
     sessions=[]
     def factory(seed,*,density):
@@ -74,7 +74,7 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
         for name in ("nodes.xml","edges.xml","connections.xml","routes.xml","slots.json","network.xml","first_visits.xml"):
             shutil.copyfile(session.network_path.parent/name,out/name)
         return session
-    svc=NativeEvaluationService(enabled=True,midblock_factory=factory)
+    svc=NativeEvaluationService(enabled=True,midblock_factory=factory,indexed_frames=indexed_frames)
     legacy=CameraFrameService(simulation_seed=seed,simulation_monotonic=lambda:0.)
     legacy.set_simulation(True)
     legacy.configure_simulation(paused=True)
@@ -94,6 +94,8 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
             start=time.perf_counter()
             timings={"scene_ms":[],"frame_ms":[]}
             digest=hashlib.sha256()
+            pixel_digest=hashlib.sha256()
+            encoded_bytes=0
             # 100 two-step batches: same 40 seconds, 400 scene/PNG pairs as
             # existing HTTP benchmark. Remaining horizon is scene-only.
             for tick in range(0,200,2):
@@ -114,6 +116,9 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
                         if flip is None: canonical=pixels
                         else: assert np.array_equal(cv2.flip(canonical,flip),pixels)
                         digest.update(response.content)
+                        pixel_digest.update(pixels.tobytes())
+                        encoded_bytes+=len(response.content)
+                        assert response.content[25]==(3 if indexed_frames else 2)
                 if tick==0:
                     assert_envelope(client.post(BASE+"/pause",json={**params,"paused":True}))
                     assert_envelope(client.post(BASE+"/step",json={**params,"steps":1}),expected_status=409)
@@ -123,7 +128,9 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
                 resources={"wall_s":time.perf_counter()-start,"cpu_delta_s":sum(after[k]["cpu_s"]-before[k]["cpu_s"] for k in before),
                            "end_combined_working_set_bytes":sum(x["working_set_bytes"] for x in after.values()),
                            "scene_reads":400,"frame_reads":400,"simulated_seconds":40,
-                           "image_digest":digest.hexdigest(),
+                           "image_digest":digest.hexdigest(),"decoded_pixel_digest":pixel_digest.hexdigest(),
+                           "encoded_bytes":encoded_bytes,"indexed_frames":indexed_frames,
+                           "background_bytes":svc._projection._background.nbytes,"before":before,"after":after,
                            "latency_ms":{k:{"mean":float(np.mean(v)),"p95":float(np.percentile(v,95)),"count":len(v)} for k,v in timings.items()}}
                 (out/"resources.json").write_text(json.dumps(resources,indent=2),encoding="utf-8")
                 (out/"latency-samples.json").write_text(json.dumps(timings),encoding="utf-8")
@@ -135,6 +142,9 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
                 assert scene["demand_model"]=="native_cyclic_slots_v1"
                 assert any(l["kind"]=="walk" and l.get("surface")=="polygon" for l in scene["lanes"])
                 assert "slot_id,visit" in z.read("agents.csv").decode()
+                contract=json.loads(z.read("detector_contract.json"))
+                assert not contract["detector_input_eligible"] and not contract["detector_observation"] and not contract["authoritative"]
+                assert contract["observations"]==json.loads(z.read("observations.json"))
                 for sid in VIEW_FLIPS:
                     assert z.read(sid+".png")==client.get(BASE+"/frame",params={**params,"source_id":sid}).content
                     meta=json.loads(z.read(sid+".json"))
@@ -142,6 +152,7 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
                     exact=client.get("/api/camera/simulation/observation/frame",params={**params,"engine":"native","layout_id":scene["layout_id"],"source_id":sid})
                     assert exact.status_code==200 and exact.content==z.read(sid+".png")
                     assert exact.headers["x-layout-id"]==scene["layout_id"] and exact.headers["x-observation-origin"]=="synthetic_sumo_projection"
+                    assert exact.headers["x-detector-input-eligible"]=="false" and exact.headers["x-coordinate-space"]=="native_projection_v1"
                 draft={**params,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":scene["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
                 regions=assert_envelope(client.post(BASE+"/region/views",json=draft))["data"]
                 assert set(regions["views"])==set(VIEW_FLIPS) and not regions["persisted"]
@@ -191,8 +202,36 @@ def main(out):
         f,a=(results[f"{seed}-{density}-{mode}"] for mode in ("fixed","adaptive"))
         assert f["layout_id"]==a["layout_id"] and f["demand_manifest"]==a["demand_manifest"]
         assert f["demand_digest"]==a["demand_digest"]
-    repeat=run_arm(out/"42-normal-fixed-repeat",42,"normal","fixed")
+    repeat=run_arm(out/"42-normal-fixed-repeat",42,"normal","fixed",read_workload=True)
     assert repeat==results["42-normal-fixed"]
+    # Same actual seed, mode, density, time horizon, camera workload and pixel
+    # output. Two RGB controls follow the indexed runs; not randomized.
+    controls=[]
+    for i in range(2):
+        folder=out/f"42-normal-fixed-rgb-{i}"
+        control=run_arm(folder,42,"normal","fixed",read_workload=True,indexed_frames=False)
+        assert control==repeat
+        controls.append(json.loads((folder/"resources.json").read_text()))
+    optimized=[json.loads((out/name/"resources.json").read_text()) for name in ("42-normal-fixed","42-normal-fixed-repeat")]
+    assert len({x["decoded_pixel_digest"] for x in controls+optimized})==1
+    assert all(x["background_bytes"]==1280*720 for x in optimized)
+    assert all(x["background_bytes"]==1280*720*3 for x in controls)
+    (out/"indexed-rgb-comparison.json").write_text(json.dumps({"evidence":"executed matched native HTTP workload",
+        "rgb":controls,"indexed":optimized,"pixel_equivalent":True,"order":"indexed, indexed, rgb, rgb (not randomized)"},indent=2))
+    # Actual child retirement without legacy activation or production camera selection.
+    lease=NativeEvaluationService(enabled=True,camera_lease_seconds=2.)
+    try:
+        owner="a"*32
+        state=lease.start(epoch=lease.epoch,generation=lease.generation,density="normal",seed=42,mode="fixed",geometry="midblock",camera_owner=owner)
+        proc=lease._session.proc
+        assert state["camera_owned"] and proc.is_alive()
+        lease.camera_heartbeat(epoch=lease.epoch,generation=lease.generation,camera_owner=owner)
+        deadline=time.monotonic()+10
+        while proc.is_alive() and time.monotonic()<deadline: time.sleep(.05)
+        assert not proc.is_alive() and lease.scene()["status"]=="idle" and not lease.scene()["camera_owned"]
+        (out/"camera-lease.json").write_text(json.dumps({"actual_native_child_reaped":True,"lease_seconds":2,"production_camera_selected":False},indent=2))
+    finally:
+        lease.close()
     # Actual saved-policy pair uses the same cyclic evaluation lifecycle.
     svc=NativeEvaluationService(enabled=True)
     try:

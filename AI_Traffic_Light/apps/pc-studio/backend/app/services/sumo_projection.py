@@ -27,6 +27,13 @@ WIDTH, HEIGHT = 1280, 720
 MARGIN = 24
 VIEW_FLIPS = SIMULATION_VIEW_FLIPS
 PROVENANCE = SUMO_EVALUATION_ORIGIN
+# Exact BGR colours of the native synthetic raster, in stable index order.
+RASTER_PALETTE = ((29,33,37),(75,80,86),(130,137,142),(225,225,225),
+                  (255,170,65),(225,240,255),(65,220,245))
+
+
+def raster_color(color, indexed):
+    return RASTER_PALETTE.index(color) if indexed else color
 
 
 @dataclass(frozen=True)
@@ -97,9 +104,10 @@ class Projection:
         return (self.bounds[0] + (px - self.offset_x) / self.scale,
                 self.bounds[3] - (py - self.offset_y) / self.scale)
 
-    def geometry_canvas(self) -> np.ndarray:
-        canvas = np.full((HEIGHT, WIDTH, 3), (29, 33, 37), np.uint8)
-        for kind, color in (("road", (75, 80, 86)), ("walk", (130, 137, 142)), ("crossing", (225, 225, 225))):
+    def geometry_canvas(self, *, indexed=False) -> np.ndarray:
+        canvas = np.full((HEIGHT, WIDTH) if indexed else (HEIGHT, WIDTH, 3), raster_color(RASTER_PALETTE[0],indexed), np.uint8)
+        for kind, bgr in (("road", RASTER_PALETTE[1]), ("walk", RASTER_PALETTE[2]), ("crossing", RASTER_PALETTE[3])):
+            color=raster_color(bgr,indexed)
             for lane in self.lanes:
                 if lane.kind != kind:
                     continue
@@ -181,11 +189,11 @@ class NativeProjection:
                     row["y"] = HEIGHT - 1 - row["y"]
         return {**meta, "lanes": deepcopy(self._lanes_by_view[source_id])}
 
-    def render_pixels(self, snapshot: ShadowSnapshot) -> tuple[dict, np.ndarray]:
+    def render_pixels(self, snapshot: ShadowSnapshot, *, indexed=False) -> tuple[dict, np.ndarray]:
         """One canonical image; callers may encode individual mirrored views."""
         meta = self.metadata(snapshot)
-        if self._background is None:
-            self._background = self.layout.geometry_canvas()
+        if self._background is None or self._background.ndim!=(2 if indexed else 3):
+            self._background = self.layout.geometry_canvas(indexed=indexed)
         image = self._background.copy()
         for row in meta["agents"]:
             # Native vehicle position is its front centre. Draw a physically
@@ -196,12 +204,12 @@ class NativeProjection:
                 half=row["width_m"]*self.layout.scale/2
                 left,right=sorted((round(x),round(tail)))
                 top,bottom=round(y-half),round(y+half)
-                cv2.rectangle(image,(left,top),(right,bottom),(255,170,65),-1)
-                cv2.line(image,(round(x),top),(round(x),bottom),(225,240,255),1)
+                cv2.rectangle(image,(left,top),(right,bottom),raster_color(RASTER_PALETTE[4],indexed),-1)
+                cv2.line(image,(round(x),top),(round(x),bottom),raster_color(RASTER_PALETTE[5],indexed),1)
             else:
                 radius=max(1,round(.25*self.layout.scale)) if self._slot_profiles is not None else (4 if row["kind"]=="vehicle" else 3)
                 cv2.circle(image,(round(row["x"]),round(row["y"])),radius,
-                           (255,170,65) if row["kind"]=="vehicle" else (65,220,245),-1)
+                           raster_color(RASTER_PALETTE[4 if row["kind"]=="vehicle" else 6],indexed),-1)
         return meta, image
 
     def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:

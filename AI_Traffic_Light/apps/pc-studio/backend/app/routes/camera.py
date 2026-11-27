@@ -376,7 +376,20 @@ class NativeEvaluationIdentity(BaseModel):
     generation: int = Field(ge=0)
 
 
-class NativeEvaluationStart(NativeEvaluationIdentity):
+class NativeEvaluationMutation(NativeEvaluationIdentity):
+    camera_owner: str | None = Field(default=None,min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeCameraHeartbeat(NativeEvaluationIdentity):
+    camera_owner: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeCameraRelease(BaseModel):
+    epoch: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+    camera_owner: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeEvaluationStart(NativeEvaluationMutation):
     engine: Literal["native","reference"] = "native"
     geometry: Literal["standard","compact","elongated","midblock"] = "standard"
     density: Literal["light","normal","busy"] = "normal"
@@ -384,12 +397,12 @@ class NativeEvaluationStart(NativeEvaluationIdentity):
     mode: Literal["fixed","adaptive"] = "fixed"
 
 
-class NativeEvaluationStep(NativeEvaluationIdentity):
+class NativeEvaluationStep(NativeEvaluationMutation):
     tick: int = Field(ge=0)
     steps: int = Field(ge=1,le=25)
 
 
-class NativeEvaluationPause(NativeEvaluationIdentity):
+class NativeEvaluationPause(NativeEvaluationMutation):
     tick: int = Field(ge=0)
     paused: bool
 
@@ -415,8 +428,18 @@ def pause_native_evaluation(payload: NativeEvaluationPause, request: Request) ->
 
 
 @router.post("/simulation/native-evaluation/stop")
-def stop_native_evaluation(payload: NativeEvaluationIdentity, request: Request) -> dict:
+def stop_native_evaluation(payload: NativeEvaluationMutation, request: Request) -> dict:
     return ok(native_evaluation_service.stop(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/camera-heartbeat")
+def native_camera_heartbeat(payload: NativeCameraHeartbeat,request: Request) -> dict:
+    return ok(native_evaluation_service.camera_heartbeat(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/camera-release")
+def native_camera_release(payload: NativeCameraRelease,request: Request) -> dict:
+    return ok(native_evaluation_service.release_camera(**payload.model_dump()),request_id=request.state.request_id)
 
 
 @router.get("/simulation/native-evaluation/frame")
@@ -507,4 +530,6 @@ def exact_simulation_observation_frame(request: Request, engine: Literal["legacy
         "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
         "X-Received-At-Ms":str(frame.received_at_ms),"X-Observation-Origin":frame.origin,
         "X-Simulation-Engine":engine,"X-Layout-ID":layout_id,
-        "X-Observation-Epoch":epoch,"X-Observation-Generation":str(generation)})
+        "X-Observation-Epoch":epoch,"X-Observation-Generation":str(generation),
+        **({"X-Detector-Input-Eligible":"false","X-Observation-Kind":"synthetic_ground_truth","X-Coordinate-Space":"native_projection_v1"}
+           if engine in {"native","reference"} else {})})

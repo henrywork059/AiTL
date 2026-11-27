@@ -8,9 +8,10 @@ import json
 import logging
 import hashlib
 import os
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event, RLock
+from threading import Event, RLock, Timer
 import time
 from uuid import uuid4
 from zipfile import ZipFile
@@ -49,11 +50,18 @@ logger = logging.getLogger(__name__)
 
 class NativeEvaluationService:
     def __init__(self, *, enabled=False, factory=GeneratedSession, trip_loader=load_trips, phase_loader=PhaseMap.load,
-                 reference_factory=GeneratedReferenceSession,midblock_factory=CyclicMidblockSession):
+                 reference_factory=GeneratedReferenceSession,midblock_factory=CyclicMidblockSession,indexed_frames=True,camera_lease_seconds=30.):
         self.enabled = enabled
         self._factory, self._trip_loader, self._phase_loader = factory, trip_loader, phase_loader
         self._reference_factory = reference_factory
         self._midblock_factory = midblock_factory
+        self._indexed_frames = indexed_frames
+        if not 0<camera_lease_seconds<=120:
+            raise ValueError("Invalid camera lease interval")
+        self._camera_lease_seconds=camera_lease_seconds
+        self._camera_owner=None
+        self._camera_deadline=0.
+        self._camera_timer=None
         self._lock = RLock()
         self._comparison = None
         self.epoch = uuid4().hex
@@ -80,6 +88,9 @@ class NativeEvaluationService:
     def _require(self, epoch, generation, tick=None, *, running=True):
         if not self.enabled:
             raise self._conflict("Standalone native evaluation is disabled.")
+        if self._camera_owner is not None and time.monotonic()>=self._camera_deadline:
+            self._retire()
+            raise self._conflict("Native camera ownership expired.")
         if epoch != self.epoch or generation != self.generation:
             raise self._conflict("Retired native evaluation generation.")
         if self._comparison is not None:
@@ -90,6 +101,11 @@ class NativeEvaluationService:
             raise self._conflict("Retired native evaluation tick.")
 
     def _retire(self, state="idle"):
+        if self._camera_timer is not None:
+            self._camera_timer.cancel()
+        self._camera_timer=None
+        self._camera_owner=None
+        self._camera_deadline=0.
         self.generation += 1
         self._publisher.invalidate()
         adapter, temp = self._adapter, self._temp
@@ -120,9 +136,59 @@ class NativeEvaluationService:
             pass
         return AppError(ErrorCode.CAMERA_FRAME_READ_FAILED, "Native evaluation failed and was retired.", status_code=503)
 
-    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard', engine='native'):
+    def _require_camera_owner(self, token):
+        if self._camera_owner is not None and token!=self._camera_owner:
+            raise self._conflict("Native camera workspace owns this session.")
+        if token is not None and (not isinstance(token,str) or not re.fullmatch(r"[0-9a-f]{32}",token)):
+            raise AppError(ErrorCode.INVALID_REQUEST,"Invalid camera owner token.",status_code=422)
+
+    def _arm_camera_timer(self, generation, delay):
+        timer=Timer(delay,self._expire_camera,args=(generation,))
+        timer.daemon=True
+        self._camera_timer=timer
+        timer.start()
+
+    def _expire_camera(self,generation):
+        with self._lock:
+            if self.generation!=generation or self._camera_owner is None:
+                return
+            remaining=self._camera_deadline-time.monotonic()
+            if remaining>0:
+                self._arm_camera_timer(generation,remaining)
+                return
+            try:
+                self._retire()
+            except Exception:
+                logger.exception("Native camera lease retirement failed")
+                self._state="unavailable"
+
+    def _renew_camera(self):
+        if self._camera_owner is not None:
+            self._camera_deadline=time.monotonic()+self._camera_lease_seconds
+
+    def camera_heartbeat(self,*,epoch,generation,camera_owner):
+        with self._lock:
+            self._require(epoch,generation)
+            self._require_camera_owner(camera_owner)
+            if self._camera_owner is None:
+                raise self._conflict("No native camera ownership.")
+            self._renew_camera()
+            return {"epoch":self.epoch,"generation":self.generation,"camera_owned":True}
+
+    def release_camera(self,*,epoch,camera_owner):
+        with self._lock:
+            if epoch!=self.epoch or self._camera_owner is None:
+                return {"released":False}
+            self._require_camera_owner(camera_owner)
+            self._retire()
+            return {"released":True}
+
+    def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard', engine='native',camera_owner=None):
         with self._lock:
             self._require(epoch, generation, running=False)
+            self._require_camera_owner(camera_owner)
+            if camera_owner is not None and self._state=="running" and self._camera_owner is None:
+                raise self._conflict("Stop standalone evaluation before claiming native camera workspace.")
             if engine not in ENGINES or not valid_geometry(engine,geometry) or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
                 raise AppError(ErrorCode.INVALID_REQUEST, "Invalid native evaluation settings.", status_code=422)
             try:
@@ -170,14 +236,21 @@ class NativeEvaluationService:
                 self._density, self._mode = density, mode
                 self._geometry = geometry
                 self._state = "running"
+                if camera_owner is not None:
+                    self._camera_owner=camera_owner
+                    self._renew_camera()
+                    self._arm_camera_timer(self.generation,self._camera_lease_seconds)
                 return self.scene()
             except Exception as exc:
                 logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
-    def step(self, *, epoch, generation, tick, steps, _return_scene=True):
+    def step(self, *, epoch, generation, tick, steps, _return_scene=True,camera_owner=None):
         with self._lock:
             self._require(epoch, generation, tick)
+            self._require_camera_owner(camera_owner)
+            if camera_owner is not None and self._camera_owner is None:
+                raise self._conflict("No native camera ownership.")
             if self._paused or tick >= MAX_TICKS:
                 raise self._conflict("Native evaluation paused or at its horizon.")
             if type(steps) is not int or not 1 <= steps <= MAX_BATCH or tick + steps > MAX_TICKS:
@@ -230,22 +303,30 @@ class NativeEvaluationService:
                         "applied_pedestrian_walk":bool(grants.intersection(self._phase_map.pedestrians))}
                 self._publisher.retire_before(snap.tick)
                 self._received_at_ms = time.time_ns() // 1_000_000
+                self._renew_camera()
                 return self.scene() if _return_scene else None
             except Exception as exc:
                 logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
-    def pause(self, *, epoch, generation, tick, paused):
+    def pause(self, *, epoch, generation, tick, paused,camera_owner=None):
         with self._lock:
             self._require(epoch,generation,tick)
+            self._require_camera_owner(camera_owner)
+            if camera_owner is not None and self._camera_owner is None:
+                raise self._conflict("No native camera ownership.")
             if type(paused) is not bool:
                 raise AppError(ErrorCode.INVALID_REQUEST, "Pause must be boolean.", status_code=422)
             self._paused = paused
+            self._renew_camera()
             return self.scene()
 
-    def stop(self, *, epoch, generation):
+    def stop(self, *, epoch, generation,camera_owner=None):
         with self._lock:
             self._require(epoch,generation,running=False)
+            self._require_camera_owner(camera_owner)
+            if camera_owner is not None and self._camera_owner is None:
+                raise self._conflict("No native camera ownership.")
             self._retire()
             return self.scene()
 
@@ -276,16 +357,17 @@ class NativeEvaluationService:
             return {"status":self._state,"provenance":ENGINES.get(self._engine,PROVENANCE),"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
                 "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":self._engine!="reference","engine":self._engine,
-                "evaluation_only":True,"available_engines":list(ENGINES) if self.enabled else [],
+                "evaluation_only":True,"camera_owned":self._camera_owner is not None,"available_engines":list(ENGINES) if self.enabled else [],
                 "profile":self._policy["active_profile"] if self._policy else None,"physical_output_allowed":False}
 
     def _ensure_frames(self):
         snap = self._adapter.snapshot()
         if not self._publisher.has_tick(snap.tick):
-            meta, pixels = self._projection.render_pixels(snap)
+            indexed=self._geometry=="midblock" and self._indexed_frames
+            meta, pixels = self._projection.render_pixels(snap,indexed=indexed)
             if self._geometry=="midblock":
                 meta.update(demand_model="native_cyclic_slots_v1",demand_digest=self._demand_digest)
-            self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True)
+            self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True,indexed=indexed)
 
     def frame(self, *, epoch, generation, tick, source_id):
         with self._lock:
@@ -334,7 +416,12 @@ class NativeEvaluationService:
                         z.writestr("scene.json",json.dumps(meta,indent=2))
                         z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False,**({"demand_model":meta["demand_model"],"demand_digest":meta["demand_digest"]} if self._geometry=="midblock" else {})},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
-                        z.writestr("observations.json",json.dumps([self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS],indent=2))
+                        observations=[self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS]
+                        z.writestr("observations.json",json.dumps(observations,indent=2))
+                        z.writestr("detector_contract.json",json.dumps({"schema_version":1,"observation_kind":"synthetic_ground_truth",
+                            "detector_input_eligible":False,"detector_observation":False,"authoritative":False,
+                            "physical_output_allowed":False,"coordinate_space":meta["coordinate_space"],"layout_id":meta["layout_id"],
+                            "observations":observations,"limitations":"Synthetic rendered scene; no model inference, detector calibration or production signal authority."},indent=2))
                     return stream.getvalue()
             except Exception as exc:
                 logger.exception("Isolated native evaluation operation failed; retiring session")

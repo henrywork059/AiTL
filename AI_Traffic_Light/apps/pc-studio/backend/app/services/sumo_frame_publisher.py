@@ -6,13 +6,47 @@ source. Existing zones, capture routes, AI and physical control stay untouched.
 from __future__ import annotations
 
 from copy import deepcopy
+import struct
+import zlib
 import cv2
 import numpy as np
 from app.services.camera_frames import CameraFrame
 
-from app.services.sumo_projection import VIEW_FLIPS, PROVENANCE, WIDTH, HEIGHT
+from app.services.sumo_projection import VIEW_FLIPS, PROVENANCE, WIDTH, HEIGHT, RASTER_PALETTE
 from app.services.sumo_projection_capture import evaluation_frames
 from app.services.observation_identity import EVALUATION_ORIGINS, evaluation_source_id
+
+
+_PNG_SIGNATURE=b"\x89PNG\r\n\x1a\n"
+_PALETTE=np.array(RASTER_PALETTE,np.uint8)
+_CHANNEL_LUTS=tuple(np.pad(_PALETTE[:,i],(0,256-len(_PALETTE))) for i in range(3))
+
+
+def _png_chunk(kind, data):
+    return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
+
+
+def encode_indexed_png(indices):
+    """Trusted fixed-palette PNG, filter None, exact decoded BGR validation.
+    One byte per pixel; no quantisation, external dependency or lossy conversion.
+    """
+    if indices.shape!=(HEIGHT,WIDTH) or indices.dtype!=np.uint8 or int(indices.max())>=len(_PALETTE):
+        raise ValueError("Invalid native palette indices")
+    rows=np.zeros((HEIGHT,WIDTH+1),np.uint8)
+    rows[:,1:]=indices
+    return (_PNG_SIGNATURE+_png_chunk(b"IHDR",struct.pack(">IIBBBBB",WIDTH,HEIGHT,8,3,0,0,0))
+            +_png_chunk(b"PLTE",_PALETTE[:,::-1].tobytes())
+            +_png_chunk(b"IDAT",zlib.compress(memoryview(rows),1))+_png_chunk(b"IEND",b""))
+
+
+def validate_indexed_png(content,indices):
+    if not content.startswith(_PNG_SIGNATURE):
+        raise ValueError("Invalid indexed PNG signature")
+    decoded=cv2.imdecode(np.frombuffer(content,np.uint8),cv2.IMREAD_COLOR)
+    if decoded is None or decoded.shape!=(HEIGHT,WIDTH,3) or any(
+        not np.array_equal(decoded[:,:,channel],cv2.LUT(indices,lut))
+        for channel,lut in enumerate(_CHANNEL_LUTS)):
+        raise ValueError("Native indexed PNG differs from raster")
 
 
 class NativeFramePublisher:
@@ -74,7 +108,7 @@ class NativeFramePublisher:
     def has_tick(self, tick: int) -> bool:
         return self._meta is not None and self._meta["tick"] == tick
 
-    def prepare(self, meta: dict, pixels: np.ndarray, *, received_at_ms: int, transfer_owned: bool=False) -> None:
+    def prepare(self, meta: dict, pixels: np.ndarray, *, received_at_ms: int, transfer_owned: bool=False, indexed: bool=False) -> None:
         """Publish a trusted canonical raster; encode only requested views.
 
         The owner serializes calls. Retain a detached, read-only raster and at
@@ -87,7 +121,8 @@ class NativeFramePublisher:
                 (meta.get("width"), meta.get("height")) != (WIDTH, HEIGHT) or
                 type(meta.get("tick")) is not int or meta["tick"] < 0 or
                 type(received_at_ms) is not int or received_at_ms < 0 or
-                pixels.shape != (HEIGHT, WIDTH, 3) or pixels.dtype != np.uint8):
+                type(indexed) is not bool or pixels.shape != ((HEIGHT, WIDTH) if indexed else (HEIGHT, WIDTH, 3)) or pixels.dtype != np.uint8 or
+                (indexed and int(pixels.max())>=len(_PALETTE))):
                 raise ValueError("Invalid native raster identity")
             # Only the internal renderer may transfer its newly allocated raster.
             # Keep defensive copy as the default for all external/test callers.
@@ -111,13 +146,17 @@ class NativeFramePublisher:
         try:
             flip = VIEW_FLIPS[source]
             expected = self._pixels if flip is None else cv2.flip(self._pixels, flip)
-            ok, encoded = cv2.imencode(".png", expected)
-            if not ok:
-                raise RuntimeError("Native projection PNG encoding failed")
-            content = encoded.tobytes()
-            decoded = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
-            if not content.startswith(b"\x89PNG\r\n\x1a\n") or decoded is None or not np.array_equal(decoded, expected):
-                raise ValueError("Native encoded view differs from raster")
+            if expected.ndim==2:
+                content=encode_indexed_png(expected)
+                validate_indexed_png(content,expected)
+            else:
+                ok, encoded = cv2.imencode(".png", expected)
+                if not ok:
+                    raise RuntimeError("Native projection PNG encoding failed")
+                content = encoded.tobytes()
+                decoded = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+                if not content.startswith(_PNG_SIGNATURE) or decoded is None or not np.array_equal(decoded, expected):
+                    raise ValueError("Native encoded view differs from raster")
             frame = CameraFrame(content=content, content_type="image/png",
                 source_id=evaluation_source_id(self._provenance,self._generation,source), width=WIDTH, height=HEIGHT,
                 received_at_ms=self._received_at_ms, frame_number=self._meta["tick"],

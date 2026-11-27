@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { SimulationCamera3D } from "../src/components/SimulationCamera3D";
+import { NativeProjectionView } from "../src/components/NativeProjectionView";
 import { fetchExactNativeFrame, type NativeEvaluationState, type SimulationScene } from "../src/lib/remoteCameraApi";
 import type { Zone } from "../src/types";
 
@@ -15,6 +16,7 @@ let nativeStatus = "running";
 let nativeCalls = 0;
 let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
 let wrongFrameHeader=false;
+let cameraOwner:string|null=null,releaseCalls=0;
 const layoutId="b".repeat(64);
 const originalFetch = window.fetch;
 window.fetch = async (input,init) => {
@@ -24,24 +26,30 @@ window.fetch = async (input,init) => {
     if(url.searchParams.get("engine")!=="native"||url.searchParams.get("layout_id")!==layoutId)throw Error("Unqualified native frame read");
     return new Response(Uint8Array.from([137,80,78,71,13,10,26,10]),{headers:{"Content-Type":"image/png","X-Camera-Source":`native_eval_g${evalGeneration}_${sid}`,
       "X-Frame-Number":String(wrongFrameHeader?evalTick-1:evalTick),"X-Received-At-Ms":"123","X-Observation-Origin":"synthetic_sumo_projection",
-      "X-Simulation-Engine":"native","X-Layout-ID":layoutId,"X-Observation-Epoch":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","X-Observation-Generation":String(evalGeneration)}});
+      "X-Simulation-Engine":"native","X-Layout-ID":layoutId,"X-Observation-Epoch":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","X-Observation-Generation":String(evalGeneration),"X-Detector-Input-Eligible":"false","X-Observation-Kind":"synthetic_ground_truth","X-Coordinate-Space":"native_projection_v1"}});
   }
   if(url.pathname.startsWith("/api/camera/simulation/native-evaluation")){
     evalCalls++;
     const command=url.pathname.split("/").pop();
     if(init?.method==="POST"){
       const body=JSON.parse(String(init.body));
+      if(command==="camera-release"){
+        check(body.camera_owner===cameraOwner,"Wrong camera release owner");releaseCalls++;cameraOwner=null;evalRunning=false;evalGeneration++;
+        return new Response(JSON.stringify({ok:true,data:{released:true}}),{headers:{"Content-Type":"application/json"}});
+      }
       if(body.generation!==evalGeneration||body.epoch!=="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")throw Error("Wrong evaluation identity");
+      if(cameraOwner&&["start","step","pause","stop","camera-heartbeat"].includes(command??"")&&body.camera_owner!==cameraOwner)throw Error("Wrong camera owner");
+      if(command==="camera-heartbeat")return new Response(JSON.stringify({ok:true,data:{epoch:body.epoch,generation:evalGeneration,camera_owned:true}}),{headers:{"Content-Type":"application/json"}});
       if(command==="region"||command==="views"){
         if(body.layout_id!==layoutId||body.coordinate_space!=="native_projection_v1"||body.tick!==evalTick||body.polygon.length!==4)throw Error("Wrong region identity");
         return new Response(JSON.stringify({ok:true,data:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false,views:{"simulation_camera":{},"simulation_camera_b":{},"simulation_camera_c":{},"simulation_camera_d":{}}}}),{headers:{"Content-Type":"application/json"}});
       }
-      if(command==="start"){evalGeneration++;evalTick=0;evalRunning=true;evalPaused=false;}
+      if(command==="start"){evalGeneration++;evalTick=0;evalRunning=true;evalPaused=false;cameraOwner=body.camera_owner??null;}
       if(command==="step"){if(evalPaused||body.tick!==evalTick)throw Error("Wrong step");evalTick+=body.steps;}
       if(command==="pause"){evalPaused=body.paused;}
-      if(command==="stop"){evalGeneration++;evalRunning=false;}
+      if(command==="stop"){evalGeneration++;evalRunning=false;cameraOwner=null;}
     }
-    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,physical_output_allowed:false,
+    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,camera_owned:cameraOwner!==null,physical_output_allowed:false,
       snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
   }
   if (url.pathname === "/api/camera/simulation/native-projection") {
@@ -201,7 +209,19 @@ async function run(){
     const retiredTick=evalTick,retiredEvalCalls=evalCalls;
     await new Promise(resolve=>setTimeout(resolve,650));
     check(evalTick===retiredTick&&evalCalls===retiredEvalCalls,"Playback or polling survived editor rollback");
+    // Previous standalone is intentionally still running: camera workspace must not take it over.
+    flushSync(()=>root.render(<NativeProjectionView sourceId="simulation_camera" standaloneOnly cameraWorkspace initialGeometry="midblock"/>));
+    await wait(()=>Boolean(button("Reset evaluation")?.disabled),"Camera workspace could mutate standalone");
+    check(!cameraOwner,"Read-only camera preview unexpectedly claimed ownership");
+    // Retire standalone through the simulated owner before starting camera session.
+    evalRunning=false;evalGeneration++;
+    await wait(()=>Boolean(button("Start evaluation")&&!button("Start evaluation")!.disabled),"Camera workspace not ready");
+    button("Start evaluation")!.click();
+    await wait(()=>Boolean(cameraOwner&&button("Play evaluation")&&!button("Play evaluation")!.disabled),"Camera lease not acquired");
+    button("Advance 5 s")!.click();
+    await wait(()=>evalTick===25,"Camera-owned step failed");
     flushSync(()=>root.unmount());
+    await wait(()=>releaseCalls===1&&!evalRunning,"Camera session not released on exit");
     check(!canvas(),"Canvas leaked after unmount");
     result.textContent="MESH_INTEGRATION_PASS";
   } catch(error){result.textContent="MESH_INTEGRATION_FAIL: "+String(error);flushSync(()=>root.unmount());}

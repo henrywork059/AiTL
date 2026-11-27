@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from "react";
-import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,fetchExactNativeFrame,nativeEvaluationExportUrl,runNativeComparison,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
+import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,fetchExactNativeFrame,nativeEvaluationExportUrl,runNativeComparison,renewNativeCamera,releaseNativeCamera,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
 import {useSerialPolling} from "../lib/useSerialPolling";
 import {NativeRoad3D} from "./NativeRoad3D";
 import {NativeRegionDraft} from "./NativeRegionDraft";
@@ -38,7 +38,7 @@ function ExactNativeImage({state,sourceId}:{state:NativeEvaluationState;sourceId
     <span role="status" style={{position:"absolute",left:8,bottom:65}}>{error||"Loading exact PNG"}</span>;
 }
 
-function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:string;standalone:boolean;profile?:string;initialGeometry?:string}){
+function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorkspace=false}:{sourceId:string;standalone:boolean;profile?:string;initialGeometry?:string;cameraWorkspace?:boolean}){
   const [scene,setScene]=useState<NativeProjectionScene|null>(null);
   const [state,setState]=useState<NativeEvaluationState|null>(null);
   const [status,setStatus]=useState("Loading native preview");
@@ -63,7 +63,16 @@ function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:s
   const [mode,setMode]=useState("fixed");
   const latest=useRef({epoch:"",generation:-1,tick:-1});
   const active=useRef<AbortController|null>(null);
-  useEffect(()=>()=>{play.current=null;active.current?.abort();},[]);
+  const owner=useRef<string|null>(null);
+  const ownerEpoch=useRef<string|null>(null);
+  const ownedGeneration=useRef<number|null>(null);
+  const lastRenew=useRef(0);
+  const [owned,setOwned]=useState(false);
+  const locked=Boolean(state?.status==="running"&&(cameraWorkspace?!owned:state.camera_owned));
+  useEffect(()=>()=>{
+    play.current=null;active.current?.abort();
+    if(owner.current&&ownerEpoch.current)void releaseNativeCamera(ownerEpoch.current,owner.current);
+  },[]);
   const onFailure=useCallback(()=>{setThree(false);setFailed(true);},[]);
   const accept=(response:NativeProjectionResponse)=>{
     if(response.provenance!=="synthetic_sumo_projection"&&!(standalone&&response.provenance==="synthetic_finite_reference_projection"&&(response as NativeEvaluationState).engine==="reference")){stopPlayback();setRegion(false);setScene(null);setState(null);setStatus("Invalid native provenance");return;}
@@ -73,6 +82,9 @@ function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:s
     const generation=response.generation;
     if(generation!==undefined&&generation<latest.current.generation)return;
     if(generation!==undefined&&generation>latest.current.generation)latest.current={epoch,generation,tick:-1};
+    const ours=Boolean(cameraWorkspace&&evaluation?.camera_owned&&ownerEpoch.current===evaluation.epoch&&ownedGeneration.current===evaluation.generation);
+    setOwned(ours);
+    if(standalone&&(evaluation?.status!=="running"||cameraWorkspace&&!ours||!cameraWorkspace&&evaluation?.camera_owned))stopPlayback();
     if(response.status!=="running"||!response.snapshot){
       stopPlayback();setRegion(false);setScene(null);setStatus(response.status==="disabled"?"Native preview disabled on server":"Native preview: "+response.status);
       if(evaluation)setState(evaluation);
@@ -92,6 +104,11 @@ function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:s
     const intent=play.current;
     const response=standalone?await fetchNativeEvaluation(signal):await fetchNativeProjection(signal);
     if(!isCurrent()||active.current)return;
+    if(standalone&&cameraWorkspace&&owner.current&&ownerEpoch.current===(response as NativeEvaluationState).epoch&&
+       ownedGeneration.current===response.generation&&(response as NativeEvaluationState).camera_owned&&Date.now()-lastRenew.current>=5000){
+      await renewNativeCamera(response as NativeEvaluationState,owner.current,signal);lastRenew.current=Date.now();
+      if(!isCurrent()||active.current)return;
+    }
     if(standalone&&intent&&play.current===intent){
       const current=response as NativeEvaluationState;
       const snap=current.snapshot;
@@ -101,21 +118,29 @@ function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:s
       }
       // The server performs one protected 0.2 s step; never catch up by
       // skipping samples. No automatic resume after reset/connection loss.
-      const next=await nativeEvaluationCommand("step",{epoch:intent.epoch,generation:intent.generation,tick:snap.tick,steps:1},signal);
+      const next=await nativeEvaluationCommand("step",{epoch:intent.epoch,generation:intent.generation,tick:snap.tick,steps:1,...(cameraWorkspace&&owner.current?{camera_owner:owner.current}:{})},signal);
       if(isCurrent()&&!active.current)accept(next);
       return;
     }
     accept(response);
   },playing?200:500,{restartKey:sourceId,onError:()=>{if(!active.current){stopPlayback();setRegion(false);setScene(null);setState(null);setStatus("Native preview unavailable");}}});
   const command=async(action:"start"|"step"|"pause"|"stop",extra:Record<string,unknown>={})=>{
-    if(!state||active.current)return;
+    if(!state||active.current||locked)return;
     stopPlayback();setRegion(false);
     const controller=new AbortController();active.current=controller;setPending(true);
     try{
       await polling.waitForIdle();
       if(controller.signal.aborted)return;
-      const response=await nativeEvaluationCommand(action,{epoch:state.epoch,generation:state.generation,...extra},controller.signal);
+      if(cameraWorkspace&&action==="start"){
+        if(!owner.current)owner.current=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");
+        ownerEpoch.current=state.epoch;
+      }
+      const response=await nativeEvaluationCommand(action,{epoch:state.epoch,generation:state.generation,...extra,
+        ...(cameraWorkspace&&owner.current?{camera_owner:owner.current}:{})},controller.signal);
+      if(cameraWorkspace&&response.camera_owned&&action==="start"){ownedGeneration.current=response.generation;lastRenew.current=Date.now();}
+      if(action==="stop"){ownedGeneration.current=null;owner.current=null;ownerEpoch.current=null;}
       if(!controller.signal.aborted)accept(response);
+      else if(cameraWorkspace&&owner.current&&ownerEpoch.current)void releaseNativeCamera(ownerEpoch.current,owner.current);
     }catch{if(!controller.signal.aborted)setStatus("Native evaluation command rejected; refreshing");}
     finally{active.current=null;if(!controller.signal.aborted){setPending(false);void polling.runNow();}}
   };
@@ -161,32 +186,32 @@ function NativeContent({sourceId,standalone,profile,initialGeometry}:{sourceId:s
         <select aria-label="Native density" value={density} disabled={pending} onChange={e=>setDensity(e.target.value)}><option>light</option><option>normal</option><option>busy</option></select>
         <select aria-label="Native policy" value={mode} disabled={pending} onChange={e=>setMode(e.target.value)}><option>fixed</option><option>adaptive</option></select>
         <label>Seed <input aria-label="Native seed" type="number" min={0} max={2147483647} value={seed} disabled={pending} onChange={e=>setSeed(Number(e.target.value))} style={{width:90}}/></label>
-        <button type="button" disabled={pending||state.status==="busy"||!validSeed} onClick={()=>void command("start",{density,mode,seed,geometry,engine})}>{scene?(engine!==state.engine?"Switch engine (reset)":"Reset evaluation"):"Start evaluation"}</button>
+        <button type="button" disabled={locked||pending||state.status==="busy"||!validSeed} onClick={()=>void command("start",{density,mode,seed,geometry,engine})}>{scene?(engine!==state.engine?"Switch engine (reset)":"Reset evaluation"):"Start evaluation"}</button>
         {!scene&&<><label>Duration <select value={duration} disabled={pending} onChange={e=>setDuration(Number(e.target.value))}>{[30,60,180,300,500].map(v=><option key={v} value={v}>{v}s</option>)}</select></label><button type="button" disabled={pending||state.status==="busy"||!validSeed} onClick={()=>void compare()}>Compare fixed/adaptive</button>
           {comparisonUrl&&<a href={comparisonUrl} download="mesh-evaluation-comparison.zip">Comparison ZIP</a>}</>}
         {scene&&<>
-          <button type="button" disabled={pending||region||scene.paused||scene.tick>=state.max_ticks} onClick={()=>{
+          <button type="button" disabled={locked||pending||region||scene.paused||scene.tick>=state.max_ticks} onClick={()=>{
             if(play.current){stopPlayback();return;}
             play.current={epoch:state.epoch,generation:state.generation};setPlaying(true);
           }}>{playing?"Stop playback":"Play evaluation"}</button>
           {scene.coordinate_space==="native_projection_v1"&&scene.layout_id&&<button type="button" disabled={pending||playing} onClick={()=>{stopPlayback();setThree(false);setImage(false);setRegion(!region);}}>{region?"Close draft":"Draft region"}</button>}
-          <button type="button" disabled={pending||playing||region||scene.paused||scene.tick>=state.max_ticks} onClick={()=>void command("step",{tick:scene.tick,steps:Math.min(25,state.max_ticks-scene.tick)})}>Advance 5 s</button>
-          <button type="button" disabled={pending} onClick={()=>void command("pause",{tick:scene.tick,paused:!scene.paused})}>{scene.paused?"Resume evaluation":"Pause evaluation"}</button>
-          <button type="button" disabled={pending} onClick={()=>void command("stop")}>Stop evaluation</button>
+          <button type="button" disabled={locked||pending||playing||region||scene.paused||scene.tick>=state.max_ticks} onClick={()=>void command("step",{tick:scene.tick,steps:Math.min(25,state.max_ticks-scene.tick)})}>Advance 5 s</button>
+          <button type="button" disabled={locked||pending} onClick={()=>void command("pause",{tick:scene.tick,paused:!scene.paused})}>{scene.paused?"Resume evaluation":"Pause evaluation"}</button>
+          <button type="button" disabled={locked||pending} onClick={()=>void command("stop")}>Stop evaluation</button>
           {!pending&&!playing&&<><a href={nativeEvaluationCaptureUrl(state)} aria-label="Download evaluation four-view capture">Capture ZIP</a>
             <a href={nativeEvaluationExportUrl(state)} target="_blank" rel="noreferrer">Export JSON</a></>}
         </>}
       </>}
     </div>
-    <span role="status">{status}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene?" · Separate evaluation coordinate plane":""}</span>
+    <span role="status">{status}{locked?" · Another workspace owns playback":owned?" · Camera-owned session":""}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene?" · Separate evaluation coordinate plane":""}</span>
   </div>;
 }
 
 /** Separate shadow and manually stepped native-only evaluation; neither is a saved camera. */
-export function NativeProjectionView({sourceId,standaloneOnly=false,profile,initialGeometry}:{sourceId:string;standaloneOnly?:boolean;profile?:string;initialGeometry?:string}){
+export function NativeProjectionView({sourceId,standaloneOnly=false,profile,initialGeometry,cameraWorkspace=false}:{sourceId:string;standaloneOnly?:boolean;profile?:string;initialGeometry?:string;cameraWorkspace?:boolean}){
   const [standalone,setStandalone]=useState(standaloneOnly);
   return <div style={{position:"absolute",inset:0}}>
-    <NativeContent key={String(standalone)} sourceId={sourceId} standalone={standalone} profile={profile} initialGeometry={initialGeometry}/>
+    <NativeContent key={String(standalone)} sourceId={sourceId} standalone={standalone} profile={profile} initialGeometry={initialGeometry} cameraWorkspace={cameraWorkspace}/>
     {!standaloneOnly&&<button type="button" style={{position:"absolute",right:8,top:8,zIndex:6}} onClick={()=>setStandalone(!standalone)}>
       {standalone?"Shadow preview":"Standalone evaluation"}
     </button>}
