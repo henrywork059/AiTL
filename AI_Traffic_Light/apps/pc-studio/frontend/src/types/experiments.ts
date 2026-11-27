@@ -86,6 +86,10 @@ export type SimulationExperiment = {
   created_at_ms: number;
   label: string;
   scenario: {
+    demand_model?: "historical" | "live_slots";
+    movement_step_seconds?: number;
+    geometry?: "legacy_camera_pixels_v1";
+    native_demand_matched?: false;
     duration_seconds: number;
     density: "light" | "normal" | "busy";
     seed: number;

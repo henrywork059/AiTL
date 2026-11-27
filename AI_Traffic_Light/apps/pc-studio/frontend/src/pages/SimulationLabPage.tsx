@@ -55,7 +55,7 @@ function directionClass(delta: ExperimentDelta): string {
 
 function scenarioLabel(item: SimulationExperimentSummary): string {
   const name = item.label.trim() || new Date(item.created_at_ms).toLocaleString();
-  return `${name} · ${item.scenario.density} · ${item.scenario.duration_seconds}s`;
+  return `${name} · ${item.scenario.density} · ${item.scenario.duration_seconds}s${item.scenario.demand_model==="live_slots"?" · live slots":""}`;
 }
 
 function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
@@ -75,6 +75,7 @@ export function SimulationLabPage() {
   const [tab, setTab] = useState<TabId>("summary");
   const [sampleMode, setSampleMode] = useState<SampleMode>("adaptive");
   const [duration, setDuration] = useState(300);
+  const [demandModel,setDemandModel]=useState<"historical"|"live_slots">("historical");
   const [density, setDensity] = useState<"light" | "normal" | "busy">("normal");
   const [seed, setSeed] = useState(25025);
   const [sampleInterval, setSampleInterval] = useState(1);
@@ -119,6 +120,7 @@ export function SimulationLabPage() {
       const next = await runSimulationExperiment({
         duration_seconds: duration,
         density,
+        demand_model:demandModel,
         seed,
         sample_interval_seconds: sampleInterval,
         profile: profile || null,
@@ -198,6 +200,12 @@ export function SimulationLabPage() {
               <option value="light">Light</option><option value="normal">Normal</option><option value="busy">Busy</option>
             </select>
           </label>
+          <label>Demand model
+            <select value={demandModel} disabled={busy} onChange={(event: ChangeEvent<HTMLSelectElement>) => setDemandModel(event.target.value as typeof demandModel)}>
+              <option value="historical">Historical benchmark</option>
+              <option value="live_slots">Live camera slots (50 ms)</option>
+            </select>
+          </label>
           <label>Duration
             <select value={duration} onChange={(event: ChangeEvent<HTMLSelectElement>) => setDuration(Number(event.target.value))}>
               {DURATION_OPTIONS.map((value) => <option key={value} value={value}>{value < 60 ? `${value}s` : `${value / 60} min`}</option>)}
@@ -233,7 +241,7 @@ export function SimulationLabPage() {
             <button type="button" disabled={!result} onClick={() => result && window.location.assign(simulationExperimentExportUrl(result.run_id))}>Export samples CSV</button>
             <button className="danger" type="button" disabled={!result || busy} onClick={() => void deleteRun()}>Delete run</button>
           </div>
-          {result && <div className="experiment-scenario-strip"><strong>{result.scenario.profile}</strong><span>{result.scenario.density}</span><span>{result.scenario.duration_seconds}s</span><span>seed {result.scenario.seed}</span><span>{new Date(result.created_at_ms).toLocaleString()}</span></div>}
+          {result && <div className="experiment-scenario-strip"><strong>{result.scenario.profile}</strong><span>{result.scenario.density}</span><span>{result.scenario.duration_seconds}s</span><span>seed {result.scenario.seed}</span>{result.scenario.demand_model==="live_slots"&&<span>Live camera slots · 50 ms</span>}<span>{new Date(result.created_at_ms).toLocaleString()}</span></div>}
         </div>
 
         {error && <p className="error-message experiment-error">{error}</p>}

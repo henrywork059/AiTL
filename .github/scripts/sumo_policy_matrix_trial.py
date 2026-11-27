@@ -77,14 +77,28 @@ def main(out):
                             summaries[mode] = arm["summary"]
                             # Execute the existing production benchmark, not a new substitute.
                             if geometry=="standard":
+                                legacy_root=root/f"{seed}-{density}-{mode}-historical"
+                                legacy_root.mkdir()
                                 legacy=_ModeSimulation(mode=mode,density=density,seed=seed,duration_seconds=120,
                                     sample_interval_seconds=1,policy_config=json.loads(z.read("policy.json")),
-                                    zones=[],temp_root=root,normalized_gate_evidence=True).run()
+                                    zones=[],temp_root=legacy_root,normalized_gate_evidence=True).run()
                                 common=legacy["normalized_gate_evidence"]
                                 assert len(common["timeline"])==600
                                 for kind,waits in common["waiting_episodes"].items():
                                     assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
                                 (out/f"{seed}-{density}-{mode}-production-legacy.json").write_text(json.dumps(legacy,indent=2),encoding="utf-8")
+                                if seed==42:
+                                    live_root=root/f"{seed}-{density}-{mode}-live"
+                                    live_root.mkdir()
+                                    live=_ModeSimulation(mode=mode,density=density,seed=seed,duration_seconds=120,
+                                        sample_interval_seconds=1,policy_config=json.loads(z.read("policy.json")),
+                                        zones=[],temp_root=live_root,normalized_gate_evidence=True,live_slot_demand=True).run()
+                                    live_common=live["normalized_gate_evidence"]
+                                    assert live_common["demand_model"]=="production_live_slots"
+                                    assert live_common["movement_step_seconds"]==.05 and len(live_common["timeline"])==600
+                                    for kind,waits in live_common["waiting_episodes"].items():
+                                        assert waits["observed_agent_seconds"]==live_common["summary"][kind+"_wait_agent_s"]
+                                    (out/f"{seed}-{density}-{mode}-live-slot-legacy.json").write_text(json.dumps(live,indent=2),encoding="utf-8")
                             reference=replay_reference(arm)
                             assert len(reference["timeline"])==len(arm["timeline"])
                             (out/f"{seed}-{density}-{geometry}-{mode}-reference.json").write_text(json.dumps(reference,indent=2),encoding="utf-8")
@@ -97,7 +111,7 @@ def main(out):
             service.close()
     result = {"evidence":"executed synthetic native policy matrix",
               "duration_seconds":120,"step_seconds":.2,"pairs":rows,
-              "reference_replays":16,"production_legacy_arms":12,"production_experiment_parity":False,"physical_output_allowed":False}
+              "reference_replays":16,"production_legacy_arms":12,"live_slot_legacy_arms":6,"production_experiment_parity":False,"physical_output_allowed":False}
     (out/"matrix.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     print(json.dumps(result,indent=2))
 

@@ -133,6 +133,20 @@ def main() -> int:
         assert zone_run["adaptive"]["metrics"]["signal"]["rule_applications"].get("whole_scene_car_demand", 0) > 0
         assert zone_run["fixed"]["metrics"]["signal"]["rule_application_count"] == 0
 
+        live_service=SimulationExperimentService(storage_root=Path(temporary)/"live_slots",
+            config_provider=signal_rules_service.get_config,zones_provider=lambda:[])
+        live_args=dict(duration_seconds=30,density="normal",seed=42,sample_interval_seconds=1,
+                       profile="Normal",demand_model="live_slots")
+        live_first=live_service.run(**live_args)
+        live_second=live_service.run(**live_args)
+        assert comparable(live_first)==comparable(live_second)
+        assert live_first["scenario"]["movement_step_seconds"]==.05
+        assert live_first["scenario"]["demand_model"]=="live_slots"
+        assert not live_first["scenario"]["native_demand_matched"]
+        assert live_service.get(live_first["run_id"])["scenario"]==live_first["scenario"]
+        assert "fixed_vehicle_queue" in live_service.export_csv(live_first["run_id"])
+        assert "demand_model" not in first["scenario"]
+
         listing = service.list()
         assert listing["total"] == 2
         loaded = service.get(first["run_id"])

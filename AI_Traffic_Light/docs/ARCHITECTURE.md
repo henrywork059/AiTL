@@ -272,3 +272,6 @@ Legacy frame owner caches one detached scene at raster publication and shares or
 
 ### S04 shared exact read boundary (unreleased)
 The common simulation observation route dispatches explicit legacy or native read owners and returns shared view-space centers/identity; exact frame reads require epoch/generation/tick/layout and never implicitly select or substitute another engine. Production multi-camera inference takes a single locked legacy publication across all requested saved simulation views. Native synthetic projections remain ineligible for the live detector cache even if misrouted internally. Native UI uses the common exact binary path; existing legacy/native routes retained. Geometry and demand equivalence, safe production engine interchangeability and owner acceptance remain gated.
+
+### S04 shared legacy motion owner (unreleased)
+Pure legacy_world module owns fixed pixel geometry, density counts/seed offsets, initial slot specs and deterministic movement/recirculation. Camera and isolated production benchmark retain their own locks, policy clocks, observation owners and metrics; both call the same movement functions. Opt-in live-slot benchmark initialization matches the camera, historical default unchanged. Native finite physical geometry remains explicitly different.

@@ -6,7 +6,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from app.services.simulation_gate_metrics import GateObservation
-from app.services.camera_frames import (EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
+from app.services.legacy_world import (EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
                                        TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y)
 
 

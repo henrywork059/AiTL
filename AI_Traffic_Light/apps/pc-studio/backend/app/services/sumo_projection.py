@@ -109,7 +109,8 @@ class NativeProjection:
     def __init__(self, layout: Projection, generation: int):
         self.layout = layout
         self.generation = generation
-        self._background = layout.geometry_canvas()
+        # Scene-only runs do not allocate the full raster.
+        self._background = None
         # Static geometry is projected once per generation and view. Public
         # scenes receive detached lane data, so consumers cannot mutate the cache.
         self._lanes_by_view = {
@@ -155,6 +156,8 @@ class NativeProjection:
     def render_pixels(self, snapshot: ShadowSnapshot) -> tuple[dict, np.ndarray]:
         """One canonical image; callers may encode individual mirrored views."""
         meta = self.metadata(snapshot)
+        if self._background is None:
+            self._background = self.layout.geometry_canvas()
         image = self._background.copy()
         for row in meta["agents"]:
             # Position markers, not detection boxes.

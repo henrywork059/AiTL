@@ -103,6 +103,38 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(reset["observation"]["generation"],service.observation_mode_token[1])
             self.assertEqual(len(reset["vehicles"]),12)
 
+    def test_shared_live_slot_motion(self):
+        from app.services.camera_frames import CameraFrameService
+        from app.services.simulation_experiments import _ModeSimulation
+        from app.services.signal_rules import signal_rules_service
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            service=CameraFrameService(simulation_seed=42,simulation_monotonic=lambda:0.)
+            with patch.object(service,"_simulation_signal_state_locked",return_value={
+                "phase":"vehicle_green","vehicle_go":True,"pedestrian_walk":False,
+                "seconds_remaining":12,"base_cycle_seconds":34,"mode":"fixed",
+                "active_profile":"fixture","active_rules":[]}):
+                service.set_simulation(True)
+            benchmark=_ModeSimulation(mode="fixed",density="normal",seed=42,
+                duration_seconds=30,sample_interval_seconds=1,
+                policy_config=signal_rules_service.get_config(),zones=[],
+                temp_root=Path(tmp),live_slot_demand=True)
+            def state(vehicles,pedestrians):
+                return ([(v.x,v.y,v.width,v.speed,v.direction) for v in vehicles],
+                        [(v.x,v.y,v.speed,v.direction) for v in pedestrians])
+            self.assertEqual(state(service._vehicles,service._pedestrians),
+                             state(benchmark.vehicles,benchmark.pedestrians))
+            for tick in range(1200):
+                phase=("vehicle_green","vehicle_yellow","all_red","pedestrian_green","pedestrian_flashing","all_red")[(tick//200)%6]
+                signal={"vehicle_go":phase=="vehicle_green","pedestrian_walk":phase=="pedestrian_green"}
+                service._advance_vehicles_locked(.05,phase)
+                service._advance_pedestrians_locked(.05,phase)
+                benchmark._advance_vehicles(.05,tick*.05,signal)
+                benchmark._advance_pedestrians(.05,tick*.05,signal)
+                self.assertEqual(state(service._vehicles,service._pedestrians),
+                                 state(benchmark.vehicles,benchmark.pedestrians))
+            service.set_simulation(False)
+
     def test_actual_legacy_agents(self):
         from app.services.camera_frames import CameraFrameService
         def run(times, seed):

@@ -21,24 +21,17 @@ from app.services.signal_rules import signal_rules_service
 from app.services.observation_identity import (ObservationIdentity, observation_provenance,
     SIMULATION_VIEW_FLIPS, simulation_view_point, synthetic_scene_identity)
 from app.services.simulation_adapter import LegacySimulationAdapter
+from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
+    CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
+    TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
+    vehicle_specs, pedestrian_specs, advance_vehicles, advance_pedestrians)
 from app.services.sumo_shadow_runtime import ShadowRuntime
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 SUPPORTED_UPLOAD_TYPES = {"image/jpeg", "image/png"}
-SIMULATION_DENSITIES = {"light", "normal", "busy"}
-
-FRAME_WIDTH = 1280
-FRAME_HEIGHT = 720
-ROAD_TOP = 179
-ROAD_BOTTOM = 625
-CROSSING_LEFT = 520
-CROSSING_RIGHT = 760
-EASTBOUND_STOP_LINE = 495
-WESTBOUND_STOP_LINE = 785
-TOP_PEDESTRIAN_WAIT_Y = 126
-BOTTOM_PEDESTRIAN_WAIT_Y = 674
+SIMULATION_DENSITIES = set(DENSITY_COUNTS)
 # Fixed legacy editor plane: no native metre calibration is implied.
 LEGACY_LAYOUT_ID = hashlib.sha256(json.dumps({
     'schema':'legacy_camera_pixels_v1','dimensions':[FRAME_WIDTH,FRAME_HEIGHT],
@@ -355,7 +348,7 @@ class CameraFrameService:
         self._simulation_adapter.reset(seed=self._simulation_seed, now=self._simulation_monotonic(),
                                        paused=self._simulation_paused)
         signal_rules_service.reset_runtime(0.0)
-        density_offset = {"light": 101, "normal": 211, "busy": 307}[self._simulation_density]
+        density_offset = DENSITY_SEED_OFFSETS[self._simulation_density]
         self._simulation_rng = random.Random(self._simulation_seed + density_offset)
         self._initialize_agents_locked()
         if self._shadow is not None:
@@ -644,8 +637,6 @@ class CameraFrameService:
         return signal_rules_service.signal_state(self._simulation_clock_s)
 
     def _initialize_agents_locked(self) -> None:
-        vehicle_count = {"light": 4, "normal": 8, "busy": 12}[self._simulation_density]
-        pedestrian_count = {"light": 4, "normal": 7, "busy": 11}[self._simulation_density]
         vehicle_palette = [
             (66, 135, 245), (94, 176, 110), (230, 144, 81),
             (181, 105, 200), (94, 188, 214), (122, 128, 137),
@@ -654,49 +645,14 @@ class CameraFrameService:
             (196, 111, 255), (119, 187, 255), (119, 220, 157),
             (255, 158, 132), (164, 142, 245), (114, 212, 229),
         ]
-        self._vehicles = []
-        for index in range(vehicle_count):
-            direction = 1 if index % 2 == 0 else -1
-            lane_index = index // 2
-            vehicle_type = ("car", "suv", "van", "bus")[index % 4]
-            width_ranges = {"car": (125, 155), "suv": (145, 175), "van": (170, 205), "bus": (220, 255)}
-            width = self._simulation_rng.randint(*width_ranges[vehicle_type])
-            spacing = 300
-            if direction > 0:
-                x = -240.0 + lane_index * spacing
-                y = 265
-            else:
-                x = float(FRAME_WIDTH + 60 - width - lane_index * spacing)
-                y = 455
-            speed = float(self._simulation_rng.randint(92, 125))
-            self._vehicles.append(
-                _SimVehicle(
-                    x=x,
-                    y=y,
-                    width=width,
-                    speed=speed,
-                    direction=direction,
-                    color=vehicle_palette[index % len(vehicle_palette)],
-                    vehicle_type=vehicle_type,
-                )
-            )
-        self._pedestrians = []
-        for index in range(pedestrian_count):
-            direction = 1 if index % 2 == 0 else -1
-            x = CROSSING_LEFT + 42 + (index * 47) % (CROSSING_RIGHT - CROSSING_LEFT - 84)
-            if direction > 0:
-                y = float(max(65, TOP_PEDESTRIAN_WAIT_Y - (index // 2) * 22))
-            else:
-                y = float(min(710, BOTTOM_PEDESTRIAN_WAIT_Y + (index // 2) * 18))
-            self._pedestrians.append(
-                _SimPedestrian(
-                    x=x,
-                    y=y,
-                    speed=float(self._simulation_rng.randint(88, 106)),
-                    direction=direction,
-                    color=pedestrian_palette[index % len(pedestrian_palette)],
-                )
-            )
+        self._vehicles = [
+            _SimVehicle(x=v.x,y=v.y,width=v.width,speed=v.speed,direction=v.direction,
+                        color=vehicle_palette[i % len(vehicle_palette)],vehicle_type=v.vehicle_type)
+            for i,v in enumerate(vehicle_specs(self._simulation_density,self._simulation_rng))]
+        self._pedestrians = [
+            _SimPedestrian(x=v.x,y=v.y,speed=v.speed,direction=v.direction,
+                           color=pedestrian_palette[i % len(pedestrian_palette)])
+            for i,v in enumerate(pedestrian_specs(self._simulation_density,self._simulation_rng))]
 
     def _advance_simulation_locked(self, dt: float) -> None:
         self._simulation_adapter.step(dt)
@@ -710,68 +666,10 @@ class CameraFrameService:
             self._shadow.observe(phase)
 
     def _advance_vehicles_locked(self, dt: float, phase: str) -> None:
-        vehicle_go = phase == "vehicle_green"
-        gap = 22.0
-        eastbound = sorted((v for v in self._vehicles if v.direction > 0), key=lambda item: item.x, reverse=True)
-        ahead: _SimVehicle | None = None
-        for vehicle in eastbound:
-            proposed = vehicle.x + vehicle.speed * dt
-            front = vehicle.x + vehicle.width
-            already_committed = front > EASTBOUND_STOP_LINE
-            if not vehicle_go and not already_committed:
-                proposed = min(proposed, EASTBOUND_STOP_LINE - 8 - vehicle.width)
-            if ahead is not None:
-                proposed = min(proposed, ahead.x - gap - vehicle.width)
-            vehicle.x = proposed
-            ahead = vehicle
-        westbound = sorted((v for v in self._vehicles if v.direction < 0), key=lambda item: item.x)
-        ahead = None
-        for vehicle in westbound:
-            proposed = vehicle.x - vehicle.speed * dt
-            front = vehicle.x
-            already_committed = front < WESTBOUND_STOP_LINE
-            if not vehicle_go and not already_committed:
-                proposed = max(proposed, WESTBOUND_STOP_LINE + 8)
-            if ahead is not None:
-                proposed = max(proposed, ahead.x + ahead.width + gap)
-            vehicle.x = proposed
-            ahead = vehicle
-        for vehicle in self._vehicles:
-            if vehicle.direction > 0 and vehicle.x > FRAME_WIDTH + 120:
-                peers = [item.x for item in self._vehicles if item.direction > 0 and item is not vehicle]
-                vehicle.x = min(
-                    -vehicle.width - self._simulation_rng.randint(80, 180),
-                    min(peers, default=-120.0) - vehicle.width - self._simulation_rng.randint(70, 140),
-                )
-            elif vehicle.direction < 0 and vehicle.x + vehicle.width < -120:
-                peers = [item.x + item.width for item in self._vehicles if item.direction < 0 and item is not vehicle]
-                vehicle.x = max(
-                    float(FRAME_WIDTH + self._simulation_rng.randint(80, 180)),
-                    max(peers, default=float(FRAME_WIDTH + 120)) + self._simulation_rng.randint(70, 140),
-                )
+        advance_vehicles(self._vehicles,self._simulation_rng,dt,phase=="vehicle_green")
 
     def _advance_pedestrians_locked(self, dt: float, phase: str) -> None:
-        can_start_crossing = phase == "pedestrian_green"
-        for pedestrian in self._pedestrians:
-            delta = pedestrian.speed * dt * pedestrian.direction
-            if pedestrian.direction > 0:
-                if pedestrian.y < TOP_PEDESTRIAN_WAIT_Y:
-                    pedestrian.y = min(TOP_PEDESTRIAN_WAIT_Y, pedestrian.y + pedestrian.speed * dt)
-                elif pedestrian.y <= TOP_PEDESTRIAN_WAIT_Y + 0.5 and not can_start_crossing:
-                    pedestrian.y = float(TOP_PEDESTRIAN_WAIT_Y)
-                else:
-                    pedestrian.y += pedestrian.speed * dt
-                if pedestrian.y > FRAME_HEIGHT + 25:
-                    pedestrian.y = float(70 - self._simulation_rng.randint(0, 42))
-            else:
-                if pedestrian.y > BOTTOM_PEDESTRIAN_WAIT_Y:
-                    pedestrian.y = max(BOTTOM_PEDESTRIAN_WAIT_Y, pedestrian.y - pedestrian.speed * dt)
-                elif pedestrian.y >= BOTTOM_PEDESTRIAN_WAIT_Y - 0.5 and not can_start_crossing:
-                    pedestrian.y = float(BOTTOM_PEDESTRIAN_WAIT_Y)
-                else:
-                    pedestrian.y += delta
-                if pedestrian.y < 20:
-                    pedestrian.y = float(FRAME_HEIGHT - 10 + self._simulation_rng.randint(0, 36))
+        advance_pedestrians(self._pedestrians,self._simulation_rng,dt,phase=="pedestrian_green")
 
     def _refresh_simulation_locked(self) -> None:
         self._simulation_adapter.sync(self._simulation_monotonic())

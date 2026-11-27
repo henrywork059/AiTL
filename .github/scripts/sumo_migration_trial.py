@@ -190,7 +190,10 @@ def arm(enabled):
                 assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": False}))
                 now[0] += .4
                 scene = assert_envelope(client.get("/api/camera/simulation/scene"))["data"]
-                assert not scene["paused"] and scene["simulation_time_seconds"] == 40.4
+                assert not scene["paused"] and 40 <= scene["simulation_time_seconds"] <= 40.4
+                assert abs(service._simulation_clock_s-40.4)<1e-6
+                exact=service.exact_simulation_frame(**{k:scene["observation"][k] for k in ("epoch","generation","tick","layout_id","source_id")})
+                assert exact.frame_number==scene["frame_number"]
                 if shadow:
                     wait_shadow(shadow, SAMPLES * 2 + 2)
                 assert_envelope(client.post("/api/camera/simulation/settings", json={"density": "busy"}))
