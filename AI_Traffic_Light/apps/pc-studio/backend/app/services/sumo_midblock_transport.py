@@ -6,6 +6,7 @@ The worker and parent retain the same simulation and protected admission checks.
 """
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import asdict
 import json
 import math
@@ -14,7 +15,7 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 import subprocess
 import sys
-from threading import Thread
+from threading import Lock, Thread
 
 from app.services.sumo_shadow_adapter import ShadowAgent
 
@@ -100,7 +101,40 @@ class ParentWire:
         self._pending=None
         self._error=None
         self._reader=Thread(target=self._read_loop,name="mesh-midblock-wire",daemon=True)
+        self._diagnostic_lock=Lock()
+        self._diagnostic_tail=deque(maxlen=64)
+        self._diagnostic_bytes=0
+        self._diagnostic_reader=Thread(target=self._drain_diagnostics,name="mesh-midblock-diagnostics",daemon=True)
         self._reader.start()
+        self._diagnostic_reader.start()
+
+    def _drain_diagnostics(self):
+        # Native warnings must not disappear just because the protocol owns
+        # stdout. Bound retained memory even for long/no-newline messages.
+        try:
+            while True:
+                chunk=self.proc.stderr.read(4096)
+                if not chunk: break
+                with self._diagnostic_lock:
+                    self._diagnostic_bytes+=len(chunk)
+                    self._diagnostic_tail.append(chunk)
+        except OSError:
+            pass
+        finally:
+            self.proc.stderr.close()
+
+    def diagnostics(self):
+        with self._diagnostic_lock:
+            retained=b"".join(self._diagnostic_tail)
+            return {"bytes_seen":self._diagnostic_bytes,"truncated":self._diagnostic_bytes>len(retained),
+                    "tail":retained.decode("utf-8",errors="replace")}
+
+    def finish(self):
+        # Called only after process reaping so the two readers receive EOF.
+        for reader in (self._reader,self._diagnostic_reader):
+            reader.join(timeout=2.)
+            if reader.is_alive():
+                raise RuntimeError("Native worker reader could not be retired")
 
     def _read_loop(self):
         try:
@@ -179,7 +213,7 @@ class ParentWire:
 
 def _launch(argv,cwd):
     proc=subprocess.Popen(argv,cwd=cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,
-                          stderr=subprocess.DEVNULL,shell=False,
+                          stderr=subprocess.PIPE,shell=False,
                           creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
     try:
         return ParentWire(proc),ProcessHandle(proc)
@@ -188,6 +222,7 @@ def _launch(argv,cwd):
         proc.wait(timeout=5)
         proc.stdin.close()
         proc.stdout.close()
+        proc.stderr.close()
         raise
 
 

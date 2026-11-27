@@ -48,6 +48,10 @@ class CaptureRecord:
     metadata_path: str
     simulation_engine: str | None = None
     simulation_demand_digest: str | None = None
+    coordinate_space: str | None = None
+    layout_id: str | None = None
+    observation_epoch: str | None = None
+    detector_input_eligible: bool | None = None
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -55,6 +59,8 @@ class CaptureRecord:
             data.pop("simulation_engine")
         if self.simulation_demand_digest is None:
             data.pop("simulation_demand_digest")
+        for key in ("coordinate_space","layout_id","observation_epoch","detector_input_eligible"):
+            if data[key] is None: data.pop(key)
         return data
 
 
@@ -138,6 +144,8 @@ class DatasetCaptureService:
             metadata_path=metadata_relative,
             simulation_engine=frame.simulation_engine,
             simulation_demand_digest=frame.simulation_demand_digest,
+            coordinate_space=frame.coordinate_space,layout_id=frame.layout_id,observation_epoch=frame.observation_epoch,
+            detector_input_eligible=False if frame.evaluation_only else None,
         )
 
         with self._lock:

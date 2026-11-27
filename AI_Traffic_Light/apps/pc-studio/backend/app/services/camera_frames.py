@@ -19,7 +19,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.services.signal_rules import signal_rules_service
 from app.services.observation_identity import (ObservationIdentity, observation_provenance,
-    SIMULATION_VIEW_FLIPS, simulation_view_point, synthetic_scene_identity)
+    SIMULATION_VIEW_FLIPS, simulation_view_point, synthetic_scene_identity, EVALUATION_ORIGINS)
 from app.services.simulation_adapter import LegacySimulationAdapter
 from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
     CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
@@ -59,6 +59,14 @@ class CameraFrame:
     mode_generation: int | None = None
     simulation_engine: str | None = None
     simulation_demand_digest: str | None = None
+    coordinate_space: str | None = None
+    layout_id: str | None = None
+    observation_epoch: str | None = None
+
+    @property
+    def evaluation_only(self) -> bool:
+        return (self.origin in EVALUATION_ORIGINS or self.simulation_engine in {"native","reference"} or
+                self.coordinate_space=="native_projection_v1")
 
     @property
     def observation(self) -> ObservationIdentity:
@@ -83,6 +91,8 @@ class CameraFrame:
             "origin": self.origin,
             **({"simulation_engine": self.simulation_engine} if self.simulation_engine else {}),
             **({"simulation_demand_digest": self.simulation_demand_digest} if self.simulation_demand_digest else {}),
+            **({"coordinate_space":self.coordinate_space,"layout_id":self.layout_id,"observation_epoch":self.observation_epoch,
+                "detector_input_eligible":False} if self.evaluation_only else {}),
         }
 
 

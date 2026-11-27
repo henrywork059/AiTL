@@ -187,10 +187,16 @@ class Tests(unittest.TestCase):
                     self.assertFalse(view["observation"]["detector_input_eligible"])
                 self.assertEqual(all_views["canonical_polygon"],[[1279,0],[0,0],[0,719],[1279,719]])
                 profile=all_views["region_profile"]
+                direct=service.evaluate_region_views(**payload)
+                self.assertEqual(direct["region_profile"],profile)
                 reuse={**identity,"tick":1,"source_id":"simulation_camera_b","profile":profile}
                 loaded=assert_envelope(client.post(BASE+"/region/profile",json=reuse))["data"]
                 self.assertEqual(loaded["agent_ids"],all_views["agent_ids"])
                 self.assertEqual(loaded["canonical_polygon"],profile["canonical_polygon"])
+                fractional={**profile,"canonical_polygon":[[0.11,0.23],[1278.91,0.23],[1278.91,718.81],[0.11,718.81]]}
+                for sid in VIEW_FLIPS:
+                    value=service.evaluate_region_profile(**{**reuse,"source_id":sid,"profile":fractional})
+                    self.assertEqual(value["region_profile"],fractional)
                 for bad in ({**profile,"layout_id":"0"*64},{**profile,"coordinate_space":"legacy_pixels"},{**profile,"detector_input_eligible":True}):
                     assert_envelope(client.post(BASE+"/region/profile",json={**reuse,"profile":bad}),expected_status=409)
                 for bad in ({**payload,"layout_id":"0"*64},{**payload,"coordinate_space":"legacy_pixels"},{**payload,"tick":0}):
@@ -208,6 +214,10 @@ class Tests(unittest.TestCase):
                         self.assertEqual(metadata["simulation_engine"],"native")
                         self.assertEqual(metadata["simulation_demand_digest"],first["snapshot"]["demand_digest"])
                         self.assertEqual(metadata["origin"],"synthetic_sumo_projection")
+                        self.assertEqual(metadata["coordinate_space"],"native_projection_v1")
+                        self.assertEqual(metadata["layout_id"],layout)
+                        self.assertEqual(metadata["observation_epoch"],identity["epoch"])
+                        self.assertFalse(metadata["detector_input_eligible"])
                     self.assertEqual(exact.content,z.read("simulation_camera_c.png"))
                 paused=assert_envelope(client.post(BASE+"/pause",json={**identity,"tick":1,"paused":True}))["data"]
                 self.assertTrue(paused["snapshot"]["paused"])
@@ -229,7 +239,21 @@ class Tests(unittest.TestCase):
                 assert_envelope(client.post(BASE+"/region/profile",json=reuse),expected_status=409)
                 fresh=assert_envelope(client.post(BASE+"/region/profile",json={**reuse,**identity2,"tick":0}))["data"]
                 self.assertEqual(fresh["region_profile"],profile)
+                self.assertEqual(service.evaluate_region_profile(**{**reuse,**identity2,"tick":0})["region_profile"],profile)
+                from app.services.inference import InferenceService
+                from app.core.exceptions import AppError
+                frame=service.frame(**identity2,tick=0,source_id="simulation_camera")
+                self.assertTrue(frame.evaluation_only)
+                for candidate in (frame,replace(frame,origin="simulation"),replace(frame,origin="simulation",simulation_engine=None)):
+                    with self.assertRaises(AppError) as rejected: InferenceService().detect_frame(candidate)
+                    self.assertEqual(rejected.exception.status_code,409)
+                    self.assertIn("not live detector inputs",str(rejected.exception))
                 self.assertFalse(fresh["persisted"])
+                # Shared read seam must not emit a valid-looking header for a
+                # misqualified internal frame, even if pixels are otherwise valid.
+                with patch.object(service._publisher,"frame_for",return_value=replace(frame,layout_id="0"*64)):
+                    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**identity2,"engine":"native","tick":0,"source_id":"simulation_camera","layout_id":layout}),expected_status=503)
+                self.assertEqual(service.scene()["status"],"unavailable")
 
     def test_reference_switch_and_production_rollback(self):
         from app.services.simulation_reference_session import FiniteReferenceSession

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from importlib.metadata import version
 import multiprocessing as mp
+import logging
 import os
 from pathlib import Path
 
@@ -154,6 +155,8 @@ class LibsumoSession:
                 self._receive()
             except BaseException:
                 self.close()
+                if hasattr(self._pipe,"diagnostics"):
+                    logging.getLogger(__name__).error("Native child startup diagnostics: %s",self._pipe.diagnostics()["tail"][-2000:])
                 raise
             return
         ctx = mp.get_context("spawn")
@@ -222,3 +225,5 @@ class LibsumoSession:
             self.proc.join(3)
         if self.proc.is_alive():
             raise RuntimeError("Shadow process could not be reaped")
+        if hasattr(self._pipe,"finish"):
+            self._pipe.finish()

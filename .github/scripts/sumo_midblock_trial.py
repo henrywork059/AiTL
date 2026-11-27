@@ -48,6 +48,10 @@ def verify_export(result,expected_slots,horizon):
     assert result["summary"]["vehicle_passages"]>0 and result["summary"]["pedestrian_crossings"]>0
     assert len(result["arrived_vehicles"])>0 and len(result["arrived_pedestrians"])>0
     assert max(result["slot_visits"].values())>=2
+    braking=result["braking_diagnostics"]
+    assert braking["speed_pairs"]==sum(row["vehicle_speed_pairs"] for row in result["timeline"])
+    assert braking["threshold_exceedance_samples"]==sum(len(row["braking_events"]) for row in result["timeline"])
+    assert not braking["physical_safety_validated"]
     for kind in ("vehicle","pedestrian"):
         waits=result["waiting_episodes"][kind]
         assert abs(sum(row[kind+"_queue"] for row in result["timeline"])*.2-waits["observed_agent_seconds"])<1e-6
@@ -150,6 +154,8 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                     assert z.read(sid+".png")==client.get(BASE+"/frame",params={**params,"source_id":sid}).content
                     meta=json.loads(z.read(sid+".json"))
                     assert meta["simulation_engine"]=="native" and meta["simulation_demand_digest"]==scene["demand_digest"]
+                    assert meta["coordinate_space"]=="native_projection_v1" and meta["layout_id"]==scene["layout_id"]
+                    assert meta["observation_epoch"]==identity["epoch"] and meta["detector_input_eligible"] is False
                     exact=client.get("/api/camera/simulation/observation/frame",params={**params,"engine":"native","layout_id":scene["layout_id"],"source_id":sid})
                     assert exact.status_code==200 and exact.content==z.read(sid+".png")
                     assert exact.headers["x-layout-id"]==scene["layout_id"] and exact.headers["x-observation-origin"]=="synthetic_sumo_projection"
@@ -182,6 +188,10 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
             verify_export(result,{"light":8,"normal":15,"busy":23}[density],horizon)
             assert legacy.latest_frame() is baseline and legacy.observation_mode_token==token
             assert_envelope(client.post(BASE+"/stop",json=identity))
+            if lean_worker:
+                wire=sessions[0]._pipe
+                assert not wire._reader.is_alive() and not wire._diagnostic_reader.is_alive()
+                (out/"worker-diagnostics.json").write_text(json.dumps(wire.diagnostics(),indent=2),encoding="utf-8")
             assert_envelope(client.get(BASE+"/frame",params={**identity,"tick":horizon,"source_id":"simulation_camera"}),expected_status=409)
             assert legacy.latest_frame() is baseline
             return result
@@ -245,7 +255,8 @@ def main(out):
         assert state["camera_owned"] and proc.is_alive()
         profile=json.loads((out/"42-normal-fixed"/"native-region-profile.json").read_text())
         reused=lease.evaluate_region_profile(epoch=lease.epoch,generation=lease.generation,tick=0,source_id="simulation_camera_d",profile=profile)
-        assert reused["region_profile"]==profile and not reused["persisted"] and not reused["agent_ids"]
+        assert reused["region_profile"]==profile and not reused["persisted"] and not reused["agent_ids"], (reused["region_profile"],profile,reused["agent_ids"])
+        (out/"cross-session-profile.json").write_text(json.dumps(reused,indent=2),encoding="utf-8")
         lease.camera_heartbeat(epoch=lease.epoch,generation=lease.generation,camera_owner=owner)
         deadline=time.monotonic()+10
         while proc.is_alive() and time.monotonic()<deadline: time.sleep(.05)

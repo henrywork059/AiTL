@@ -6,6 +6,7 @@ from dataclasses import asdict
 from io import BytesIO
 import json
 import logging
+import math
 import hashlib
 import os
 import re
@@ -30,7 +31,7 @@ from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
 from app.services.native_evaluation_geometry import region_counts
-from app.services.native_evaluation_experiments import summarize_timeline, validate_pair
+from app.services.native_evaluation_experiments import summarize_timeline, validate_pair, vehicle_braking_sample, summarize_braking
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
     REFERENCE_EVALUATION_ORIGIN, simulation_view_point)
 from app.services.simulation_reference_session import GeneratedReferenceSession
@@ -293,7 +294,8 @@ class NativeEvaluationService:
                     measured = self._metrics.sample(snap.tick,self._routes.observations(snap.agents))
                     if self._geometry=="midblock" and self._routes.unknown_roads:
                         raise RuntimeError("Cyclic agent left its validated route")
-                    self._timeline.append({**measured,"phase":phase,"t":measured["t_seconds"],
+                    braking=vehicle_braking_sample(before.agents,snap.agents) if self._geometry=="midblock" else {}
+                    self._timeline.append({**measured,**braking,"phase":phase,"t":measured["t_seconds"],
                         "active_rules":list(signal.get("active_rules",[])),"applied_permission":permission,
                         "vehicle_trip_arrivals":len(self._session.arrived),"pedestrian_trip_arrivals":len(self._session.person_arrived)})
                     self._signal = {"phase":phase,"vehicle_go":signal["vehicle_go"],
@@ -365,6 +367,7 @@ class NativeEvaluationService:
         if not self._publisher.has_tick(snap.tick):
             indexed=self._geometry=="midblock" and self._indexed_frames
             meta, pixels = self._projection.render_pixels(snap,indexed=indexed)
+            meta.update(epoch=self.epoch)
             if self._geometry=="midblock":
                 meta.update(demand_model="native_cyclic_slots_v1",demand_digest=self._demand_digest)
             self._publisher.prepare(meta,pixels,received_at_ms=self._received_at_ms,transfer_owned=True,indexed=indexed)
@@ -387,7 +390,17 @@ class NativeEvaluationService:
             self._require(epoch,generation,tick)
             if engine != self._engine or layout_id != self._projection.layout_id:
                 raise self._conflict("Evaluation engine or publication layout mismatch.")
-            return self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+            frame=self.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+            if (frame.observation_epoch!=epoch or frame.mode_generation!=generation or frame.frame_number!=tick or
+                frame.layout_id!=layout_id or frame.coordinate_space!="native_projection_v1" or
+                frame.source_id!=evaluation_source_id(ENGINES[engine],generation,source_id) or
+                frame.origin!=ENGINES[engine] or not frame.evaluation_only or
+                (frame.width,frame.height)!=(1280,720) or frame.content_type!="image/png" or
+                frame.received_at_ms!=self._received_at_ms or
+                (self._geometry=="midblock" and frame.simulation_demand_digest!=self._demand_digest)):
+                logger.error("Native frame identity mismatch; retiring session")
+                raise self._failure()
+            return frame
 
     def current_simulation_scene(self, source_id, *, engine="native"):
         with self._lock:
@@ -455,7 +468,8 @@ class NativeEvaluationService:
                 "waiting_episodes":self._metrics.waiting_episodes(),
                 "demand_manifest":deepcopy(self._demand_manifest),
                 **({"demand_model":"native_cyclic_slots_v1","journey_manifest":[asdict(t) for t in self._trips],
-                    "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current)} if self._geometry=="midblock" else {}),
+                    "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current),
+                    "braking_diagnostics":summarize_braking(self._timeline)} if self._geometry=="midblock" else {}),
                 "trip_accounting":self._trip_accounting(),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
@@ -509,7 +523,7 @@ class NativeEvaluationService:
                 coordinate_space=coordinate_space,layout_id=layout_id,polygon=polygon)
             if any(not (0<=x<=1279 and 0<=y<=719) for x,y in original["polygon"]):
                 raise AppError(ErrorCode.INVALID_REQUEST,"Draft vertices must lie within mirrorable pixel centres.",status_code=422)
-            canonical=[simulation_view_point(x,y,1280,720,source_id) for x,y in original["polygon"]]
+            canonical=[list(simulation_view_point(x,y,1280,720,source_id)) for x,y in original["polygon"]]
             views={}
             for sid in VIEW_FLIPS:
                 mirrored=[simulation_view_point(x,y,1280,720,sid) for x,y in canonical]
@@ -536,11 +550,21 @@ class NativeEvaluationService:
                 profile.get("layout_id")!=self._projection.layout_id or profile.get("count_basis")!="observed_agent_anchor" or
                 profile.get("detector_input_eligible") is not False):
                 raise self._conflict("Native region profile is incompatible with this layout or authority.")
-            if any(not (0<=x<=1279 and 0<=y<=719) for x,y in profile["canonical_polygon"]):
+            canonical=[[float(x),float(y)] for x,y in profile["canonical_polygon"]]
+            if any(not (0<=x<=1279 and 0<=y<=719) for x,y in canonical):
                 raise AppError(ErrorCode.INVALID_REQUEST,"Native profile vertices outside mirrorable pixel centres.",status_code=422)
-            polygon=[simulation_view_point(x,y,1280,720,source_id) for x,y in profile["canonical_polygon"]]
-            return self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
+            polygon=[simulation_view_point(x,y,1280,720,source_id) for x,y in canonical]
+            result=self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
                 coordinate_space=profile["coordinate_space"],layout_id=profile["layout_id"],polygon=polygon)
+            # Double mirroring fractional coordinates may introduce roundoff.
+            # Preserve the original validated canonical JSON coordinates, not a
+            # repeatedly transformed approximation or a tuple/list mismatch.
+            if any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9)
+                   for p,q in zip(canonical,result["canonical_polygon"]) for a,b in zip(p,q)):
+                raise self._conflict("Native profile canonical transform mismatch.")
+            result["canonical_polygon"]=canonical
+            result["region_profile"]["canonical_polygon"]=deepcopy(canonical)
+            return result
 
     def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard', engine='native'):
         """Run a bounded pair with one immutable copy of the saved policy.

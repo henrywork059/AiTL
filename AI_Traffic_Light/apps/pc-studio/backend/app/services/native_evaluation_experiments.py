@@ -39,3 +39,39 @@ def validate_pair(fixed,adaptive):
         first,second=fixed["summary"][key],adaptive["summary"][key]
         deltas[key]={"difference":round(second-first,6),"percent_change":round((second-first)*100/first,6) if first else None}
     return deltas
+
+
+def vehicle_braking_sample(before,after):
+    """Same-journey finite-difference deceleration, not a collision or comfort test.
+    Exclude insertions/arrivals: there is no consecutive speed sample.
+    Thresholds are diagnostic, not approved traffic-engineering limits.
+    """
+    previous={a.id:a for a in before if a.kind=="vehicle"}
+    events=[]
+    count=0
+    peak=0.
+    for a in after:
+        old=previous.get(a.id)
+        if a.kind!="vehicle" or old is None:
+            continue
+        count+=1
+        deceleration=max(0.,(old.speed_m_s-a.speed_m_s)/STEP_S)
+        peak=max(peak,deceleration)
+        if deceleration>4.5+1e-6:
+            events.append({"agent_id":a.id,"from_road":old.road_id,"to_road":a.road_id,
+                           "deceleration_m_s2":round(deceleration,6)})
+    return {"vehicle_speed_pairs":count,"peak_vehicle_deceleration_m_s2":round(peak,6),
+            "braking_events":sorted(events,key=lambda e:e["agent_id"])}
+
+
+def summarize_braking(timeline):
+    events=[(row,event) for row in timeline for event in row["braking_events"]]
+    return {"contract":"consecutive_native_vehicle_speed_v1","step_s":STEP_S,
+            "threshold_m_s2":4.5,"severe_threshold_m_s2":9.,
+            "speed_pairs":sum(row["vehicle_speed_pairs"] for row in timeline),
+            "peak_deceleration_m_s2":max((row["peak_vehicle_deceleration_m_s2"] for row in timeline),default=0.),
+            "threshold_exceedance_samples":len(events),
+            "severe_exceedance_samples":sum(event["deceleration_m_s2"]>9. for _,event in events),
+            "affected_journeys":len({event["agent_id"] for _,event in events}),
+            "by_requested_phase":dict(sorted(Counter(row["phase"] for row,_ in events).items())),
+            "physical_safety_validated":False}

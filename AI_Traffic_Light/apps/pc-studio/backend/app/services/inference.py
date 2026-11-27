@@ -16,7 +16,6 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.services.camera_frames import CameraFrame
-from app.services.observation_identity import EVALUATION_ORIGINS
 from app.services.model_registry import ModelRegistryService
 
 logger = get_logger(__name__)
@@ -215,7 +214,7 @@ class InferenceService:
 
         # Native ground-truth renderings are evaluation-only. Reject accidental
         # routing into the production detector/cache, even from internal callers.
-        if frame.origin in EVALUATION_ORIGINS:
+        if frame.evaluation_only:
             raise AppError(ErrorCode.INFERENCE_SOURCE_MISSING,
                 "Native evaluation images are not live detector inputs.",status_code=409)
 

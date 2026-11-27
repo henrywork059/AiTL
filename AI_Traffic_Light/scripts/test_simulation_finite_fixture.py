@@ -16,6 +16,23 @@ def path(prefix,kind,y):
 
 
 class Tests(unittest.TestCase):
+    def test_same_journey_braking_diagnostics(self):
+        from app.services.native_evaluation_experiments import vehicle_braking_sample,summarize_braking
+        old=(ShadowAgent("vehicle","v0_0",0.,0.,10.,"WC"),
+             ShadowAgent("vehicle","v1_0",0.,0.,12.,"WC"),
+             ShadowAgent("pedestrian","p0_0",0.,0.,1.,"NC"))
+        new=(ShadowAgent("vehicle","v0_0",1.,0.,8.,"WC"),
+             ShadowAgent("vehicle","v1_1",0.,0.,0.,"WC"),
+             ShadowAgent("pedestrian","p0_0",0.,0.,0.,"NC"))
+        sample=vehicle_braking_sample(old,new)
+        self.assertEqual(sample["vehicle_speed_pairs"],1)
+        self.assertEqual(sample["peak_vehicle_deceleration_m_s2"],10.)
+        self.assertEqual(len(sample["braking_events"]),1)
+        result=summarize_braking([{**sample,"phase":"vehicle_yellow"}])
+        self.assertEqual(result["severe_exceedance_samples"],1)
+        self.assertFalse(result["physical_safety_validated"])
+
+
     def test_lean_midblock_private_transport_roundtrip_and_failure(self):
         from app.services.sumo_midblock_transport import _launch, _encode, MAX_MESSAGE
         from app.services.sumo_shadow_process import LibsumoSession
@@ -26,6 +43,7 @@ class Tests(unittest.TestCase):
         preamble="import sys;sys.path.insert(0,sys.argv[1]);from app.services.sumo_midblock_transport import ChildWire;from app.services.sumo_shadow_adapter import ShadowAgent;"
         echo=preamble+"""
 wire=ChildWire(sys.stdin.buffer,sys.stdout.buffer)
+sys.stderr.write("Warning: synthetic diagnostic test\\n");sys.stderr.flush()
 wire.send(("ok",None))
 while True:
     cmd=wire.recv()
@@ -50,6 +68,9 @@ wire.close()
             finally:
                 session.close()
             self.assertFalse(handle.is_alive())
+            self.assertFalse(session._pipe._reader.is_alive())
+            self.assertFalse(session._pipe._diagnostic_reader.is_alive())
+            self.assertIn("synthetic diagnostic test",session._pipe.diagnostics()["tail"])
             # Startup exceptions must close/reap child, not silently fall back.
             for code in ('print("invalid JSON",flush=True)', 'import sys;sys.stdout.write("x"*300000+"\\n");sys.stdout.flush()', 'import time;time.sleep(30)'):
                 handles=[]

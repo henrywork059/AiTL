@@ -35,5 +35,7 @@ def evaluation_frames(meta: dict, views: dict[str, bytes], *, received_at_ms: in
         frames.append(CameraFrame(content=content, content_type="image/png",
                                   source_id=evaluation_source_id(meta["provenance"],generation,source),
                                   width=WIDTH, height=HEIGHT, received_at_ms=received_at_ms,
-                                  frame_number=tick, origin=meta["provenance"], mode_generation=generation))
+                                  frame_number=tick, origin=meta["provenance"], mode_generation=generation,
+                                  coordinate_space=meta.get("coordinate_space"),layout_id=meta.get("layout_id"),
+                                  observation_epoch=meta.get("epoch")))
     return tuple(frames)

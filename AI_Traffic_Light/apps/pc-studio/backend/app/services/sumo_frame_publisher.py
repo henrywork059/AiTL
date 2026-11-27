@@ -162,7 +162,9 @@ class NativeFramePublisher:
                 received_at_ms=self._received_at_ms, frame_number=self._meta["tick"],
                 origin=self._provenance, mode_generation=self._generation,
                 simulation_engine="native" if self._meta.get("demand_model")=="native_cyclic_slots_v1" else None,
-                simulation_demand_digest=self._meta.get("demand_digest"))
+                simulation_demand_digest=self._meta.get("demand_digest"),
+                coordinate_space=self._meta.get("coordinate_space"),layout_id=self._meta.get("layout_id"),
+                observation_epoch=self._meta.get("epoch"))
             self._frames[source] = frame
             if len(self._frames) == len(VIEW_FLIPS):
                 self._pixels = None  # all validated views cached; release the raster
