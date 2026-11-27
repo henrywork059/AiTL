@@ -24,6 +24,7 @@ class SeededBatchTest(unittest.TestCase):
             self.assertEqual(audit["busy_repeats"], 1)
             self.assertGreater(audit["timeline_samples"], 0)
             self.assertGreaterEqual(audit["decision_records"], 0)
+            self.assertEqual(audit["conservation_runs"], 4)
             # Rehash a deliberately changed CSV: consistency must still fail.
             members = {p.name: p.read_bytes() for p in out.iterdir()}
             rows = list(csv.reader(members["paired-metrics.csv"].decode("utf-8").splitlines()))
@@ -87,6 +88,19 @@ class SeededBatchTest(unittest.TestCase):
                 members["manifest.json"] = json.dumps(forged).encode("utf-8")
                 with self.assertRaisesRegex(ValueError, "Timeline|Decision"):
                     verify_members(list(members), members.__getitem__)
+
+            # Change a raw-only arrival count and rehash; the cross-field
+            # conservation audit must catch what CSV equality alone cannot.
+            members = dict(original)
+            changed = json.loads(members["busy-42.json"])
+            node = changed["fixed"]["timeline"][-1]["source"]["intersection_id"]
+            changed["fixed"]["intersections"][node]["metrics"]["throughput"]["external_vehicle_arrivals"] += 1
+            members["busy-42.json"] = json.dumps(changed).encode("utf-8")
+            forged = json.loads(members["manifest.json"])
+            forged["sha256"]["busy-42.json"] = hashlib.sha256(members["busy-42.json"]).hexdigest()
+            members["manifest.json"] = json.dumps(forged).encode("utf-8")
+            with self.assertRaisesRegex(ValueError, "Conservation vehicle balance"):
+                verify_members(list(members), members.__getitem__)
 
 if __name__ == "__main__":
     unittest.main()

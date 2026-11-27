@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -39,7 +40,9 @@ def main() -> int:
         receiver_image = dataset_root / receiver_record.image_path
         receiver_metadata = dataset_root / receiver_record.metadata_path
         assert receiver_image.read_bytes() == ONE_PIXEL_PNG
-        assert json.loads(receiver_metadata.read_text(encoding="utf-8"))["origin"] == "upload"
+        receiver_doc = json.loads(receiver_metadata.read_text(encoding="utf-8"))
+        assert receiver_doc["origin"] == "upload"
+        assert receiver_doc["content_sha256"] == hashlib.sha256(ONE_PIXEL_PNG).hexdigest()
 
         camera.set_simulation(True)
         simulated = camera.latest_frame()

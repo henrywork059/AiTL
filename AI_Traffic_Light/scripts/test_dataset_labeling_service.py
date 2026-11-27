@@ -13,7 +13,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.error_codes import ErrorCode  # noqa: E402
 from app.core.exceptions import AppError  # noqa: E402
-from app.services.dataset_labeling import DatasetLabelingService  # noqa: E402
+from app.services.dataset_labeling import DatasetLabelingService, evaluation_only_record  # noqa: E402
 from app.services.training import training_service  # noqa: E402
 
 
@@ -109,6 +109,11 @@ def main() -> int:
         built = service.build_training_dataset(validation_fraction=0.2)
         assert built["ready"] is True
         assert built["train_count"] == 1 and built["val_count"] == 1
+        assert len(service.verify_managed_dataset()) == 64
+        assert evaluation_only_record({"origin": "synthetic_sumo_projection"})
+        assert evaluation_only_record({"simulation_engine": "reference"})
+        assert evaluation_only_record({"coordinate_space": "native_projection_v1"})
+        assert not evaluation_only_record({"origin": "simulation"})
         assert (dataset_root / "yolo" / "data.yaml").is_file()
         assert (dataset_root / "yolo" / "manifest.json").is_file()
         copied_images = list((dataset_root / "yolo" / "images").glob("*/*"))
@@ -119,6 +124,33 @@ def main() -> int:
         label_text = "\n".join(path.read_text(encoding="utf-8") for path in label_files)
         assert "0 0.350000 0.350000 0.500000 0.500000" in label_text
 
+        # Every verified member must match the original reviewed source and
+        # normalized labels even if a local user regenerates its hash manifest.
+        original_image = copied_images[0].read_bytes()
+        copied_images[0].write_bytes(original_image + b"tamper")
+        def assert_rejected():
+            try:
+                service.verify_managed_dataset()
+            except AppError as exc:
+                assert exc.code == ErrorCode.DATASET_TRAINING_NOT_READY
+            else:
+                raise AssertionError("Corrupted managed dataset accepted")
+        assert_rejected()
+        copied_images[0].write_bytes(original_image)
+        original_label = label_files[0].read_bytes()
+        label_files[0].write_bytes(b"0 0.1 0.1 0.2 0.2\n")
+        assert_rejected()
+        label_files[0].write_bytes(original_label)
+        extra = copied_images[0].parent / "untracked.png"
+        extra.write_bytes(original_image)
+        assert_rejected()
+        extra.unlink()
+        original_source = dataset_root / "captures" / "acceptance" / "images" / "capture_positive.png"
+        source_bytes = original_source.read_bytes()
+        original_source.write_bytes(source_bytes + b"tamper")
+        assert_rejected()
+        original_source.write_bytes(source_bytes)
+        assert len(service.verify_managed_dataset()) == 64
         manifest_before = (dataset_root / "yolo" / "manifest.json").read_bytes()
         with patch.object(training_service, "status", return_value={"status": "running"}):
             try:

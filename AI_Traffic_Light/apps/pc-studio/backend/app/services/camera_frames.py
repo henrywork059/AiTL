@@ -29,6 +29,7 @@ from app.services.sumo_shadow_runtime import ShadowRuntime
 from app.services.protected_crosswalk import ProtectedCrosswalk
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
+RECEIVER_FRAME_MAX_AGE_MS = 5000
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
 SOURCE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 SUPPORTED_UPLOAD_TYPES = {"image/jpeg", "image/png"}
@@ -62,6 +63,11 @@ class CameraFrame:
     coordinate_space: str | None = None
     layout_id: str | None = None
     observation_epoch: str | None = None
+
+    def fresh_for_capture(self, now_ms: int) -> bool:
+        # Simulation frames can intentionally be paused. Receiver frames must
+        # still be current at the snapshot boundary, not merely cached.
+        return self.origin != "upload" or 0 <= now_ms - self.received_at_ms <= RECEIVER_FRAME_MAX_AGE_MS
 
     @property
     def evaluation_only(self) -> bool:
@@ -665,7 +671,7 @@ class CameraFrameService:
             "frame_available": frame is not None,
             "streaming": frame is not None and (
                 (simulation_enabled and not simulation_paused)
-                or (not simulation_enabled and age_ms is not None and age_ms <= 5000)
+                or (not simulation_enabled and age_ms is not None and 0 <= age_ms <= RECEIVER_FRAME_MAX_AGE_MS)
             ),
             "active_source_id": frame.source_id if frame else None,
             "resolution": {"width": frame.width, "height": frame.height} if frame else None,
@@ -675,7 +681,7 @@ class CameraFrameService:
             "frame_number": frame.frame_number if frame else 0,
             "size_bytes": len(frame.content) if frame else 0,
             "origin": frame.origin if frame else None,
-            "stale": bool(frame and not simulation_enabled and age_ms is not None and age_ms > 5000),
+            "stale": bool(frame and not simulation_enabled and age_ms is not None and not 0 <= age_ms <= RECEIVER_FRAME_MAX_AGE_MS),
             "frame_url": "/api/camera/frame" if frame else None,
             "upload_endpoint": "/api/camera/frame?source_id=<camera_id>",
         }

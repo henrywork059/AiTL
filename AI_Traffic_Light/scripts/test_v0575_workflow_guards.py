@@ -3,6 +3,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 import sys
+import time
+from dataclasses import replace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps/pc-studio/backend"))
@@ -17,7 +19,7 @@ from app.services.camera_frames import CameraFrame
 def main():
     frame = CameraFrame(content=b"synthetic-bytes", content_type="image/png",
                         source_id="cam_source_a", width=1280, height=720,
-                        received_at_ms=123456, frame_number=7, origin="upload")
+                        received_at_ms=int(time.time() * 1000), frame_number=7, origin="upload")
     saved = SimpleNamespace(capture_id="saved_1", origin="upload",
                             to_dict=lambda: {"capture_id": "saved_1", "source_id": "cam_source_a", "origin": "upload"})
     request = SimpleNamespace(state=SimpleNamespace(request_id="req_source_guard"))
@@ -38,6 +40,22 @@ def main():
             assert result["data"]["source_id"] == "cam_source_a"
             assert result["meta"]["request_id"] == "req_source_guard"
         assert write.call_count == 2
+    from app.services.camera_frames import RECEIVER_FRAME_MAX_AGE_MS
+    now = int(time.time() * 1000)
+    stale = replace(frame, received_at_ms=now - RECEIVER_FRAME_MAX_AGE_MS - 1)
+    with patch.object(dataset.camera_frame_service, "latest_frame", return_value=stale), patch.object(
+            dataset.dataset_capture_service, "capture_frame") as write:
+        try:
+            dataset.capture_latest_frame(CaptureFrameRequest(session_id="guard_test"), request)
+        except AppError as error:
+            assert error.code == ErrorCode.CAMERA_NOT_CONNECTED and error.status_code == 409
+        else:
+            raise AssertionError("Expired receiver capture accepted")
+        write.assert_not_called()
+    assert frame.fresh_for_capture(frame.received_at_ms + RECEIVER_FRAME_MAX_AGE_MS)
+    assert not frame.fresh_for_capture(frame.received_at_ms + RECEIVER_FRAME_MAX_AGE_MS + 1)
+    assert not frame.fresh_for_capture(frame.received_at_ms - 1)
+    assert replace(stale, origin="simulation").fresh_for_capture(now)
     for source in ("", "x" * 161):
         try:
             CaptureFrameRequest(expected_source_id=source)

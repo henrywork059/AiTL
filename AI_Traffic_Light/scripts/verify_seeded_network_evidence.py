@@ -79,6 +79,53 @@ def verify_trace_exports(case, raw, read):
             require(row[column] == ("" if value is None else str(value)), "Decision timing differs: " + case + "/" + column)
     return len(rows), len(decisions)
 
+
+def verify_conservation(case, raw):
+    """Check raw run identities independently of copied summary/CSV values."""
+    duration = raw["scenario"]["duration_seconds"]
+    checked = 0
+    for mode in FAIRNESS_MODES:
+        arm = raw[mode]
+        timeline = arm["timeline"]
+        require(timeline and timeline[-1]["t"] == duration, "Conservation horizon differs: " + case)
+        final = timeline[-1]
+        network = arm["network_metrics"]
+        previous = None
+        for sample in timeline:
+            for role in ("source", "destination"):
+                for key in ("vehicle_queue", "pedestrian_queue", "vehicles_served"):
+                    value = sample[role][key]
+                    require(type(value) is int and value >= 0, "Conservation negative or fractional count: " + case)
+            require(sample["transfers_departed"] - sample["transfers_arrived"] == sample["pipeline_count"]
+                    and sample["transfers_departed"] >= sample["transfers_arrived"] >= sample["corridor_completed"] >= 0,
+                    "Conservation transfer pipeline differs: " + case + "/" + mode)
+            if previous is not None:
+                require(sample["t"] > previous["t"] and all(sample[k] >= previous[k]
+                        for k in ("transfers_departed", "transfers_arrived", "corridor_completed")),
+                        "Conservation cumulative count or clock moved backward: " + case)
+            previous = sample
+        for role in ("source", "destination"):
+            sample = final[role]
+            metrics = arm["intersections"][sample["intersection_id"]]["metrics"]
+            t = metrics["throughput"]
+            require(t["external_vehicle_arrivals"] + t["transfer_vehicle_arrivals"] - t["vehicles_served"] == sample["vehicle_queue"]
+                    and t["vehicles_served"] == sample["vehicles_served"], "Conservation vehicle balance differs: " + case + "/" + mode)
+            require(t["external_pedestrian_arrivals"] - t["pedestrians_served"] == sample["pedestrian_queue"],
+                    "Conservation pedestrian balance differs: " + case + "/" + mode)
+            require(metrics["waiting"]["vehicle"]["count"] == t["vehicles_served"] + sample["vehicle_queue"]
+                    and metrics["waiting"]["pedestrian"]["count"] == t["pedestrians_served"] + sample["pedestrian_queue"],
+                    "Conservation waiting-episode counts differ: " + case + "/" + mode)
+            require(abs(sum(metrics["signal"]["phase_time_seconds"].values()) - duration) <= .03,
+                    "Conservation phase duration differs: " + case + "/" + mode)
+        require(all(final[k] == network[k] for k in ("transfers_departed", "transfers_arrived", "corridor_completed")),
+                "Conservation final transfer totals differ: " + case + "/" + mode)
+        for kind in ("vehicle", "pedestrian"):
+            total = sum(node["metrics"]["waiting"][kind]["total_seconds"] for node in arm["intersections"].values())
+            require(abs(total - network["total_" + kind + "_wait_seconds"]) <= .021,
+                    "Conservation local/network waiting sums differ: " + case + "/" + mode)
+        checked += 1
+    return checked
+
 def verify_members(names, read):
     require(len(names) == len(set(names)), "Duplicate member names")
     require(all(Path(n).name == n and n not in (".", "..") and "\\" not in n for n in names), "Unexpected member path")
@@ -99,7 +146,7 @@ def verify_members(names, read):
     require(len(records) == len(cases) and {(r["density"], r["seed"]) for r in records} == cases, "Case coverage differs")
     require(tuple(manifest["fairness_modes"]) == FAIRNESS_MODES, "Fairness modes differ")
     expected_primary, expected_fairness, originals = {}, {}, {}
-    timeline_samples = decision_records = 0
+    timeline_samples = decision_records = conservation_runs = 0
     expected_files = {"paired-metrics.csv", "intersection-fairness.csv", "repeat.json"}
     nodes = {n["id"] for n in settings["network"]["intersections"]}
     for record in records:
@@ -107,6 +154,7 @@ def verify_members(names, read):
         case = f"{density}-{seed}"
         expected_files.update((case + ".json", case + "-timeline.csv", case + "-decisions.csv"))
         raw = originals[density, seed] = load(case + ".json")
+        conservation_runs += verify_conservation(case, raw)
         samples, decisions = verify_trace_exports(case, raw, read)
         timeline_samples += samples
         decision_records += decisions
@@ -179,6 +227,7 @@ def verify_members(names, read):
     return {"verified_members": len(hashes), "matched_cases": len(cases), "primary_rows": len(expected_primary),
             "fairness_rows": len(expected_fairness), "busy_repeats": len(expected_busy),
             "timeline_samples": timeline_samples, "decision_records": decision_records,
+            "conservation_runs": conservation_runs,
             "pedestrian_wait_signs": signs, "evidence_class": manifest["evidence_class"],
             "scope": "Content consistency only; no field efficacy or migration acceptance."}
 

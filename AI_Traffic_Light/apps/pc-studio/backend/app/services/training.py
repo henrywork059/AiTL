@@ -73,6 +73,7 @@ class TrainingService:
     def _idle_state() -> dict[str, Any]:
         return {
             "active_run_id": None,
+            "dataset_integrity_sha256": None,
             "progress": 0,
             "status": "idle",
             "message": "No training run has started.",
@@ -123,11 +124,13 @@ class TrainingService:
         device: str,
         patience: int,
     ) -> dict:
-        normalized_dataset_yaml = dataset_yaml.replace("\\", "/")
         dataset_path = self._resolve_dataset_path(dataset_yaml)
+        normalized_dataset_yaml = dataset_path.relative_to(self._dataset_root).as_posix()
+        dataset_integrity_sha256 = None
         managed_manifest = self._dataset_root / "yolo" / "manifest.json"
-        if normalized_dataset_yaml == MANAGED_DATASET_YAML and managed_manifest.is_file():
-            managed_status = DatasetLabelingService(dataset_root=self._dataset_root).training_dataset_status()
+        if normalized_dataset_yaml == MANAGED_DATASET_YAML and managed_manifest.exists():
+            managed_service = DatasetLabelingService(dataset_root=self._dataset_root)
+            managed_status = managed_service.training_dataset_status()
             if not managed_status["ready"]:
                 raise AppError(
                     ErrorCode.DATASET_TRAINING_NOT_READY,
@@ -139,6 +142,7 @@ class TrainingService:
                         "eligible_frame_count": managed_status["eligible_frame_count"],
                     },
                 )
+            dataset_integrity_sha256 = managed_service.verify_managed_dataset()
         if not self._training_available():
             raise AppError(
                 ErrorCode.TRAINING_NOT_READY,
@@ -175,6 +179,7 @@ class TrainingService:
                 )
             self._state = {
                 "active_run_id": run_id,
+                "dataset_integrity_sha256": dataset_integrity_sha256,
                 "progress": 0,
                 "status": "running",
                 "message": "Training process is starting with automatic early stopping enabled.",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -52,6 +53,7 @@ class CaptureRecord:
     layout_id: str | None = None
     observation_epoch: str | None = None
     detector_input_eligible: bool | None = None
+    content_sha256: str | None = None
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -59,7 +61,7 @@ class CaptureRecord:
             data.pop("simulation_engine")
         if self.simulation_demand_digest is None:
             data.pop("simulation_demand_digest")
-        for key in ("coordinate_space","layout_id","observation_epoch","detector_input_eligible"):
+        for key in ("coordinate_space","layout_id","observation_epoch","detector_input_eligible","content_sha256"):
             if data[key] is None: data.pop(key)
         return data
 
@@ -146,6 +148,7 @@ class DatasetCaptureService:
             simulation_demand_digest=frame.simulation_demand_digest,
             coordinate_space=frame.coordinate_space,layout_id=frame.layout_id,observation_epoch=frame.observation_epoch,
             detector_input_eligible=False if frame.evaluation_only else None,
+            content_sha256=hashlib.sha256(frame.content).hexdigest(),
         )
 
         with self._lock:

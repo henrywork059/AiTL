@@ -16,6 +16,7 @@ from app.core.json_store import write_json_atomic
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
+from app.services.observation_identity import EVALUATION_ORIGINS
 
 logger = get_logger(__name__)
 
@@ -37,6 +38,22 @@ def serialize_managed_dataset(operation):
         with _MANAGED_DATASET_LOCK:
             return operation(*args, **kwargs)
     return guarded
+
+
+def evaluation_only_record(record: dict[str, Any]) -> bool:
+    """Retain legacy captures, but reject all recognized isolated-evaluation identities."""
+    return (record.get("detector_input_eligible") is False
+            or record.get("origin") in EVALUATION_ORIGINS
+            or record.get("simulation_engine") in {"native", "reference"}
+            or record.get("coordinate_space") == "native_projection_v1")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 class DatasetLabelingService:
@@ -260,10 +277,10 @@ class DatasetLabelingService:
     def training_dataset_status(self) -> dict[str, Any]:
         items = self._labeled_items()
         eligible = [item for item in items if item["record"].get("quality_tag") != "bad"
-                    and item["record"].get("detector_input_eligible") is not False]
+                    and not evaluation_only_record(item["record"])]
         excluded_bad_count = sum(item["record"].get("quality_tag") == "bad" for item in items)
         excluded_evaluation_count = sum(item["record"].get("quality_tag") != "bad"
-                                        and item["record"].get("detector_input_eligible") is False for item in items)
+                                        and evaluation_only_record(item["record"]) for item in items)
         box_count = sum(len(item["labels"].get("labels", [])) for item in eligible)
         signature = self._source_signature(eligible)
         manifest_path = self._managed_yolo_root / "manifest.json"
@@ -276,7 +293,14 @@ class DatasetLabelingService:
                 manifest = None
 
         generated = bool(manifest and data_yaml_path.is_file())
-        stale = generated and manifest.get("source_signature") != signature
+        # Metadata-only polling stays cheap. Full byte verification is performed
+        # synchronously at training admission, under the existing managed lock.
+        stale = generated and (
+            manifest.get("source_signature") != signature
+            or manifest.get("classes") != self.classes()
+            or not isinstance(manifest.get("artifact_sha256"), dict)
+            or not manifest.get("artifact_sha256")
+        )
         ready = generated and not stale and len(eligible) >= 2
         return {
             "ready": ready,
@@ -316,7 +340,7 @@ class DatasetLabelingService:
             )
         items = [item for item in self._labeled_items()
                  if item["record"].get("quality_tag") != "bad"
-                 and item["record"].get("detector_input_eligible") is not False]
+                 and not evaluation_only_record(item["record"])]
         if len(items) < 2:
             raise AppError(
                 ErrorCode.DATASET_TRAINING_NOT_READY,
@@ -345,6 +369,7 @@ class DatasetLabelingService:
                     (build_root / "labels" / split).mkdir(parents=True, exist_ok=False)
 
                 split_records: dict[str, list[str]] = {"train": [], "val": []}
+                artifact_hashes: dict[str, str] = {}
                 for item in items:
                     record = item["record"]
                     label_document = item["labels"]
@@ -361,14 +386,25 @@ class DatasetLabelingService:
                     destination_image = build_root / "images" / split / f"{capture_id}{source_image.suffix.lower()}"
                     destination_label = build_root / "labels" / split / f"{capture_id}.txt"
                     shutil.copy2(source_image, destination_image)
+                    image_digest = file_sha256(destination_image)
+                    if record.get("content_sha256") is not None and record["content_sha256"] != image_digest:
+                        raise AppError(
+                            ErrorCode.DATASET_TRAINING_NOT_READY,
+                            "Captured image bytes no longer match the saved capture digest.",
+                            status_code=409, details={"capture_id": capture_id},
+                        )
+                    artifact_hashes[destination_image.relative_to(build_root).as_posix()] = image_digest
                     yolo_lines = self._to_yolo_lines(label_document)
                     destination_label.write_text("\n".join(yolo_lines) + ("\n" if yolo_lines else ""), encoding="utf-8")
+                    artifact_hashes[destination_label.relative_to(build_root).as_posix()] = file_sha256(destination_label)
                     split_records[split].append(capture_id)
 
                 yaml_text = self._dataset_yaml(classes)
                 (build_root / "data.yaml").write_text(yaml_text, encoding="utf-8")
+                artifact_hashes["data.yaml"] = file_sha256(build_root / "data.yaml")
                 manifest = {
                     "format": "aitl-managed-yolo-v1",
+                    "artifact_sha256": artifact_hashes,
                     "generated_at_ms": generated_at_ms,
                     "source_signature": source_signature,
                     "validation_fraction": validation_fraction,
@@ -421,6 +457,74 @@ class DatasetLabelingService:
         )
         return self.training_dataset_status()
 
+    def verify_managed_dataset(self) -> str:
+        """Reconcile copied dataset bytes and provenance before optional training.
+
+        The digest is a reproducibility identifier, not authentication. No
+        captured data is rewritten and no training is executed here.
+        """
+        try:
+            status = self.training_dataset_status()
+            if not status["ready"]:
+                raise ValueError(status["message"])
+            manifest = self._read_json(self._managed_yolo_root / "manifest.json")
+            eligible = {str(item["record"]["capture_id"]): item
+                        for item in self._labeled_items()
+                        if item["record"].get("quality_tag") != "bad"
+                        and not evaluation_only_record(item["record"])}
+            splits = {split: manifest[split + "_capture_ids"] for split in ("train", "val")}
+            combined = splits["train"] + splits["val"]
+            if (len(combined) != len(set(combined)) or set(combined) != set(eligible)
+                    or not all(splits.values())
+                    or any(manifest[split + "_count"] != len(ids) for split, ids in splits.items())):
+                raise ValueError("Managed split membership or counts differ.")
+            hashes = manifest["artifact_sha256"]
+            expected = {"data.yaml"}
+            if (self._managed_yolo_root / "data.yaml").read_text(encoding="utf-8") != self._dataset_yaml(self.classes()):
+                raise ValueError("Managed YAML no longer matches the class and path contract.")
+            for split, ids in splits.items():
+                for capture_id in ids:
+                    item = eligible[capture_id]
+                    record, labels = item["record"], item["labels"]
+                    source = self._safe_dataset_path(str(record["image_path"]))
+                    image_name = f"images/{split}/{capture_id}{source.suffix.lower()}"
+                    label_name = f"labels/{split}/{capture_id}.txt"
+                    expected.update((image_name, label_name))
+                    source_digest = file_sha256(source)
+                    if (source_digest != hashes.get(image_name)
+                            or (record.get("content_sha256") is not None
+                                and record["content_sha256"] != source_digest)):
+                        raise ValueError("Source image bytes changed: " + capture_id)
+                    yolo_lines = self._to_yolo_lines(labels)
+                    label_text = "\n".join(yolo_lines) + ("\n" if yolo_lines else "")
+                    if (self._managed_yolo_root / label_name).read_text(encoding="utf-8") != label_text:
+                        raise ValueError("Managed label differs from saved review: " + capture_id)
+            if set(hashes) != expected:
+                raise ValueError("Managed manifest artifact set differs.")
+            # Ultralytics may create its own split caches outside the split
+            # folders. Verify the dataset inputs, not transient cache outputs.
+            actual = {"data.yaml"}
+            for category in ("images", "labels"):
+                for split in ("train", "val"):
+                    root = self._managed_yolo_root / category / split
+                    actual.update(path.relative_to(self._managed_yolo_root).as_posix()
+                                  for path in root.rglob("*") if path.is_file())
+            if actual != expected:
+                raise ValueError("Managed split contains missing or untracked files.")
+            for name in sorted(expected):
+                path = self._managed_yolo_root / name
+                if path.is_symlink() or not path.resolve().is_relative_to(self._managed_yolo_root.resolve()):
+                    raise ValueError("Managed artifact escapes its dataset root.")
+                if file_sha256(path) != hashes[name]:
+                    raise ValueError("Managed artifact digest differs: " + name)
+            return hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        except (OSError, KeyError, TypeError, ValueError, AppError) as exc:
+            raise AppError(
+                ErrorCode.DATASET_TRAINING_NOT_READY,
+                "Managed dataset integrity verification failed. Rebuild from reviewed captures before training.",
+                status_code=409, details={"reason": str(exc)},
+            ) from exc
+
     def _labeled_items(self) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         if not self._capture_root.exists():
@@ -432,6 +536,9 @@ class DatasetLabelingService:
                 if not label_path.is_file():
                     continue
                 labels = self._read_label_document(label_path)
+                if any(labels.get(key) != record.get(key)
+                       for key in ("capture_id", "session_id", "image_path", "width", "height")):
+                    raise ValueError("Label identity or coordinate dimensions differ from capture")
                 items.append({"record": record, "labels": labels})
             except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError):
                 logger.warning("Skipping invalid labeled capture", extra={"path": str(metadata_path)})
@@ -539,6 +646,11 @@ class DatasetLabelingService:
                 "capture_id": record["capture_id"],
                 "image_path": record["image_path"],
                 "quality_tag": record.get("quality_tag"),
+                "origin": record.get("origin"),
+                "source_id": record.get("source_id"),
+                "content_sha256": record.get("content_sha256"),
+                "coordinate_space": record.get("coordinate_space"),
+                "layout_id": record.get("layout_id"),
                 "width": record.get("width"),
                 "height": record.get("height"),
                 "labels": labels.get("labels", []),
@@ -576,11 +688,11 @@ class DatasetLabelingService:
     @staticmethod
     def _training_status_message(*, generated: bool, stale: bool, eligible_count: int) -> str:
         if eligible_count < 2:
-            return "Save labels for at least two non-bad captures before building the managed training dataset."
+            return "Save labels for at least two training-eligible captures before building the managed training dataset."
         if not generated:
             return "Labels are ready. Build the managed YOLO dataset before starting training with yolo/data.yaml."
         if stale:
-            return "Saved labels changed after the last build. Rebuild the managed YOLO dataset before training."
+            return "Capture labels, provenance, classes or integrity metadata changed. Rebuild the managed YOLO dataset before training."
         return "Managed YOLO dataset is current and ready for the optional training runner."
 
 
