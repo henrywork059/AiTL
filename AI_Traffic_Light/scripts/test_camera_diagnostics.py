@@ -188,7 +188,8 @@ def main() -> int:
         assert marker in analysis_text, marker
     assert '@router.post("/run")' in route_text
     assert "CameraBottleneckAnalysis" in api_text
-    assert "Deep one-click camera test" in page_text
+    assert "<h2>Camera diagnostic</h2>" in page_text
+    assert "Diagnose camera" in page_text and "onClick={() => void diagnose()}" in page_text
     assert "FPS / throughput load ladder" in page_text
     assert "Diagnostic boundary resets excluded" in page_text
     firmware = (ROOT / "apps" / "device-camera" / "esp32-cam" / "src" / "main.cpp").read_text(encoding="utf-8")

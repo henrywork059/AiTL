@@ -135,6 +135,16 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
     return () => observer.disconnect();
   }, [positions, overview]);
 
+  function inspectCrossing(id: string) {
+    setSelectedId(id);
+    const canvas = canvasRef.current;
+    const scroll = canvas?.parentElement;
+    const point = positions.get(id);
+    if (canvas && scroll && point) {
+      scroll.scrollLeft = Math.max(0, canvas.clientWidth * point.x / 100 - scroll.clientWidth / 2);
+    }
+  }
+
   function edgeUnderPointer(clientX: number, clientY: number) {
     const button = document.elementFromPoint(clientX, clientY)?.closest<HTMLButtonElement>("[data-crosswalk-id][data-crosswalk-edge]");
     if (!button || !canvasRef.current?.contains(button)) return null;
@@ -356,8 +366,8 @@ export function CrosswalkNetworkPanel({ config, overview, onSaved, onRefresh }: 
 
       <div className="crossing-network-layout">
         <div className="panel crossing-network-map">
-          <div className="panel-header"><h3>Crossing map</h3><span className="small-note">Drag a title to move · Drag edge label to edge label to connect</span></div>
-          <div className="workspace-network-controls"><label>Inspect crossing <select value={selected?.id ?? ""} onChange={event => setSelectedId(event.target.value)} disabled={!crosswalks.length}>{!crosswalks.length && <option value="">No crossings</option>}{crosswalks.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><p className="small-note">Scroll the map for all crossings. Use Enter or Space on two edge labels to connect them.</p></div>
+          <div className="panel-header"><h3>Crossing map</h3><span className="small-note">Drag a title to move</span></div>
+          <div className="workspace-network-controls"><label>Inspect crossing <select value={selected?.id ?? ""} onChange={event => inspectCrossing(event.target.value)} disabled={!crosswalks.length}>{!crosswalks.length && <option value="">No crossings</option>}{crosswalks.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><p className="small-note">Scroll the map for all crossings. Use Enter or Space on two edge labels to connect them.</p></div>
           <div className="crossing-network-scroll" tabIndex={0} role="region" aria-label="Scrollable crossing map">
             <div ref={canvasRef} className="crossing-network-canvas" style={{ height: canvasHeight }}
               onPointerMove={moveDrag}

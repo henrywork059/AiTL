@@ -173,3 +173,10 @@
 .workspace-device-controls .button-row { flex-wrap: wrap; }
 .crossing-network-scroll:focus-visible, .workspace-disclosure summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 @media (max-width: 1050px) { .workspace-split { grid-template-columns: minmax(0,1fr); } }
+
+/* Keep mobile controls above the fold; do not change desktop navigation. */
+@media (max-width: 760px) {
+  .brand-block { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2); margin-bottom: var(--space-2); }
+  .brand-block .simulation-tools-toggle { width: auto; margin-top: 0; }
+  .page-header { gap: var(--space-2); padding-bottom: var(--space-3); }
+}

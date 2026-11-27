@@ -22,8 +22,9 @@ function statusClass(status: string) {
 }
 
 export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refreshing, cameraStatus, onNavigate }: Props) {
-  const passCount = smokeStatus?.checks.filter((check) => check.status === "pass").length ?? 0;
-  const warnCount = smokeStatus?.checks.filter((check) => check.status === "warn").length ?? 0;
+  const verifiedSmoke = apiState.status === "connected" ? smokeStatus : null;
+  const passCount = verifiedSmoke?.checks.filter((check) => check.status === "pass").length ?? 0;
+  const warnCount = verifiedSmoke?.checks.filter((check) => check.status === "warn").length ?? 0;
   const version = health?.version ?? smokeStatus?.version ?? PROJECT_VERSION;
 
   const source = apiState.status === "connected" ? cameraStatus : null;
@@ -39,7 +40,7 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
         metrics={[
           { label: "Release", value: version, note: "installed version" },
           { label: "Backend", value: apiState.status, note: health?.mode ?? "checking" },
-          { label: "Validation", value: `${passCount} passed`, note: warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "no smoke warnings" },
+          { label: "Validation", value: verifiedSmoke ? `${passCount} passed` : "Unavailable", note: verifiedSmoke ? (warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "no smoke warnings") : "No verified checks" },
           { label: "Mode", value: health?.mode ?? "checking", note: "PC Studio" },
         ]}
       />
@@ -52,8 +53,9 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
           </div>
           <button className="primary" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh status"}</button>
         </div>
+        {!verifiedSmoke && <p className="small-note" role="status">Validation results are unavailable.</p>}
         <div className="smoke-grid">
-          {(smokeStatus?.checks ?? []).map((check) => (
+          {(verifiedSmoke?.checks ?? []).map((check) => (
             <article className="smoke-card" key={check.id}>
               <div className="panel-header compact-header">
                 <strong>{check.label}</strong>
@@ -69,14 +71,15 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
       <div className="two-column-grid">
         <section className="panel">
           <div className="panel-header"><h2>Available now</h2></div>
+          {!verifiedSmoke && <p className="small-note">Availability has not been verified.</p>}
           <ul className="check-list">
-            {(smokeStatus?.ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
+            {(verifiedSmoke?.ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>
         </section>
         <section className="panel">
           <div className="panel-header"><h2>Out of scope</h2></div>
           <ul className="check-list">
-            {(smokeStatus?.not_ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
+            {(verifiedSmoke?.not_ready_for ?? []).map((item) => <li key={item}>{item.split("_").join(" ")}</li>)}
           </ul>
           <p className="small-note">Signal decisions and timing changes are confined to the software simulation. PC Studio does not connect to physical public-road signal infrastructure.</p>
         </section>
