@@ -82,7 +82,7 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
   }
 
   const previewUrl = captureReady
-    ? `${API_BASE}/api/camera/frame?v=${cameraStatus.frame_number}`
+    ? `${API_BASE}/api/camera/frame?v=${cameraStatus?.frame_number ?? 0}`
     : null;
 
   return (
