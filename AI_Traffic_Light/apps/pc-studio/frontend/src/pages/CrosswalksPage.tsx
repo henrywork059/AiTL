@@ -5,6 +5,7 @@ import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { CrosswalkRegionEditor } from "./CrosswalkRegionEditor";
 import type { CameraStatus } from "../types";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { PollingContext } from "../lib/pollingScope";
 import type { Crosswalk, CrosswalkConfig, CrosswalkRegion } from "../types/crosswalks";
 import "./crosswalksPage.css";
 
@@ -56,10 +57,11 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
     void load().catch((err) => setError(err instanceof Error ? err.message : "Crosswalk loading failed."));
   }, [load]);
 
-  const pollCameras = useCallback(async () => {
-    setCameras((await fetchRemoteCameraStatus()).cameras);
+  const pollCameras = useCallback(async (context: PollingContext) => {
+    const status = await fetchRemoteCameraStatus();
+    if (context.isCurrent()) setCameras(status.cameras);
   }, []);
-  useSerialPolling(pollCameras, 2000, { onError: () => undefined });
+  const { waitForIdle: waitForCameraPoll } = useSerialPolling(pollCameras, 2000, { enabled: !busy, onError: () => undefined });
 
   const selected = useMemo(
     () => draft?.crosswalks.find((item) => item.id === selectedId) ?? null,
@@ -69,7 +71,7 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
   const dirty = Boolean(saved && draft && JSON.stringify(saved) !== JSON.stringify(draft));
 
   function update(changes: Partial<Crosswalk>) {
-    if (!draft || !selected) return;
+    if (!draft || !selected || busy) return;
     setDraft({
       ...draft,
       crosswalks: draft.crosswalks.map((item) => item.id === selected.id ? { ...item, ...changes } : item),
@@ -122,6 +124,7 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
     setBusy(true);
     setError(null);
     try {
+      await waitForCameraPoll();
       const cameraRegistry = await saveSimulationCamera();
       setCameras(cameraRegistry.cameras);
       onCameraStatusChange(await refreshCameraAfterRemoteChange());
@@ -188,6 +191,7 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
         onRegionsChange={(regions: CrosswalkRegion[]) => update({ regions })}
         onSave={save}
         saving={busy}
+        saveError={error}
         hasUnsavedChanges={dirty}
         onClose={() => setRegionEditorOpen(false)}
       />
@@ -212,6 +216,7 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
                 key={item.id}
                 className={item.id === selectedId ? "crosswalk-list-item active" : "crosswalk-list-item"}
                 aria-pressed={item.id === selectedId}
+                disabled={busy}
                 onClick={() => setSelectedId(item.id)}
               >
                 <strong>{item.label || item.id}</strong>
@@ -241,7 +246,7 @@ export function CrosswalksPage({ cameraStatus, showSimulationTools, changingMode
               </div>
               <p className="small-note">ID: {selected.id}</p>
               <div className="button-row">
-                <button type="button" onClick={() => setRegionEditorOpen(true)}>
+                <button type="button" disabled={busy} onClick={() => { setError(null); setRegionEditorOpen(true); }}>
                   Edit regions ({selected.regions.length})
                 </button>
               </div>

@@ -12,6 +12,7 @@ type Props = {
   selectedClassId: number;
   labels: DatasetLabelBox[];
   onChange: (labels: DatasetLabelBox[]) => void;
+  disabled?: boolean;
 };
 
 function orderedBox(start: Point, end: Point): [number, number, number, number] {
@@ -31,22 +32,21 @@ export function LabelingCanvas({
   selectedClassId,
   labels,
   onChange,
+  disabled = false,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [dragEnd, setDragEnd] = useState<Point | null>(null);
 
   function eventPoint(event: ReactPointerEvent<SVGSVGElement>): Point {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
-    return {
-      x: Math.max(0, Math.min(width, ((event.clientX - rect.left) / rect.width) * width)),
-      y: Math.max(0, Math.min(height, ((event.clientY - rect.top) / rect.height) * height)),
-    };
+    const transform = svgRef.current?.getScreenCTM();
+    if (!transform) return { x: 0, y: 0 };
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
+    return { x: Math.max(0, Math.min(width, point.x)), y: Math.max(0, Math.min(height, point.y)) };
   }
 
   function startBox(event: ReactPointerEvent<SVGSVGElement>) {
-    if (event.button !== 0) return;
+    if (disabled || event.button !== 0) return;
     const point = eventPoint(event);
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragStart(point);
@@ -54,7 +54,7 @@ export function LabelingCanvas({
   }
 
   function moveBox(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!dragStart) return;
+    if (disabled || !dragStart) return;
     setDragEnd(eventPoint(event));
   }
 
@@ -64,7 +64,7 @@ export function LabelingCanvas({
     const box = orderedBox(dragStart, end);
     setDragStart(null);
     setDragEnd(null);
-    if (box[2] - box[0] < 3 || box[3] - box[1] < 3) return;
+    if (disabled || box[2] - box[0] < 3 || box[3] - box[1] < 3) return;
     const selectedClass = classes.find((item) => item.id === selectedClassId);
     if (!selectedClass) return;
     onChange([
@@ -90,6 +90,7 @@ export function LabelingCanvas({
         onPointerUp={finishBox}
         onPointerCancel={() => { setDragStart(null); setDragEnd(null); }}
         aria-label="Manual bounding-box labeling canvas"
+        aria-disabled={disabled}
       >
         <image href={imageUrl} x={0} y={0} width={width} height={height} preserveAspectRatio="none" />
         {labels.map((label, index) => {

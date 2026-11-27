@@ -11,12 +11,14 @@ class SeededBatchTest(unittest.TestCase):
     def test_real_paired_smoke(self):
         with TemporaryDirectory() as temporary:
             out = Path(temporary) / "evidence"
-            manifest = execute(out, seeds=(42,), densities=("normal",), duration=30)
+            manifest = execute(out, seeds=(42,), densities=("busy",), duration=30)
             self.assertTrue(manifest["repeat_primary_metrics_and_demand_equal"])
             self.assertTrue(manifest["repeat_intersection_fairness_equal"])
             self.assertFalse(manifest["physical_output_allowed"])
+            self.assertEqual(manifest["busy_repeats"], [{"seed": 42, "file": "busy-42-repeat.json", "primary_fairness_and_demand_equal": True}])
+            self.assertEqual(sum(manifest["cooperative_vs_adaptive_pedestrian_wait_signs"]["busy"].values()), 1)
             row = manifest["records"][0]
-            raw = json.loads((out / "normal-42.json").read_text(encoding="utf-8"))
+            raw = json.loads((out / "busy-42.json").read_text(encoding="utf-8"))
             self.assertEqual(row["demand_sha256"], raw["scenario"]["arrival_plan"]["fingerprint_sha256"])
             with (out / "paired-metrics.csv").open(encoding="utf-8") as source:
                 rows = list(csv.DictReader(source))

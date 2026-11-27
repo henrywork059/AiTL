@@ -179,14 +179,21 @@ export function DatasetReviewPage() {
     setMessage(null);
     try {
       const saved = await saveCaptureLabels(selectedCapture.capture_id, labels);
-      if (saved.capture_id !== selectedCapture.capture_id || saved.width !== selectedCapture.width || saved.height !== selectedCapture.height) throw new Error("Saved label identity mismatch; reload before editing.");
+      if (saved.capture_id !== selectedCapture.capture_id || saved.width !== selectedCapture.width || saved.height !== selectedCapture.height) {
+        setListAvailable(false);
+        setDecodedImage(null);
+        setLoadedLabelRevision(null);
+        // Keep edits visible in state until the user explicitly reloads; do not allow another save.
+        setDirty(false);
+        throw new Error("Saved label identity mismatch; reload before editing.");
+      }
       setLabelDocument(saved);
       setLabels(saved.labels);
       setDirty(false);
       setMessage(saved.labels.length === 0
         ? "Review saved as a negative example with zero objects."
         : `Saved ${saved.labels.length} bounding box${saved.labels.length === 1 ? "" : "es"}.`);
-      await Promise.all([refreshCaptures(selectedCapture.capture_id), refreshTrainingDataset()]);
+      await Promise.all([refreshCaptures(selectedCapture.capture_id).catch(reason => { setListAvailable(false); throw reason; }), refreshTrainingDataset()]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Labels could not be saved.");
     } finally {
@@ -203,11 +210,18 @@ export function DatasetReviewPage() {
     setMessage(null);
     try {
       const result = await deleteDatasetCapture(selectedCapture.capture_id);
+      if (!result.deleted || result.capture_id !== selectedCapture.capture_id || result.session_id !== selectedCapture.session_id) {
+        setListAvailable(false);
+        setDecodedImage(null);
+        setLoadedLabelRevision(null);
+        setDirty(false);
+        throw new Error("Delete response capture identity mismatch; reload before editing.");
+      }
       setLabelDocument(null);
       setLabels([]);
       setDirty(false);
       setTrainingDataset(result.training_dataset);
-      await refreshCaptures(null);
+      await refreshCaptures(null).catch(reason => { setListAvailable(false); throw reason; });
       setMessage(result.training_dataset.stale
         ? `Deleted ${result.capture_id}. Rebuild the managed YOLO dataset before the next training run.`
         : `Deleted ${result.capture_id}.`);
@@ -312,6 +326,7 @@ export function DatasetReviewPage() {
                 selectedClassId={selectedClassId}
                 labels={labels}
                 onChange={updateLabels}
+                disabled={busy || labelLoading || !listAvailable}
               /> : <div className="label-empty-state" role="status">{imageError ?? "Loading captured image..."}</div>}
               <p className="small-note">
                 Saving zero boxes marks this as a reviewed negative example. Deleting a capture also removes its metadata and saved labels.

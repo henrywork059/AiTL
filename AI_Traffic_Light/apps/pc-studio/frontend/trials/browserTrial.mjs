@@ -10,7 +10,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 // Review is a real image-decode workflow. The dump-dom virtual-time clock can
 // advance JS retry timers before asynchronous browser decoding completes.
 // Use wall-clock CDP for this page, retaining every image/identity assertion.
-async function reviewWithRealTime(workspaceUrl,workspaceArgs){
+async function reviewWithRealTime(workspaceUrl,workspaceArgs,page){
   const reviewProfile=mkdtempSync(resolve(process.env.RUNNER_TEMP||'.','mesh-edge-review-'));
   const child=spawn(edge,[...workspaceArgs.filter(a=>!a.startsWith('--virtual-time-budget=')),
     '--user-data-dir='+reviewProfile,'--remote-debugging-port=0',
@@ -58,25 +58,26 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs){
     await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
     const navigation=await call('Page.navigate',{url:workspaceUrl});
     if(navigation.errorText)throw Error('Review navigation failed: '+navigation.errorText);
-    let outcome='',details='';
-    const deadline=Date.now()+35000;
+    let outcome='',details='',lastDrag=0;
+    const deadline=Date.now()+45000;
     while(Date.now()<deadline){
-      const response=await call('Runtime.evaluate',{expression:`JSON.stringify({result:document.querySelector('#result')?.textContent??'',state:document.querySelector('.label-empty-state')?.textContent??'',selected:document.querySelector('.capture-browser-item.active')?.textContent??'',save:[...document.querySelectorAll('button')].find(b=>b.textContent==='Save review')?.disabled??null})`,returnByValue:true});
+      const response=await call('Runtime.evaluate',{expression:`JSON.stringify({result:document.querySelector('#result')?.textContent??'',drag:document.querySelector('#result')?.dataset.drag??null,state:document.querySelector('.label-empty-state')?.textContent??'',selected:document.querySelector('.capture-browser-item.active')?.textContent??'',save:[...document.querySelectorAll('button')].find(b=>b.textContent==='Save review')?.disabled??null})`,returnByValue:true});
       if(response.result?.value){
         const observed=JSON.parse(response.result.value);
         outcome=observed.result;details=JSON.stringify(observed);
+        if(observed.drag){const drag=JSON.parse(observed.drag);if(drag.id>lastDrag){lastDrag=drag.id;await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:drag.from[0],y:drag.from[1]});await call('Input.dispatchMouseEvent',{type:'mousePressed',x:drag.from[0],y:drag.from[1],button:'left',buttons:1,clickCount:1});await delay(100);await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:drag.to[0],y:drag.to[1],button:'left',buttons:1});await delay(100);await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:drag.to[0],y:drag.to[1],button:'left',buttons:0,clickCount:1});}}
         if(outcome.startsWith('MESH_WORKSPACE_PASS')||outcome.startsWith('MESH_WORKSPACE_FAIL'))break;
       }
       await delay(100);
     }
     const passed=outcome==='MESH_WORKSPACE_PASS · synthetic API fixture';
-    const target=resolve(process.env.RUNNER_TEMP||'.',passed?'mesh-workspace-review.png':'mesh-workspace-review-failed.png');
+    const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+(passed?'.png':'-failed.png'));
     const screenshot=await call('Page.captureScreenshot',{format:'png',fromSurface:true});
     const bytes=Buffer.from(screenshot.data,'base64');
     if(bytes.length<1000)throw Error('Review screenshot missing');
     writeFileSync(target,bytes);
-    if(!passed)throw Error('Workspace review failed (real clock): '+details);
-    console.log('[PASS] real-clock Dataset Review browser assertions and same-session screenshot');
+    if(!passed)throw Error('Workspace '+page+' failed (real clock): '+details);
+    console.log('[PASS] real-clock '+page+' browser assertions, real pointer input and same-session screenshot');
   }finally{
     if(socket)socket.close();
     child.kill();
@@ -94,10 +95,10 @@ try {
   const png=resolve(process.env.RUNNER_TEMP||'.','mesh-renderer.png');
   const shot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-shot','--screenshot='+png,url],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(shot.status!==0||!existsSync(png)||readFileSync(png).length<1000)throw new Error('Screenshot missing');
-  for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['diagnostics',600,900],['network',1440,1000],['models',600,900],['review',1440,1000]]){
+  for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['diagnostics',600,900],['network',1440,1000],['crosswalks',1440,1000],['models',600,900],['review',1440,1000]]){
     const workspaceUrl='http://127.0.0.1:4179/workspace.html?page='+page;
     const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=7000'];
-    if(page==='review'){await reviewWithRealTime(workspaceUrl,workspaceArgs);continue;}
+    if(page==='review'||page==='crosswalks'){await reviewWithRealTime(workspaceUrl,workspaceArgs,page);continue;}
     const dom=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-'+page,'--dump-dom',workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
     if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS · synthetic API fixture'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
     const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'.png');

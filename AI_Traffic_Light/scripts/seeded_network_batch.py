@@ -118,6 +118,17 @@ def execute(output, seeds=DEFAULT_SEEDS, densities=DENSITIES, duration=120):
         write_json(output / "repeat.json", repeat)
         if not repeat_ok or not repeat_fairness_ok:
             raise ValueError("Repeat demand or primary metrics differ")
+        busy_repeats = []
+        for case in (r for r in records if r["density"] == "busy"):
+            duplicate = run(case["seed"], case["density"])
+            original = json.loads((output / f"busy-{case['seed']}.json").read_text(encoding="utf-8"))
+            same = (primary(duplicate) == case["metrics"] and fairness(duplicate) == fairness(original)
+                    and duplicate["scenario"]["arrival_plan"]["fingerprint_sha256"] == case["demand_sha256"])
+            name = f"busy-{case['seed']}-repeat.json"
+            write_json(output / name, duplicate)
+            if not same:
+                raise ValueError(f"Busy repeat differs: {case['seed']}")
+            busy_repeats.append({"seed": case["seed"], "file": name, "primary_fairness_and_demand_equal": same})
     groups = {density: [r for r in records if r["density"] == density] for density in densities}
     summary = {density: {pair: {metric: {"mean": mean(values), "min": min(values), "max": max(values),
                 "n": len(values)} for metric in METRICS
@@ -145,6 +156,8 @@ def execute(output, seeds=DEFAULT_SEEDS, densities=DENSITIES, duration=120):
                 "records": records, "paired_summary_by_density": summary,
                 "repeat_primary_metrics_and_demand_equal": repeat_ok,
                 "repeat_intersection_fairness_equal": repeat_fairness_ok,
+                "busy_repeats": busy_repeats,
+                "cooperative_vs_adaptive_pedestrian_wait_signs": {density: {direction: sum(1 for row in group if comparison(row["paired_deltas"]["cooperative_minus_adaptive"]["total_pedestrian_wait_seconds"])) for direction, comparison in (("higher", lambda x: x > 0), ("lower", lambda x: x < 0), ("equal", lambda x: x == 0))} for density, group in groups.items()},
                 "fairness_modes": list(FAIRNESS_MODES),
                 "fairness_scope": "Per-intersection waits include unfinished waits at horizon. Network overlay columns repeat across intersections and must not be summed. Pedestrian-aware cooperative is a secondary existing policy, not a replacement or tuned winner.",
                 "limitations": "Restricted synthetic queue model; same exogenous arrivals across three primary policies; policy-dependent transfers. Other existing service arms retained in raw exports. Small seed sample, range not confidence interval; no native/legacy or field superiority claim.",
