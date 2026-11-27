@@ -263,7 +263,7 @@ export function CrosswalkRegionEditor({
                     className={selected?.id === region.id ? "crosswalk-region-polygon is-selected" : "crosswalk-region-polygon"}
                   />
                   {selected?.id === region.id && verticesForSide(region, sideKey).map(([x, y], index) => (
-                    <g key={index}>
+                    <g key={`${sideKey}-${index}`}>
                       <circle
                         cx={x} cy={y} r="17"
                         className="crosswalk-region-vertex"

@@ -61,6 +61,9 @@ def main():
     assert "fetchTrainingStatusStrict(signal?: AbortSignal)" in api
     assert "fetchTrainingDatasetStatusStrict(signal?: AbortSignal)" in api
     assert ":$"+"{sourceId}" in native and "key={" in native
+    editor = (src / "pages/CrosswalkRegionEditor.tsx").read_text(encoding="utf-8")
+    assert "<g key={`${sideKey}-${index}`}>" in editor
+    assert "dragRef.current = null;" in editor
     print("[PASS] Capture source/mode mismatch rejected before persistence; legacy callers unaffected")
     print("[PASS] Fail-closed training and dataset status, fresh readiness and source-scoped native view")
 
