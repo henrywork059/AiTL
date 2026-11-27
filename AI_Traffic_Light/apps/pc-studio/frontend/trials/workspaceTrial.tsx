@@ -9,6 +9,8 @@ import {DEFAULT_REMOTE_CAMERA_SETTINGS} from "../src/lib/remoteCameraApi";
 import {CameraDiagnosticsPage} from "../src/pages/CameraDiagnosticsPage";
 import {CrosswalkNetworkPanel} from "../src/components/CrosswalkNetworkPanel";
 import {DatasetReviewPage} from "../src/pages/DatasetReviewPage";
+import {DatasetCapturePage} from "../src/pages/DatasetCapturePage";
+import {TrainExportPage} from "../src/pages/TrainExportPage";
 import {CrosswalksPage} from "../src/pages/CrosswalksPage";
 import {JunctionNetworkPage} from "../src/pages/JunctionNetworkPage";
 import {fallbackJunctionNode} from "../src/lib/junctionNetworkView";
@@ -21,7 +23,7 @@ import type {CrosswalkConfig} from "../src/types/crosswalks";
 import "../src/styles.css";
 
 const page=new URLSearchParams(location.search).get("page")??"dashboard";
-const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",junctions:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review"};
+const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",junctions:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review",capture:"dataset_capture",training:"train_export"};
 const fixture:CrosswalkConfig={schema_version:1,crosswalks:["North crossing","South crossing"].map((label,i)=>({id:"crossing_"+i,label,location:"Synthetic fixture",camera_side_a_id:i===0?"fixture_a":null,camera_side_b_id:null,regions:[]}))};
 const model={model_id:"fixture_model",model_path:"outputs/training/fixture_model/weights/best.pt",modified_at_ms:0,size_bytes:1048576,is_active:false,is_default:true,is_latest:true};
 const classes=[{id:0,name:"vehicle"}];
@@ -29,6 +31,9 @@ const captureList=["cap_a","cap_b"].map(id=>({capture_id:id,session_id:id,qualit
 const labelDocs=Object.fromEntries(captureList.map(c=>[c.capture_id,{capture_id:c.capture_id,session_id:c.session_id,image_path:"fixture",width:c.width,height:c.height,reviewed:false,updated_at_ms:null,labels:c.capture_id==="cap_a"?[{class_id:0,class_name:"vehicle",box_xyxy:[10,10,20,20]}]:[]} ]));
 let labelFailure=true, imageFailure=true, labelSaves=0, imageVariant:"valid"|"wrong-size"|"invalid"="valid";
 let captureBImageRequests=0, datasetBuilt=false, datasetStale=false, datasetBuilds=0, captureDeletes=0;
+let capturePostCount=0, captureSavedCount=0, receiverSource="camera_b", trainingStatusFailure=false, trainingStartCount=0, trainingPollCount=0;
+let trainerState="idle";
+if(page==="training"){datasetBuilt=true;datasetStale=true;}
 const datasetStatus=()=>{const reviewed=captureList.filter(c=>c.labeled);return {ready:datasetBuilt&&!datasetStale,stale:datasetStale,eligible_frame_count:reviewed.length,labeled_frame_count:reviewed.length,label_box_count:reviewed.reduce((sum,c)=>sum+c.label_count,0),train_count:datasetBuilt?1:0,val_count:datasetBuilt?1:0,message:"Synthetic fixture",classes};};
 // Encode once synchronously: canvas.toBlob callbacks can be delayed by headless virtual time.
 const fixtureImage=(width=1280,height=720)=>{const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d")!;ctx.fillStyle="#dae4e8";ctx.fillRect(0,0,width,height);ctx.fillStyle="#59636c";ctx.fillRect(0,250,width,220);ctx.fillStyle="#ffffff";ctx.font="32px sans-serif";ctx.fillText("Synthetic empty road fixture",40,100);const bytes=Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]),char=>char.charCodeAt(0));return new Blob([bytes],{type:"image/png"});};
@@ -53,9 +58,14 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/camera/remote/connect"){const body=JSON.parse(String(init?.body));check(body.source_id===selectedCamera,"Wrong connection target");const p=profiles.find(p=>p.source_id===selectedCamera)!;if(failProbe){p.last_error="Fixture ESP unreachable";return fixtureError(p.last_error);}p.last_error=null;p.connected=true;p.device_reachable=true;data=remoteState();}
   else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");data=remoteState();}
   else if(path==="/api/camera/status")data={mode:"receiver",simulation_enabled:false,simulation_paused:false,frame_available:false,stale:true,streaming:profiles.find(p=>p.source_id===selectedCamera)?.streaming??false,active_source_id:selectedCamera,resolution:null,age_ms:null,frame_url:null};
+  else if(path==="/api/dataset/status")data={active_dataset_id:"captures",session_count:0,frame_count:captureSavedCount,metadata_count:captureSavedCount,capture_enabled:true,status:"ready",dataset_path:"datasets/captures",last_capture:null};
+  else if(path==="/api/dataset/captures"&&init?.method==="POST"){capturePostCount++;const body=JSON.parse(String(init.body));check(body.expected_source_id==="camera_a"&&body.expected_origin==="upload"&&body.session_id==="default","Capture identity preflight missing");if(body.expected_source_id!==receiverSource)return fixtureError("Camera source changed before capture");captureSavedCount++;data={capture_id:"saved_capture_1",source_id:receiverSource,origin:"upload",image_path:"captures/default/saved_capture_1.png"};}
   else if(path==="/api/dataset/captures")data={captures:captureList,total:captureList.length,classes};
   else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/image")){const id=path.split("/")[4];if(id==="cap_b"){captureBImageRequests++;if(imageFailure)return fixtureError("Fixture image unavailable");}const blob=id!=="cap_b"||imageVariant==="valid"?validFixtureImage:imageVariant==="wrong-size"?wrongSizeFixtureImage:invalidFixtureImage;return new Response(blob,{headers:{"Content-Type":"image/png"}});}
-  else if(path==="/api/dataset/training-dataset/status")data=datasetStatus();
+  else if(path==="/api/dataset/training-dataset/status"){if(trainingStatusFailure)return fixtureError("Managed dataset status unavailable");data=datasetStatus();}
+  else if(path==="/api/settings/runtime")data=fallbackRuntimeSettings;
+  else if(path==="/api/training/status"){trainingPollCount++;if(trainingStatusFailure)return fixtureError("Training status unavailable");data={training_available:true,status:trainerState,progress:trainerState==="running"?2:0,completed_epochs:0,active_run_id:trainerState==="running"?"fixture_run":null,message:"Synthetic training fixture",config:null,output_path:null,best_model_path:null,error:null,history:[],early_stopping:null};}
+  else if(path==="/api/training/start"){const body=JSON.parse(String(init?.body));check(body.dataset_yaml==="yolo/data.yaml"&&datasetStatus().ready&&!datasetStatus().stale,"Training started with stale managed dataset");trainingStartCount++;trainerState="running";data={training_available:true,status:"running",progress:0,completed_epochs:0,active_run_id:"fixture_run",message:"Synthetic run initiated",config:body,output_path:null,best_model_path:null,error:null,history:[],early_stopping:null};}
   else if(path==="/api/dataset/training-dataset"&&init?.method==="POST"){check(JSON.parse(String(init.body)).validation_fraction===0.2&&datasetStatus().eligible_frame_count>=2,"Invalid dataset build");datasetBuilds++;datasetBuilt=true;datasetStale=false;data=datasetStatus();}
   else if(path.startsWith("/api/dataset/captures/")&&init?.method==="DELETE"){const id=path.split("/")[4];check(id==="cap_b"&&captureList.some(c=>c.capture_id===id),"Wrong delete capture");captureList.splice(captureList.findIndex(c=>c.capture_id===id),1);delete labelDocs[id];captureDeletes++;datasetStale=datasetBuilt;data={capture_id:id,session_id:id,deleted:true,cleanup_pending:false,deleted_paths:[],training_dataset:datasetStatus()};}
   else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/labels")){const id=path.split("/")[4];if(init?.method==="PUT"){check(id===(labelSaves===0?"cap_b":"cap_a"),"Wrong capture label save");const body=JSON.parse(String(init.body));check(Array.isArray(body.labels),"Invalid labels");if(id==="cap_b")check(body.labels.length===0,"Old capture labels leaked");else{check(body.labels.length===2,"New annotation not saved");const box=body.labels[1].box_xyxy;check([160,200,400,360].every((value,i)=>Math.abs(box[i]-value)<3),"Annotation coordinates mismatch: "+box);}labelSaves++;if(datasetBuilt)datasetStale=true;labelDocs[id]={...labelDocs[id],reviewed:true,labels:body.labels};const cap=captureList.find(x=>x.capture_id===id)!;cap.labeled=true;cap.label_count=body.labels.length;}else if(id==="cap_b"&&labelFailure){await new Promise(r=>setTimeout(r,150));return fixtureError("Fixture labels unavailable");}data=labelDocs[id];}
@@ -83,14 +93,15 @@ function CameraFixture(){
   const [status,setStatus]=useState<CameraStatus|null>(null);
   return <CameraSettingsPage status={status} showSimulationTools={false} onSimulationChange={()=>{}} onStatusChange={setStatus} changingMode={false}/>;
 }
-const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions"].includes(page)?100:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
+const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions","capture","training"].includes(page)?120:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 let dragSerial=0;
 async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};const id=++dragSerial;result.dataset.drag=JSON.stringify({id,from:toScreen(start),to:toScreen(end),target:selector===".crosswalk-region-overlay"?".crosswalk-region-vertex":".label-canvas"});await waitFor(()=>result.dataset.dragDone===String(id)&&done(),"Real pointer drag not committed: "+selector+"; released="+result.dataset.dragDone+"; vertices="+[...svg.querySelectorAll("circle")].map(c=>c.getAttribute("cx")+","+c.getAttribute("cy")).join(";"));delete result.dataset.drag;}
 const vertexNear=(x:number,y:number)=>{const c=document.querySelector(".crosswalk-region-vertex");return Boolean(c&&Math.abs(Number(c.getAttribute("cx"))-x)<=1&&Math.abs(Number(c.getAttribute("cy"))-y)<=1);};
+function CaptureFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:true,streaming:true,active_source_id:"camera_a",resolution:{width:1280,height:720},content_type:"image/png",received_at_ms:123456,age_ms:50,frame_number:7,size_bytes:500,origin:"upload",stale:false,frame_url:null,upload_endpoint:""});return <><button id="fixture-source-stale" type="button" onClick={()=>setStatus(current=>({...current,stale:!current.stale}))}>Toggle fixture stale</button><DatasetCapturePage cameraStatus={status}/></>;}
 function CrosswalkFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:false,streaming:true,active_source_id:"camera_a",resolution:null,content_type:null,received_at_ms:null,age_ms:null,frame_number:0,size_bytes:0,origin:null,stale:false,frame_url:null,upload_endpoint:""});return <CrosswalksPage cameraStatus={status} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}} onCameraStatusChange={setStatus}/>;}
 async function main(){
-  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
+  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="capture"?<CaptureFixture/>:page==="training"?<TrainExportPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
   flushSync(()=>root.render(<AppShell activePage={routes[page]} apiState={apiState} cameraStatus={null} onPageChange={id=>{selected=id;}} showSimulationTools={false} onSimulationToolsToggle={()=>{}}>{content}</AppShell>));
   for(let i=0;i<20;i++){if((page!=="models"||document.body.textContent?.includes("fixture_model"))&&(page!=="cameras"||document.body.textContent?.includes("camera_b")))break;await pause();}
   await pause();
@@ -214,6 +225,36 @@ async function main(){
     window.confirm=()=>true;await clickReady("Delete capture",()=>imageFor("cap_b",0));await waitFor(()=>captureDeletes===1&&document.querySelectorAll(".capture-browser-item").length===1&&document.body.textContent?.includes("rebuild required"),"Delete did not invalidate managed dataset");
     await waitFor(()=>imageFor("cap_a",2)&&findButton("Save review")&&!findButton("Save review")!.disabled,"Remaining positive capture did not reload");
     check(findButton("Build managed dataset")?.disabled&&captureList[0].capture_id==="cap_a"&&labelDocs.cap_a.labels.length===2,"Deletion corrupted remaining capture or rebuild gate");
+  }
+
+  if(page==="capture"){
+    await waitFor(()=>findButton("Capture frame")&&!findButton("Capture frame")!.disabled,"Available selected frame did not unlock capture");
+    document.querySelector<HTMLButtonElement>("#fixture-source-stale")!.click();
+    await waitFor(()=>findButton("Capture frame")?.disabled,"Stale frame did not prevent capture");
+    check(capturePostCount===0,"Stale frame was captured");
+    document.querySelector<HTMLButtonElement>("#fixture-source-stale")!.click();
+    await waitFor(()=>findButton("Capture frame")&&!findButton("Capture frame")!.disabled,"Fresh frame did not recover");
+    findButton("Capture frame")!.click();
+    await waitFor(()=>capturePostCount===1&&document.body.textContent?.includes("Camera source changed before capture"),"Cross-source capture was not rejected");
+    check(captureSavedCount===0,"Cross-source capture wrote a frame");
+    receiverSource="camera_a";
+    await waitFor(()=>!findButton("Capture frame")!.disabled,"Capture recovery unavailable");
+    findButton("Capture frame")!.click();
+    await waitFor(()=>capturePostCount===2&&captureSavedCount===1&&document.body.textContent?.includes("Captured captures/default/saved_capture_1.png"),"Qualified source capture did not succeed");
+  }
+  if(page==="training"){
+    await waitFor(()=>trainingPollCount>0&&findButton("Start training")?.disabled&&document.body.textContent?.includes("rebuild required"),"Stale dataset did not block training");
+    check(trainingStartCount===0,"Stale training started");
+    datasetStale=false;
+    await waitFor(()=>findButton("Start training")&&!findButton("Start training")!.disabled,"Ready dataset did not unblock training");
+    trainingStatusFailure=true;
+    await waitFor(()=>findButton("Start training")?.disabled&&document.body.textContent?.includes("Training status unavailable"),"Failed training poll retained ready permission");
+    check(trainingStartCount===0,"Unavailable status allowed training");
+    trainingStatusFailure=false;
+    await waitFor(()=>findButton("Start training")&&!findButton("Start training")!.disabled,"Training polling did not recover");
+    findButton("Start training")!.click();
+    await waitFor(()=>trainingStartCount===1&&document.body.textContent?.includes("Training in progress"),"Training fresh readiness preflight or launch failed");
+    check(document.body.textContent?.includes("fixture_run"),"Training run identity not displayed");
   }
   if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;load.click();for(let i=0;i<20&&!load.disabled;i++)await pause();await pause();check(activeModel&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model activation");modelFailure=true;const refresh=[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")!;refresh.click();for(let i=0;i<20&&!document.body.textContent?.includes("Model registry unavailable or loading.");i++)await pause();check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")?.click();for(let i=0;i<20&&!document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model");i++)await pause();check(document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Model recovery");}
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";
