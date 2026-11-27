@@ -183,9 +183,17 @@ def main() -> int:
         selector.join(1.0)
         camera_frame_service.publish_cached_upload = original_store  # type: ignore[method-assign]
         assert not emitter.is_alive() and not selector.is_alive()
-        assert camera_frame_service.latest_frame().source_id == "cam_b"
+        assert manager.status()["active_source_id"] == "cam_b"
+        selected_frame = camera_frame_service.latest_frame()
+        # The blocked handoff may consume B's cache freshness window under a
+        # loaded Windows runner. Expiry must fail closed, never publish A.
+        assert selected_frame is None or selected_frame.source_id == "cam_b"
 
-        # Selecting A publishes its cached newest frame immediately.
+        # A newly received inactive-source frame must remain cached without
+        # overwriting B; selecting A then publishes that verified fresh cache.
+        session_a.emit(4, jpeg(95))
+        after_a_background = camera_frame_service.latest_frame()
+        assert after_a_background is None or after_a_background.source_id == "cam_b"
         manager.select("cam_a")
         assert camera_frame_service.latest_frame().source_id == "cam_a"
 
