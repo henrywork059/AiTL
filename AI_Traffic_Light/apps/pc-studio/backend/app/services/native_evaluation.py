@@ -32,6 +32,11 @@ from app.services.native_evaluation_experiments import summarize_timeline, valid
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
     REFERENCE_EVALUATION_ORIGIN)
 from app.services.simulation_reference_session import GeneratedReferenceSession
+from app.services.sumo_midblock_session import CyclicMidblockSession
+
+
+def valid_geometry(engine,geometry):
+    return geometry in GEOMETRY_PRESETS or (engine=="native" and geometry=="midblock")
 
 ENGINES = {"native": PROVENANCE, "reference": REFERENCE_EVALUATION_ORIGIN}
 
@@ -41,10 +46,11 @@ MAX_BATCH = 25
 
 class NativeEvaluationService:
     def __init__(self, *, enabled=False, factory=GeneratedSession, trip_loader=load_trips, phase_loader=PhaseMap.load,
-                 reference_factory=GeneratedReferenceSession):
+                 reference_factory=GeneratedReferenceSession,midblock_factory=CyclicMidblockSession):
         self.enabled = enabled
         self._factory, self._trip_loader, self._phase_loader = factory, trip_loader, phase_loader
         self._reference_factory = reference_factory
+        self._midblock_factory = midblock_factory
         self._lock = RLock()
         self._comparison = None
         self.epoch = uuid4().hex
@@ -58,6 +64,7 @@ class NativeEvaluationService:
         self._paused = False
         self._policy = None
         self._demand_digest = None
+        self._demand_manifest = None
         self._geometry = None
         self._engine = None
         self._trips = ()
@@ -90,6 +97,7 @@ class NativeEvaluationService:
         self._paused = False
         self._policy = None
         self._demand_digest = None
+        self._demand_manifest = None
         self._geometry = None
         self._engine = None
         self._trips = ()
@@ -112,7 +120,7 @@ class NativeEvaluationService:
     def start(self, *, epoch, generation, density, seed, mode, policy_config=None, profile=None, geometry='standard', engine='native'):
         with self._lock:
             self._require(epoch, generation, running=False)
-            if engine not in ENGINES or geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
+            if engine not in ENGINES or not valid_geometry(engine,geometry) or density not in DENSITY_COUNTS or mode not in ("fixed", "adaptive") or type(seed) is not int or not 0 <= seed <= 2**31-1:
                 raise AppError(ErrorCode.INVALID_REQUEST, "Invalid native evaluation settings.", status_code=422)
             try:
                 self._retire()
@@ -128,10 +136,11 @@ class NativeEvaluationService:
                 self._policy = self._controller.save_config(config)
                 self._controller.reset_runtime(0.)
                 self._engine = engine
-                factory = self._factory if engine=="native" else self._reference_factory
+                cyclic = geometry=="midblock"
+                factory = self._midblock_factory if cyclic else (self._factory if engine=="native" else self._reference_factory)
                 def open_session(value):
                     kwargs = {'density': density}
-                    if geometry != 'standard':
+                    if geometry != 'standard' and not cyclic:
                         kwargs['geometry'] = geometry
                     self._session = factory(value, **kwargs)
                     return self._session
@@ -139,12 +148,13 @@ class NativeEvaluationService:
                 self._adapter.reset(seed=seed)
                 network = self._session.network_path
                 self._projection = NativeProjection(Projection.load(network), self.generation, provenance=ENGINES[engine])
-                trips = (self._session.trips if engine=="reference" else
+                trips = (self._session.trips if engine=="reference" or cyclic else
                          self._trip_loader(network, network.parent/"routes.xml"))
                 self._trips = tuple(trips)
                 self._routes = RouteGateAdapter(trips)
-                self._demand_digest = hashlib.sha256(json.dumps([asdict(t) for t in trips],sort_keys=True,separators=(",",":")).encode()).hexdigest()
-                self._phase_map = self._session.phase_map if engine=="reference" else self._phase_loader(network)
+                self._demand_manifest = self._session.demand_manifest if cyclic else [asdict(t) for t in trips]
+                self._demand_digest = hashlib.sha256(json.dumps(self._demand_manifest,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+                self._phase_map = self._session.phase_map if engine=="reference" or cyclic else self._phase_loader(network)
                 self._metrics = GateMetrics()
                 self._publisher.begin(self.generation,provenance=ENGINES[engine])
                 self._received_at_ms = time.time_ns() // 1_000_000
@@ -180,7 +190,15 @@ class NativeEvaluationService:
                     self._seen_trips.update(a.engine_id for a in snap.agents)
                     permission = self._session.last_permission
                     vehicle_inside=any(a.kind=="vehicle" and a.road_id.startswith(":C_") for a in before.agents)
-                    expected=self._phase_map.state(phase,vehicle_inside=vehicle_inside,pedestrian_inside=bool(crossing))
+                    pedestrian_inside=bool(crossing)
+                    if self._geometry=="midblock":
+                        vehicle_inside,pedestrian_inside=self._session.occupied(before.agents)
+                        self._session.occupied(snap.agents)
+                        trips=self._session.trips
+                        if len(trips)!=len(self._trips):
+                            self._trips=trips
+                            self._routes.trips.update({t.ident:t for t in trips})
+                    expected=self._phase_map.state(phase,vehicle_inside=vehicle_inside,pedestrian_inside=pedestrian_inside)
                     if permission!=expected:
                         raise RuntimeError("Native permission differs from protected phase map")
                     grants = {i for i,c in enumerate(permission) if c=="G"}
@@ -190,6 +208,8 @@ class NativeEvaluationService:
                         grants.intersection(self._phase_map.pedestrians) and phase!="pedestrian_green"):
                         raise RuntimeError("Invalid native permission")
                     measured = self._metrics.sample(snap.tick,self._routes.observations(snap.agents))
+                    if self._geometry=="midblock" and self._routes.unknown_roads:
+                        raise RuntimeError("Cyclic agent left its validated route")
                     self._timeline.append({**measured,"phase":phase,"t":measured["t_seconds"],
                         "active_rules":list(signal.get("active_rules",[])),"applied_permission":permission,
                         "vehicle_trip_arrivals":len(self._session.arrived),"pedestrian_trip_arrivals":len(self._session.person_arrived)})
@@ -198,6 +218,7 @@ class NativeEvaluationService:
                         "applied_permission":permission,
                         "applied_vehicle_go":bool(grants.intersection(self._phase_map.vehicles)),
                         "applied_pedestrian_walk":bool(grants.intersection(self._phase_map.pedestrians))}
+                self._publisher.retire_before(snap.tick)
                 self._received_at_ms = time.time_ns() // 1_000_000
                 return self.scene() if _return_scene else None
             except Exception as exc:
@@ -237,6 +258,13 @@ class NativeEvaluationService:
                     "paused":self._paused,"density":self._density,"geometry":self._geometry,"engine":self._engine,"signal":deepcopy(self._signal),
                     "epoch":self.epoch,"profile":self._policy["active_profile"],
                     "legacy_editor_compatible":False}
+                if self._geometry=="midblock":
+                    snapshot["demand_model"]="native_cyclic_slots_v1"
+                    snapshot["demand_digest"]=self._demand_digest
+                    for agent in snapshot["agents"]:
+                        ident=agent["id"].split(":")[-1]
+                        slot,visit=ident.rsplit("_",1)
+                        agent.update(slot_id=slot,visit=int(visit))
             return {"status":self._state,"provenance":ENGINES.get(self._engine,PROVENANCE),"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
                 "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":self._engine!="reference","engine":self._engine,
@@ -293,7 +321,7 @@ class NativeEvaluationService:
                             z.writestr(sid+".json",(writer.dataset_root/rec.metadata_path).read_bytes())
                         meta=self.scene()["snapshot"]
                         z.writestr("scene.json",json.dumps(meta,indent=2))
-                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False},indent=2))
+                        z.writestr("coordinate_contract.json",json.dumps({"epoch":epoch,"generation":generation,"tick":tick,"layout_id":meta["layout_id"],"engine":self._engine,"provenance":meta["provenance"],"coordinate_space":meta["coordinate_space"],"width":1280,"height":720,"views":list(VIEW_FLIPS),"legacy_editor_compatible":False,**({"demand_model":meta["demand_model"],"demand_digest":meta["demand_digest"]} if self._geometry=="midblock" else {})},indent=2))
                         z.writestr("agents.csv",export_csv(meta))
                         z.writestr("observations.json",json.dumps([self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS],indent=2))
                     return stream.getvalue()
@@ -326,7 +354,9 @@ class NativeEvaluationService:
                 "policy_config":deepcopy(self._policy),"legacy_editor_compatible":False,
                 "demand_digest":self._demand_digest,"derived_metrics":summarize_timeline(self._timeline,self._metrics.summary()),
                 "waiting_episodes":self._metrics.waiting_episodes(),
-                "demand_manifest":[asdict(t) for t in self._trips],
+                "demand_manifest":deepcopy(self._demand_manifest),
+                **({"demand_model":"native_cyclic_slots_v1","journey_manifest":[asdict(t) for t in self._trips],
+                    "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current)} if self._geometry=="midblock" else {}),
                 "trip_accounting":self._trip_accounting(),
                 "unknown_roads":sorted(self._routes.unknown_roads),"arrived_vehicles":sorted(self._session.arrived),
                 "arrived_pedestrians":sorted(self._session.person_arrived),
@@ -378,7 +408,7 @@ class NativeEvaluationService:
             self._require(epoch,generation,running=False)
             if self._state == "running":
                 raise self._conflict("Stop the active native evaluation before comparing policies.")
-            if engine not in ENGINES or geometry not in GEOMETRY_PRESETS or density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
+            if engine not in ENGINES or not valid_geometry(engine,geometry) or density not in DENSITY_COUNTS or type(seed) is not int or not 0<=seed<=2**31-1 or type(duration_seconds) is not int or not 30<=duration_seconds<=500:
                 raise AppError(ErrorCode.INVALID_REQUEST,"Invalid native comparison settings.",status_code=422)
             policy=deepcopy(signal_rules_service.get_config())
             selected=profile or policy.get("active_profile")
@@ -387,7 +417,7 @@ class NativeEvaluationService:
             policy["active_profile"]=selected
             pair={}
             child=NativeEvaluationService(enabled=True,factory=self._factory,
-                trip_loader=self._trip_loader,phase_loader=self._phase_loader,reference_factory=self._reference_factory)
+                trip_loader=self._trip_loader,phase_loader=self._phase_loader,reference_factory=self._reference_factory,midblock_factory=self._midblock_factory)
             cancelled=Event()
             reservation=(cancelled,child)
             previous_state=self._state
@@ -422,9 +452,10 @@ class NativeEvaluationService:
             meta={"schema_version":1,"engine":engine,"evidence":"executed_synthetic_native_comparison" if engine=="native" else "executed_synthetic_reference_comparison",
                 "metric_contract":"normalized_physical_service_gate_v1","coordinate_space":"native_projection_v1",
                 "layout_id":pair["fixed"]["layout_id"],"geometry":geometry,"profile":selected,"density":density,"seed":seed,
+                **({"demand_model":"native_cyclic_slots_v1"} if geometry=="midblock" else {}),
                 "duration_seconds":duration_seconds,"demand_digest":pair["fixed"]["demand_digest"],"policy_sha256":hashlib.sha256(json.dumps(policy,sort_keys=True).encode()).hexdigest(),
                 "production_experiment_parity":False,"physical_output_allowed":False,
-                "limitations":"Same finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained. Reference uses constant-speed/gap model, not SUMO or production legacy."}
+                "limitations":("Same cyclic slot specification and saved policy, not matched journey counts or legacy pixel geometry. Reentry requires native arrival; unfinished visits retained." if geometry=="midblock" else "Same finite demand and saved policy copy, not legacy metric parity. Wait is queued agent-seconds; unfinished journeys and censored visits retained. Reference uses constant-speed/gap model, not SUMO or production legacy.")}
             stream=BytesIO()
             with ZipFile(stream,"w") as z:
                 z.writestr("manifest.json",json.dumps(meta,indent=2))

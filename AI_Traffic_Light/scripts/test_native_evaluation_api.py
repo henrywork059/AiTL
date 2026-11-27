@@ -53,6 +53,69 @@ class Tests(unittest.TestCase):
             self.assertEqual(data["status"],"disabled")
             assert_envelope(client.post(BASE+"/start",json={"epoch":data["epoch"],"generation":data["generation"]}),expected_status=409)
 
+    def test_midblock_lifecycle_and_dynamic_journey_export(self):
+        from app.services.sumo_midblock_fixture import slots_for
+        from app.services.sumo_midblock_session import CyclicLedger
+        from dataclasses import asdict,replace
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"network.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            slots=slots_for(42,"light")[:1]
+            class CyclicFake(FakeSession):
+                def __init__(self):
+                    super().__init__(path)
+                    self.ledger=CyclicLedger(slots)
+                    self.phase_map=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset())
+                    self.trips=(Trip("v0_0","vehicle",0.,5.,(Segment("WC","road",((0.,0.),(20.,0.))),)),)
+                @property
+                def demand_manifest(self):
+                    return [asdict(x) for x in slots]
+                def occupied(self,agents): return False,False
+                def agents(self):
+                    return () if self.tick==2 else (ShadowAgent("vehicle","v0_0" if self.tick==1 else "v0_1",min(19.,self.tick*.2),0.,1.,"WC"),)
+                def advance(self):
+                    super().advance()
+                    if self.tick==1:
+                        self.ledger.reconcile(("v0_0",),(),.2)
+                    if self.tick==2:
+                        new=self.ledger.reconcile((),("v0_0",),.4)
+                        self.arrived.add("v0_0")
+                        self.trips+=tuple(replace(self.trips[0],ident=ident,depart_s=depart) for ident,depart in new)
+            sessions=[]
+            def factory(seed,*,density):
+                session=CyclicFake()
+                sessions.append(session)
+                return session
+            service=NativeEvaluationService(enabled=True,midblock_factory=factory)
+            self.addCleanup(service.close)
+            with patch.object(routes,"native_evaluation_service",service),TestClient(build_test_app()) as client:
+                initial=service.scene()
+                identity={k:initial[k] for k in ("epoch","generation")}
+                assert_envelope(client.post(BASE+"/start",json={**identity,"geometry":"midblock","engine":"reference"}),expected_status=422)
+                state=assert_envelope(client.post(BASE+"/start",json={**identity,"geometry":"midblock","density":"light"}))["data"]
+                identity={k:state[k] for k in ("epoch","generation")}
+                assert state["snapshot"]["demand_model"]=="native_cyclic_slots_v1"
+                first=assert_envelope(client.post(BASE+"/step",json={**identity,"tick":0,"steps":1}))["data"]
+                self.assertEqual(first["snapshot"]["agents"][0]["slot_id"],"v0")
+                self.assertEqual(first["snapshot"]["agents"][0]["visit"],0)
+                with ZipFile(io.BytesIO(service.capture(**identity,tick=1))) as z:
+                    self.assertIn("slot_id,visit",z.read("agents.csv").decode())
+                    self.assertEqual(json.loads(z.read("coordinate_contract.json"))["demand_digest"],first["snapshot"]["demand_digest"])
+                paused=assert_envelope(client.post(BASE+"/pause",json={**identity,"tick":1,"paused":True}))["data"]
+                self.assertTrue(paused["snapshot"]["paused"])
+                assert_envelope(client.post(BASE+"/step",json={**identity,"tick":1,"steps":1}),expected_status=409)
+                assert_envelope(client.post(BASE+"/pause",json={**identity,"tick":1,"paused":False}))
+                assert_envelope(client.post(BASE+"/step",json={**identity,"tick":1,"steps":1}))
+                result=service.export(**identity,tick=2)
+                self.assertEqual(result["demand_manifest"],[asdict(x) for x in slots])
+                self.assertEqual(len(result["journey_manifest"]),2)
+                self.assertEqual(result["trip_accounting"]["arrived"],["v0_0"])
+                self.assertEqual(result["trip_accounting"]["not_yet_due"],["v0_1"])
+                self.assertEqual(result["slot_visits"],{"v0":1})
+                assert_envelope(client.post(BASE+"/stop",json=identity))
+                self.assertTrue(sessions[0].closed)
+                assert_envelope(client.get(BASE+"/frame",params={**identity,"tick":2,"source_id":"simulation_camera"}),expected_status=409)
+
     def test_reference_switch_and_production_rollback(self):
         from app.services.simulation_reference_session import FiniteReferenceSession
         from app.services.observation_identity import REFERENCE_EVALUATION_ORIGIN

@@ -59,7 +59,7 @@ class Trip:
         raise AssertionError("Empty path")
 
 
-def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
+def load_trips(network: Path, routes: Path, *, midblock=False) -> tuple[Trip, ...]:
     net = ET.parse(network).getroot()
     demand = ET.parse(routes).getroot()
     edges = {e.attrib["id"]:e for e in net.findall("edge")}
@@ -109,7 +109,10 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
                 pending.append(path+(nxt,))
         paths=[]
         for route in found:
-            if sum(edges[e].get("function")=="crossing" for e in route)!=2:
+            crossing_count=sum(edges[e].get("function")=="crossing" for e in route)
+            if midblock and crossing_count!=1:
+                raise ValueError("Midblock pedestrian bypass or multiple crossings")
+            if not midblock and crossing_count!=2:
                 continue
             segments={}
             for i,e in enumerate(route):
@@ -133,8 +136,8 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
                         raise ValueError("Degenerate walking area chord")
                     segments[i]=seg
             paths.append(tuple(segments[i] for i in range(len(route))))
-        if len(paths)!=2:
-            raise ValueError("Expected two WC-CN pedestrian alternatives")
+        if len(paths)!=(1 if midblock else 2):
+            raise ValueError("Unexpected pedestrian route alternatives")
         # Deterministic reference chooses shortest chord path, ties by road IDs.
         return tuple(sorted(paths,key=lambda path:(sum(s.length for s in path),tuple(s.road_id for s in path))))
 
@@ -148,7 +151,8 @@ def load_trips(network: Path, routes: Path) -> tuple[Trip, ...]:
     for person in demand.findall("person"):
         walk=person.find("walk")
         path=tuple(walk.attrib["edges"].split())
-        if path!=("WC","CN"):
+        allowed=(("NC","CS"),("SC","CN")) if midblock else (("WC","CN"),)
+        if path not in allowed:
             raise ValueError("Unsupported walking route")
         options=pedestrian_paths(*path)
         trips.append(Trip(person.attrib["id"],"pedestrian",float(person.attrib["depart"]),float(walk.attrib["speed"]),options[0],options[1:]))

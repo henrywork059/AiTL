@@ -187,6 +187,8 @@ def export_csv(meta: dict) -> str:
     output = io.StringIO(newline="")
     fields = ("provenance", "generation", "seed", "tick", "time_s", "id", "kind", "road_id",
               "x_m", "y_m", "speed_m_s", "x", "y")
+    if meta.get("demand_model")=="native_cyclic_slots_v1":
+        fields += ("slot_id","visit")
     writer = csv.DictWriter(output, fieldnames=fields)
     writer.writeheader()
     for agent in meta["agents"]:

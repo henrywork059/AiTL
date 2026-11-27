@@ -30,6 +30,8 @@ class NativeFramePublisher:
             raise ValueError("Native generation must advance")
         self.invalidate()
         self._generation = generation
+        self._last_tick = -1
+        self._minimum_tick = 0
         self._provenance = provenance
         self._active = True
 
@@ -46,7 +48,7 @@ class NativeFramePublisher:
         if meta.get("provenance") != self._provenance:
             raise ValueError("Evaluation provenance changed within generation")
         tick = meta.get("tick")
-        if self._meta is not None and (type(tick) is not int or tick <= self._meta["tick"]):
+        if type(tick) is not int or tick <= self._last_tick or tick < self._minimum_tick:
             raise ValueError("Native frame tick must advance")
 
     def publish(self, meta: dict, views: dict[str, bytes], *, received_at_ms: int) -> None:
@@ -54,12 +56,20 @@ class NativeFramePublisher:
         try:
             frames = evaluation_frames(meta, views, received_at_ms=received_at_ms)
             self._meta = deepcopy(meta)
+            self._last_tick = meta["tick"]
             self._frames = dict(zip(VIEW_FLIPS, frames))
             self._pixels = None
             self._received_at_ms = received_at_ms
         except Exception:
             self.invalidate()
             raise
+
+    def retire_before(self,tick: int) -> None:
+        """Release pixels/frames already retired by the owner clock."""
+        self._minimum_tick=max(self._minimum_tick,tick)
+        if self._meta is not None and self._meta["tick"]<tick:
+            self._meta = self._pixels = self._received_at_ms = None
+            self._frames = {}
 
     def has_tick(self, tick: int) -> bool:
         return self._meta is not None and self._meta["tick"] == tick
@@ -86,6 +96,7 @@ class NativeFramePublisher:
             self._pixels = pixels if transfer_owned else pixels.copy()
             self._pixels.flags.writeable = False
             self._meta = deepcopy(meta)
+            self._last_tick = meta["tick"]
             self._received_at_ms = received_at_ms
             self._frames = {}
         except Exception:

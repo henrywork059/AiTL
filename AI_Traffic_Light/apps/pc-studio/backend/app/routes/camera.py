@@ -378,7 +378,7 @@ class NativeEvaluationIdentity(BaseModel):
 
 class NativeEvaluationStart(NativeEvaluationIdentity):
     engine: Literal["native","reference"] = "native"
-    geometry: Literal["standard","compact","elongated"] = "standard"
+    geometry: Literal["standard","compact","elongated","midblock"] = "standard"
     density: Literal["light","normal","busy"] = "normal"
     seed: int = Field(default=42, ge=0, le=2147483647)
     mode: Literal["fixed","adaptive"] = "fixed"

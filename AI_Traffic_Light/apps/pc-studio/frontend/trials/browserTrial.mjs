@@ -28,10 +28,11 @@ try {
   const nativeDom=spawnSync(edge,[...args,'--user-data-dir='+profile+'-native','--dump-dom',nativeUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(nativeDom.status!==0||!nativeDom.stdout.includes('<div id="result">MESH_NATIVE_RENDERER_PASS</div>')||
       (actual&&!nativeDom.stdout.includes('Executed SUMO capture')))throw Error('Native renderer trial failed: '+nativeDom.stdout.slice(-1500)+' '+nativeDom.stderr.slice(-1000));
-  const nativePng=resolve(process.env.RUNNER_TEMP||'.',actual?'mesh-native-actual.png':'mesh-native-fixture.png');
+  const midblock=process.argv.includes('--midblock');
+  const nativePng=resolve(process.env.RUNNER_TEMP||'.',midblock?'mesh-midblock-actual.png':actual?'mesh-native-actual.png':'mesh-native-fixture.png');
   const nativeShot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-native-shot','--screenshot='+nativePng,nativeUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(nativeShot.status!==0||!existsSync(nativePng)||readFileSync(nativePng).length<1000)throw Error('Native screenshot missing');
-  const detailPng=resolve(process.env.RUNNER_TEMP||'.',actual?'mesh-native-actual-detail.png':'mesh-native-fixture-detail.png');
+  const detailPng=resolve(process.env.RUNNER_TEMP||'.',midblock?'mesh-midblock-actual-detail.png':actual?'mesh-native-actual-detail.png':'mesh-native-fixture-detail.png');
   const detailShot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-native-detail','--screenshot='+detailPng,nativeUrl+(actual?'&':'?')+'detail=1'],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(detailShot.status!==0||!existsSync(detailPng)||readFileSync(detailPng).length<1000)throw Error('Native detail screenshot missing');
   console.log('[PASS] native WebGL screenshot from '+(actual?'actual SUMO capture':'illustrative scene fixture'));

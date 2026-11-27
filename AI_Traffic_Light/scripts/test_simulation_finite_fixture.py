@@ -16,6 +16,90 @@ def path(prefix,kind,y):
 
 
 class Tests(unittest.TestCase):
+    def test_midblock_route_requires_exactly_one_crossing_both_directions(self):
+        from app.services.simulation_finite_fixture import load_trips
+        import xml.etree.ElementTree as ET
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            net=ET.Element("net")
+            def edge(id,shape,kind=None,lane=0):
+                e=ET.SubElement(net,"edge",{"id":id,**({"function":kind} if kind else {})})
+                ET.SubElement(e,"lane",id=id+"_"+str(lane),shape=shape)
+            for ident,shape in (("NC","0,20 0,8"),("CS","0,-8 0,-20"),("SC","0,-20 0,-8"),("CN","0,8 0,20")):
+                edge(ident,shape)
+            edge(":C_w0","0,8 0,5","walkingarea")
+            edge(":C_w1","0,-5 0,-8","walkingarea")
+            edge(":C_c0","0,5 0,-5","crossing")
+            for a,z in (("NC",":C_w0"),(":C_w0",":C_c0"),(":C_c0",":C_w1"),(":C_w1","CS"),
+                        ("SC",":C_w1"),(":C_w0","CN")):
+                ET.SubElement(net,"connection",{"from":a,"to":z,"fromLane":"0","toLane":"0"})
+            ET.ElementTree(net).write(folder/"network.xml")
+            (folder/"routes.xml").write_text('<routes><person id="p0_0" depart="0"><walk edges="NC CS" speed=".65"/></person><person id="p1_0" depart="0"><walk edges="SC CN" speed="1.3"/></person></routes>')
+            trips=load_trips(folder/"network.xml",folder/"routes.xml",midblock=True)
+            self.assertEqual(len(trips),2)
+            gates=[next(s for s in t.path if s.kind=="pedestrian_gate") for t in trips]
+            self.assertEqual(gates[0].points,tuple(reversed(gates[1].points)))
+            self.assertEqual(gates[0].road_id,gates[1].road_id)
+            ET.SubElement(net,"connection",{"from":"NC","to":"CS","fromLane":"0","toLane":"0"})
+            ET.ElementTree(net).write(folder/"network.xml")
+            with self.assertRaises(ValueError):
+                load_trips(folder/"network.xml",folder/"routes.xml",midblock=True)
+
+    def test_cyclic_slot_ledger_and_protection(self):
+        from app.services.sumo_midblock_fixture import slots_for,occupancy,write_midblock
+        from app.services.sumo_midblock_session import CyclicLedger
+        from app.services.sumo_shadow_fixture import PhaseMap
+        from tempfile import TemporaryDirectory
+        import xml.etree.ElementTree as ET
+        for seed in (42,73):
+            for density,nv,np in (("light",4,4),("normal",8,7),("busy",12,11)):
+                slots=slots_for(seed,density)
+                self.assertEqual(slots,slots_for(seed,density))
+                self.assertEqual(sum(x.kind=="vehicle" for x in slots),nv)
+                self.assertEqual(sum(x.kind=="pedestrian" for x in slots),np)
+                self.assertEqual(sum(x.speed==.65 for x in slots if x.kind=="pedestrian"),1)
+                ledger=CyclicLedger(slots)
+                self.assertEqual(len(ledger.current),nv+np)
+                first=tuple(ledger.current.values())
+                now=max(ledger.offered.values())+1
+                ledger.reconcile(first,(),now)
+                a=first[0];z=first[-1]
+                next_a=ledger.reconcile([i for i in first if i!=a],(a,),now+1)
+                next_z=ledger.reconcile([i for i in first if i not in (a,z)],(z,),now+2)
+                other=CyclicLedger(slots)
+                other.reconcile(first,(),now)
+                reverse_z=other.reconcile([i for i in first if i!=z],(z,),now+1)
+                reverse_a=other.reconcile([i for i in first if i not in (a,z)],(a,),now+2)
+                self.assertEqual(next_a[0][0],reverse_a[0][0])
+                self.assertAlmostEqual(next_a[0][1]-(now+1),reverse_a[0][1]-(now+2))
+                self.assertAlmostEqual(next_z[0][1]-(now+2),reverse_z[0][1]-(now+1))
+                self.assertEqual(len(ledger.current),nv+np)
+                self.assertEqual(len(ledger.arrived),2)
+                self.assertEqual(len(ledger.offered),nv+np+2)
+                with self.assertRaises(RuntimeError):
+                    ledger.reconcile([],(),now+3)
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            write_midblock(root,42,"normal")
+            net=ET.parse(root/"edges.xml").getroot()
+            self.assertEqual(len(net.findall("edge")),8)
+            for e in net.findall("edge"):
+                if e.get("id") in {"NC","CN","SC","CS"}:
+                    self.assertEqual(e.get("allow"),"pedestrian")
+                else:
+                    self.assertEqual(e.find("lane[@index='0']").get("allow"),"pedestrian")
+                    self.assertEqual(e.find("lane[@index='1']").get("allow"),"passenger")
+            self.assertEqual(len(ET.parse(root/"connections.xml").getroot().findall("crossing")),1)
+        mapping=PhaseMap((("a","b",""),("c","d","")),(0,),(1,),frozenset({":C_c0"}))
+        car=ShadowAgent("vehicle","v0_0",8.,0.,2.,"CE")
+        walker=ShadowAgent("pedestrian","p0_0",0.,0.,.65,":C_c0")
+        self.assertEqual(occupancy((car,),mapping,(-1.,1.)),(True,False))
+        self.assertEqual(mapping.state("pedestrian_green",vehicle_inside=True,pedestrian_inside=False),"rr")
+        with self.assertRaises(RuntimeError):
+            occupancy((car,walker),mapping,(-1.,1.))
+        self.assertEqual(occupancy((ShadowAgent("vehicle","v0_0",15.,0.,2.,"CE"),walker),mapping,(-1.,1.)),(False,True))
+
     def test_reference_session_lifecycle(self):
         from app.services.simulation_reference_session import FiniteReferenceSession
         from app.services.sumo_shadow_fixture import PhaseMap

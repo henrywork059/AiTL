@@ -93,6 +93,29 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_retired_tick_releases_raster_without_reopening_old_tick(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 20,0"/></edge></net>')
+            projection=NativeProjection(Projection.load(path),1)
+            pub=NativeFramePublisher()
+            pub.begin(1)
+            meta,pixels=projection.render_pixels(ShadowSnapshot(42,1,False,()))
+            pub.prepare(meta,pixels,received_at_ms=42,transfer_owned=True)
+            pub.frame_for("simulation_camera")
+            pub.retire_before(3)
+            self.assertIsNone(pub._pixels)
+            self.assertFalse(pub.has_tick(1))
+            self.assertIsNone(pub.frame_for("simulation_camera"))
+            with self.assertRaises(ValueError):
+                pub.prepare(meta,pixels.copy(),received_at_ms=43)
+            meta2,pixels2=projection.render_pixels(ShadowSnapshot(42,2,False,()))
+            with self.assertRaises(ValueError):
+                pub.prepare(meta2,pixels2,received_at_ms=44)
+            meta3,pixels3=projection.render_pixels(ShadowSnapshot(42,3,False,()))
+            pub.prepare(meta3,pixels3,received_at_ms=45)
+            self.assertEqual(pub.frame_for("simulation_camera").frame_number,3)
+
     def test_exclusive_raster_transfer(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"net.xml"
