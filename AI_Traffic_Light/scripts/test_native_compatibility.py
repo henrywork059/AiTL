@@ -168,6 +168,58 @@ class Tests(unittest.TestCase):
         self.assertGreater(len(outline),4)
         with self.assertRaises(ValueError): legacy_region_projection(scene,"simulation_camera",regions+regions,boxes)
 
+    def test_legacy_editor_edges_and_mirrored_bottom_centres(self):
+        from app.services.legacy_region_compatibility import legacy_region_projection,edge_view_point,edge_landmarks
+        from app.services.crosswalks import CrosswalkService
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        import os
+        scene=self.scene()
+        full=[[0,0],[1280,0],[1280,720],[0,720]]
+        region={"id":"whole","label":"Whole","vertices":full,
+                "vertices_by_side":{"a":full,"b":[[0,0],[640,0],[640,720],[0,720]]}}
+        config={"schema_version":1,"crosswalks":[{"id":"fixture","label":"Fixture","location":"",
+                "camera_side_a_id":"simulation_camera","camera_side_b_id":"simulation_camera_b","regions":[region]}]}
+        with TemporaryDirectory() as folder:
+            path=Path(folder)/"crosswalks.json"
+            with patch.dict(os.environ,{"AITL_CROSSWALKS_CONFIG":str(path)}):
+                saved=CrosswalkService(config_path=path).save(config)
+                initial=path.read_bytes()
+                self.assertEqual(CrosswalkService(config_path=path).get(),saved)
+                for sid in VIEW_FLIPS:
+                    polygon=[list(edge_view_point(x,y,sid)) for x,y in full]
+                    self.assertEqual([list(edge_view_point(x,y,sid)) for x,y in polygon],full)
+                    box=[638,346,642,354]
+                    x1,y1,x2,y2=box
+                    if VIEW_FLIPS[sid] in (1,-1): x1,x2=1280-x2,1280-x1
+                    if VIEW_FLIPS[sid] in (0,-1): y1,y2=720-y2,720-y1
+                    rows=[{"id":"first","polygon":polygon},{"id":"overlap","polygon":polygon}]
+                    before=deepcopy(rows)
+                    result=legacy_region_projection(scene,sid,rows,[{"agent_id":"p","kind":"pedestrian","box_xyxy":[x1,y1,x2,y2]}])
+                    self.assertEqual(result["coordinate_mapping_contract"],"semantic_midblock_image_edges_v2")
+                    self.assertEqual(result["assignments"][0]["native_bottom_center"],[(x1+x2)/2,y2])
+                    self.assertEqual(result["assignments"][0]["region_id"],"first")
+                    self.assertEqual(result["kind_counts"]["overlap"]["pedestrian"],0)
+                    self.assertEqual(result["regions"][0]["original_polygon"],polygon)
+                    self.assertEqual(rows,before)
+                    self.assertFalse(result["persisted"])
+                # Vertical flip changes the per-view bottom, not the world anchor.
+                a=legacy_region_projection(scene,"simulation_camera",[{"id":"whole","polygon":full}],
+                    [{"kind":"pedestrian","box_xyxy":[638,346,642,354]}])
+                b=legacy_region_projection(scene,"simulation_camera_b",[{"id":"whole","polygon":full}],
+                    [{"kind":"pedestrian","box_xyxy":[638,366,642,374]}])
+                self.assertNotAlmostEqual(a["assignments"][0]["legacy_point"][1]+b["assignments"][0]["legacy_point"][1],720)
+                # Far image-edge boxes are not silently clamped to semantic road landmarks.
+                outside=legacy_region_projection(scene,"simulation_camera",[{"id":"whole","polygon":full}],
+                    [{"kind":"vehicle","box_xyxy":[0,0,1,1]}])
+                self.assertEqual(outside["outside_semantic_domain"],1)
+                self.assertIsNone(outside["assignments"][0]["legacy_point"])
+                for bad in ([[-1,0],[1280,0],[1280,720],[0,720]], [[0,0],[1280,720],[1280,0],[0,720]]):
+                    with self.assertRaises(ValueError):
+                        legacy_region_projection(scene,"simulation_camera",[{"id":"bad","polygon":bad}],[])
+                self.assertEqual(path.read_bytes(),initial)
+                self.assertEqual(CrosswalkService(config_path=path).get(),saved)
+
     def test_normalized_report_censoring(self):
         rows=[{"vehicle_queue":1,"pedestrian_queue":0},{"vehicle_queue":2,"pedestrian_queue":1}]
         summary={"vehicle_wait_agent_s":.6,"pedestrian_wait_agent_s":.2,"vehicle_passages":1,

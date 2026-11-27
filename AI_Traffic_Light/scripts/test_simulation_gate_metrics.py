@@ -5,6 +5,8 @@ import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"apps/pc-studio/backend"))
 from app.services.simulation_gate_metrics import GateMetrics,GateObservation
+from verify_wait_trace import record_rows, qualify, replay, comparison
+from copy import deepcopy
 
 
 def obs(i,k,p,x=None,gate="g"):
@@ -40,6 +42,53 @@ class Tests(unittest.TestCase):
         for kind in waits:
             self.assertEqual(waits[kind]["observed_agent_seconds"],m.summary()[kind+"_wait_agent_s"])
         self.assertEqual(m.waiting_episodes(),waits)
+
+    def test_independent_wait_trace_and_negative_controls(self):
+        m=GateMetrics()
+        frames=[
+            [obs("v","vehicle",-.2),obs("p","pedestrian",-.2)],
+            [obs("v","vehicle",-.2),obs("p","pedestrian",-.2)],
+            [obs("v","vehicle",-.2),obs("p","pedestrian",-.1)],
+            [obs("p","pedestrian",-.1)],
+        ]
+        raw=[record_rows(row) for row in frames]
+        timeline=[m.sample(i,row) for i,row in enumerate(frames,1)]
+        summary,episodes=m.summary(),m.waiting_episodes()
+        audit=qualify(raw,timeline,summary,episodes)
+        self.assertTrue(audit["independent_replay_passed"])
+        self.assertEqual(audit["waiting"]["vehicle"]["censored_observed_seconds"],[.4])
+        self.assertEqual(audit["waiting"]["pedestrian"]["completed_seconds"],[.2])
+        self.assertEqual(audit["waiting"]["pedestrian"]["censored_observed_seconds"],[.2])
+        scaled=[[[i,k,p,x*11,y*11,s*11,g] for i,k,p,x,y,s,g in row] for row in raw]
+        self.assertEqual(replay(raw),replay(scaled))
+        changed=deepcopy(timeline)
+        changed[1]["vehicle_queue"]=0
+        with self.assertRaisesRegex(ValueError,"queue mismatch"):
+            qualify(raw,changed,summary,episodes)
+        changed=deepcopy(episodes)
+        changed["vehicle"]["censored_observed_seconds"]=[.2,.2]
+        with self.assertRaisesRegex(ValueError,"episode mismatch"):
+            qualify(raw,timeline,summary,changed)
+        changed=deepcopy(summary)
+        changed["vehicle_wait_agent_s"]=.2
+        with self.assertRaisesRegex(ValueError,"integral"):
+            qualify(raw,timeline,changed,episodes)
+        runs=[{"engine":e,"summary":summary,"wait_audit":audit} for e in ("legacy","native") for _ in range(2)]
+        verdict=comparison(runs,"legacy","native",False)
+        self.assertTrue(verdict["exact_wait_totals_equal"])
+        self.assertEqual(verdict["production_wait_parity"],"not_established")
+        self.assertFalse(verdict["default_migration_allowed"])
+        changed=deepcopy(runs)
+        changed[-1]["wait_audit"]={**audit,"trace_sha256":"different"}
+        with self.assertRaisesRegex(ValueError,"Nonrepeatable"):
+            comparison(changed,"legacy","native",False)
+
+    def test_wait_gate_change_censors_old_episode(self):
+        m=GateMetrics()
+        frames=[[obs("v","vehicle",-.2,gate=g)] for g in ("a","a","b","b")]
+        timeline=[m.sample(i,row) for i,row in enumerate(frames,1)]
+        audit=qualify([record_rows(row) for row in frames],timeline,m.summary(),m.waiting_episodes())
+        self.assertEqual(audit["waiting"]["vehicle"]["censored_observed_seconds"],[.2,.2])
 
     def test_disappearance_and_reset_are_not_crossings(self):
         m=GateMetrics()

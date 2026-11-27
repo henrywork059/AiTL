@@ -1,3 +1,13 @@
+## 0_5_78 — Update 28B qualified editor-edge coordinate compatibility
+
+- Correct inclusive saved editor bounds and separate continuous edge mirroring from raster pixel-centre mirrors in isolated legacy-region preview. Preserve native profiles, historical rectangle preview, production saved data and control. Add mapping contract and landmarks, retain first-match bottom-centre assignment and explicit out-of-domain exclusion.
+- Exact standard/native CI 46041638586/46041638617 passed. Fresh archive 15221111551 SHA-256 matched; independent replay of 44 decoded views, 556 truth assignments, 154 truth/154 palette outlines and 11 fixture digests. Synthetic mapping only, no physical calibration or production coordinate parity. Previous 0_5_77, accepted baseline 0_5_0; no stable promotion. See [PATCH_0_5_78](docs/PATCH_0_5_78.md).
+
+## 0_5_77 — Update 28A common waiting-time measurement qualification
+
+- Update 28A only: raw stationary-approach observations and completed/censored wait episodes independently replayed from actual legacy/SUMO and finite-reference/SUMO trials. Standard/native CI 46039170194/46039170178 passed, archive 15218724611 SHA-256 matched; 20,000 samples, 99,642 agent observations, 222 episodes and repeat hashes reconciled.
+- Explicit negative parity verdict: finite reference/SUMO waits 144.0/129.4 vehicle-agent-s and 57.2/15.4 pedestrian-agent-s, matched offered demand but different motion and not production legacy equivalence. Historical metric and legacy default unchanged; S04 remains gated. Previous version 0_5_76, baseline 0_5_0, owner PASS pending. See [PATCH_0_5_77](docs/PATCH_0_5_77.md).
+
 ## 0_5_76 — Capture freshness, managed training integrity and independent S04 audit
 
 - Candidate `0_5_76`; previous `0_5_75`; accepted baseline `0_5_0`. Reconciled authorized HEAD 00f4d542c20899816758114b012e83650a8e9263 retained, including 8 MiB bounded upload regression and historical main integration. Concurrent P3/P4/P5 independent candidate; Updates 30/33/37/38 remain partial, S04 / Update 28 gated. Delivered milestones remain 30/39 (76.9%), not acceptance.

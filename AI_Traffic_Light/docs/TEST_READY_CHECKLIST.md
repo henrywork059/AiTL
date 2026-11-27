@@ -1,3 +1,32 @@
+# V0578 — Qualified simulator editor-edge coordinate compatibility (Update 28B)
+
+Candidate `0_5_78`; previous `0_5_77`; passed baseline `0_5_0`.
+
+- [x] Exact 0_5_77 release CI 46040786995 passed.
+- [x] Exact implementation standard/native CI 46041638586 / 46041638617 passed.
+- [x] Fresh archive SHA-256 matched; 44 decoded views, 556 truth assignments, 154 truth and 154 palette outlines, 11 fixture digests independently verified.
+- [x] Synthetic semantic edge transform and saved-region compatibility qualified; limitations explicit.
+- [ ] Exact 0_5_78 release and PR CI, merge qualification.
+- [ ] Owner Windows PASS, physical calibration, production wait parity and other S04 migration gates.
+
+See [PATCH_0_5_78](PATCH_0_5_78.md).
+
+---
+
+# V0577 — Independently qualified simulator waiting-time measurement (Update 28A)
+
+Candidate `0_5_77`; previous `0_5_76`; passed baseline `0_5_0`.
+
+- [x] Exact application standard and native CI passed (46039170194 / 46039170178).
+- [x] Fresh archive SHA-256 matched and all 20,000 samples, 99,642 observations, 222 episodes independently replayed.
+- [x] Common metric, repeatability and explicit negative parity verdict recorded.
+- [ ] Exact release-bundle CI on the metadata commit.
+- [ ] Owner Windows PASS; production historical wait equivalence and other S04 gates remain open.
+
+See [PATCH_0_5_77](PATCH_0_5_77.md).
+
+---
+
 # V0576 — Capture freshness, managed dataset integrity and independent S04 evidence candidate
 
 Candidate `0_5_76`; previous `0_5_75`; accepted baseline `0_5_0`. Reconciled authorized HEAD 00f4d542c20899816758114b012e83650a8e9263 retained, including 8 MiB bounded upload regression and historical main integration. Concurrent P3/P4/P5 independent candidate; Updates 30/33/37/38 remain partial, S04 / Update 28 gated. Delivered milestones remain 30/39 (76.9%), not acceptance.
