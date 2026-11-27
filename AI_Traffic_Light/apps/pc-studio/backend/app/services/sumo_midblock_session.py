@@ -151,7 +151,7 @@ def _midblock_worker(pipe, root, seed):
 
 
 class CyclicMidblockSession(LibsumoSession):
-    def __init__(self,seed,*,density):
+    def __init__(self,seed,*,density,lean_worker=True):
         self._temp=TemporaryDirectory(prefix="mesh-midblock-")
         root=Path(self._temp.name)
         try:
@@ -180,7 +180,11 @@ class CyclicMidblockSession(LibsumoSession):
             self._last_route_index={}
             self._exited_gate=set()
             self.closed=False
-            super().__init__(root,seed,controlled=True,_target=_midblock_worker)
+            if lean_worker:
+                from app.services.sumo_midblock_transport import launch_midblock
+                super().__init__(root,seed,controlled=True,_launcher=launch_midblock)
+            else:
+                super().__init__(root,seed,controlled=True,_target=_midblock_worker)
         except BaseException:
             self._temp.cleanup()
             raise

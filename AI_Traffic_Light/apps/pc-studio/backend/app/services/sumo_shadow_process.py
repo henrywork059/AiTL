@@ -128,7 +128,7 @@ class LibsumoSession:
     No engine import in the parent, public API, shell, or physical-control path.
     A failed or timed-out request closes/reaps the child before returning.
     """
-    def __init__(self, root: Path, seed: int, *, controlled: bool = False, lane_scenario: bool = False, corridor: bool = False, _target=None, _timeout: float = 15.0):
+    def __init__(self, root: Path, seed: int, *, controlled: bool = False, lane_scenario: bool = False, corridor: bool = False, _target=None, _timeout: float = 15.0, _launcher=None):
         root = root.resolve(strict=True)
         if not all((root / name).is_file() for name in ("network.xml", "routes.xml")):
             raise ValueError("Missing generated shadow fixture")
@@ -144,6 +144,18 @@ class LibsumoSession:
         self._agents = ()
         self.arrived: set[str] = set()
         self.person_arrived: set[str] = set()
+        # Optional private launcher for the midblock worker only. Keep existing
+        # spawn transport for finite, shadow and corridor sessions.
+        if _launcher is not None:
+            if not controlled or corridor or lane_scenario or _target is not None:
+                raise ValueError("Unsupported private worker launcher")
+            self._pipe,self.proc=_launcher(root,seed)
+            try:
+                self._receive()
+            except BaseException:
+                self.close()
+                raise
+            return
         ctx = mp.get_context("spawn")
         self._pipe, child = ctx.Pipe()
         self.proc = ctx.Process(target=_target or (_corridor_worker if corridor else _lane_worker if lane_scenario else _controlled_worker if controlled else _worker), args=(child, str(root), seed), daemon=True)

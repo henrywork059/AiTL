@@ -493,6 +493,26 @@ def native_evaluation_region_views(payload: NativeEvaluationRegion, request: Req
     return ok(native_evaluation_service.evaluate_region_views(**payload.model_dump()),request_id=request.state.request_id)
 
 
+class NativeRegionProfile(BaseModel):
+    schema_version: Literal[1]
+    coordinate_space: str = Field(max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    canonical_polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+    count_basis: str = Field(max_length=64)
+    detector_input_eligible: bool
+
+
+class NativeRegionProfileRequest(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    profile: NativeRegionProfile
+
+
+@router.post("/simulation/native-evaluation/region/profile")
+def evaluate_native_region_profile(payload: NativeRegionProfileRequest,request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region_profile(**payload.model_dump()),request_id=request.state.request_id)
+
+
 @router.get("/simulation/observation")
 def simulation_observation(request: Request, engine: Literal["legacy","protected","native","reference"] = "legacy",
                            source_id: str = "simulation_camera") -> dict:

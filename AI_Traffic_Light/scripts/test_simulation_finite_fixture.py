@@ -16,6 +16,51 @@ def path(prefix,kind,y):
 
 
 class Tests(unittest.TestCase):
+    def test_lean_midblock_private_transport_roundtrip_and_failure(self):
+        from app.services.sumo_midblock_transport import _launch, _encode, MAX_MESSAGE
+        from app.services.sumo_shadow_process import LibsumoSession
+        from tempfile import TemporaryDirectory
+        backend=Path(__file__).resolve().parents[1]/"apps/pc-studio/backend"
+        # Actual subprocess, but no SUMO dependency. Exercise the same wire
+        # and existing session close path, including timeout and bad output.
+        preamble="import sys;sys.path.insert(0,sys.argv[1]);from app.services.sumo_midblock_transport import ChildWire;from app.services.sumo_shadow_adapter import ShadowAgent;"
+        echo=preamble+"""
+wire=ChildWire(sys.stdin.buffer,sys.stdout.buffer)
+wire.send(("ok",None))
+while True:
+    cmd=wire.recv()
+    if cmd=="close": break
+    assert cmd==("step","vehicle_green")
+    wire.send(("ok",((ShadowAgent("vehicle","v0_0",1.25,2.,3.,"WC"),),("v1_0",),(),"GGr",[("v1_1",1.6)])))
+wire.close()
+"""
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for name in ("network.xml","routes.xml"): (root/name).write_text("<net/>")
+            def launcher(code):
+                return lambda *_:_launch([sys.executable,"-I","-u","-c",code,str(backend)],backend)
+            session=LibsumoSession(root,42,controlled=True,_launcher=launcher(echo),_timeout=3.)
+            handle=session.proc
+            try:
+                for _ in range(20):
+                    session._pipe.send(("step","vehicle_green"))
+                    rows,arrivals,persons,permission,new=session._receive()
+                    self.assertEqual(rows,(ShadowAgent("vehicle","v0_0",1.25,2.,3.,"WC"),))
+                    self.assertEqual((arrivals,persons,permission,new),(("v1_0",),(),"GGr",[("v1_1",1.6)]))
+            finally:
+                session.close()
+            self.assertFalse(handle.is_alive())
+            # Startup exceptions must close/reap child, not silently fall back.
+            for code in ('print("invalid JSON",flush=True)', 'import sys;sys.stdout.write("x"*300000+"\\n");sys.stdout.flush()', 'import time;time.sleep(30)'):
+                handles=[]
+                def failing(*args):
+                    wire,proc=launcher(code)(*args);handles.append(proc);return wire,proc
+                with self.assertRaises((ValueError,RuntimeError,TimeoutError,EOFError)):
+                    LibsumoSession(root,42,controlled=True,_launcher=failing,_timeout=.2)
+                self.assertFalse(handles[0].is_alive())
+            with self.assertRaises(ValueError): _encode("x"*MAX_MESSAGE)
+            with self.assertRaises(ValueError): _encode(float("nan"))
+
     def test_midblock_route_requires_exactly_one_crossing_both_directions(self):
         from app.services.simulation_finite_fixture import load_trips
         import xml.etree.ElementTree as ET

@@ -49,7 +49,7 @@ window.fetch = async (input,init) => {
       if(command==="pause"){evalPaused=body.paused;}
       if(command==="stop"){evalGeneration++;evalRunning=false;cameraOwner=null;}
     }
-    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,camera_owned:cameraOwner!==null,physical_output_allowed:false,
+    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,engine:evalRunning?"native":null,camera_owned:cameraOwner!==null,physical_output_allowed:false,
       snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
   }
   if (url.pathname === "/api/camera/simulation/native-projection") {
@@ -211,7 +211,10 @@ async function run(){
     check(evalTick===retiredTick&&evalCalls===retiredEvalCalls,"Playback or polling survived editor rollback");
     // Previous standalone is intentionally still running: camera workspace must not take it over.
     flushSync(()=>root.render(<NativeProjectionView sourceId="simulation_camera" standaloneOnly cameraWorkspace initialGeometry="midblock"/>));
-    await wait(()=>Boolean(button("Reset evaluation")?.disabled),"Camera workspace could mutate standalone");
+    await wait(()=>Boolean(host.textContent?.includes("Another workspace owns playback")),"Camera ownership lock not displayed");
+    for(const label of ["Reset evaluation","Play evaluation","Advance 5 s","Pause evaluation","Stop evaluation"]){
+      check(button(label)?.disabled===true,`Camera workspace could mutate standalone: ${label}`);
+    }
     check(!cameraOwner,"Read-only camera preview unexpectedly claimed ownership");
     // Retire standalone through the simulated owner before starting camera session.
     evalRunning=false;evalGeneration++;

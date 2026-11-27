@@ -401,9 +401,16 @@ export async function runNativeComparison(state:NativeEvaluationState,density:st
   return response.blob();
 }
 
-export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false;views?:Record<string,{polygon:[number,number][];counts:{vehicle:number;pedestrian:number};agent_ids:string[]}>;canonical_polygon?:[number,number][];count_basis?:string};
+export type NativeRegionProfile={schema_version:1;coordinate_space:"native_projection_v1";layout_id:string;canonical_polygon:[number,number][];count_basis:"observed_agent_anchor";detector_input_eligible:false};
+export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false;views?:Record<string,{polygon:[number,number][];counts:{vehicle:number;pedestrian:number};agent_ids:string[]}>;canonical_polygon?:[number,number][];count_basis?:string;region_profile?:NativeRegionProfile};
 export function evaluateNativeRegion(state:NativeEvaluationState,sourceId:string,polygon:[number,number][],signal:AbortSignal,allViews=false):Promise<NativeRegionResult>{
   const snapshot=state.snapshot;
   if(snapshot?.coordinate_space!=="native_projection_v1"||!snapshot.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
   return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region${allViews?"/views":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,coordinate_space:snapshot.coordinate_space,layout_id:snapshot.layout_id,polygon}),signal});
+}
+
+export function evaluateNativeRegionProfile(state:NativeEvaluationState,sourceId:string,profile:unknown,signal:AbortSignal):Promise<NativeRegionResult>{
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
+  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region/profile`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,profile}),signal});
 }

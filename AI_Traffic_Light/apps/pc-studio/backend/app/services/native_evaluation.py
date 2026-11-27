@@ -519,8 +519,28 @@ class NativeEvaluationService:
                     raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED,"Native draft view identity mismatch.",status_code=503)
                 views[sid]={"polygon":result["polygon"],"counts":result["counts"],
                             "agent_ids":result["agent_ids"],"observation":result["observation"]}
+            profile={"schema_version":1,"coordinate_space":coordinate_space,"layout_id":layout_id,
+                     "canonical_polygon":canonical,"count_basis":"observed_agent_anchor","detector_input_eligible":False}
             return {**original,"canonical_polygon":canonical,"views":views,"count_basis":"observed_agent_anchor",
-                    "legacy_editor_compatible":False}
+                    "legacy_editor_compatible":False,"region_profile":profile}
+
+    def evaluate_region_profile(self,*,epoch,generation,tick,source_id,profile):
+        """Explicitly reuse a native-only profile across equivalent layouts.
+        Never convert a legacy zone or accept a detector-eligible profile.
+        """
+        with self._lock:
+            self._require(epoch,generation,tick)
+            if source_id not in VIEW_FLIPS:
+                raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown native evaluation view.",status_code=422)
+            if (profile.get("schema_version")!=1 or profile.get("coordinate_space")!="native_projection_v1" or
+                profile.get("layout_id")!=self._projection.layout_id or profile.get("count_basis")!="observed_agent_anchor" or
+                profile.get("detector_input_eligible") is not False):
+                raise self._conflict("Native region profile is incompatible with this layout or authority.")
+            if any(not (0<=x<=1279 and 0<=y<=719) for x,y in profile["canonical_polygon"]):
+                raise AppError(ErrorCode.INVALID_REQUEST,"Native profile vertices outside mirrorable pixel centres.",status_code=422)
+            polygon=[simulation_view_point(x,y,1280,720,source_id) for x,y in profile["canonical_polygon"]]
+            return self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
+                coordinate_space=profile["coordinate_space"],layout_id=profile["layout_id"],polygon=polygon)
 
     def compare(self, *, epoch, generation, density, seed, duration_seconds, profile=None, geometry='standard', engine='native'):
         """Run a bounded pair with one immutable copy of the saved policy.

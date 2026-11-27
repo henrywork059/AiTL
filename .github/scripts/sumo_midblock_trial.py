@@ -60,12 +60,12 @@ def verify_export(result,expected_slots,horizon):
     assert {trips[i]["path"][0]["road_id"] for i in result["arrived_pedestrians"]}=={"NC","CS"}
 
 
-def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True):
+def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean_worker=True):
     out.mkdir(parents=True,exist_ok=True)
     sessions=[]
     def factory(seed,*,density):
         try:
-            session=CyclicMidblockSession(seed,density=density)
+            session=CyclicMidblockSession(seed,density=density,lean_worker=lean_worker)
         except Exception:
             import traceback
             (out/"startup-failure.txt").write_text(traceback.format_exc(),encoding="utf-8")
@@ -130,6 +130,7 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True):
                            "scene_reads":400,"frame_reads":400,"simulated_seconds":40,
                            "image_digest":digest.hexdigest(),"decoded_pixel_digest":pixel_digest.hexdigest(),
                            "encoded_bytes":encoded_bytes,"indexed_frames":indexed_frames,
+                           "worker_transport":"lean_stdio" if lean_worker else "spawn","child_pid":str(sessions[0].proc.pid),"parent_pid":str(os.getpid()),
                            "background_bytes":svc._projection._background.nbytes,"before":before,"after":after,
                            "latency_ms":{k:{"mean":float(np.mean(v)),"p95":float(np.percentile(v,95)),"count":len(v)} for k,v in timings.items()}}
                 (out/"resources.json").write_text(json.dumps(resources,indent=2),encoding="utf-8")
@@ -159,6 +160,12 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True):
                 assert regions["agent_ids"]==sorted(a["id"] for a in scene["agents"])
                 assert all(v["counts"]==regions["counts"] and v["agent_ids"]==regions["agent_ids"] and not v["observation"]["detector_input_eligible"] for v in regions["views"].values())
                 (out/"multiview-region.json").write_text(json.dumps(regions,indent=2),encoding="utf-8")
+                profile=regions["region_profile"]
+                profile_request={**params,"source_id":"simulation_camera_b","profile":profile}
+                reloaded=assert_envelope(client.post(BASE+"/region/profile",json=profile_request))["data"]
+                assert reloaded["agent_ids"]==regions["agent_ids"] and reloaded["region_profile"]==profile
+                assert_envelope(client.post(BASE+"/region/profile",json={**profile_request,"profile":{**profile,"detector_input_eligible":True}}),expected_status=409)
+                (out/"native-region-profile.json").write_text(json.dumps(profile,indent=2),encoding="utf-8")
                 assert_envelope(client.post(BASE+"/region/views",json={**draft,"layout_id":"0"*64}),expected_status=409)
             try:
                 InferenceService().detect_frame(svc.frame(**params,source_id="simulation_camera"))
@@ -218,6 +225,17 @@ def main(out):
     assert all(x["background_bytes"]==1280*720*3 for x in controls)
     (out/"indexed-rgb-comparison.json").write_text(json.dumps({"evidence":"executed matched native HTTP workload",
         "rgb":controls,"indexed":optimized,"pixel_equivalent":True,"order":"indexed, indexed, rgb, rgb (not randomized)"},indent=2))
+    # Isolate worker bootstrap overhead from the image codec. Same indexed
+    # workload, native seed, route, policy and decoded output, spawn controls.
+    spawn=[]
+    for i in range(2):
+        folder=out/f"42-normal-fixed-spawn-{i}"
+        control=run_arm(folder,42,"normal","fixed",read_workload=True,lean_worker=False)
+        assert control==repeat
+        spawn.append(json.loads((folder/"resources.json").read_text()))
+    assert len({x["decoded_pixel_digest"] for x in spawn+optimized})==1
+    (out/"worker-memory-comparison.json").write_text(json.dumps({"evidence":"executed matched native HTTP workload",
+        "spawn":spawn,"lean":optimized,"pixel_equivalent":True,"order":"lean before spawn (not randomized)"},indent=2))
     # Actual child retirement without legacy activation or production camera selection.
     lease=NativeEvaluationService(enabled=True,camera_lease_seconds=2.)
     try:
@@ -225,11 +243,14 @@ def main(out):
         state=lease.start(epoch=lease.epoch,generation=lease.generation,density="normal",seed=42,mode="fixed",geometry="midblock",camera_owner=owner)
         proc=lease._session.proc
         assert state["camera_owned"] and proc.is_alive()
+        profile=json.loads((out/"42-normal-fixed"/"native-region-profile.json").read_text())
+        reused=lease.evaluate_region_profile(epoch=lease.epoch,generation=lease.generation,tick=0,source_id="simulation_camera_d",profile=profile)
+        assert reused["region_profile"]==profile and not reused["persisted"] and not reused["agent_ids"]
         lease.camera_heartbeat(epoch=lease.epoch,generation=lease.generation,camera_owner=owner)
         deadline=time.monotonic()+10
         while proc.is_alive() and time.monotonic()<deadline: time.sleep(.05)
         assert not proc.is_alive() and lease.scene()["status"]=="idle" and not lease.scene()["camera_owned"]
-        (out/"camera-lease.json").write_text(json.dumps({"actual_native_child_reaped":True,"lease_seconds":2,"production_camera_selected":False},indent=2))
+        (out/"camera-lease.json").write_text(json.dumps({"actual_native_child_reaped":True,"lease_seconds":2,"production_camera_selected":False,"region_profile_reused_across_sessions":True},indent=2))
     finally:
         lease.close()
     # Actual saved-policy pair uses the same cyclic evaluation lifecycle.

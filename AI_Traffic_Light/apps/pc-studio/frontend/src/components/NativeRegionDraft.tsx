@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type PointerEvent} from "react";
-import {evaluateNativeRegion,type NativeEvaluationState,type NativeRegionResult} from "../lib/remoteCameraApi";
+import {evaluateNativeRegion,evaluateNativeRegionProfile,type NativeEvaluationState,type NativeRegionResult} from "../lib/remoteCameraApi";
 
 type Point=[number,number];
 /** Draft-only native pixel geometry. Never writes the production zone registry. */
@@ -18,6 +18,27 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
     return [Math.round(Math.max(0,Math.min(1279,p.x))*100)/100,Math.round(Math.max(0,Math.min(719,p.y))*100)/100];
   };
   const changed=(next:Point[])=>{request.current?.abort();request.current=null;setBusy(false);setPoints(next);setResult(null);setError("");};
+  const importProfile=async(file:File)=>{
+    if(busy||!state.snapshot)return;
+    if(file.size>16384){setError("Native region profile is too large");return;}
+    const controller=new AbortController();request.current=controller;setBusy(true);setError("");
+    try{
+      const profile=JSON.parse(await file.text());
+      if(controller.signal.aborted)return;
+      const value=await evaluateNativeRegionProfile(state,sourceId,profile,controller.signal);
+      if(!controller.signal.aborted&&value.tick===state.snapshot.tick&&value.generation===state.generation&&value.epoch===state.epoch&&value.layout_id===state.snapshot.layout_id&&value.persisted===false&&value.source_id===sourceId){
+        const polygon=value.views?.[sourceId]?.polygon;
+        if(!polygon||polygon.length!==4)throw new Error("Native profile polygon unavailable");
+        setPoints(polygon);setResult(value);
+      }
+    }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Region profile rejected");}
+    finally{if(!controller.signal.aborted){setBusy(false);request.current=null;}}
+  };
+  const exportProfile=()=>{
+    if(!result?.region_profile)return;
+    const url=URL.createObjectURL(new Blob([JSON.stringify(result.region_profile,null,2)],{type:"application/json"}));
+    const a=document.createElement("a");a.href=url;a.download="mesh-native-region.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
   const evaluate=async()=>{
     if(points.length!==4||busy||!state.snapshot)return;
     const controller=new AbortController();request.current=controller;setBusy(true);setError("");
@@ -44,6 +65,8 @@ export function NativeRegionDraft({sourceId,state}:{sourceId:string;state:Native
       <span>{points.length}/4 vertices · native draft only</span>
       <button type="button" onClick={()=>changed([])}>Clear draft</button>
       <button type="button" disabled={points.length!==4||busy} onClick={()=>void evaluate()}>Evaluate draft</button>
+      <label>Load native profile <input type="file" accept=".json,application/json" disabled={busy} onChange={e=>{const file=e.target.files?.[0];e.target.value="";if(file)void importProfile(file);}} style={{maxWidth:180}}/></label>
+      {result?.region_profile&&<button type="button" onClick={exportProfile}>Export native profile</button>}
       {result&&<span role="status">Vehicles {result.counts.vehicle} · Pedestrians {result.counts.pedestrian} · tick {result.tick}{result.views?` · ${Object.keys(result.views).length} matched views`:""}</span>}
       {error&&<span role="alert">{error}</span>}
     </div>

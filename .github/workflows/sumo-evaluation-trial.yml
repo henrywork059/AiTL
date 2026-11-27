@@ -28,6 +28,7 @@ on:
       - '.github/scripts/sumo_midblock_trial.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_fixture.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_session.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_transport.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/routes/experiments.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation_geometry.py'

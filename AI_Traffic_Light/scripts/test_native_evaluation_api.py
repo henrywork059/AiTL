@@ -186,6 +186,13 @@ class Tests(unittest.TestCase):
                     self.assertEqual(view["observation"]["demand_digest"],first["snapshot"]["demand_digest"])
                     self.assertFalse(view["observation"]["detector_input_eligible"])
                 self.assertEqual(all_views["canonical_polygon"],[[1279,0],[0,0],[0,719],[1279,719]])
+                profile=all_views["region_profile"]
+                reuse={**identity,"tick":1,"source_id":"simulation_camera_b","profile":profile}
+                loaded=assert_envelope(client.post(BASE+"/region/profile",json=reuse))["data"]
+                self.assertEqual(loaded["agent_ids"],all_views["agent_ids"])
+                self.assertEqual(loaded["canonical_polygon"],profile["canonical_polygon"])
+                for bad in ({**profile,"layout_id":"0"*64},{**profile,"coordinate_space":"legacy_pixels"},{**profile,"detector_input_eligible":True}):
+                    assert_envelope(client.post(BASE+"/region/profile",json={**reuse,"profile":bad}),expected_status=409)
                 for bad in ({**payload,"layout_id":"0"*64},{**payload,"coordinate_space":"legacy_pixels"},{**payload,"tick":0}):
                     assert_envelope(client.post(BASE+"/region/views",json=bad),expected_status=409)
                 assert_envelope(client.post(BASE+"/region/views",json={**payload,"polygon":[[0,0],[1279.5,0],[1279.5,719],[0,719]]}),expected_status=422)
@@ -217,6 +224,12 @@ class Tests(unittest.TestCase):
                 self.assertTrue(sessions[0].closed)
                 assert_envelope(client.get(BASE+"/frame",params={**identity,"tick":2,"source_id":"simulation_camera"}),expected_status=409)
                 assert_envelope(client.post(BASE+"/region/views",json=payload),expected_status=409)
+                restarted=assert_envelope(client.post(BASE+"/start",json={**{k:service.scene()[k] for k in ("epoch","generation")},"geometry":"midblock","density":"light"}))["data"]
+                identity2={k:restarted[k] for k in ("epoch","generation")}
+                assert_envelope(client.post(BASE+"/region/profile",json=reuse),expected_status=409)
+                fresh=assert_envelope(client.post(BASE+"/region/profile",json={**reuse,**identity2,"tick":0}))["data"]
+                self.assertEqual(fresh["region_profile"],profile)
+                self.assertFalse(fresh["persisted"])
 
     def test_reference_switch_and_production_rollback(self):
         from app.services.simulation_reference_session import FiniteReferenceSession
