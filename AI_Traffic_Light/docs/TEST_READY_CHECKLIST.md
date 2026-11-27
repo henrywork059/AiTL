@@ -1,3 +1,18 @@
+# V0574 — Independent network, region, AI review and reproducible experiment candidate
+
+Candidate `0_5_74`; previous `0_5_73`; accepted baseline `0_5_0`. Updates 31 / U02 and 36 / E02 delivered as software candidate milestones. Updates 30, 33, 37 and 38 partial; Update 28 / S04 remains gated. Owner PASS pending.
+
+- [x] Application standard CI 46018941752; full offline suite, build and audit.
+- [x] Browser CI 46016827486; real-clock junction, region and review pointer/identity workflows, inspected screenshots.
+- [x] Latest paired evidence archive independently checked; adverse cases retained; read-only verifier tested locally against two archives and tampered inputs.
+- [ ] Exact release standard CI, including new verifier integration and tamper smoke regression.
+- [ ] Owner Windows/live authorized bench and manual acceptance; remaining 30/33/37/38 evidence.
+- [ ] S04 migration qualification; legacy default and all safety restrictions retained.
+
+See [PATCH_0_5_74](PATCH_0_5_74.md).
+
+---
+
 # V0573 — Independent P4 hardware-first workspace candidate
 
 Candidate `0_5_73`; previous `0_5_72`; accepted baseline `0_5_0`. Update 29 / U01 delivered as candidate; Updates 30–31 / U02 and 33 / U02 partial. Owner PASS pending.

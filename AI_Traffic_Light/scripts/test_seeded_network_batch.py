@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from seeded_network_batch import execute, MODES, METRICS, FAIRNESS_MODES
+from verify_seeded_network_evidence import verify, verify_members
 
 class SeededBatchTest(unittest.TestCase):
     def test_real_paired_smoke(self):
@@ -15,6 +16,26 @@ class SeededBatchTest(unittest.TestCase):
             self.assertTrue(manifest["repeat_primary_metrics_and_demand_equal"])
             self.assertTrue(manifest["repeat_intersection_fairness_equal"])
             self.assertFalse(manifest["physical_output_allowed"])
+            audit = verify(out)
+            self.assertEqual(audit["matched_cases"], 1)
+            self.assertEqual(audit["primary_rows"], 3)
+            self.assertEqual(audit["fairness_rows"], 8)
+            self.assertEqual(audit["busy_repeats"], 1)
+            # Rehash a deliberately changed CSV: consistency must still fail.
+            members = {p.name: p.read_bytes() for p in out.iterdir()}
+            rows = list(csv.reader(members["paired-metrics.csv"].decode("utf-8").splitlines()))
+            rows[1][4] = str(float(rows[1][4]) + 1)
+            import io
+            buffer = io.StringIO()
+            csv.writer(buffer).writerows(rows)
+            members["paired-metrics.csv"] = buffer.getvalue().encode("utf-8")
+            with self.assertRaisesRegex(ValueError, "Member digest mismatch"):
+                verify_members(list(members), members.__getitem__)
+            altered_manifest = json.loads(members["manifest.json"])
+            altered_manifest["sha256"]["paired-metrics.csv"] = hashlib.sha256(members["paired-metrics.csv"]).hexdigest()
+            members["manifest.json"] = json.dumps(altered_manifest).encode("utf-8")
+            with self.assertRaisesRegex(ValueError, "CSV metric differs"):
+                verify_members(list(members), members.__getitem__)
             self.assertEqual(manifest["busy_repeats"], [{"seed": 42, "file": "busy-42-repeat.json", "primary_fairness_and_demand_equal": True}])
             self.assertEqual(sum(manifest["cooperative_vs_adaptive_pedestrian_wait_signs"]["busy"].values()), 1)
             row = manifest["records"][0]

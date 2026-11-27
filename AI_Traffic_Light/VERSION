@@ -1,5 +1,5 @@
-version: 0_5_73
-status: Independent P4 hardware-first workspace candidate (Update 29; partial 30-31/33)
-previous_version: 0_5_72
+version: 0_5_74
+status: Independent P4/P5 network and reproducible evidence candidate (Updates 31/36; partial 30/33/37/38)
+previous_version: 0_5_73
 passed_baseline: 0_5_0
-notes: Application standard/browser CI passed; corrected camera and saved-network screenshots inspected; release commit CI and owner PASS pending; S04 migration remains open.
+notes: Application standard/browser CI passed; exact release CI and owner PASS pending; S04 gates and legacy default unchanged.
