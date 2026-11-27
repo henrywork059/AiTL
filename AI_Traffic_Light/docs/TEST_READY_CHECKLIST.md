@@ -6,7 +6,8 @@ Candidate 0_5_75; previous 0_5_74; accepted baseline 0_5_0. Independent concurre
 - [x] P3/P4/P5 application CI 46022866121 passed and newer 46025214608 completed offline regression checks, including source-switch race.
 - [x] Browser CI 46025031969 passed all real-clock capture, training, crosswalk, network, review and renderer fixtures; evidence ZIP checksum verified and screenshots inspected.
 - [x] Independent archive 15209410327 reconciled all member digests, local/primary rows, timeline samples, decisions and busy repeats.
-- [ ] Exact 0_5_75 release commit CI after VERSION synchronization.
+- [x] Exact pre-reconciliation 0_5_75 release commit CI 46025843286 passed.
+- [ ] Main reconciliation CI, including preserved upload-stream boundary regression.
 - [ ] Authorized Windows/ESP bench and owner manual editor/source-mode/physical integration PASS.
 - [ ] Qualified trusted holdout, production calibration/common waiting metric, owner resource budget and migration/rollback approval for S04.
 

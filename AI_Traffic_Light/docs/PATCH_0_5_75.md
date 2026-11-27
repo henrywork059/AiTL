@@ -30,3 +30,8 @@ Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
 ```
 
 Check footer 0_5_75 Candidate, two physical sources and simulation-mode handoff (authorized test only); verify no stale preview, Side A/B polygon save/fail/reload and real pointer hit, capture source-switch rejection with no file write, status-error recovery, managed dataset exclusion of evaluation-only samples, training ready/stale/failure recovery and raw evidence integrity. Use disposable test data and back up saved profiles. Do not run real YOLO training or connect public-road controllers as part of CI. Owner must explicitly confirm PASS.
+
+
+## Main integration reconciliation (27 November 2026)
+
+The independent main branch candidates 0_5_28 and 0_5_29 are preserved in Git history and in [main CI history](PATCH_0_5_28_MAIN.md) and [main bounded-upload history](PATCH_0_5_29_MAIN.md). The current feature route already bounds streamed upload bytes and additionally validates decoding; retain main's dedicated exact-boundary and early-rejection regression with its mock adapted to the current signature. Standard CI runs on both main and the feature branch. Exact pre-reconciliation 0_5_75 release CI 46025843286 passed all jobs, including seeded evidence verification. Reconciliation CI and owner acceptance remain separate. Candidate version and baseline are unchanged; S04 remains gated.
