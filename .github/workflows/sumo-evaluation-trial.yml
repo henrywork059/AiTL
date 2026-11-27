@@ -37,6 +37,8 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation_experiments.py'
       - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/NativeRoadRenderer.ts'
       - 'AI_Traffic_Light/scripts/test_native_evaluation_api.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/legacy_region_compatibility.py'
+      - 'AI_Traffic_Light/scripts/test_native_compatibility.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_reference_session.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/observation_identity.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/legacy_world.py'

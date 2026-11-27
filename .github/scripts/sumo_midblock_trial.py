@@ -190,20 +190,53 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                 assert not converted["production_coordinate_parity"] and not converted["mapping"]["persisted"]
                 assert not converted["synthetic_box_center_evaluation"]["detector_observation"]
                 assert converted["synthetic_legacy_ui_region_evaluation"]["contract"]=="legacy_ui_bottom_center_first_match_semantic_v1"
-                from app.services.legacy_region_compatibility import legacy_region_projection
+                from app.services.legacy_region_compatibility import legacy_region_projection,edge_view_point
+                from app.services.crosswalks import CrosswalkService
+                # A disposable persisted fixture, never the owner's crosswalk store.
+                full=[[0,0],[1280,0],[1280,720],[0,720]]
+                slanted=[[100,100],[1100,300],[1000,680],[80,500]]
+                def mirrored(polygon,sid):
+                    return [list(edge_view_point(x,y,sid)) for x,y in polygon]
+                pairs=list(VIEW_FLIPS)
+                fixture={"schema_version":1,"crosswalks":[]}
+                for n,(a,b) in enumerate(zip(pairs[::2],pairs[1::2])):
+                    fixture["crosswalks"].append({"id":f"fixture_{n}","label":"Coordinate fixture","location":"",
+                        "camera_side_a_id":a,"camera_side_b_id":b,"regions":[
+                        {"id":"crossing","label":"Crossing","vertices":preview["polygon"],
+                         "vertices_by_side":{"a":mirrored(preview["polygon"],a),"b":mirrored(preview["polygon"],b)}},
+                        {"id":"slanted","label":"Slanted","vertices":slanted,
+                         "vertices_by_side":{"a":mirrored(slanted,a),"b":mirrored(slanted,b)}},
+                        {"id":"a_only","label":"Legacy A only","camera_side":"a","vertices":[[0,0],[80,0],[80,80],[0,80]]},
+                        {"id":"full","label":"Legacy shared full frame","vertices":full}]})
+                fixture_path=(out/"coordinate-fixture-crosswalks.json").resolve()
+                with patch.dict(os.environ,{"AITL_CROSSWALKS_CONFIG":str(fixture_path)}):
+                    saved=CrosswalkService(config_path=fixture_path).save(fixture)
+                    saved=CrosswalkService(config_path=fixture_path).get()
+                original_bytes=fixture_path.read_bytes()
                 report={}
                 for sid in VIEW_FLIPS:
-                    ordered=[{"id":"crossing","polygon":[list(simulation_view_point(x,y,1280,720,sid)) for x,y in preview["polygon"]]},
-                             {"id":"slanted","polygon":[[100,100],[1100,300],[1000,680],[80,500]]}]
+                    crossing=next(c for c in saved["crosswalks"] if sid in (c["camera_side_a_id"],c["camera_side_b_id"]))
+                    side="a" if sid==crossing["camera_side_a_id"] else "b"
+                    ordered=[{"id":region["id"],"polygon":region.get("vertices_by_side",{}).get(side,region["vertices"])}
+                             for region in crossing["regions"] if region.get("camera_side") in (None,side)]
                     payload={k:v for k,v in preview.items() if k!="polygon"}
                     payload.update(source_id=sid,regions=ordered)
                     truth=assert_envelope(client.post(BASE+"/region/legacy-regions-preview",json=payload))["data"]
                     assert truth["contract"]=="legacy_ui_bottom_center_first_match_semantic_v1" and not truth["persisted"]
+                    assert truth["coordinate_mapping_contract"]=="semantic_midblock_image_edges_v2"
                     assert len(truth["regions"][1]["native_outline"])>4
+                    assert [r["original_polygon"] for r in truth["regions"]]==[r["polygon"] for r in ordered]
+                    assert truth["regions"][-1]["original_polygon"]==full
                     assert len(truth["assignments"])==len(annotations["views"][sid])
                     predicted=legacy_region_projection(scene,sid,ordered,palette_predictions(qualified_images[sid]))
                     report[sid]={"truth":truth,"palette":predicted}
+                assert fixture_path.read_bytes()==original_bytes
+                with patch.dict(os.environ,{"AITL_CROSSWALKS_CONFIG":str(fixture_path)}):
+                    assert CrosswalkService(config_path=fixture_path).get()==saved
                 (out/"legacy-ui-region-comparison.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+                (out/"coordinate-fixture-integrity.json").write_text(json.dumps({
+                    "schema":"saved_legacy_regions_edge_v2","sha256":hashlib.sha256(original_bytes).hexdigest(),
+                    "unchanged_after_preview":True,"synthetic_fixture":True,"physical_output_allowed":False}),encoding="utf-8")
                 assert converted["mapping"]["original_polygon"]==preview["polygon"]
                 assert_envelope(client.post(BASE+"/region/legacy-preview",json={**preview,"legacy_layout_id":"0"*64}),expected_status=409)
                 (out/"legacy-rectangle-preview.json").write_text(json.dumps(converted,indent=2),encoding="utf-8")

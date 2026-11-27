@@ -174,11 +174,111 @@ def audit_captures(read):
     return len(identities), views
 
 
+def audit_legacy_region_edges(read):
+    """Independently verify saved-fixture edge mapping and region assignments."""
+    import bisect
+    report = load(read, "mesh-native-detector-batch.json")
+    captures = views = assignments = outlines = 0
+    for record in report["records"]:
+        root = "mesh-sumo-midblock/" + str(Path(record["capture_name"]).parent).replace("\\", "/") + "/"
+        preview = load(read, root + "legacy-ui-region-comparison.json")
+        if preview[VIEWS[0]]["truth"].get("coordinate_mapping_contract") != "semantic_midblock_image_edges_v2":
+            continue  # Retained earlier evidence, not qualified against this contract.
+        fixture_bytes = read(root + "coordinate-fixture-crosswalks.json")
+        integrity = load(read, root + "coordinate-fixture-integrity.json")
+        check(integrity == {"schema":"saved_legacy_regions_edge_v2","sha256":digest(fixture_bytes),
+                            "unchanged_after_preview":True,"synthetic_fixture":True,"physical_output_allowed":False},
+              "Saved coordinate fixture digest")
+        fixture = json.loads(fixture_bytes)
+        check(fixture["schema_version"] == 1, "Saved coordinate fixture schema")
+        with ZipFile(io.BytesIO(read("mesh-sumo-midblock/" + record["capture_name"]))) as capture:
+            scene = load(capture.read, "scene.json")
+            truth = load(capture.read, "synthetic_footprints.json")["views"]
+        lanes = {l["id"]:l for l in scene["lanes"]}
+        crossing = next(l for l in lanes.values() if l["kind"] == "crossing")
+        x = crossing["points"][0][0]
+        half = crossing["width_px"] / 2
+        road_x = [p[0] for k in ("WC_1","EC_1") for p in lanes[k]["points"]]
+        walk_y = [p[1] for k in ("NC_0","CS_0") for p in lanes[k]["points"]]
+        sx,sy = [0,520,760,1280],[0,179,625,720]
+        tx = [v+.5 for v in (min(road_x),x-half,x+half,max(road_x))]
+        ty = [v+.5 for v in (min(walk_y),min(p[1] for p in crossing["points"]),max(p[1] for p in crossing["points"]),max(walk_y))]
+        def transform(v, src, dst):
+            if v < src[0]-1e-9 or v > src[-1]+1e-9:
+                return None
+            i = min(max(bisect.bisect_right(src,v)-1,0),len(src)-2)
+            v = min(max(v,src[0]),src[-1])
+            return dst[i]+(v-src[i])*(dst[i+1]-dst[i])/(src[i+1]-src[i])
+        def same(p,q):
+            return len(p)==len(q) and all(math.isclose(a,b,rel_tol=0.,abs_tol=1e-8) for a,b in zip(p,q))
+        def contains(point,polygon):
+            x,y = point
+            hits = sum(x < a[0]+(y-a[1])*(b[0]-a[0])/(b[1]-a[1])
+                       for a,b in zip(polygon,polygon[1:]+polygon[:1])
+                       if min(a[1],b[1]) <= y < max(a[1],b[1]))
+            return hits%2 == 1
+        for i,sid in enumerate(VIEWS):
+            def mirror(x,y):
+                return (1280-x if i in (2,3) else x,720-y if i in (1,3) else y)
+            saved = next(c for c in fixture["crosswalks"] if sid in (c["camera_side_a_id"],c["camera_side_b_id"]))
+            side = "a" if sid == saved["camera_side_a_id"] else "b"
+            regions = [(r["id"],r.get("vertices_by_side",{}).get(side,r["vertices"]))
+                       for r in saved["regions"] if r.get("camera_side") in (None,side)]
+            result = preview[sid]["truth"]
+            check(result["coordinate_mapping_contract"] == "semantic_midblock_image_edges_v2"
+                  and result["landmarks"] == {"legacy_x":sx,"legacy_y":sy,"native_x":tx,"native_y":ty}
+                  and result["source_id"] == sid and result["native_layout_id"] == scene["layout_id"]
+                  and all(result[k] is False for k in ("calibrated","persisted","detector_observation","detector_input_eligible","production_coordinate_parity","physical_output_allowed")),
+                  "Legacy edge coordinate provenance")
+            check([(r["id"],r["original_polygon"]) for r in result["regions"]] == regions, "Saved region side/order changed")
+            for (ident,polygon),mapped in zip(regions,result["regions"]):
+                expected = []
+                canonical = [mirror(*p) for p in polygon]
+                for a,b in zip(canonical,canonical[1:]+canonical[:1]):
+                    cuts={0.}
+                    for k,knots in enumerate((sx,sy)):
+                        if a[k]!=b[k]:
+                            cuts.update((knot-a[k])/(b[k]-a[k]) for knot in knots[1:-1]
+                                        if min(a[k],b[k])<knot<max(a[k],b[k]))
+                    for u in sorted(cuts):
+                        expected.append(mirror(transform(a[0]+(b[0]-a[0])*u,sx,tx),
+                                               transform(a[1]+(b[1]-a[1])*u,sy,ty)))
+                check(len(expected)==len(mapped["native_outline"]) and all(same(p,q) for p,q in zip(expected,mapped["native_outline"])), "Mapped edge outline differs")
+                outlines += 1
+            check(len(result["assignments"]) == len(truth[sid]), "Region assignment coverage")
+            counts={k:{"vehicle":0,"pedestrian":0} for k,_ in regions}
+            classes={k:{} for k,_ in regions}
+            outside=0
+            for n,(row,box) in enumerate(zip(result["assignments"],truth[sid])):
+                x1,y1,x2,y2 = box["box_xyxy"]
+                bottom=((x1+x2)/2,y2)
+                x,y=mirror(*bottom)
+                a,b=transform(x,tx,sx),transform(y,ty,sy)
+                legacy=None if a is None or b is None else mirror(a,b)
+                ident=None if legacy is None else next((k for k,p in regions if contains(legacy,p)),None)
+                check(row["index"]==n and row["agent_id"]==box["agent_id"] and same(row["native_bottom_center"],bottom)
+                      and (row["legacy_point"] is None if legacy is None else row["legacy_point"] is not None and same(row["legacy_point"],legacy))
+                      and row["region_id"]==ident, "Region bottom-centre assignment differs")
+                if legacy is None: outside+=1
+                if ident is not None:
+                    kind=box["kind"]
+                    counts[ident][kind]+=1
+                    name=box.get("class_name",kind)
+                    classes[ident][name]=classes[ident].get(name,0)+1
+                assignments+=1
+            check(counts==result["kind_counts"] and classes==result["class_counts"] and outside==result["outside_semantic_domain"], "Region count reconciliation")
+            views+=1
+        captures+=1
+    check(captures in (0,len(report["records"])), "Mixed edge-coordinate evidence")
+    return {"captures":captures,"views":views,"assignments":assignments,"outlines":outlines,
+            "saved_fixture_verified":captures>0,"production_calibrated":False}
+
+
 def audit(read):
     samples, metrics = audit_metrics(read)
     captures, views = audit_captures(read)
     return {"normalized_samples": samples, "metrics": metrics, "resource_arms": audit_resources(read),
-            "capture_count": captures, "coordinate_views": views, "migration_allowed": False,
+            "capture_count": captures, "coordinate_views": views, "legacy_edge_regions": audit_legacy_region_edges(read), "migration_allowed": False,
             "limitations": "Synthetic evidence consistency only; no calibrated production coordinates, trained holdout, owner resource budget or migration acceptance."}
 
 
