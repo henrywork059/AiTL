@@ -81,7 +81,14 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs,page){
               ({from,to}=mapped.result.value);
             }
             const expression='Boolean(document.elementFromPoint('+from[0]+','+from[1]+')?.closest('+JSON.stringify(drag.target)+'))';
-            const hit=await call('Runtime.evaluate',{expression,returnByValue:true});
+            let hit=await call('Runtime.evaluate',{expression,returnByValue:true});
+            // React updates SVG attributes before a Windows headless Edge frame
+            // necessarily repaints the hit geometry. Do not send a pointer to
+            // the old side's vertex; settle the *actual* DOM hit target first.
+            for(let attempt=0;attempt<20&&!hit.result?.value;attempt++){
+              await delay(100);
+              hit=await call('Runtime.evaluate',{expression,returnByValue:true});
+            }
             if(!hit.result?.value){
               const diagnostic="(()=>{const top=document.elementFromPoint("+from[0]+","+from[1]+");const svg=document.querySelector("+JSON.stringify(drag.svgSelector||'.crosswalk-region-overlay')+");const nodes=[...document.querySelectorAll("+JSON.stringify(drag.target)+")].map(el=>({x:el.getAttribute('cx'),y:el.getAttribute('cy'),rect:(()=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height];})(),pointer:getComputedStyle(el).pointerEvents}));return {topTag:top?.tagName,topClass:top?.getAttribute('class'),topOuter:top?.outerHTML.slice(0,200),svgRect:svg?.getBoundingClientRect().toJSON(),nodes};})()";
               const details=await call('Runtime.evaluate',{expression:diagnostic,returnByValue:true});
