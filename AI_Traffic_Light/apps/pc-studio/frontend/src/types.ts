@@ -382,6 +382,9 @@ export type CameraStatus = {
   simulation_enabled: boolean;
   simulation_paused: boolean;
   simulation_density: SimulationDensity;
+  simulation_engine?: "legacy" | "protected";
+  simulation_fault?: string | null;
+  simulation_applied_phase?: string | null;
   simulation_signal_phase?: string | null;
   simulation_signal_seconds_remaining?: number | null;
   simulation_signal_cycle_seconds?: number | null;

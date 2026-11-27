@@ -26,6 +26,7 @@ from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD
     TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
     vehicle_specs, pedestrian_specs, advance_vehicles, advance_pedestrians)
 from app.services.sumo_shadow_runtime import ShadowRuntime
+from app.services.protected_crosswalk import ProtectedCrosswalk
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 MAX_FRAME_PIXELS = 16 * 1024 * 1024  # Reject decompression bombs before image decoding.
@@ -56,6 +57,7 @@ class CameraFrame:
     session_generation: int | None = None
     source_epoch: int | None = None
     mode_generation: int | None = None
+    simulation_engine: str | None = None
 
     @property
     def observation(self) -> ObservationIdentity:
@@ -78,6 +80,7 @@ class CameraFrame:
             "frame_number": self.frame_number,
             "size_bytes": len(self.content),
             "origin": self.origin,
+            **({"simulation_engine": self.simulation_engine} if self.simulation_engine else {}),
         }
 
 
@@ -229,6 +232,9 @@ class CameraFrameService:
         self._simulation_enabled = False
         self._observation_mode_generation = 0
         self._simulation_density = "normal"
+        self._simulation_engine = "legacy"
+        self._protected_world = None
+        self._simulation_fault = None
         self._simulation_seed = (int(time.time() * 1000) & 0x7FFFFFFF) if simulation_seed is None else simulation_seed
         self._frame_counter = 0
         self._last_simulation_tick = -1
@@ -340,6 +346,7 @@ class CameraFrameService:
             return frame
 
     def _reset_simulation_locked(self) -> None:
+        self._simulation_fault = None
         self._simulation_frame = None
         self._simulation_scene = None
         self._simulation_canvas = None
@@ -351,6 +358,8 @@ class CameraFrameService:
         density_offset = DENSITY_SEED_OFFSETS[self._simulation_density]
         self._simulation_rng = random.Random(self._simulation_seed + density_offset)
         self._initialize_agents_locked()
+        self._protected_world = (ProtectedCrosswalk(self._vehicles,self._pedestrians,self._simulation_rng)
+                                 if self._simulation_engine=="protected" else None)
         if self._shadow is not None:
             self._shadow.reset(self._simulation_seed)
 
@@ -371,12 +380,23 @@ class CameraFrameService:
                 self._last_simulation_tick = -1
                 self._vehicles = []
                 self._pedestrians = []
+                self._protected_world = None
+                self._simulation_fault = None
+                self._simulation_engine = "legacy"
                 signal_rules_service.reset_runtime(0.0)
         return self.status()
 
-    def configure_simulation(self, *, density: str | None = None, paused: bool | None = None) -> dict:
+    def configure_simulation(self, *, density: str | None = None, paused: bool | None = None,
+                             engine: str | None = None) -> dict:
         with self._lock:
             reset_agents = False
+            if engine is not None and engine not in {"legacy","protected"}:
+                raise AppError(ErrorCode.INVALID_REQUEST,"Unknown production simulation engine.",status_code=422)
+            switching = engine is not None and engine != self._simulation_engine
+            if switching and self._simulation_enabled and (not self._simulation_paused or paused is False):
+                raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"Pause simulation before switching engines.",status_code=409)
+            if self._simulation_fault and paused is False and not switching and (density is None or density.strip().lower()==self._simulation_density):
+                raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"Reset or switch the faulted simulator first.",status_code=409)
             if paused is not None and not self._simulation_enabled:
                 raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,
                     'Start simulation mode before pausing or resuming the synthetic scene.', status_code=409)
@@ -392,6 +412,9 @@ class CameraFrameService:
                 if normalized_density != self._simulation_density:
                     self._simulation_density = normalized_density
                     reset_agents = True
+            if switching:
+                self._simulation_engine = engine
+                reset_agents = True
             if paused is not None:
                 if paused != self._simulation_paused:
                     self._simulation_adapter.set_paused(paused, self._simulation_monotonic())
@@ -413,7 +436,7 @@ class CameraFrameService:
             self._simulation_source_id = source_id
 
     def _simulation_frame_for_locked(self, source_id: str, *, refresh: bool = True) -> CameraFrame | None:
-        if not self._simulation_enabled:
+        if not self._simulation_enabled or self._simulation_fault:
             return None
         if refresh and (self._simulation_frame is None or not self._simulation_paused):
             self._refresh_simulation_locked()
@@ -436,7 +459,7 @@ class CameraFrameService:
                 content=encoded.tobytes(), content_type="image/png",
                 source_id=source_id, width=original.width, height=original.height,
                 received_at_ms=original.received_at_ms, frame_number=original.frame_number,
-                origin="simulation", mode_generation=original.mode_generation,
+                origin="simulation", mode_generation=original.mode_generation, simulation_engine=original.simulation_engine,
             )
             self._simulation_view_frames[source_id] = cached
         return cached
@@ -451,24 +474,25 @@ class CameraFrameService:
         if any(sid not in SIMULATION_CAMERA_SOURCE_IDS for sid in ids):
             raise ValueError("Unknown simulation camera")
         with self._lock:
-            if not self._simulation_enabled or not ids:
+            if not self._simulation_enabled or self._simulation_fault or not ids:
                 return []
             if self._simulation_frame is None or not self._simulation_paused:
                 self._refresh_simulation_locked()
             return [frame for sid in ids
                     if (frame := self._simulation_frame_for_locked(sid, refresh=False)) is not None]
 
-    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id):
+    def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id, engine=None):
         """Read the requested current publication without stepping or selecting."""
         with self._lock:
             if (not self._simulation_enabled or self._simulation_frame is None or
                 epoch != self._simulation_epoch or generation != self._observation_mode_generation or
-                tick != self._simulation_frame.frame_number or layout_id != LEGACY_LAYOUT_ID):
+                tick != self._simulation_frame.frame_number or layout_id != LEGACY_LAYOUT_ID or
+                (engine is not None and engine != self._simulation_engine)):
                 raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,
                     "Retired legacy simulation publication or layout.", status_code=409)
             return self._simulation_frame_for_locked(source_id, refresh=False)
 
-    def simulation_scene_for(self, source_id: str) -> dict | None:
+    def simulation_scene_for(self, source_id: str, *, engine=None) -> dict | None:
         """Read the running simulator's actual agents for the optional 3D UI.
 
         This view is read-only with respect to controller policy. Every saved
@@ -479,6 +503,8 @@ class CameraFrameService:
         if source_id not in SIMULATION_CAMERA_SOURCE_IDS:
             raise ValueError("Unknown simulation camera")
         with self._lock:
+            if engine is not None and engine != self._simulation_engine:
+                raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"Production simulation engine mismatch.",status_code=409)
             frame = self._simulation_frame_for_locked(source_id)
             if frame is None:
                 return None
@@ -497,6 +523,7 @@ class CameraFrameService:
                 coordinate_space="legacy_camera_pixels_v1", layout_id=LEGACY_LAYOUT_ID,
                 width=frame.width, height=frame.height, provenance="simulation",
                 tick_kind="published_frame", detector_input_eligible=True)
+            scene["observation"]["simulation_engine"] = self._simulation_engine
             # Keep existing canonical vehicle/pedestrian arrays for the 3D
             # renderer; expose exact mirrored image-centres separately.
             scene["view_agents"] = [
@@ -511,21 +538,25 @@ class CameraFrameService:
     def _snapshot_simulation_scene_locked(self) -> dict:
         clock = self._simulation_adapter.snapshot()
         signal = self._simulation_signal_state_locked()
+        applied = self._protected_world.permission(signal["phase"]) if self._protected_world else None
         return {
             "width": FRAME_WIDTH,
             "height": FRAME_HEIGHT,
             "simulation_time_seconds": round(clock.time_s, 3),
             "paused": clock.paused,
             "density": self._simulation_density,
+            "simulation_engine": self._simulation_engine,
             "signal": {
                 "phase": signal["phase"],
-                "vehicle_go": signal["vehicle_go"],
-                "pedestrian_walk": signal["pedestrian_walk"],
+                "vehicle_go": signal["vehicle_go"] if applied is None else applied=="vehicle_green",
+                "pedestrian_walk": signal["pedestrian_walk"] if applied is None else applied=="pedestrian_green",
+                **({"applied_phase":applied} if applied is not None else {}),
                 "seconds_remaining": signal["seconds_remaining"],
             },
             "vehicles": [
                 {
                     "id": f"vehicle_{index}",
+                    **({"visit":self._protected_world.vehicle_visits[index]} if self._protected_world else {}),
                     "x": round(vehicle.x, 2),
                     "y": vehicle.y,
                     "width": vehicle.width,
@@ -538,6 +569,7 @@ class CameraFrameService:
             "pedestrians": [
                 {
                     "id": f"pedestrian_{index}",
+                    **({"visit":self._protected_world.pedestrian_visits[index]} if self._protected_world else {}),
                     "x": pedestrian.x,
                     "y": round(pedestrian.y, 2),
                     "direction": pedestrian.direction,
@@ -584,24 +616,30 @@ class CameraFrameService:
             return signal_rules_service.reset_runtime(self._simulation_clock_s)
 
     def status(self) -> dict:
-        frame = self.latest_frame()
-        now_ms = int(time.time() * 1000)
-        age_ms = now_ms - frame.received_at_ms if frame else None
         with self._lock:
+            frame = self._simulation_frame_for_locked(self._simulation_source_id) if self._simulation_enabled else self._uploaded_frame
+            now_ms = int(time.time() * 1000)
+            age_ms = now_ms - frame.received_at_ms if frame else None
             simulation_enabled = self._simulation_enabled
             simulation_paused = self._simulation_paused
             simulation_density = self._simulation_density
             signal = self._simulation_signal_state_locked() if simulation_enabled else None
+            engine = self._simulation_engine
+            fault = self._simulation_fault
+            applied = ("all_red" if fault else self._protected_world.permission(signal["phase"])) if signal and self._protected_world else None
         return {
             "mode": "simulation" if simulation_enabled else "receiver",
             "simulation_enabled": simulation_enabled,
             "simulation_paused": simulation_paused,
             "simulation_density": simulation_density,
+            "simulation_engine": engine,
+            "simulation_fault": fault,
+            "simulation_applied_phase": applied,
             "simulation_signal_phase": signal["phase"] if signal else None,
             "simulation_signal_seconds_remaining": signal["seconds_remaining"] if signal else None,
             "simulation_signal_cycle_seconds": signal["base_cycle_seconds"] if signal else None,
-            "simulation_signal_vehicle_go": signal["vehicle_go"] if signal else False,
-            "simulation_signal_pedestrian_walk": signal["pedestrian_walk"] if signal else False,
+            "simulation_signal_vehicle_go": (applied=="vehicle_green" if applied is not None else signal["vehicle_go"]) if signal else False,
+            "simulation_signal_pedestrian_walk": (applied=="pedestrian_green" if applied is not None else signal["pedestrian_walk"]) if signal else False,
             "simulation_signal_mode": signal["mode"] if signal else None,
             "simulation_signal_profile": signal["active_profile"] if signal else None,
             "simulation_signal_active_rules": signal["active_rules"] if signal else [],
@@ -660,8 +698,21 @@ class CameraFrameService:
     def _step_simulation_world_locked(self, step: float) -> None:
         # Both movement types must obey the same protected phase snapshot.
         phase = self._simulation_signal_state_locked()["phase"]
-        self._advance_vehicles_locked(step, phase)
-        self._advance_pedestrians_locked(step, phase)
+        if self._protected_world is not None:
+            try:
+                phase = self._protected_world.step(step,phase)
+            except RuntimeError as exc:
+                self._simulation_fault = "Protected crosswalk retired; reset or roll back."
+                self._observation_mode_generation += 1
+                self._simulation_adapter.set_paused(True,self._simulation_monotonic())
+                self._simulation_frame = self._simulation_scene = self._simulation_canvas = None
+                self._simulation_view_frames.clear()
+                if self._shadow is not None:
+                    self._shadow.stop()
+                raise AppError(ErrorCode.CAMERA_FRAME_READ_FAILED,self._simulation_fault,status_code=503) from exc
+        else:
+            self._advance_vehicles_locked(step, phase)
+            self._advance_pedestrians_locked(step, phase)
         if self._shadow is not None:
             self._shadow.observe(phase)
 
@@ -736,6 +787,7 @@ class CameraFrameService:
             received_at_ms=now_ms,
             frame_number=self._frame_counter,
             origin="simulation", mode_generation=self._observation_mode_generation,
+            simulation_engine=self._simulation_engine if self._simulation_engine=="protected" else None,
         )
 
 

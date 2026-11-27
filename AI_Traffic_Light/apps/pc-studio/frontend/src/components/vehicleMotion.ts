@@ -1,6 +1,6 @@
 /** Presentation-only interpolation in canonical synthetic camera pixels. No extrapolation. */
-export type VehicleObservation = { id: string; x: number; y: number; width: number; direction: number; vehicle_type: string; color: string };
-type Scene = { source_id: string; simulation_time_seconds: number; paused: boolean; density: string; width: number; height: number; vehicles: readonly VehicleObservation[] };
+export type VehicleObservation = { id: string; visit?:number; x: number; y: number; width: number; direction: number; vehicle_type: string; color: string };
+type Scene = { observation?:{epoch:string;generation:number}; source_id: string; simulation_time_seconds: number; paused: boolean; density: string; width: number; height: number; vehicles: readonly VehicleObservation[] };
 export type VehiclePose = { x: number; y: number; heading: number };
 type Track = { from: VehiclePose; to: VehiclePose; start: number; duration: number; observation: VehicleObservation };
 const MAX_BLEND_MS = 450;
@@ -23,13 +23,14 @@ export function mirroredYaw(heading: number, source: string) {
 }
 export class VehicleMotion {
   private tracks = new Map<string,Track>();
-  private last: {source: string; time: number; paused: boolean; density: string} | null = null;
+  private last: {scope:string;source: string; time: number; paused: boolean; density: string} | null = null;
   clear() { this.tracks.clear(); this.last=null; }
   update(scene: Scene | null, now: number) {
     if (!scene || !Number.isFinite(scene.simulation_time_seconds)) { this.clear(); return; }
     const time=scene.simulation_time_seconds;
     const dt=this.last?time-this.last.time:0;
-    const reset=!this.last||this.last.source!==scene.source_id||this.last.density!==scene.density||dt<0||dt>MAX_CONTINUOUS_GAP_S;
+    const scope=scene.observation?scene.observation.epoch+':'+scene.observation.generation:'';
+    const reset=!this.last||this.last.scope!==scope||this.last.source!==scene.source_id||this.last.density!==scene.density||dt<0||dt>MAX_CONTINUOUS_GAP_S;
     const resume=Boolean(this.last?.paused&&!scene.paused);
     const next=new Map<string,Track>();
     for(const v of scene.vehicles) {
@@ -39,7 +40,7 @@ export class VehicleMotion {
       const dx=previous?p.x-previous.to.x:0,dy=previous?p.y-previous.to.y:0;
       // Backend IDs are recycled slots. Large jumps or backwards straight motion must not traverse the road.
       const discontinuous=Boolean(previous&&(Math.abs(dx)>scene.width/2||Math.abs(dy)>scene.height/2||
-        (Math.abs(dy)<1 && dx*v.direction < -1)||!sameShape(previous.observation,v)));
+        (Math.abs(dy)<1 && dx*v.direction < -1)||previous.observation.visit!==v.visit||!sameShape(previous.observation,v)));
       const changed=Math.abs(dx)>0.001||Math.abs(dy)>0.001;
       const heading=previous&&!discontinuous&&changed?Math.atan2(dy,dx):
         previous&&!discontinuous&&v.direction===previous.observation.direction?previous.to.heading:directionHeading(v.direction);
@@ -51,7 +52,7 @@ export class VehicleMotion {
       next.set(v.id,{from:blend?sample(previous!,now):to,to,start:now,duration:blend?Math.min(MAX_BLEND_MS,dt*1000):0,observation:v});
     }
     this.tracks=next;
-    this.last={source:scene.source_id,time,paused:scene.paused,density:scene.density};
+    this.last={scope,source:scene.source_id,time,paused:scene.paused,density:scene.density};
   }
   pose(id: string, now: number) { const t=this.tracks.get(id);return t?sample(t,now):undefined; }
   isAnimating(now: number) { return Array.from(this.tracks.values()).some(t=>t.duration>0&&now<t.start+t.duration); }

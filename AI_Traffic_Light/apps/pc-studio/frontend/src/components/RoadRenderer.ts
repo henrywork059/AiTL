@@ -18,6 +18,7 @@ export class RoadRenderer {
   private readonly pedestrianMotion = new PedestrianMotion();
   private readonly vehicles = new Map<string,VehicleVisual>();
   private readonly motion = new VehicleMotion();
+  private observationScope:string|null=null;
   private viewportWidth=0;
   private viewportHeight=0;
   private readonly vehicleLamp: THREE.MeshBasicMaterial;
@@ -94,7 +95,9 @@ export class RoadRenderer {
     const s=snapshot?.source_id===this.sourceId?snapshot:null;
     this.vehicleLamp.color.set(s?.signal.vehicle_go?0x42dc89:s?.signal.phase==='vehicle_yellow'?0xf1c247:0xd14f43);
     this.pedestrianLamp.color.set(s?.signal.pedestrian_walk?0x42dc89:0xd14f43);
-    if(!s){this.clearVehicles();this.clearPedestrians();return;}
+    if(!s){this.observationScope=null;this.clearVehicles();this.clearPedestrians();return;}
+    const scope=s.observation?`${s.observation.epoch}:${s.observation.generation}`:'';
+    if(this.observationScope!==scope){this.clearVehicles();this.clearPedestrians();this.observationScope=scope;}
     this.motion.update(s,now);
     const live=new Set<string>();
     for(const v of s.vehicles) {

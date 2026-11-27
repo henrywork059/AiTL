@@ -103,6 +103,86 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(reset["observation"]["generation"],service.observation_mode_token[1])
             self.assertEqual(len(reset["vehicles"]),12)
 
+    def test_protected_camera_engine_switch_rollback_and_fault(self):
+        from app.services.camera_frames import CameraFrameService, SIMULATION_CAMERA_SOURCE_IDS
+        from app.services.traffic_observations import selected_observation_is_current
+        from app.services.dataset_capture import DatasetCaptureService
+        from app.core.exceptions import AppError
+        from tempfile import TemporaryDirectory
+        import cv2
+        import numpy as np
+        import json
+        now=[0.]
+        service=CameraFrameService(simulation_seed=42,simulation_monotonic=lambda:now[0])
+        phase={"phase":"vehicle_green","vehicle_go":True,"pedestrian_walk":False,
+               "seconds_remaining":12,"base_cycle_seconds":34,"mode":"fixed",
+               "active_profile":"fixture","active_rules":[]}
+        def signal():
+            return dict(phase)
+        with patch.object(service,"_simulation_signal_state_locked",side_effect=signal), \
+             patch("app.services.camera_frames.camera_frame_service",service):
+            service.set_simulation(True)
+            original=service.latest_frame()
+            self.assertTrue(selected_observation_is_current(original.observation))
+            old=service.simulation_scene_for("simulation_camera")["observation"]
+            identity={k:old[k] for k in ("epoch","generation","tick","layout_id","source_id")}
+            with self.assertRaises(AppError):
+                service.configure_simulation(engine="protected")
+            self.assertIs(service.latest_frame(),original)
+            service.configure_simulation(paused=True)
+            status=service.configure_simulation(engine="protected")
+            self.assertEqual(status["simulation_engine"],"protected")
+            self.assertTrue(status["simulation_paused"])
+            self.assertEqual(service._simulation_clock_s,0.)
+            self.assertFalse(selected_observation_is_current(original.observation))
+            with self.assertRaises(AppError):
+                service.exact_simulation_frame(**identity,engine="legacy")
+            self.assertEqual(service._protected_world.occupancy(),(False,False))
+            first=service.simulation_scene_for("simulation_camera",engine="protected")
+            self.assertEqual(first["observation"]["layout_id"],old["layout_id"])
+            self.assertTrue(first["observation"]["detector_input_eligible"])
+            batch=service.simulation_frames_for(SIMULATION_CAMERA_SOURCE_IDS)
+            self.assertEqual(len(batch),4)
+            self.assertEqual(len({(f.frame_number,f.received_at_ms,f.mode_generation) for f in batch}),1)
+            self.assertTrue(all(f.origin=="simulation" and f.simulation_engine=="protected" for f in batch))
+            self.assertTrue(selected_observation_is_current(batch[0].observation))
+            canonical=cv2.imdecode(np.frombuffer(batch[0].content,np.uint8),cv2.IMREAD_COLOR)
+            from app.services.observation_identity import SIMULATION_VIEW_FLIPS
+            for frame in batch[1:]:
+                self.assertTrue(np.array_equal(cv2.flip(canonical,SIMULATION_VIEW_FLIPS[frame.source_id]),
+                    cv2.imdecode(np.frombuffer(frame.content,np.uint8),cv2.IMREAD_COLOR)))
+            with TemporaryDirectory() as tmp:
+                writer=DatasetCaptureService(dataset_root=Path(tmp),respect_environment=False)
+                record=writer.capture_frame(batch[0],session_id="protected_trial")
+                self.assertEqual(record.simulation_engine,"protected")
+                self.assertEqual(json.loads((Path(tmp)/record.metadata_path).read_text())["simulation_engine"],"protected")
+            service.configure_simulation(paused=False)
+            for tick in range(1,1201):
+                phase["phase"]=("vehicle_green","pedestrian_green","all_red","pedestrian_green","vehicle_green","pedestrian_flashing")[(tick//200)%6]
+                phase["vehicle_go"]=phase["phase"]=="vehicle_green"
+                phase["pedestrian_walk"]=phase["phase"]=="pedestrian_green"
+                service._advance_simulation_locked(.05)
+                self.assertNotEqual(service._protected_world.occupancy(),(True,True))
+            now[0]=60.
+            service.configure_simulation(paused=True)
+            service.configure_simulation(engine="legacy")
+            restored=service.latest_frame()
+            self.assertEqual(restored.content,original.content)
+            self.assertGreater(restored.mode_generation,batch[0].mode_generation)
+            self.assertFalse(selected_observation_is_current(batch[0].observation))
+            service.configure_simulation(engine="protected")
+            service.configure_simulation(paused=False)
+            with patch.object(service._protected_world,"step",side_effect=RuntimeError("fixture fault")):
+                now[0]+=.1
+                with self.assertRaises(AppError): service.latest_frame()
+            self.assertIsNone(service.latest_frame())
+            self.assertTrue(service.status()["simulation_fault"])
+            self.assertFalse(service.simulation_frames_for(SIMULATION_CAMERA_SOURCE_IDS))
+            with self.assertRaises(AppError): service.configure_simulation(paused=False)
+            service.configure_simulation(engine="legacy")
+            self.assertEqual(service.latest_frame().content,original.content)
+            service.set_simulation(False)
+
     def test_shared_live_slot_motion(self):
         from app.services.camera_frames import CameraFrameService
         from app.services.simulation_experiments import _ModeSimulation

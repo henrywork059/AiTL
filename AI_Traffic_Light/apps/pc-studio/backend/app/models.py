@@ -70,6 +70,7 @@ class TrafficState(BaseModel):
 
 
 class CameraSimulationSettingsRequest(BaseModel):
+    engine: Literal["legacy", "protected"] | None = None
     density: Literal["light", "normal", "busy"] | None = None
     paused: bool | None = None
 

@@ -282,7 +282,7 @@ export async function setCameraSimulation(enabled: boolean): Promise<CameraStatu
   const action = enabled ? "start" : "stop";
   return requestJson<CameraStatus>(`${API_BASE}/api/camera/simulation/${action}`, fallbackCameraStatus, { method: "POST" });
 }
-export async function setCameraSimulationSettings(input: { density?: SimulationDensity; paused?: boolean }): Promise<CameraStatus> {
+export async function setCameraSimulationSettings(input: { density?: SimulationDensity; paused?: boolean; engine?: "legacy" | "protected" }): Promise<CameraStatus> {
   return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
 export async function fetchDatasetStatus(): Promise<DatasetStatus> { return requestJson<DatasetStatus>(`${API_BASE}/api/dataset/status`, fallbackDatasetStatus); }

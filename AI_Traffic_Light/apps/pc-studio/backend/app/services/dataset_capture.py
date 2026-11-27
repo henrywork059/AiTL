@@ -46,9 +46,13 @@ class CaptureRecord:
     note: str
     image_path: str
     metadata_path: str
+    simulation_engine: str | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        if self.simulation_engine is None:
+            data.pop("simulation_engine")
+        return data
 
 
 class DatasetCaptureService:
@@ -129,6 +133,7 @@ class DatasetCaptureService:
             note=note.strip(),
             image_path=image_relative,
             metadata_path=metadata_relative,
+            simulation_engine=frame.simulation_engine,
         )
 
         with self._lock:

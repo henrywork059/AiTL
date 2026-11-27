@@ -34,6 +34,7 @@ on:
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_reference_session.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/observation_identity.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/legacy_world.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/protected_crosswalk.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_experiments.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_finite_fixture.py'
       - 'AI_Traffic_Light/scripts/test_simulation_finite_fixture.py'

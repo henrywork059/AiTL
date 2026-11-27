@@ -16,7 +16,7 @@ export function SimulationControls({ status, onStatusChange }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function updateSettings(input: { density?: SimulationDensity; paused?: boolean }) {
+  async function updateSettings(input: { density?: SimulationDensity; paused?: boolean; engine?: "legacy" | "protected" }) {
     setSaving(true);
     setError(null);
     try {
@@ -31,6 +31,15 @@ export function SimulationControls({ status, onStatusChange }: Props) {
   return (
     <div className="simulation-controls">
       <div className="simulation-control-grid">
+        <label>
+          Simulation engine
+          <select aria-label="Simulation engine" value={status?.simulation_engine??"legacy"}
+            disabled={saving||!status||Boolean(status.simulation_enabled&&!status.simulation_paused)}
+            onChange={event=>void updateSettings({engine:event.target.value as "legacy"|"protected"})}>
+            <option value="legacy">Legacy</option>
+            <option value="protected">Protected crosswalk (trial)</option>
+          </select>
+        </label>
         <label>
           Scene density
           <select
@@ -56,8 +65,10 @@ export function SimulationControls({ status, onStatusChange }: Props) {
         </button>
       </div>
       <p className="small-note">
-        Density changes the synthetic pedestrian/vehicle population. Pause freezes one frame for inspection or capture.
+        Pause before switching engines. Switching resets the synthetic world; saved camera regions are unchanged.
       </p>
+      {status?.simulation_fault&&<p className="error-message">{status.simulation_fault}</p>}
+      {status?.simulation_applied_phase&&<p className="small-note">Admission: {status.simulation_applied_phase.replaceAll("_"," ")}</p>}
       {error && <p className="error-message">{error}</p>}
     </div>
   );

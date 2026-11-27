@@ -183,6 +183,7 @@ export function liveCameraMjpegUrl(): string {
 export type SimulationObservation = {epoch:string;generation:number;tick:number;source_id:string;view_id:string;frame_number:number;received_at_ms:number;coordinate_space:string;layout_id:string;width:number;height:number;provenance:string;tick_kind:string;observation_kind:"synthetic_ground_truth";detector_observation:false;authoritative:false;detector_input_eligible:boolean;physical_output_allowed:false};
 
 export type SimulationScene = {
+  simulation_engine?: "legacy" | "protected";
   observation?: SimulationObservation;
   view_agents?: Array<{id:string;kind:"vehicle"|"pedestrian";x:number;y:number}>;
   source_id: string;
@@ -198,9 +199,11 @@ export type SimulationScene = {
     vehicle_go: boolean;
     pedestrian_walk: boolean;
     seconds_remaining: number;
+    applied_phase?: string;
   };
   vehicles: Array<{
     id: string;
+    visit?: number;
     x: number;
     y: number;
     width: number;
@@ -210,6 +213,7 @@ export type SimulationScene = {
   }>;
   pedestrians: Array<{
     id: string;
+    visit?: number;
     x: number;
     y: number;
     direction: number;

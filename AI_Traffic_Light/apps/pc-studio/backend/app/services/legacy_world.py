@@ -58,7 +58,7 @@ def pedestrian_specs(density, rng):
         yield PedestrianSpec(x, y, float(rng.randint(88, 106)), direction)
 
 
-def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=None):
+def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=None, monotonic=False):
     """Preserve legacy following/stop-line behavior; callbacks precede reentry."""
     for direction in (1, -1):
         group = sorted((v for v in vehicles if v.direction * direction > 0),
@@ -79,6 +79,8 @@ def advance_vehicles(vehicles, rng, dt, vehicle_go, *, on_move=None, on_respawn=
                     proposed = max(proposed, WESTBOUND_STOP_LINE + 8)
                 if ahead is not None:
                     proposed = max(proposed, ahead.x + ahead.width + 22.0)
+            if monotonic:
+                proposed = max(old_x, proposed) if direction > 0 else min(old_x, proposed)
             vehicle.x = proposed
             if on_move is not None:
                 on_move(vehicle, old_x, committed)

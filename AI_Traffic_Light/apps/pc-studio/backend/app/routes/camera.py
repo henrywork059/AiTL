@@ -367,7 +367,7 @@ def update_camera_simulation_settings(
     payload: CameraSimulationSettingsRequest,
     request: Request,
 ) -> dict:
-    data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused)
+    data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused, engine=payload.engine)
     return ok(data, request_id=request.state.request_id)
 
 
@@ -466,13 +466,13 @@ def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) 
 
 
 @router.get("/simulation/observation")
-def simulation_observation(request: Request, engine: Literal["legacy","native","reference"] = "legacy",
+def simulation_observation(request: Request, engine: Literal["legacy","protected","native","reference"] = "legacy",
                            source_id: str = "simulation_camera") -> dict:
     """Common read-only scene interface, explicit engine and image plane."""
     if source_id not in SIMULATION_SOURCE_IDS:
         raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
-    if engine == "legacy":
-        scene = camera_frame_service.simulation_scene_for(source_id)
+    if engine in {"legacy","protected"}:
+        scene = camera_frame_service.simulation_scene_for(source_id,engine=engine)
         if scene is None:
             raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"No active legacy simulation.",status_code=409)
         agents = scene["view_agents"]
@@ -483,20 +483,20 @@ def simulation_observation(request: Request, engine: Literal["legacy","native","
         time_s = scene["time_s"]
     return ok({"engine":engine,"observation":scene["observation"],"agents":agents,
                "time_s":time_s,"paused":scene["paused"],"signal":scene["signal"],
-               "legacy_editor_compatible":engine=="legacy","physical_output_allowed":False},
+               "legacy_editor_compatible":engine in {"legacy","protected"},"physical_output_allowed":False},
               request_id=request.state.request_id)
 
 
 @router.get("/simulation/observation/frame")
-def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","native","reference"],
+def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","protected","native","reference"],
                                        source_id: str, epoch: str,
                                        generation: int=Query(ge=0),tick: int=Query(ge=0),
                                        layout_id: str=Query(min_length=64,max_length=64)) -> Response:
     if source_id not in SIMULATION_SOURCE_IDS:
         raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
-    owner = camera_frame_service if engine=="legacy" else native_evaluation_service
+    owner = camera_frame_service if engine in {"legacy","protected"} else native_evaluation_service
     identity = dict(epoch=epoch,generation=generation,tick=tick,layout_id=layout_id,source_id=source_id)
-    frame = owner.exact_simulation_frame(**identity) if engine=="legacy" else owner.exact_simulation_frame(**identity,engine=engine)
+    frame = owner.exact_simulation_frame(**identity,engine=engine)
     return Response(content=frame.content,media_type=frame.content_type,headers={
         "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
         "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
