@@ -8,6 +8,7 @@ import {CameraSettingsPage} from "../src/pages/CameraSourcesPage";
 import {DEFAULT_REMOTE_CAMERA_SETTINGS} from "../src/lib/remoteCameraApi";
 import {CameraDiagnosticsPage} from "../src/pages/CameraDiagnosticsPage";
 import {CrosswalkNetworkPanel} from "../src/components/CrosswalkNetworkPanel";
+import {DatasetReviewPage} from "../src/pages/DatasetReviewPage";
 import {ModelRegistryPage} from "../src/pages/ModelRegistryPage";
 import {fetchCrosswalks} from "../src/lib/crosswalksApi";
 import {fallbackRuntimeSettings} from "../src/api";
@@ -16,9 +17,13 @@ import type {CrosswalkConfig} from "../src/types/crosswalks";
 import "../src/styles.css";
 
 const page=new URLSearchParams(location.search).get("page")??"dashboard";
-const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",models:"model_registry"};
+const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",models:"model_registry",review:"dataset_review"};
 const fixture:CrosswalkConfig={schema_version:1,crosswalks:["North crossing","South crossing"].map((label,i)=>({id:"crossing_"+i,label,location:"Synthetic fixture",camera_side_a_id:null,camera_side_b_id:null,regions:[]}))};
 const model={model_id:"fixture_model",model_path:"outputs/training/fixture_model/weights/best.pt",modified_at_ms:0,size_bytes:1048576,is_active:false,is_default:true,is_latest:true};
+const classes=[{id:0,name:"vehicle"}];
+const captureList=["cap_a","cap_b"].map(id=>({capture_id:id,session_id:id,quality_tag:"good",origin:"synthetic",width:1280,height:720,labeled:false,label_count:0}));
+const labelDocs=Object.fromEntries(captureList.map(c=>[c.capture_id,{capture_id:c.capture_id,session_id:c.session_id,image_path:"fixture",width:c.width,height:c.height,reviewed:false,updated_at_ms:null,labels:c.capture_id==="cap_a"?[{class_id:0,class_name:"vehicle",box_xyxy:[10,10,20,20]}]:[]} ]));
+let labelFailure=true, labelSaves=0;
 let activeModel=false, modelFailure=false, savedNetwork=fixture;
 let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true;
 const profiles=["camera_a","camera_b"].map((source_id,i)=>({source_id,host:"192.168.1."+(80+i),kind:"esp32",selected:i===0,connected:false,streaming:false,device_reachable:false,target_fps:15,settings:DEFAULT_REMOTE_CAMERA_SETTINGS,last_error:null as string|null,stream_connected:false,measured_fps:0,paused_for_simulation:false}));
@@ -33,6 +38,9 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/camera/remote/connect"){const body=JSON.parse(String(init?.body));check(body.source_id===selectedCamera,"Wrong connection target");const p=profiles.find(p=>p.source_id===selectedCamera)!;if(failProbe){p.last_error="Fixture ESP unreachable";return fixtureError(p.last_error);}p.last_error=null;p.connected=true;p.device_reachable=true;data=remoteState();}
   else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");data=remoteState();}
   else if(path==="/api/camera/status")data={mode:"receiver",simulation_enabled:false,simulation_paused:false,frame_available:false,stale:true,streaming:profiles.find(p=>p.source_id===selectedCamera)?.streaming??false,active_source_id:selectedCamera,resolution:null,age_ms:null,frame_url:null};
+  else if(path==="/api/dataset/captures")data={captures:captureList,total:2,classes};
+  else if(path==="/api/dataset/training-dataset/status")data={ready:false,stale:false,eligible_frame_count:0,labeled_frame_count:0,label_box_count:0,train_count:0,val_count:0,message:"Synthetic fixture",classes};
+  else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/labels")){const id=path.split("/")[4];if(init?.method==="PUT"){check(id==="cap_b","Wrong capture label save");const body=JSON.parse(String(init.body));check(Array.isArray(body.labels)&&body.labels.length===0,"Old capture labels leaked");labelSaves++;labelDocs[id]={...labelDocs[id],reviewed:true,labels:body.labels};}else if(id==="cap_b"&&labelFailure){await new Promise(r=>setTimeout(r,150));return fixtureError("Fixture labels unavailable");}data=labelDocs[id];}
   else if(path==="/api/models"){if(modelFailure)return new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message:"Model registry unavailable"}}),{status:503,headers:{"Content-Type":"application/json"}});data={total:1,models:[{...model,is_active:activeModel}],default_model_id:model.model_id,active_model_id:activeModel?model.model_id:null};}
   else if(path==="/api/inference/load"){check(JSON.parse(String(init?.body)).model_id===model.model_id,"Wrong load model");activeModel=true;data={model_loaded:true,backend_available:true,active_model_id:model.model_id};}
   else if(path==="/api/crosswalks"){if(init?.method==="PUT"){savedNetwork=JSON.parse(String(init.body)).config;savedCount++;}else{readCount++;}data=savedNetwork;}
@@ -58,7 +66,7 @@ function CameraFixture(){
 const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<30;i++){if(predicate())return;await pause();}throw Error(reason);};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 async function main(){
-  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
+  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="review"?<DatasetReviewPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
   flushSync(()=>root.render(<AppShell activePage={routes[page]} apiState={apiState} cameraStatus={null} onPageChange={id=>{selected=id;}} showSimulationTools={false} onSimulationToolsToggle={()=>{}}>{content}</AppShell>));
   for(let i=0;i<20;i++){if((page!=="models"||document.body.textContent?.includes("fixture_model"))&&(page!=="cameras"||document.body.textContent?.includes("camera_b")))break;await pause();}
   await pause();
@@ -89,6 +97,17 @@ async function main(){
   }
   if(page==="diagnostics"){const b=[...document.querySelectorAll("button")].find(x=>x.textContent==="Diagnose camera");check(b?.disabled,"No camera must prevent diagnostics");}
   if(page==="network"){const s=document.querySelector<HTMLSelectElement>(".workspace-network-controls select")!;s.value="crossing_1";s.dispatchEvent(new Event("change",{bubbles:true}));await pause();check(document.querySelector(".crossing-network-node.is-selected")?.textContent?.includes("South crossing"),"Crossing selection");const scroll=document.querySelector<HTMLElement>(".crossing-network-scroll")!;if(scroll.scrollWidth>scroll.clientWidth)check(scroll.scrollLeft>0,"Selected crossing not revealed");for(const [id,edge] of [["crossing_0","2"],["crossing_1","4"]]){document.querySelector(`[data-crosswalk-id="${id}"][data-crosswalk-edge="${edge}"]`)!.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));await pause();}const save=[...document.querySelectorAll("button")].find(b=>b.textContent==="Save network")!;check(!save.disabled,"Keyboard link did not mark draft dirty");save.click();for(let i=0;i<20&&savedCount===0;i++)await pause();check(savedCount===1&&savedNetwork.network?.links.length===1&&savedNetwork.network.links[0].source_edge==="2"&&savedNetwork.crosswalks.length===2,"Network save contract");await waitFor(()=>document.querySelectorAll(".crossing-network-link-row").length===1&&document.querySelectorAll(".crossing-network-links line").length===1&&save.disabled,"Saved link vanished from parent-rendered UI");const readsBeforeReload=readCount;findButton("Reload")!.click();await waitFor(()=>readCount>readsBeforeReload&&document.querySelectorAll(".crossing-network-link-row").length===1,"Reload did not retain connection");check(savedNetwork.network?.links[0].destination_edge==="4","Destination edge lost");}
+  if(page==="review"){
+    await waitFor(()=>document.querySelectorAll(".manual-label-box").length===1,"Initial capture labels missing");
+    [...document.querySelectorAll<HTMLButtonElement>(".capture-browser-item")].find(b=>b.textContent?.includes("cap_b"))!.click();
+    await waitFor(()=>document.body.textContent?.includes("Fixture labels unavailable"),"Capture failure missing");
+    check(!findButton("Save review")&&!document.querySelector(".label-canvas"),"Previous labels editable after capture switch failure");
+    labelFailure=false;findButton("Refresh list")!.click();
+    await waitFor(()=>Boolean(findButton("Save review")&&!findButton("Save review")!.disabled),"Label retry failed");
+    check(document.querySelectorAll(".manual-label-box").length===0,"Old labels survived retry");
+    findButton("Save review")!.click();
+    await waitFor(()=>labelSaves===1&&document.body.textContent?.includes("reviewed negative example"),"Negative review save failed");
+  }
   if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;load.click();for(let i=0;i<20&&!load.disabled;i++)await pause();await pause();check(activeModel&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model activation");modelFailure=true;const refresh=[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")!;refresh.click();for(let i=0;i<20&&!document.body.textContent?.includes("Model registry unavailable or loading.");i++)await pause();check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")?.click();for(let i=0;i<20&&!document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model");i++)await pause();check(document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Model recovery");}
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";
 }

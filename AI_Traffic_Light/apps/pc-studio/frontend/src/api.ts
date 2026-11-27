@@ -289,6 +289,8 @@ export async function fetchDatasetStatus(): Promise<DatasetStatus> { return requ
 export async function captureLatestFrame(input: { session_id: string; quality_tag: CaptureQualityTag; note: string }): Promise<CaptureRecord> {
   return requestJsonStrict<CaptureRecord>(`${API_BASE}/api/dataset/captures`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
+export async function fetchDatasetCapturesStrict(): Promise<DatasetCaptureList> { return requestJsonStrict<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`); }
+export async function fetchTrainingDatasetStatusStrict(): Promise<TrainingDatasetStatus> { return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset/status`); }
 export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> { return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList); }
 export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> { return requestJsonStrict<CaptureDeleteResult>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`, { method: "DELETE" }); }
 export function captureImageUrl(captureId: string): string { return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`; }

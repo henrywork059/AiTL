@@ -25,6 +25,8 @@ on:
       - '.github/scripts/sumo_native_evaluation_trial.py'
       - '.github/scripts/sumo_http_compatibility_trial.py'
       - '.github/scripts/sumo_policy_matrix_trial.py'
+      - 'AI_Traffic_Light/scripts/native_detector_batch.py'
+      - 'AI_Traffic_Light/scripts/test_native_detector_batch.py'
       - '.github/scripts/sumo_midblock_trial.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_fixture.py'
       - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_session.py'
@@ -164,6 +166,9 @@ jobs:
       - name: Execute native multi-seed multi-density policy matrix
         if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
         run: python .github/scripts/sumo_policy_matrix_trial.py "$env:RUNNER_TEMP/mesh-sumo-policy-matrix"
+      - name: Score qualified midblock capture batch (palette control, not trained model)
+        if: "!cancelled() && steps.midblock_trial.outcome == 'success'"
+        run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$env:RUNNER_TEMP/mesh-sumo-midblock" --output "$env:RUNNER_TEMP/mesh-native-detector-batch.json"
       - uses: actions/setup-node@v4
         if: "!cancelled() && (steps.http_compatibility.outcome == 'success' || steps.midblock_trial.outcome == 'success')"
         with:
@@ -220,5 +225,6 @@ jobs:
             ${{ runner.temp }}/mesh-native-actual-detail.png
             ${{ runner.temp }}/mesh-sumo-policy-matrix/
             ${{ runner.temp }}/mesh-sumo-midblock/
+            ${{ runner.temp }}/mesh-native-detector-batch.json
             ${{ runner.temp }}/mesh-midblock-actual.png
             ${{ runner.temp }}/mesh-midblock-actual-detail.png
