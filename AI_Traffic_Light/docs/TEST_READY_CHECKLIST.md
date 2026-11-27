@@ -1,3 +1,21 @@
+# V0576 — Capture freshness, managed dataset integrity and independent S04 evidence candidate
+
+Candidate `0_5_76`; previous `0_5_75`; accepted baseline `0_5_0`. Reconciled authorized HEAD 00f4d542c20899816758114b012e83650a8e9263 retained, including 8 MiB bounded upload regression and historical main integration. Concurrent P3/P4/P5 independent candidate; Updates 30/33/37/38 remain partial, S04 / Update 28 gated. Delivered milestones remain 30/39 (76.9%), not acceptance.
+
+- [x] Authorized reconciled HEAD and push/PR CI 46028075101 / 46028088239 verified.
+- [x] Application CI 46030780891 passed offline, bounded upload, managed launch and evidence regressions, build and audit.
+- [x] Browser CI 46030781055 passed; artifact 15213763479 SHA checked and capture/training screenshots inspected.
+- [x] Fresh native CI 46030002341 passed; actual archive 15213988017 verified including 44 content digests and renderer screenshot.
+- [x] Independent S04 verifier passed both retained archives and CI audit step 46030592878, three tamper checks.
+- [x] Integrated native full CI 46030592878 passed.
+- [ ] Exact 0_5_76 release commit CI after version synchronization.
+- [ ] Owner Windows/ESP controlled integration and PASS.
+- [ ] Trusted trained holdout, calibrated production coordinates, accepted common wait estimand, resource budget and migration/rollback gate approval.
+
+See [PATCH_0_5_76](PATCH_0_5_76.md).
+
+---
+
 # V0575 — Independent source-qualified capture, training-safety and evidence-verification candidate
 
 Candidate 0_5_75; previous 0_5_74; accepted baseline 0_5_0. Independent concurrent P3/P4/P5 progress, partial Updates 30/33/37/38. Updates 31 and 36 remain delivered candidates from 0_5_74. 30/39 delivered candidate milestones (76.9%), not owner acceptance. Update 28 / S04 remains gated.

@@ -1,2 +1,2 @@
-export const PROJECT_VERSION = "0_5_75";
-export const PROJECT_VERSION_LABEL = "0_5_75 Candidate";
+export const PROJECT_VERSION = "0_5_76";
+export const PROJECT_VERSION_LABEL = "0_5_76 Candidate";

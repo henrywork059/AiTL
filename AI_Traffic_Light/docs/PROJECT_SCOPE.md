@@ -210,3 +210,8 @@ Hardware-first navigation and partial device, crossing-network and AI model work
 ## 0_5_75 — PROJECT_SCOPE addendum
 
 0_5_75 is an independently qualified software candidate, not a physical or field deployment. The actual executed experiments are synthetic queue-model runs; the captured browser training status is a scripted API fixture, not executed YOLO training. Browser screenshot image states 'Synthetic browser capture fixture' and is served by isolated trial middleware. An evaluation-only false flag excludes a capture from managed training; it does not validate detector accuracy. Do not label any of these as measured road performance, actual trained model, pilot, partnership, S04 migration, owner PASS or public-road signal authority. Accepted baseline remains 0_5_0.
+
+
+## 0_5_76 — capture and evidence integrity addendum
+
+0_5_76 is an independent software candidate, not S04 migration. Native capture coordinate checks concern synthetic mirrored raster and retained provenance, not physical calibration. Model training admission tested with fake trainer; no trusted trained model run. Seeded policy conservation and native resource trials are actually executed synthetic model workloads; no field performance or public-road authority. No promotion, owner acceptance or migration authorization.

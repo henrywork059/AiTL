@@ -336,3 +336,8 @@ The existing AppShell and appNavigation own presentation and route grouping; the
 ## 0_5_75 — ARCHITECTURE addendum
 
 Capture identity is validated by the dataset FastAPI route against CameraFrameService under the existing source/mode abstraction; the browser page is an additional guard, not the authority. Training status and managed dataset are fetched strictly through centralized API helpers with scoped polling; error paths fail closed. Managed training builder explicitly excludes evaluation-only detector captures; stored captures, labels and previous data are not rewritten. CrosswalkRegionEditor owns side-specific vertex keys and dragRef pointer/side lifecycle. NativeProjectionView client remounts on source ID; it does not change native worker authority or simulator default. Browser trial HTTP synthetic image middleware exists only under frontend/trials and is never installed in production. Evidence verification remains a standalone stdlib reader of manifest/raw JSON/CSV with no simulator imports.
+
+
+## 0_5_76 — capture and evidence integrity addendum
+
+CameraFrame.fresh_for_capture uses shared receiver max age constant; route validates source/mode and snapshot expiry before DatasetCaptureService. Dataset capture owns new digest metadata; DatasetLabelingService owns generated manifest and preflight checks, protected by existing serialize_managed_dataset lock with TrainingService. No real training dependency added. S04 read-only audit script owns independent evidence reconciliation and negative controls, not camera/control state; native trial workflow retains audit JSON. No alternate simulator or detector authority introduced.

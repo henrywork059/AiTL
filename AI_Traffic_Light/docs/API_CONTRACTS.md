@@ -568,3 +568,8 @@ S04 closure: production frontend regionCounts.ts uses bottom-centre ground conta
 ## 0_5_75 — API_CONTRACTS addendum
 
 POST /api/dataset/captures accepts optional expected_source_id (nonempty, max 160 chars) and expected_origin (upload or simulation) in addition to existing session_id/quality_tag/note. If the latest backend CameraFrame differs in either supplied identity, the operation rejects with CAMERA_NOT_CONNECTED, HTTP 409, before capture persistence. Existing clients omitting preflight fields remain supported. The frontend also checks the persisted response identity. Dataset training status now includes additive optional excluded_evaluation_count for explicitly detector_input_eligible=false reviewed captures; older captures without the flag preserve eligibility semantics. Standard error/request-ID envelopes remain unchanged. Native evaluation artifacts have no authority to act as real training holdouts. See PATCH_0_5_75.md.
+
+
+## 0_5_76 — capture and evidence integrity addendum
+
+POST /api/dataset/captures also rejects receiver age outside 0–5000 ms using CAMERA_NOT_CONNECTED/409 before file persistence; camera status stale semantics match. Source/mode guards and legacy request shape preserved. New capture records add optional content_sha256. GET /api/training/status adds optional dataset_integrity_sha256 (null for unmanaged/idle; canonical managed-build manifest digest after byte-level launch preflight). POST /api/training/start rejects stale/corrupt managed artifacts or missing newly marked manifest with DATASET_TRAINING_NOT_READY/409. Resolved relative path aliases cannot bypass an existing managed manifest. Full input verification occurs at admission, not each metadata-only status poll. See PATCH_0_5_76.md.
