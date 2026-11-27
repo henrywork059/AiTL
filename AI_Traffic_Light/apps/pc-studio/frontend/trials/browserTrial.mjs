@@ -82,7 +82,13 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs,page){
             }
             const expression='Boolean(document.elementFromPoint('+from[0]+','+from[1]+')?.closest('+JSON.stringify(drag.target)+'))';
             const hit=await call('Runtime.evaluate',{expression,returnByValue:true});
-            if(!hit.result?.value)throw Error('Real pointer target unavailable after live reproject: '+JSON.stringify({drag,from,to}));
+            if(!hit.result?.value){
+              const diagnostic='(()=>{const top=document.elementFromPoint('+from[0]+','+from[1]+');const svg=document.querySelector('+JSON.stringify(drag.svgSelector||'.crosswalk-region-overlay')+');const nodes=[...document.querySelectorAll('+JSON.stringify(drag.target)+')].map(el=>({x:el.getAttribute('cx'),y:el.getAttribute('cy'),rect:(()=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height];})(),pointer:getComputedStyle(el).pointerEvents}));return {topTag:top?.tagName,topClass:top?.getAttribute('class'),topOuter:top?.outerHTML.slice(0,200),svgRect:svg?.getBoundingClientRect().toJSON(),nodes};})()';
+              const details=await call('Runtime.evaluate',{expression:diagnostic,returnByValue:true});
+              const shot=await call('Page.captureScreenshot',{format:'png',fromSurface:true});
+              writeFileSync(resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'-hit-failed.png'),Buffer.from(shot.data,'base64'));
+              throw Error('Real pointer target unavailable after live reproject: '+JSON.stringify({drag,from,to,diagnostic:details.result?.value}));
+            }
             await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:from[0],y:from[1]});
             await call('Input.dispatchMouseEvent',{type:'mousePressed',x:from[0],y:from[1],button:'left',buttons:1,clickCount:1});
             await delay(100);
