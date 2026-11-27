@@ -67,7 +67,31 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs,page){
       if(response.result?.value){
         const observed=JSON.parse(response.result.value);
         outcome=observed.result;details=JSON.stringify(observed);
-        if(observed.drag){const drag=JSON.parse(observed.drag);if(drag.id>lastDrag){lastDrag=drag.id;const hit=await call('Runtime.evaluate',{expression:`Boolean(document.elementFromPoint(${drag.from[0]},${drag.from[1]})?.closest(${JSON.stringify(drag.target)}))`,returnByValue:true});if(!hit.result?.value)throw Error('Real pointer target unavailable: '+JSON.stringify(drag));await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:drag.from[0],y:drag.from[1]});await call('Input.dispatchMouseEvent',{type:'mousePressed',x:drag.from[0],y:drag.from[1],button:'left',buttons:1,clickCount:1});await delay(100);await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:drag.to[0],y:drag.to[1],button:'left',buttons:1});await delay(100);await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:drag.to[0],y:drag.to[1],button:'left',buttons:0,clickCount:1});await call('Runtime.evaluate',{expression:`document.querySelector('#result').dataset.dragDone=${JSON.stringify(String(drag.id))}`});}}
+        if(observed.drag){
+          const drag=JSON.parse(observed.drag);
+          if(drag.id>lastDrag){
+            lastDrag=drag.id;
+            let from=drag.from,to=drag.to;
+            // Reproject after the final scroll/layout update. A prior SVG
+            // screen matrix may no longer match the real DOM hit target.
+            if(drag.svgSelector&&drag.logicalFrom&&drag.logicalTo){
+              const expression='(()=>{const svg=document.querySelector('+JSON.stringify(drag.svgSelector)+');const matrix=svg?.getScreenCTM();if(!matrix)return null;const a=new DOMPoint('+Number(drag.logicalFrom[0])+','+Number(drag.logicalFrom[1])+').matrixTransform(matrix);const b=new DOMPoint('+Number(drag.logicalTo[0])+','+Number(drag.logicalTo[1])+').matrixTransform(matrix);return {from:[a.x,a.y],to:[b.x,b.y]};})()';
+              const mapped=await call('Runtime.evaluate',{expression,returnByValue:true});
+              if(!mapped.result?.value)throw Error('Pointer transform unavailable: '+JSON.stringify(drag));
+              ({from,to}=mapped.result.value);
+            }
+            const expression='Boolean(document.elementFromPoint('+from[0]+','+from[1]+')?.closest('+JSON.stringify(drag.target)+'))';
+            const hit=await call('Runtime.evaluate',{expression,returnByValue:true});
+            if(!hit.result?.value)throw Error('Real pointer target unavailable after live reproject: '+JSON.stringify({drag,from,to}));
+            await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:from[0],y:from[1]});
+            await call('Input.dispatchMouseEvent',{type:'mousePressed',x:from[0],y:from[1],button:'left',buttons:1,clickCount:1});
+            await delay(100);
+            await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:to[0],y:to[1],button:'left',buttons:1});
+            await delay(100);
+            await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:to[0],y:to[1],button:'left',buttons:0,clickCount:1});
+            await call('Runtime.evaluate',{expression:'document.querySelector("#result").dataset.dragDone='+JSON.stringify(String(drag.id))});
+          }
+        }
         if(outcome.startsWith('MESH_WORKSPACE_PASS')||outcome.startsWith('MESH_WORKSPACE_FAIL'))break;
       }
       await delay(100);
