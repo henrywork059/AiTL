@@ -43,6 +43,42 @@ def local_metrics(arm, node):
             "network_pedestrian_awareness_applied": net["pedestrian_awareness"]["applied"]}
 
 
+
+def verify_trace_exports(case, raw, read):
+    """Reconcile selected raw timeline and every normalized decision row, not just hashes."""
+    timeline_name = case + "-timeline.csv"
+    table = csv.DictReader(io.StringIO(read(timeline_name).decode("utf-8")))
+    rows = list(table)
+    modes = ("fixed", "adaptive", "cooperative", "pedestrian_aware_cooperative")
+    require(len(rows) == len(raw["fixed"]["timeline"]), "Timeline sample count differs: " + case)
+    for mode in modes:
+        require(len(raw[mode]["timeline"]) == len(rows), "Mode timeline count differs: " + case + "/" + mode)
+    for index, row in enumerate(rows):
+        for mode in modes:
+            sample = raw[mode]["timeline"][index]
+            require(float(row["t_seconds"]) == sample["t"], "Timeline timestamp differs: " + case + "/" + mode)
+            for location in ("source", "destination"):
+                location_sample = sample[location]
+                prefix = mode + "_" + location + "_"
+                require(row[prefix + "phase"] == location_sample["phase"], "Timeline phase differs: " + case + "/" + mode)
+                for metric in ("vehicle_queue", "pedestrian_queue", "vehicles_served"):
+                    require(float(row[prefix + metric]) == location_sample[metric], "Timeline queue/throughput differs: " + case + "/" + mode + "/" + metric)
+            for metric in ("pipeline_count", "transfers_departed", "transfers_arrived", "corridor_completed"):
+                require(float(row[mode + "_" + metric]) == sample[metric], "Timeline transfer differs: " + case + "/" + mode + "/" + metric)
+    decision_name = case + "-decisions.csv"
+    decisions = list(csv.DictReader(io.StringIO(read(decision_name).decode("utf-8"))))
+    evidence = raw["decision_evidence"]
+    require(evidence["prototype_only"] is True and len(decisions) == evidence["record_count"] == len(evidence["records"]), "Decision count differs: " + case)
+    require(len({item["evidence_id"] for item in evidence["records"]}) == len(decisions), "Duplicate decision evidence IDs: " + case)
+    for row, item in zip(decisions, evidence["records"]):
+        for field in ("evidence_id", "mode", "trigger_category", "trigger_id", "intersection_id", "source_intersection_id", "destination_intersection_id", "link_id", "decision", "action", "phase_before", "phase_key_before", "provenance", "reason", "explanation", "source_ref"):
+            require(row[field] == str(item.get(field) or ""), "Decision identity/value differs: " + case + "/" + field)
+        require(float(row["t_seconds"]) == item["t_seconds"] and row["applied"] == str(item["applied"]), "Decision time/applied differs: " + case)
+        for column, key in (("timing_delta_seconds", "delta_seconds"), ("previous_duration_seconds", "previous_duration_seconds"), ("effective_duration_seconds", "effective_duration_seconds")):
+            value = item.get("timing", {}).get(key)
+            require(row[column] == ("" if value is None else str(value)), "Decision timing differs: " + case + "/" + column)
+    return len(rows), len(decisions)
+
 def verify_members(names, read):
     require(len(names) == len(set(names)), "Duplicate member names")
     require(all(Path(n).name == n and n not in (".", "..") and "\\" not in n for n in names), "Unexpected member path")
@@ -63,6 +99,7 @@ def verify_members(names, read):
     require(len(records) == len(cases) and {(r["density"], r["seed"]) for r in records} == cases, "Case coverage differs")
     require(tuple(manifest["fairness_modes"]) == FAIRNESS_MODES, "Fairness modes differ")
     expected_primary, expected_fairness, originals = {}, {}, {}
+    timeline_samples = decision_records = 0
     expected_files = {"paired-metrics.csv", "intersection-fairness.csv", "repeat.json"}
     nodes = {n["id"] for n in settings["network"]["intersections"]}
     for record in records:
@@ -70,6 +107,9 @@ def verify_members(names, read):
         case = f"{density}-{seed}"
         expected_files.update((case + ".json", case + "-timeline.csv", case + "-decisions.csv"))
         raw = originals[density, seed] = load(case + ".json")
+        samples, decisions = verify_trace_exports(case, raw, read)
+        timeline_samples += samples
+        decision_records += decisions
         scenario = raw["scenario"]
         require(raw["prototype_only"] is True and raw["run_id"] == record["run_id"] and scenario["density"] == density and scenario["seed"] == seed, "Run identity differs: " + case)
         for key in ("duration_seconds", "sample_interval_seconds", "transfer_share_percent"):
@@ -138,6 +178,7 @@ def verify_members(names, read):
     require(summary == manifest["paired_summary_by_density"] and signs == manifest["cooperative_vs_adaptive_pedestrian_wait_signs"], "Paired aggregate differs")
     return {"verified_members": len(hashes), "matched_cases": len(cases), "primary_rows": len(expected_primary),
             "fairness_rows": len(expected_fairness), "busy_repeats": len(expected_busy),
+            "timeline_samples": timeline_samples, "decision_records": decision_records,
             "pedestrian_wait_signs": signs, "evidence_class": manifest["evidence_class"],
             "scope": "Content consistency only; no field efficacy or migration acceptance."}
 

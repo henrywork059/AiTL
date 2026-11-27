@@ -1,5 +1,6 @@
 """Focused actual isolated queue-model smoke and paired-delta invariants."""
 import csv
+import io
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +22,8 @@ class SeededBatchTest(unittest.TestCase):
             self.assertEqual(audit["primary_rows"], 3)
             self.assertEqual(audit["fairness_rows"], 8)
             self.assertEqual(audit["busy_repeats"], 1)
+            self.assertGreater(audit["timeline_samples"], 0)
+            self.assertGreaterEqual(audit["decision_records"], 0)
             # Rehash a deliberately changed CSV: consistency must still fail.
             members = {p.name: p.read_bytes() for p in out.iterdir()}
             rows = list(csv.reader(members["paired-metrics.csv"].decode("utf-8").splitlines()))
@@ -63,6 +66,27 @@ class SeededBatchTest(unittest.TestCase):
             for key in METRICS:
                 self.assertAlmostEqual(row["paired_deltas"]["cooperative_minus_fixed"][key],
                     row["metrics"]["cooperative"][key] - row["metrics"]["fixed"][key])
+
+
+            # A changed trace/decision CSV cannot be laundered by recomputing
+            # its manifest member digest; compare exported rows to raw run JSON.
+            original = {p.name: p.read_bytes() for p in out.iterdir()}
+            for filename, field in (("busy-42-timeline.csv", "fixed_source_vehicle_queue"),
+                                    ("busy-42-decisions.csv", "action")):
+                members = dict(original)
+                rows = list(csv.DictReader(io.StringIO(members[filename].decode("utf-8"))))
+                self.assertTrue(rows)
+                rows[0][field] = "999" if field.endswith("queue") else "corrupted"
+                buf = io.StringIO()
+                writer = csv.DictWriter(buf, fieldnames=rows[0].keys())
+                writer.writeheader()
+                writer.writerows(rows)
+                members[filename] = buf.getvalue().encode("utf-8")
+                forged = json.loads(members["manifest.json"])
+                forged["sha256"][filename] = hashlib.sha256(members[filename]).hexdigest()
+                members["manifest.json"] = json.dumps(forged).encode("utf-8")
+                with self.assertRaisesRegex(ValueError, "Timeline|Decision"):
+                    verify_members(list(members), members.__getitem__)
 
 if __name__ == "__main__":
     unittest.main()
