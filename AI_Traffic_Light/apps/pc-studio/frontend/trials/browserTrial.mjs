@@ -24,8 +24,10 @@ async function reviewWithRealTime(workspaceUrl,workspaceArgs,page){
       if(launchError)throw launchError;
       if(child.exitCode!==null)throw Error('Review Edge exited before CDP connection');
       if(existsSync(portFile)){
-        const port=readFileSync(portFile,'utf8').split(/\r?\n/)[0];
         try{
+          // Windows Edge can briefly lock DevToolsActivePort while publishing it.
+          const port=readFileSync(portFile,'utf8').split(/\r?\n/)[0];
+          if(!/^\d+$/.test(port))throw Error('Incomplete CDP port');
           const pages=await (await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(1000)})).json();
           endpoint=pages.find(p=>p.type==='page')?.webSocketDebuggerUrl;
           if(endpoint)break;
