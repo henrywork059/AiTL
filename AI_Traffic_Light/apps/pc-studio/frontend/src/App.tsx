@@ -186,6 +186,8 @@ export default function App() {
       case "dashboard":
         return (
           <DashboardPage
+            cameraStatus={cameraStatus}
+            onNavigate={setActivePage}
             health={health}
             smokeStatus={smokeStatus}
             apiState={apiState}
@@ -267,7 +269,7 @@ export default function App() {
       case "logs":
         return <LogsPage logs={recentLogs} apiState={apiState} onLogsChange={setRecentLogs} />;
       default:
-        return <DashboardPage health={health} smokeStatus={smokeStatus} apiState={apiState} onRefresh={refreshAll} refreshing={refreshing} />;
+        return <DashboardPage cameraStatus={cameraStatus} onNavigate={setActivePage} health={health} smokeStatus={smokeStatus} apiState={apiState} onRefresh={refreshAll} refreshing={refreshing} />;
     }
   }
 
@@ -280,8 +282,8 @@ export default function App() {
 
   return (
     <>
-      <AppShell activePage={activePage} onPageChange={setActivePage} showSimulationTools={showSimulationTools} onSimulationToolsToggle={toggleSimulationTools}>{renderPage()}</AppShell>
-      <AppStatusBar apiState={apiState} detectionCount={statusBarDetectionCount} />
+      <AppShell apiState={apiState} cameraStatus={cameraStatus} activePage={activePage} onPageChange={setActivePage} showSimulationTools={showSimulationTools} onSimulationToolsToggle={toggleSimulationTools}>{renderPage()}</AppShell>
+      <AppStatusBar apiState={apiState} detectionCount={statusBarDetectionCount} preview={activePage === "live_ai"} />
     </>
   );
 }

@@ -150,10 +150,10 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
           <button className="primary" onClick={() => void refresh().catch((reason) => setError(errorMessage(reason)))}>Refresh</button>
         </div>
         <div className="camera-status-list inference-status-list">
-          <div><span>Saved models</span><strong>{registry?.total ?? 0}</strong></div>
+          <div><span>Saved models</span><strong>{registry?.total ?? "—"}</strong></div>
           <div><span>Loaded for inference</span><strong>{inferenceStatus?.active_model_id ?? "none"}</strong></div>
           <div><span>Default on startup</span><strong>{registry?.default_model_id ?? "none"}</strong></div>
-          <div><span>Inference dependency</span><strong>{inferenceStatus?.backend_available ? "available" : "not installed"}</strong></div>
+          <div><span>Inference dependency</span><strong>{!inferenceStatus ? "unavailable" : inferenceStatus.backend_available ? "available" : "not installed"}</strong></div>
         </div>
         <div className="button-row">
           <button type="button" disabled={!inferenceStatus?.model_loaded || busyModelId !== null} onClick={() => void handleUnload()}>
@@ -162,6 +162,38 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
         </div>
         {notice && <p className="success-message" role="status">{notice}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Installed AI models</h2>
+            <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
+          </div>
+          <span className="status-pill muted">{registry?.total ?? 0} models</span>
+        </div>
+        <div className="model-list-grid">
+          {(registry?.models ?? []).map((model) => (
+            <article className="smoke-card" key={model.model_id}>
+              <div className="panel-header compact-header">
+                <strong>{model.model_id}</strong>
+                <span className={`status-pill ${model.is_active ? "status-implemented" : model.is_default ? "status-info" : ""}`}>
+                  {model.is_active ? "active" : model.is_default ? "default" : model.is_latest ? "latest" : "saved"}
+                </span>
+              </div>
+              <p><code>{model.model_path}</code></p>
+              <p>Updated {new Date(model.modified_at_ms).toLocaleString()}</p>
+              <p>{formatSize(model.size_bytes)}</p>
+              <div className="button-row wrap-row">
+                <button className="primary" disabled={busyModelId !== null || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
+                <button disabled={busyModelId !== null || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
+                <button className="danger" disabled={busyModelId !== null || model.is_active} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
+              </div>
+            </article>
+          ))}
+          {!registry && <p>Model registry unavailable or loading.</p>}
+          {registry && registry.models.length === 0 && <p>No trained models were found under <code>outputs/training</code>.</p>}
+        </div>
       </section>
 
       <section className="panel">
@@ -214,36 +246,6 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2>Installed AI models</h2>
-            <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
-          </div>
-          <span className="status-pill muted">{registry?.total ?? 0} models</span>
-        </div>
-        <div className="model-list-grid">
-          {(registry?.models ?? []).map((model) => (
-            <article className="smoke-card" key={model.model_id}>
-              <div className="panel-header compact-header">
-                <strong>{model.model_id}</strong>
-                <span className={`status-pill ${model.is_active ? "status-implemented" : model.is_default ? "status-info" : ""}`}>
-                  {model.is_active ? "active" : model.is_default ? "default" : model.is_latest ? "latest" : "saved"}
-                </span>
-              </div>
-              <p><code>{model.model_path}</code></p>
-              <p>Updated {new Date(model.modified_at_ms).toLocaleString()}</p>
-              <p>{formatSize(model.size_bytes)}</p>
-              <div className="button-row wrap-row">
-                <button className="primary" disabled={busyModelId !== null || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
-                <button disabled={busyModelId !== null || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
-                <button className="danger" disabled={busyModelId !== null || model.is_active} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
-              </div>
-            </article>
-          ))}
-          {(registry?.models.length ?? 0) === 0 && <p>No trained models were found under <code>outputs/training</code>.</p>}
-        </div>
-      </section>
     </div>
   );
 }

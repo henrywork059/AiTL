@@ -1,4 +1,8 @@
 import { createRoot } from "react-dom/client";
+import { DashboardPage } from "../src/pages/DashboardPage";
+import { AppStatusBar } from "../src/components/AppStatusBar";
+import { AppShell } from "../src/layout/AppShell";
+import { visibleSections } from "../src/constants/appNavigation";
 import { flushSync } from "react-dom";
 import { SimulationCamera3D } from "../src/components/SimulationCamera3D";
 import { NativeProjectionView } from "../src/components/NativeProjectionView";
@@ -85,6 +89,20 @@ const mount = (sourceId="simulation_camera",editing=false,overlay=false) =>
   flushSync(()=>root.render(<SimulationCamera3D sourceId={sourceId} editing={editing} zones={overlay?zones:[]} />));
 async function run(){
   try{
+    const all = visibleSections(true).flatMap(section => section.pages.map(page => page.id));
+    check(visibleSections(true).length===6&&new Set(all).size===16&&all.length===16,"Workspace route coverage");
+    check(!visibleSections(false).some(section=>section.pages.some(page=>page.id==="simulation_lab")),"Simulation gate lost");
+    let selected = "";
+    flushSync(()=>root.render(<AppShell activePage="dashboard" apiState={{status:"fallback",message:"fixture"}} cameraStatus={null} onPageChange={page=>{selected=page;}} showSimulationTools={false} onSimulationToolsToggle={()=>{}}><p>Workspace body</p></AppShell>));
+    check(host.querySelector("main")?.id==="workspace-content"&&Boolean(host.querySelector("a[href=\"#workspace-content\"]")),"Workspace landmark missing");
+    check(host.querySelector("button[aria-current=page]")?.textContent==="Overview","Active page missing");
+    check(host.textContent?.includes("Source unknown")&&!host.textContent?.includes("Simulation Experiments"),"Fallback or simulation navigation incorrect");
+    button("Cameras")?.click();check(selected==="camera_settings","Desktop navigation failed");
+    const picker=host.querySelector("select")!;picker.value="model_registry";picker.dispatchEvent(new Event("change",{bubbles:true}));check(String(selected)==="model_registry","Mobile navigation failed");
+    flushSync(()=>root.render(<><DashboardPage cameraStatus={null} health={null} smokeStatus={null} apiState={{status:"fallback",message:"fixture"}} onNavigate={page=>{selected=page;}} onRefresh={()=>{}} refreshing={false}/><AppStatusBar apiState={{status:"connected",message:"fixture"}} detectionCount={3} preview={true}/></>));
+    check(host.querySelector("[aria-label=\"Device overview\"]")?.textContent?.includes("Unavailable"),"Unknown camera must be unavailable");
+    button("Diagnostics")?.click();check(String(selected)==="camera_diagnostics","Dashboard diagnostics shortcut failed");
+    check(host.querySelector("footer")?.textContent?.includes("Preview detections: 3")&&!host.querySelector("footer")?.textContent?.includes("mock"),"Preview provenance label failed");
     const regionFixture:Zone[]=[{id:"first",label:"first",type:"counting_region",polygon:[[520,179],[760,179],[760,625],[520,625]]},{id:"second",label:"second",type:"counting_region",polygon:[[0,0],[1279,0],[1279,719],[0,719]]}];
     check(pointInRegion([520,179],regionFixture[0].polygon)&&!pointInRegion([760,625],regionFixture[0].polygon),"Production boundary convention changed");
     const fixture=[{box_xyxy:[600,220,680,300],class_name:"person"},{box_xyxy:[600,600,680,650],class_name:"car"}] as Detection[];

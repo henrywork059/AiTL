@@ -18,14 +18,14 @@ def main() -> None:
     status = read("components/AppStatusBar.tsx")
 
     brand = shell.split('<div className="brand-block">', 1)[1].split("</div>", 1)[0]
-    assert "<h1>AI Traffic Light</h1>" in brand
+    assert "<h1>M.E.S.H.</h1>" in brand
     assert brand.count("<button") == 1
     assert 'type="button"' in brand
     assert 'className="simulation-tools-toggle"' in brand
     assert 'aria-pressed={showSimulationTools}' in brand
     assert 'onClick={onSimulationToolsToggle}' in brand
     assert "onKeyDown=" not in brand and 'role="button"' not in brand
-    assert "APP_VERSION_LABEL" not in shell
+    assert "APP_VERSION_LABEL" in shell and 'className="workspace-context"' in shell
     assert "APP_VERSION_LABEL" in status
     assert '<div className="eyebrow">Legacy</div>' not in shell
     assert "<p>{page.description}</p>" in shell

@@ -8,7 +8,9 @@ def main():
     assert 'setShowSimulationTools((current) => !current)' in app
     assert 'showSimulationTools ? <SimulationLabPage />' in app
     assert 'aria-pressed={showSimulationTools}' in shell
-    assert 'showSimulationTools || navPage.id !== "simulation_lab"' in shell
+    navigation = (SRC / "constants/appNavigation.ts").read_text(encoding="utf-8")
+    assert 'showSimulationTools || page.id !== "simulation_lab"' in navigation
+    assert "visibleSections(showSimulationTools)" in shell
     for page in ("CameraSourcesPage", "CrosswalksPage", "JunctionNetworkPage", "CrosswalkRegionEditor"):
         assert "showSimulationTools" in (SRC / "pages" / (page+".tsx")).read_text(encoding="utf-8")
     camera = (SRC / "pages/CameraSourcesPage.tsx").read_text(encoding="utf-8")

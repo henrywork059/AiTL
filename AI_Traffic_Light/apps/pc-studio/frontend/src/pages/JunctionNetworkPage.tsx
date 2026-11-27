@@ -383,7 +383,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
       {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
       {crosswalkError && <p role="alert" className="error-message">{crosswalkError}</p>}
       <details className="junction-advanced-config">
-        <summary>Advanced junction configuration (existing)</summary>
+        <summary>Junction topology and source assignments{dirty ? " · Unsaved changes" : ""}</summary>
       <section className="panel junction-network-toolbar">
         <div className="junction-network-title-row">
           <div>
@@ -498,20 +498,21 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
               </div>
 
               <section className="junction-inspector-section">
-                <div className="junction-section-title"><h4>Live state</h4><span className="status-pill muted">{selectedOverview.live.observation_provenance}</span></div>
-                <div className="junction-live-grid">
+                <div className="junction-section-title"><h4>Last reported observation</h4><span className="status-pill muted">{selectedOverview.live.available ? selectedOverview.live.observation_provenance : "Unavailable"}</span></div>
+                {!selectedOverview.live.available && <p className="small-note">No verified observation for this junction. Counts and phase are unavailable, not zero.</p>}
+                {selectedOverview.live.available && <div className="junction-live-grid">
                   <div><span>Vehicle load</span><strong className={junctionLoadClass(selectedOverview.live.vehicle.load)}>{JUNCTION_LOAD_LABELS[selectedOverview.live.vehicle.load]}</strong><small>{selectedOverview.live.vehicle.total} total · {selectedOverview.live.vehicle.waiting} waiting</small></div>
                   <div><span>Pedestrian load</span><strong className={junctionLoadClass(selectedOverview.live.pedestrian.load)}>{JUNCTION_LOAD_LABELS[selectedOverview.live.pedestrian.load]}</strong><small>{selectedOverview.live.pedestrian.total} total · {selectedOverview.live.pedestrian.waiting} waiting · {selectedOverview.live.pedestrian.crossing} crossing</small></div>
                   <div><span>Phase</span><strong>{junctionPhaseLabel(selectedOverview.live.phase)}</strong></div>
                   <div><span>Decision</span><strong>{selectedOverview.live.decision ?? "Unavailable"}</strong></div>
-                </div>
-                {selectedOverview.live.decision_reason && <p className="small-note junction-decision-reason">{selectedOverview.live.decision_reason}</p>}
+                </div>}
+                {selectedOverview.live.available && selectedOverview.live.decision_reason && <p className="small-note junction-decision-reason">{selectedOverview.live.decision_reason}</p>}
               </section>
 
               <section className="junction-inspector-section">
                 <div className="junction-section-title"><h4>ESP cameras</h4><span className="status-pill muted">{selectedConfig.source_ids.length} assigned</span></div>
                 <div className="junction-camera-list">
-                  {availableCameras.length === 0 && <p className="small-note">No saved ESP cameras. Add cameras on Camera Sources first.</p>}
+                  {availableCameras.length === 0 && <p className="small-note">No saved ESP cameras. Add cameras in Devices → Cameras first.</p>}
                   {availableCameras.map((camera) => {
                     const owner = cameraOwner(camera.source_id);
                     const checked = selectedConfig.source_ids.includes(camera.source_id);
@@ -580,7 +581,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
                   </select>
                 </label>
                 {crosswalkError && <p className="error-message">{crosswalkError}</p>}
-                {crosswalks.length === 0 && !crosswalkError && <p className="small-note">No defined crosswalks. Create one under Traffic → Crosswalks first.</p>}
+                {crosswalks.length === 0 && !crosswalkError && <p className="small-note">No defined crosswalks. Create one under Network → Crosswalks first.</p>}
                 {JUNCTION_EDGES.some((edge) => {
                   const id = selectedConfig.crosswalk_edges[edge];
                   return Boolean(id && !crosswalkById.has(id));

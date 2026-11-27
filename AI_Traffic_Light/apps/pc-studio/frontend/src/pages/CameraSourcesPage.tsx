@@ -584,7 +584,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
           <section className="panel compact-panel training-form">
             <div className="panel-header">
               <div>
-                <h2>Camera manager</h2>
+                <h2>Device setup</h2>
               </div>
               <span className="status-pill muted">{remote?.camera_count ?? 0} / {remote?.max_saved_cameras ?? 12} saved</span>
             </div>
@@ -616,7 +616,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
                 {firstSimulationPairSaved ? "Add second simulation pair" : "Add simulation pair"}
               </button>
             </div>}
-            {!selectedSimulation && effectiveCameraType === "esp32" && <details className="camera-fold">
+            {!selectedSimulation && effectiveCameraType === "esp32" && <details className="camera-fold" open>
               <summary>Manage IP addresses and connections</summary>
               <div className="form-grid">
               {effectiveCameraType === "esp32" && <label>

@@ -55,7 +55,7 @@ def main() -> int:
     # The ESP-only form uses effectiveCameraType so concealed simulation tools
     # cannot accidentally select the simulator save path.
     assert 'const effectiveCameraType = showSimulationTools ? newCameraType : "esp32"' in page
-    esp_form = page.split('effectiveCameraType === "esp32" && <details className="camera-fold">', 1)[1].split("</details>", 1)[0]
+    esp_form = page.split('effectiveCameraType === "esp32" && <details className="camera-fold" open>', 1)[1].split("</details>", 1)[0]
     assert 'effectiveCameraType === "simulation"' not in esp_form
     assert esp_form.count('disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}') == 2
     assert 'disabled={busy || !readyToStart}' in page

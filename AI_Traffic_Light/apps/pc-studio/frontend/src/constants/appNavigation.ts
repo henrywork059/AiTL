@@ -25,9 +25,16 @@ export const PAGE_DETAILS: Record<AppPageId, AppPageSummary> = {
 };
 
 export const APP_SECTIONS: AppSection[] = [
-  { id: "operate", label: "Operate", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.camera_settings, PAGE_DETAILS.camera_diagnostics] },
-  { id: "traffic", label: "Traffic", pages: [PAGE_DETAILS.crosswalks, PAGE_DETAILS.junction_network, PAGE_DETAILS.signal_timing, PAGE_DETAILS.live_signal_adjustments, PAGE_DETAILS.traffic_logic, PAGE_DETAILS.traffic_analytics, PAGE_DETAILS.simulation_lab] },
-  { id: "ai", label: "AI", pages: [PAGE_DETAILS.model_registry, PAGE_DETAILS.live_ai] },
-  { id: "data", label: "Data & Training", pages: [PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export] },
-  { id: "system", label: "System", pages: [PAGE_DETAILS.logs] },
+  { id: "operate", label: "Overview", pages: [PAGE_DETAILS.dashboard, PAGE_DETAILS.logs] },
+  { id: "devices", label: "Devices", pages: [PAGE_DETAILS.camera_settings, PAGE_DETAILS.camera_diagnostics] },
+  { id: "traffic", label: "Network", pages: [PAGE_DETAILS.crosswalks, PAGE_DETAILS.junction_network, PAGE_DETAILS.signal_timing, PAGE_DETAILS.live_signal_adjustments, PAGE_DETAILS.traffic_logic] },
+  { id: "simulation", label: "Simulation", pages: [PAGE_DETAILS.simulation_lab] },
+  { id: "ai", label: "AI Lab", pages: [PAGE_DETAILS.model_registry, PAGE_DETAILS.live_ai, PAGE_DETAILS.dataset_capture, PAGE_DETAILS.dataset_review, PAGE_DETAILS.train_export] },
+  { id: "analytics", label: "Analytics", pages: [PAGE_DETAILS.traffic_analytics] },
 ];
+
+export function visibleSections(showSimulationTools: boolean): AppSection[] {
+  return APP_SECTIONS.map(section => ({
+    ...section, pages: section.pages.filter(page => showSimulationTools || page.id !== "simulation_lab"),
+  })).filter(section => section.pages.length > 0);
+}

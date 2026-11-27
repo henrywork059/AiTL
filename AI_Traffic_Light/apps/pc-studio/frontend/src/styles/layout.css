@@ -144,3 +144,18 @@
   .page-header { margin-bottom: var(--space-4); }
   .form-grid, .two-column-grid { grid-template-columns: 1fr; }
 }
+
+/* P4 workspace shell: desktop navigation and a compact native mobile picker. */
+.workspace-mobile-picker { display: none; }
+.workspace-skip-link { position: fixed; top: var(--space-2); left: var(--space-2); z-index: 100; padding: var(--space-3); background: var(--color-surface); transform: translateY(-200%); }
+.workspace-skip-link:focus { transform: none; }
+.workspace-context { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); color: var(--color-text-secondary); font-size: 0.85rem; }
+.workspace-device-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.workspace-device-facts > div { display: grid; gap: var(--space-1); min-width: 0; }
+.workspace-device-facts span { color: var(--color-text-secondary); }
+@media (max-width: 760px) {
+  .sidebar .side-nav { display: none; }
+  .workspace-mobile-picker { display: grid; gap: var(--space-1); }
+  .workspace-mobile-picker select { width: 100%; min-width: 0; }
+  .workspace-context { width: 100%; }
+}
