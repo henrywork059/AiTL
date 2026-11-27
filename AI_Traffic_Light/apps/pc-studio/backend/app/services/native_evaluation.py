@@ -30,12 +30,13 @@ from app.services.sumo_projection import NativeProjection, Projection, PROVENANC
 from app.services.sumo_shadow_adapter import SumoShadowAdapter
 from app.services.sumo_shadow_fixture import DENSITY_COUNTS, GEOMETRY_PRESETS, PHASES, PhaseMap
 from app.services.sumo_shadow_runtime import GeneratedSession
-from app.services.native_evaluation_geometry import region_counts, legacy_rectangle_preview
+from app.services.native_evaluation_geometry import region_counts, legacy_rectangle_preview, footprint_center_counts
 from app.services.camera_frames import LEGACY_LAYOUT_ID
 from app.services.legacy_world import ROAD_TOP, ROAD_BOTTOM, CROSSING_LEFT, CROSSING_RIGHT
 from app.services.native_detector_validation import footprint_annotations
 from app.services.native_evaluation_experiments import summarize_timeline, validate_pair, vehicle_braking_sample, summarize_braking, vehicle_centerline_events
 from app.services.simulation_gate_reporting import normalized_report_metrics
+from app.services.simulation_wait_metrics import NativeApproachWait
 from app.services.observation_identity import (synthetic_scene_identity, evaluation_source_id,
     REFERENCE_EVALUATION_ORIGIN, simulation_view_point)
 from app.services.simulation_reference_session import GeneratedReferenceSession
@@ -86,6 +87,7 @@ class NativeEvaluationService:
         self._trips = ()
         self._seen_trips = set()
         self._centerline_seen = set()
+        self._approach_wait = None
 
     @staticmethod
     def _conflict(message):
@@ -127,6 +129,7 @@ class NativeEvaluationService:
         self._trips = ()
         self._seen_trips = set()
         self._centerline_seen = set()
+        self._approach_wait = None
         self._state = state
         try:
             if adapter is not None:
@@ -247,6 +250,7 @@ class NativeEvaluationService:
                 self._demand_digest = hashlib.sha256(json.dumps(self._demand_manifest,sort_keys=True,separators=(",",":")).encode()).hexdigest()
                 self._phase_map = self._session.phase_map if engine=="reference" or cyclic else self._phase_loader(network)
                 self._metrics = GateMetrics()
+                self._approach_wait = NativeApproachWait() if cyclic else None
                 self._publisher.begin(self.generation,provenance=ENGINES[engine])
                 self._received_at_ms = time.time_ns() // 1_000_000
                 self._density, self._mode = density, mode
@@ -306,7 +310,10 @@ class NativeEvaluationService:
                         grants.intersection(self._phase_map.vehicles) and (crossing or phase!="vehicle_green") or
                         grants.intersection(self._phase_map.pedestrians) and phase!="pedestrian_green"):
                         raise RuntimeError("Invalid native permission")
-                    measured = self._metrics.sample(snap.tick,self._routes.observations(snap.agents))
+                    rows=self._routes.observations(snap.agents)
+                    measured = self._metrics.sample(snap.tick,rows)
+                    if self._approach_wait is not None:
+                        measured.update(self._approach_wait.sample(snap.tick,before.agents,snap.agents,rows,self._routes.trips))
                     if self._geometry in MIDBLOCK_GEOMETRIES and self._routes.unknown_roads:
                         raise RuntimeError("Cyclic agent left its validated route")
                     braking=vehicle_braking_sample(before.agents,snap.agents) if self._geometry in MIDBLOCK_GEOMETRIES else {}
@@ -508,6 +515,7 @@ class NativeEvaluationService:
                 **({"demand_model":"native_cyclic_slots_v1","journey_manifest":[asdict(t) for t in self._trips],
                     "slot_visits":dict(self._session.ledger.visits),"current_visits":dict(self._session.ledger.current),
                     "braking_diagnostics":summarize_braking(self._timeline),
+                    "legacy_inspired_wait":self._approach_wait.report(),
                     "legacy_event_projection":{"contract":"observed_vehicle_body_centerline_v1",
                         "vehicle_passages":len(self._centerline_seen),
                         "vehicle_journey_ids":sorted(self._centerline_seen),
@@ -596,7 +604,9 @@ class NativeEvaluationService:
                 raise AppError(ErrorCode.INVALID_REQUEST,str(exc),status_code=422) from exc
             result=self.evaluate_region_views(epoch=epoch,generation=generation,tick=tick,source_id=source_id,
                 coordinate_space="native_projection_v1",layout_id=layout_id,polygon=mapping["polygon"])
-            return {"mapping":mapping,"evaluation":result,"legacy_layout_id":legacy_layout_id,
+            annotations=footprint_annotations(self.scene()["snapshot"])
+            box_counts=footprint_center_counts(annotations,mapping["polygon"],source_id)
+            return {"mapping":mapping,"evaluation":result,"synthetic_box_center_evaluation":box_counts,"legacy_layout_id":legacy_layout_id,
                     "native_layout_id":layout_id,"production_coordinate_parity":False}
 
     def evaluate_region_profile(self,*,epoch,generation,tick,source_id,profile):
@@ -647,7 +657,7 @@ class NativeEvaluationService:
             policy["active_profile"]=selected
             pair={}
             child=NativeEvaluationService(enabled=True,factory=self._factory,
-                trip_loader=self._trip_loader,phase_loader=self._phase_loader,reference_factory=self._reference_factory,midblock_factory=self._midblock_factory)
+                trip_loader=self._trip_loader,phase_loader=self._phase_loader,reference_factory=self._reference_factory,midblock_factory=self._midblock_factory,indexed_frames=self._indexed_frames)
             cancelled=Event()
             reservation=(cancelled,child)
             previous_state=self._state

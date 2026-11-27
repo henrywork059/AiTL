@@ -18,6 +18,8 @@ let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
 let wrongFrameHeader=false;
 let cameraOwner:string|null=null,releaseCalls=0;
 const layoutId="b".repeat(64);
+const legacyLayoutId="c".repeat(64);
+let previewCalls=0;
 const originalFetch = window.fetch;
 window.fetch = async (input,init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
@@ -40,6 +42,12 @@ window.fetch = async (input,init) => {
       if(body.generation!==evalGeneration||body.epoch!=="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")throw Error("Wrong evaluation identity");
       if(cameraOwner&&["start","step","pause","stop","camera-heartbeat"].includes(command??"")&&body.camera_owner!==cameraOwner)throw Error("Wrong camera owner");
       if(command==="camera-heartbeat")return new Response(JSON.stringify({ok:true,data:{epoch:body.epoch,generation:evalGeneration,camera_owned:true}}),{headers:{"Content-Type":"application/json"}});
+      if(command==="legacy-preview"){
+        check(body.legacy_layout_id===legacyLayoutId&&body.layout_id===layoutId&&body.tick===evalTick,"Legacy preview identity mismatch");
+        check(body.polygon.length===4,"Legacy rectangle missing");previewCalls++;
+        const polygon=[[300,200],[400,200],[400,300],[300,300]];
+        return new Response(JSON.stringify({ok:true,data:{mapping:{calibrated:false,persisted:false},production_coordinate_parity:false,evaluation:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false,views:{[body.source_id]:{polygon}}}}}),{headers:{"Content-Type":"application/json"}});
+      }
       if(command==="region"||command==="views"){
         if(body.layout_id!==layoutId||body.coordinate_space!=="native_projection_v1"||body.tick!==evalTick||body.polygon.length!==4)throw Error("Wrong region identity");
         return new Response(JSON.stringify({ok:true,data:{counts:{vehicle:0,pedestrian:1},agent_ids:["p0"],epoch:body.epoch,generation:evalGeneration,tick:evalTick,source_id:body.source_id,layout_id:layoutId,persisted:false,views:{"simulation_camera":{},"simulation_camera_b":{},"simulation_camera_c":{},"simulation_camera_d":{}}}}),{headers:{"Content-Type":"application/json"}});
@@ -50,7 +58,7 @@ window.fetch = async (input,init) => {
       if(command==="stop"){evalGeneration++;evalRunning=false;cameraOwner=null;}
     }
     return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,engine:evalRunning?"native":null,camera_owned:cameraOwner!==null,physical_output_allowed:false,
-      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
+      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,legacy_preview_layout_id:legacyLayoutId,legacy_preview_crossing:[[520,179],[760,179],[760,625],[520,625]],lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
   }
   if (url.pathname === "/api/camera/simulation/native-projection") {
     nativeCalls++;
@@ -172,6 +180,8 @@ async function run(){
     }
     button("Evaluate draft")!.click();
     await wait(()=>Boolean(host.textContent?.includes("Vehicles 0 · Pedestrians 1")&&host.textContent?.includes("4 matched views")),"Native multiview draft result missing");
+    button("Preview legacy crossing")!.click();
+    await wait(()=>previewCalls===1&&editor.querySelector("polygon")?.getAttribute("points")==="300,200 400,200 400,300 300,300","Qualified legacy preview missing");
     const frameState={status:"running",engine:"native",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,
       snapshot:{tick:evalTick,received_at_ms:123,layout_id:layoutId,coordinate_space:"native_projection_v1"}} as NativeEvaluationState;
     const signal=new AbortController().signal;

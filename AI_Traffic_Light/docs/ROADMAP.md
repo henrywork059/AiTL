@@ -240,3 +240,6 @@ Sustained VGA/QVGA measured FPS; visible end-to-end latency; ESP reset/reconnect
 
 
 | 2026-11-27 | 28 / S04 configurable midblock and metric events | Exact 5888597 all three CI passed; archive mirror, palette, rectangle and normalized integral evidence inspected. Added bounded compact/wide native geometry, body-centre passage diagnostics, frontend selection and lighter region reads with focused actual native trials. | Verify new exact CI and compare geometry-specific evidence; no default migration until remaining gates pass. |
+
+
+| 2026-11-27 | 28 / S04 legacy-inspired wait and capture acceptance | Shared blocked predicate, explicit native approach episodes/censoring, synthetic box-centre preview counts, offline detector per-class evidence, interleaved full/light read benchmark and browser preview regression. | Native metric calibration, actual weights, matched budget and owner acceptance remain gated; no new candidate. |

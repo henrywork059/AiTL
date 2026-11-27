@@ -99,7 +99,16 @@ def score_footprints(truth,predictions,threshold=.5):
         if i not in used_t and j not in used_p:
             used_t.add(i);used_p.add(j)
             matches.append({"agent_id":truth[i]["agent_id"],"prediction_index":j,"iou":round(-negative,6)})
-    return {"iou_threshold":threshold,"truth_count":len(tb),"prediction_count":len(pb),
+    by_kind={}
+    for kind in ("vehicle","pedestrian"):
+        nt=sum(row["kind"]==kind for row in truth)
+        npred=sum(row["kind"]==kind for row in predictions)
+        matched=sum(truth[i]["kind"]==kind for i in used_t)
+        by_kind[kind]={"truth_count":nt,"prediction_count":npred,"matched":matched,
+            "unmatched_truth":nt-matched,"unmatched_predictions":npred-matched,
+            "precision":round(matched/npred,6) if npred else None,
+            "recall":round(matched/nt,6) if nt else None}
+    return {"iou_threshold":threshold,"truth_count":len(tb),"prediction_count":len(pb),"by_kind":by_kind,
             "matched":len(matches),"unmatched_truth":len(tb)-len(matches),
             "unmatched_predictions":len(pb)-len(matches),"matches":matches,
             "production_detector_validated":False}

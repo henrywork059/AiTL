@@ -18,6 +18,9 @@ def main():
     parser.add_argument("--confidence",type=float,default=.1)
     args=parser.parse_args()
     if not 0<args.confidence<=1: parser.error("confidence must be in (0,1]")
+    # Validate archive identity before loading even explicitly trusted weights.
+    with ZipFile(args.capture) as archive:
+        ann,images,integrity=qualified_capture(archive)
     model=None
     model_digest=None
     if args.model is not None:
@@ -30,18 +33,16 @@ def main():
         model_digest=digest.hexdigest()
         from ultralytics import YOLO
         model=YOLO(str(path))
-    with ZipFile(args.capture) as archive:
-        ann,images,integrity=qualified_capture(archive)
-        views={}
-        for sid in VIEW_FLIPS:
-            image=images[sid]
-            unmapped=[]
-            if model is None:
-                predictions=palette_predictions(image)
-            else:
-                predictions,unmapped=model_predictions(image,ann,sid,model,args.confidence)
-            views[sid]={"score":score_footprints(ann["views"][sid],predictions),
-                        "predictions":predictions,"unmapped_classes":unmapped}
+    views={}
+    for sid in VIEW_FLIPS:
+        image=images[sid]
+        unmapped=[]
+        if model is None:
+            predictions=palette_predictions(image)
+        else:
+            predictions,unmapped=model_predictions(image,ann,sid,model,args.confidence)
+        views[sid]={"score":score_footprints(ann["views"][sid],predictions),
+                    "predictions":predictions,"unmapped_classes":unmapped}
     print(json.dumps({"method":"offline_local_yolo" if model is not None else "exact_palette_components_not_trained_model",
         "model_sha256":model_digest,"confidence":args.confidence if model is not None else None,
         "layout_id":ann["layout_id"],"generation":ann["generation"],"tick":ann["tick"],

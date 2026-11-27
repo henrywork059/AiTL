@@ -20,6 +20,7 @@ from app.services.signal_rules import SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
 from app.services.experiment_timeline_csv import serialize_experiment_timeline
 from app.services.protected_crosswalk import ProtectedCrosswalk
+from app.services.simulation_wait_metrics import blocked_motion
 from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
     CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
     TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
@@ -340,7 +341,7 @@ class _ModeSimulation:
     def _vehicle_callbacks(self, dt, clock, waiting_now):
 
         def record(vehicle, old_x, committed):
-            blocked = abs(vehicle.x-old_x)+.05 < abs(vehicle.speed*dt) and not committed
+            blocked = blocked_motion(vehicle.x-old_x,vehicle.speed*dt,.05,committed)
             if blocked:
                 waiting_now.add(vehicle.vehicle_id)
                 if vehicle.wait_started_s is None:

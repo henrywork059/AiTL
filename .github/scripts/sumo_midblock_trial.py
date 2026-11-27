@@ -41,6 +41,13 @@ def verify_export(result,expected_slots,horizon):
     assert sorted(events)==projection["vehicle_journey_ids"]
     assert set(result["arrived_vehicles"])<=set(events)
     assert not projection["production_experiment_parity"]
+    waits=result["legacy_inspired_wait"]
+    assert not waits["production_experiment_parity"]
+    for kind in ("vehicle","pedestrian"):
+        samples=sum(row["legacy_inspired_"+kind+"_queue"] for row in result["timeline"])
+        report=waits["waiting"][kind]
+        assert abs(samples*.2-report["observed_agent_seconds"])<1e-6
+        assert abs(sum(report["completed_seconds"]+report["censored_observed_seconds"])-samples*.2)<1e-6
     assert len(result["current_visits"])==expected_slots==len(result["demand_manifest"])
     assert len(set(result["current_visits"].values()))==expected_slots
     a=result["trip_accounting"]
@@ -180,12 +187,27 @@ def run_arm(out,seed,density,mode,*,read_workload=False,indexed_frames=True,lean
                          "layout_id":scene["layout_id"],"polygon":[[520,179],[760,179],[760,625],[520,625]]}
                 converted=assert_envelope(client.post(BASE+"/region/legacy-preview",json=preview))["data"]
                 assert not converted["production_coordinate_parity"] and not converted["mapping"]["persisted"]
+                assert not converted["synthetic_box_center_evaluation"]["detector_observation"]
                 assert converted["mapping"]["original_polygon"]==preview["polygon"]
                 assert_envelope(client.post(BASE+"/region/legacy-preview",json={**preview,"legacy_layout_id":"0"*64}),expected_status=409)
                 (out/"legacy-rectangle-preview.json").write_text(json.dumps(converted,indent=2),encoding="utf-8")
                 full=svc.view_scene(**params,source_id="simulation_camera")
                 light=svc.view_scene(**params,source_id="simulation_camera",_include_lanes=False)
                 assert {k:v for k,v in full.items() if k!="lanes"}==light and "lanes" not in light
+                if read_workload:
+                    # Interleave both paths on the same immutable actual tick,
+                    # avoiding changed demand, codec or worker effects.
+                    timings={"full":[],"light":[]}
+                    for i in range(100):
+                        for include in ((True,False) if i%2==0 else (False,True)):
+                            started=time.perf_counter_ns()
+                            svc.view_scene(**params,source_id="simulation_camera",_include_lanes=include)
+                            timings["full" if include else "light"].append((time.perf_counter_ns()-started)/1e6)
+                    (out/"region-read-resources.json").write_text(json.dumps({"samples":timings,
+                        "mean_ms":{k:sum(v)/len(v) for k,v in timings.items()},
+                        "p95_ms":{k:float(np.percentile(v,95)) for k,v in timings.items()},
+                        "same_tick":params["tick"],"same_layout":scene["layout_id"],
+                        "scope":"in-process view reads, not HTTP or GPU"},indent=2),encoding="utf-8")
                 draft={**params,"source_id":"simulation_camera_c","coordinate_space":"native_projection_v1","layout_id":scene["layout_id"],"polygon":[[0,0],[1279,0],[1279,719],[0,719]]}
                 regions=assert_envelope(client.post(BASE+"/region/views",json=draft))["data"]
                 assert set(regions["views"])==set(VIEW_FLIPS) and not regions["persisted"]

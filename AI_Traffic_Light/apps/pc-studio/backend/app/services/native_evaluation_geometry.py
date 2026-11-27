@@ -27,6 +27,23 @@ def region_counts(scene,polygon):
     return {"counts":counts,"agent_ids":sorted(ids),"polygon":points}
 
 
+def footprint_center_counts(annotations, polygon, view_id):
+    """Legacy detection-box-centre convention on synthetic truth boxes only."""
+    rows=[{"id":a["agent_id"],"kind":a["kind"],
+           "x":(a["box_xyxy"][0]+a["box_xyxy"][2])/2,
+           "y":(a["box_xyxy"][1]+a["box_xyxy"][3])/2}
+          for a in annotations["views"][view_id]]
+    # Half-open XYXY edge coordinates are offset by half a pixel from
+    # pixel-centre coordinates. Convert before applying pixel-centre mirrors.
+    for row in rows:
+        row["x"]-=.5
+        row["y"]-=.5
+    result=region_counts({"agents":rows},polygon)
+    return {"counts":result["counts"],"agent_ids":result["agent_ids"],
+            "count_basis":"synthetic_half_open_box_center_pixel_v1","detector_observation":False,
+            "detector_input_eligible":False}
+
+
 def legacy_rectangle_preview(scene, polygon, view_id):
     """Semantic midblock preview only, not camera calibration.
 

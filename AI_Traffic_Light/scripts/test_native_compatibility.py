@@ -103,6 +103,52 @@ class Tests(unittest.TestCase):
         new=ShadowAgent("vehicle","v1_0",-half-.5,0.,5.,":C_1")
         self.assertEqual(vehicle_centerline_events((old,),(new,),slots,(-2.,2.),set()),["v1_0"])
 
+    def test_palette_merge_reports_missing_objects(self):
+        from app.services.native_detector_validation import score_footprints
+        truth=[{"agent_id":"p1","kind":"pedestrian","box_xyxy":[10,10,13,13]},
+               {"agent_id":"p2","kind":"pedestrian","box_xyxy":[13,10,16,13]}]
+        predictions=[{"kind":"pedestrian","box_xyxy":[10,10,16,13]}]
+        result=score_footprints(truth,predictions)
+        self.assertEqual(result["matched"],1)
+        self.assertEqual(result["by_kind"]["pedestrian"]["recall"],.5)
+        self.assertEqual(result["by_kind"]["pedestrian"]["precision"],1.)
+        self.assertIsNone(result["by_kind"]["vehicle"]["precision"])
+
+    def test_native_approach_wait_observed_and_censored(self):
+        from app.services.simulation_wait_metrics import NativeApproachWait,blocked_motion
+        from app.services.simulation_gate_metrics import GateObservation
+        from app.services.sumo_shadow_adapter import ShadowAgent
+        from app.services.simulation_finite_fixture import Trip,Segment
+        self.assertTrue(blocked_motion(.2,1.,.05,False))
+        self.assertFalse(blocked_motion(.2,1.,.05,True))
+        trip=Trip("v0_0","vehicle",0.,5.,(Segment("WC","road",((0.,0.),(10.,0.))),))
+        a=ShadowAgent("vehicle","v0_0",0.,0.,0.,"WC")
+        b=ShadowAgent("vehicle","v0_0",1.,0.,5.,"WC")
+        row=lambda x:GateObservation(x.id,"vehicle",-.5,x.x_m,x.y_m,10.,"gate")
+        metrics=NativeApproachWait()
+        self.assertEqual(metrics.sample(1,(),(a,),(row(a),),{trip.ident:trip})["legacy_inspired_vehicle_queue"],0)
+        self.assertEqual(metrics.sample(2,(a,),(a,),(row(a),),{trip.ident:trip})["legacy_inspired_vehicle_queue"],1)
+        self.assertEqual(metrics.sample(3,(a,),(b,),(row(b),),{trip.ident:trip})["legacy_inspired_vehicle_queue"],0)
+        metrics.sample(4,(b,),(b,),(row(b),),{trip.ident:trip})
+        metrics.sample(5,(b,),(),(),{trip.ident:trip})
+        report=metrics.report()["waiting"]["vehicle"]
+        self.assertEqual(report["completed_seconds"],[.2])
+        self.assertEqual(report["censored_observed_seconds"],[.2])
+        self.assertEqual(report["observed_agent_seconds"],.4)
+
+    def test_box_center_counts_distinguish_front_anchor(self):
+        from app.services.native_evaluation_geometry import footprint_center_counts
+        from app.services.native_detector_validation import footprint_annotations
+        scene=self.scene()
+        ann=footprint_annotations(scene)
+        box=ann["views"]["simulation_camera"][0]["box_xyxy"]
+        x=(box[0]+box[2]-1)/2
+        y=(box[1]+box[3]-1)/2
+        poly=[[x-1,y-1],[x+1,y-1],[x+1,y+1],[x-1,y+1]]
+        result=footprint_center_counts(ann,poly,"simulation_camera")
+        self.assertIn(ann["views"]["simulation_camera"][0]["agent_id"],result["agent_ids"])
+        self.assertFalse(result["detector_observation"])
+
     def test_normalized_report_censoring(self):
         rows=[{"vehicle_queue":1,"pedestrian_queue":0},{"vehicle_queue":2,"pedestrian_queue":1}]
         summary={"vehicle_wait_agent_s":.6,"pedestrian_wait_agent_s":.2,"vehicle_passages":1,
