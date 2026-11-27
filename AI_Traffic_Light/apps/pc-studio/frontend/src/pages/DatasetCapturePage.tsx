@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatus } from "../api";
+import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatusStrict } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { PollingContext } from "../lib/pollingScope";
 import type { CameraStatus, CaptureQualityTag, CaptureRecord, DatasetStatus } from "../types";
 
 type Props = {
@@ -19,23 +20,39 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<CaptureRecord | null>(null);
 
-  async function refreshStatus() {
-    const nextStatus = await fetchDatasetStatus();
+  async function refreshStatus(context?: PollingContext) {
+    const nextStatus = await fetchDatasetStatusStrict(context?.signal);
+    if (context && !context.isCurrent()) return;
     setDatasetStatus(nextStatus);
     setLastCapture(nextStatus.last_capture);
   }
 
   const { runNow: refreshDatasetStatus, waitForIdle: waitForDatasetStatusIdle } = useSerialPolling(refreshStatus, 3000, {
     enabled: !saving && !deleting,
-    onError: (error) => setMessage(error instanceof Error ? error.message : "Dataset status could not be refreshed."),
+    onError: (error) => {
+      setDatasetStatus(null);
+      setLastCapture(null);
+      setMessage(error instanceof Error ? error.message : "Dataset status could not be refreshed.");
+    },
   });
 
+  const captureReady = Boolean(cameraStatus?.frame_available && !cameraStatus.stale && cameraStatus.active_source_id && cameraStatus.origin);
+
   async function saveCurrentFrame() {
+    if (!captureReady || !cameraStatus?.active_source_id || !cameraStatus.origin) return;
+    const expectedSource = cameraStatus.active_source_id;
+    const expectedOrigin = cameraStatus.origin;
     setSaving(true);
     setMessage(null);
     try {
       await waitForDatasetStatusIdle();
-      const record = await captureLatestFrame({ session_id: sessionId, quality_tag: qualityTag, note });
+      const record = await captureLatestFrame({
+        session_id: sessionId, quality_tag: qualityTag, note,
+        expected_source_id: expectedSource, expected_origin: expectedOrigin,
+      });
+      if (record.source_id !== expectedSource || record.origin !== expectedOrigin) {
+        throw new Error("Captured frame identity differs from the selected preview; inspect the saved capture.");
+      }
       setLastCapture(record);
       setMessage(`Captured ${record.image_path}`);
       await refreshDatasetStatus();
@@ -64,7 +81,7 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     }
   }
 
-  const previewUrl = cameraStatus?.frame_available
+  const previewUrl = captureReady
     ? `${API_BASE}/api/camera/frame?v=${cameraStatus.frame_number}`
     : null;
 
@@ -112,7 +129,7 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
               Note
               <textarea value={note} maxLength={500} rows={4} placeholder="Optional context for later review" onChange={(event) => setNote(event.target.value)} />
             </label>
-            <button className="primary" onClick={() => void saveCurrentFrame()} disabled={saving || deleting || !cameraStatus?.frame_available || !sessionId}>
+            <button className="primary" onClick={() => void saveCurrentFrame()} disabled={saving || deleting || !captureReady || !sessionId || !datasetStatus?.capture_enabled}>
               {saving ? "Saving..." : "Capture frame"}
             </button>
             {message && <p className={message.startsWith("Captured") || message.startsWith("Deleted") ? "success-message" : "error-message"}>{message}</p>}

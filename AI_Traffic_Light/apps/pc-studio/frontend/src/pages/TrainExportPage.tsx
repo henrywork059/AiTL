@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { fetchRuntimeSettings, fetchTrainingDatasetStatus, fetchTrainingStatus, startTraining } from "../api";
+import { fetchRuntimeSettings, fetchTrainingDatasetStatusStrict, fetchTrainingStatusStrict, startTraining } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { TrainingConvergenceChart } from "../components/TrainingConvergenceChart";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { PollingContext } from "../lib/pollingScope";
 import type { TrainingConfig, TrainingDatasetStatus, TrainingStatus } from "../types";
 
 const DEFAULT_CONFIG: TrainingConfig = {
@@ -23,11 +24,12 @@ export function TrainExportPage() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function refreshStatus() {
+  async function refreshStatus({ signal, isCurrent }: PollingContext) {
     const [nextStatus, nextDataset] = await Promise.all([
-      fetchTrainingStatus(),
-      fetchTrainingDatasetStatus(),
+      fetchTrainingStatusStrict(signal),
+      fetchTrainingDatasetStatusStrict(signal),
     ]);
+    if (!isCurrent()) return;
     setStatus(nextStatus);
     setManagedDataset(nextDataset);
   }
@@ -48,7 +50,11 @@ export function TrainExportPage() {
 
   const { waitForIdle: waitForTrainingStatusIdle } = useSerialPolling(refreshStatus, 1200, {
     enabled: !starting,
-    onError: (nextError) => setError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed."),
+    onError: (nextError) => {
+      setStatus(null);
+      setManagedDataset(null);
+      setError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed.");
+    },
   });
 
   async function launchTraining() {
@@ -56,8 +62,21 @@ export function TrainExportPage() {
     setError(null);
     try {
       await waitForTrainingStatusIdle();
+      const [currentStatus, currentDataset] = await Promise.all([
+        fetchTrainingStatusStrict(), fetchTrainingDatasetStatusStrict(),
+      ]);
+      setStatus(currentStatus);
+      setManagedDataset(currentDataset);
+      if (!currentStatus.training_available || currentStatus.status === "running") {
+        throw new Error("Training is unavailable or another run is active.");
+      }
+      if (config.dataset_yaml.trim() === "yolo/data.yaml" && (!currentDataset.ready || currentDataset.stale)) {
+        throw new Error(currentDataset.message || "Rebuild the managed dataset before training.");
+      }
       setStatus(await startTraining(config));
     } catch (nextError) {
+      setStatus(null);
+      setManagedDataset(null);
       setError(nextError instanceof Error ? nextError.message : "Training could not start.");
     } finally {
       setStarting(false);

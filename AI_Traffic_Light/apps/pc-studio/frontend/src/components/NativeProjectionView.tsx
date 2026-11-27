@@ -211,7 +211,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
 export function NativeProjectionView({sourceId,standaloneOnly=false,profile,initialGeometry,cameraWorkspace=false}:{sourceId:string;standaloneOnly?:boolean;profile?:string;initialGeometry?:string;cameraWorkspace?:boolean}){
   const [standalone,setStandalone]=useState(standaloneOnly);
   return <div style={{position:"absolute",inset:0}}>
-    <NativeContent key={`${standalone}:${cameraWorkspace}`} sourceId={sourceId} standalone={standalone} profile={profile} initialGeometry={initialGeometry} cameraWorkspace={cameraWorkspace}/>
+    <NativeContent key={`${standalone}:${cameraWorkspace}:${sourceId}`} sourceId={sourceId} standalone={standalone} profile={profile} initialGeometry={initialGeometry} cameraWorkspace={cameraWorkspace}/>
     {!standaloneOnly&&<button type="button" style={{position:"absolute",right:8,top:8,zIndex:6}} onClick={()=>setStandalone(!standalone)}>
       {standalone?"Shadow preview":"Standalone evaluation"}
     </button>}

@@ -79,6 +79,9 @@ class CaptureFrameRequest(BaseModel):
     session_id: str = Field(default="default", min_length=1, max_length=64)
     quality_tag: Literal["unreviewed", "useful", "bad"] = "unreviewed"
     note: str = Field(default="", max_length=500)
+    # Preflight identity is optional for pre-existing API clients.
+    expected_source_id: str | None = Field(default=None, min_length=1, max_length=160)
+    expected_origin: Literal["upload", "simulation"] | None = None
 
 
 class DatasetLabelBoxRequest(BaseModel):

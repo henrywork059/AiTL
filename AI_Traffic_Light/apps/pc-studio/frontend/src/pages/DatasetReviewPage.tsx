@@ -239,6 +239,9 @@ export function DatasetReviewPage() {
     try {
       const status = await buildTrainingDataset(0.2);
       setTrainingDataset(status);
+      if (!status.ready || status.stale || status.train_count < 1 || status.val_count < 1) {
+        throw new Error(status.message || "Managed dataset was not built; review eligible captures and retry.");
+      }
       setMessage(`Managed dataset ready: ${status.train_count} train / ${status.val_count} validation frames.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Training dataset could not be built.");

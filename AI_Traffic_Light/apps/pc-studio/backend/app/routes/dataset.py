@@ -32,6 +32,13 @@ def capture_latest_frame(payload: CaptureFrameRequest, request: Request) -> dict
             "No camera frame is available to capture. Upload a frame or start simulation mode.",
             status_code=409,
         )
+    if ((payload.expected_source_id is not None and frame.source_id != payload.expected_source_id)
+            or (payload.expected_origin is not None and frame.origin != payload.expected_origin)):
+        raise AppError(
+            ErrorCode.CAMERA_NOT_CONNECTED,
+            "Camera source or mode changed before capture. Refresh the preview and retry.",
+            status_code=409,
+        )
     record = dataset_capture_service.capture_frame(
         frame,
         session_id=payload.session_id,

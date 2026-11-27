@@ -286,11 +286,12 @@ export async function setCameraSimulationSettings(input: { density?: SimulationD
   return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
 export async function fetchDatasetStatus(): Promise<DatasetStatus> { return requestJson<DatasetStatus>(`${API_BASE}/api/dataset/status`, fallbackDatasetStatus); }
-export async function captureLatestFrame(input: { session_id: string; quality_tag: CaptureQualityTag; note: string }): Promise<CaptureRecord> {
+export async function fetchDatasetStatusStrict(signal?: AbortSignal): Promise<DatasetStatus> { return requestJsonStrict<DatasetStatus>(`${API_BASE}/api/dataset/status`, { signal }); }
+export async function captureLatestFrame(input: { session_id: string; quality_tag: CaptureQualityTag; note: string; expected_source_id?: string; expected_origin?: "upload" | "simulation" }): Promise<CaptureRecord> {
   return requestJsonStrict<CaptureRecord>(`${API_BASE}/api/dataset/captures`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
 }
 export async function fetchDatasetCapturesStrict(): Promise<DatasetCaptureList> { return requestJsonStrict<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`); }
-export async function fetchTrainingDatasetStatusStrict(): Promise<TrainingDatasetStatus> { return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset/status`); }
+export async function fetchTrainingDatasetStatusStrict(signal?: AbortSignal): Promise<TrainingDatasetStatus> { return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset/status`, { signal }); }
 export async function fetchDatasetCaptures(): Promise<DatasetCaptureList> { return requestJson<DatasetCaptureList>(`${API_BASE}/api/dataset/captures?limit=500`, fallbackCaptureList); }
 export async function deleteDatasetCapture(captureId: string): Promise<CaptureDeleteResult> { return requestJsonStrict<CaptureDeleteResult>(`${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}`, { method: "DELETE" }); }
 export function captureImageUrl(captureId: string): string { return `${API_BASE}/api/dataset/captures/${encodeURIComponent(captureId)}/image`; }
@@ -305,6 +306,7 @@ export async function buildTrainingDataset(validationFraction = 0.2): Promise<Tr
   return requestJsonStrict<TrainingDatasetStatus>(`${API_BASE}/api/dataset/training-dataset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ validation_fraction: validationFraction }) });
 }
 export async function fetchTrainingStatus(): Promise<TrainingStatus> { return requestJson<TrainingStatus>(`${API_BASE}/api/training/status`, fallbackTrainingStatus); }
+export async function fetchTrainingStatusStrict(signal?: AbortSignal): Promise<TrainingStatus> { return requestJsonStrict<TrainingStatus>(`${API_BASE}/api/training/status`, { signal }); }
 export async function startTraining(config: TrainingConfig): Promise<TrainingStatus> {
   return requestJsonStrict<TrainingStatus>(`${API_BASE}/api/training/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) });
 }
