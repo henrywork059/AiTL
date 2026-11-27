@@ -58,7 +58,7 @@ These should stay useful across version changes:
 | `apps/pc-studio/backend/README.md` | Backend responsibilities/run guidance |
 | `apps/pc-studio/frontend/README.md` | Frontend responsibilities/run/presentation guidance |
 | `docs/PC_STUDIO_FUNCTION_LIST.md` | Current functional capability catalog |
-| `docs/ROADMAP.md` | Planned dependency order and evidence milestones |
+| [`docs/ROADMAP.md`](ROADMAP.md) | Owner-approved development schedule, numbered patch-by-patch queue, ordered backlog, progress and evidence gates; consult for open-ended future updates |
 
 For routine coding work, read the mandatory authority files and then use `PATCH_PLAYBOOK.md` as the short execution path. Open the longer guides only for the parts of the task that need them.
 

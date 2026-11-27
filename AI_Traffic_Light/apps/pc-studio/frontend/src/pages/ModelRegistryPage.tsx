@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteModel, fetchInferenceStatus, fetchModelRegistry, loadInferenceModel, saveRuntimeSettings, uploadInferenceModel, setDefaultModel, unloadInferenceModel } from "../api";
+import { deleteModel, fetchInferenceStatusStrict, fetchModelRegistryStrict, loadInferenceModel, saveRuntimeSettings, uploadInferenceModel, setDefaultModel, unloadInferenceModel } from "../api";
 import type { InferenceStatus, ModelRegistryStatus, RuntimeSettings } from "../types";
 
 function errorMessage(error: unknown): string {
@@ -29,14 +29,25 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadId, setUploadId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [modelFilter, setModelFilter] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const visibleModels = (registry?.models ?? []).filter(model => model.model_id.toLowerCase().includes(modelFilter.trim().toLowerCase())).sort((a,b) => Number(b.is_active)-Number(a.is_active) || Number(b.is_default)-Number(a.is_default) || a.model_id.localeCompare(b.model_id));
 
   useEffect(() => setDefaultConfidence(runtimeSettings.default_confidence), [runtimeSettings.default_confidence]);
   useEffect(() => setInferenceInterval(runtimeSettings.inference_interval_ms), [runtimeSettings.inference_interval_ms]);
 
   const refresh = useCallback(async () => {
-    const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistry(), fetchInferenceStatus()]);
-    setRegistry(nextRegistry);
-    setInferenceStatus(nextInference);
+    setRefreshing(true);
+    try {
+      const [nextRegistry, nextInference] = await Promise.all([fetchModelRegistryStrict(), fetchInferenceStatusStrict()]);
+      setRegistry(nextRegistry);
+      setInferenceStatus(nextInference);
+      setError(null);
+    } catch (reason) {
+      setRegistry(null);
+      setInferenceStatus(null);
+      throw reason;
+    } finally { setRefreshing(false); }
   }, []);
 
   useEffect(() => {
@@ -144,19 +155,19 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2>AI Models</h2>
+            <h2>Inference status</h2>
             <p className="placeholder-copy">Manage saved AI models and choose one running model shared by all registered cameras.</p>
           </div>
-          <button className="primary" onClick={() => void refresh().catch((reason) => setError(errorMessage(reason)))}>Refresh</button>
+          <button className="primary" disabled={refreshing || busyModelId !== null || uploading} onClick={() => void refresh().catch((reason) => setError(errorMessage(reason)))}>{refreshing ? "Refreshing..." : "Refresh"}</button>
         </div>
         <div className="camera-status-list inference-status-list">
-          <div><span>Saved models</span><strong>{registry?.total ?? 0}</strong></div>
-          <div><span>Loaded for inference</span><strong>{inferenceStatus?.active_model_id ?? "none"}</strong></div>
-          <div><span>Default on startup</span><strong>{registry?.default_model_id ?? "none"}</strong></div>
-          <div><span>Inference dependency</span><strong>{inferenceStatus?.backend_available ? "available" : "not installed"}</strong></div>
+          <div><span>Saved models</span><strong>{registry?.total ?? "—"}</strong></div>
+          <div><span>Loaded for inference</span><strong>{inferenceStatus ? inferenceStatus.active_model_id ?? "none" : "unavailable"}</strong></div>
+          <div><span>Default on startup</span><strong>{registry ? registry.default_model_id ?? "none" : "unavailable"}</strong></div>
+          <div><span>Inference dependency</span><strong>{!inferenceStatus ? "unavailable" : inferenceStatus.backend_available ? "available" : "not installed"}</strong></div>
         </div>
         <div className="button-row">
-          <button type="button" disabled={!inferenceStatus?.model_loaded || busyModelId !== null} onClick={() => void handleUnload()}>
+          <button type="button" disabled={refreshing || uploading || !inferenceStatus?.model_loaded || busyModelId !== null} onClick={() => void handleUnload()}>
             {busyModelId === "__unload__" ? "Unloading..." : "Unload active model"}
           </button>
         </div>
@@ -164,6 +175,41 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
         {error && <p className="error-message" role="alert">{error}</p>}
       </section>
 
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Installed AI models</h2>
+            <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
+          </div>
+          <span className="status-pill muted">{registry ? `${registry.total} models` : "Unavailable"}</span>
+        </div>
+        <label className="workspace-model-filter">Find model <input type="search" value={modelFilter} onChange={event => setModelFilter(event.target.value)} placeholder="Model ID" /></label>
+        {registry && registry.models.length > 0 && !visibleModels.length && <p role="status">No matching models.</p>}
+        <div className="model-list-grid">
+          {visibleModels.map((model) => (
+            <article className="smoke-card" key={model.model_id}>
+              <div className="panel-header compact-header">
+                <strong>{model.model_id}</strong>
+                <span className={`status-pill ${model.is_active ? "status-implemented" : model.is_default ? "status-info" : ""}`}>
+                  {model.is_active ? "active" : model.is_default ? "default" : model.is_latest ? "latest" : "saved"}
+                </span>
+              </div>
+              <p><code>{model.model_path}</code></p>
+              <p>Updated {new Date(model.modified_at_ms).toLocaleString()}</p>
+              <p>{formatSize(model.size_bytes)}</p>
+              <div className="button-row wrap-row">
+                <button className="primary" disabled={refreshing || uploading || busyModelId !== null || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
+                <button disabled={refreshing || uploading || busyModelId !== null || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
+                <button className="danger" disabled={refreshing || uploading || busyModelId !== null || model.is_active} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
+              </div>
+            </article>
+          ))}
+          {!registry && <p>Model registry unavailable or loading.</p>}
+          {registry && registry.models.length === 0 && <p>No trained models were found under <code>outputs/training</code>.</p>}
+        </div>
+      </section>
+
+      <div className="workspace-split">
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -180,7 +226,7 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
           </label>
         </div>
         <div className="button-row">
-          <button className="primary" type="button" disabled={uploading || busyModelId !== null || !uploadFile}
+          <button className="primary" type="button" disabled={refreshing || uploading || busyModelId !== null || !uploadFile}
             onClick={() => void handleUpload()}>{uploading ? "Uploading..." : "Upload model"}</button>
         </div>
       </section>
@@ -213,37 +259,7 @@ export function ModelRegistryPage({ runtimeSettings, onSettingsChange }: Props) 
           </button>
         </div>
       </section>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2>Installed AI models</h2>
-            <p className="placeholder-copy">Activate one global model. Deleting a run permanently removes its local files.</p>
-          </div>
-          <span className="status-pill muted">{registry?.total ?? 0} models</span>
-        </div>
-        <div className="model-list-grid">
-          {(registry?.models ?? []).map((model) => (
-            <article className="smoke-card" key={model.model_id}>
-              <div className="panel-header compact-header">
-                <strong>{model.model_id}</strong>
-                <span className={`status-pill ${model.is_active ? "status-implemented" : model.is_default ? "status-info" : ""}`}>
-                  {model.is_active ? "active" : model.is_default ? "default" : model.is_latest ? "latest" : "saved"}
-                </span>
-              </div>
-              <p><code>{model.model_path}</code></p>
-              <p>Updated {new Date(model.modified_at_ms).toLocaleString()}</p>
-              <p>{formatSize(model.size_bytes)}</p>
-              <div className="button-row wrap-row">
-                <button className="primary" disabled={busyModelId !== null || model.is_active} onClick={() => void handleLoad(model.model_id)}>Load model</button>
-                <button disabled={busyModelId !== null || model.is_default} onClick={() => void handleDefault(model.model_id)}>Set default</button>
-                <button className="danger" disabled={busyModelId !== null || model.is_active} onClick={() => void handleDelete(model.model_id)}>Delete run</button>
-              </div>
-            </article>
-          ))}
-          {(registry?.models.length ?? 0) === 0 && <p>No trained models were found under <code>outputs/training</code>.</p>}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

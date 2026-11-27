@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Query, Request, Response
+from pydantic import BaseModel, Field
+from typing import Literal
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
@@ -130,3 +132,28 @@ def delete_network_simulation_experiment(run_id: str, request: Request) -> dict:
         extra={"request_id": request.state.request_id, "run_id": run_id},
     )
     return ok(data, request_id=request.state.request_id)
+
+
+class NativeComparisonRequest(BaseModel):
+    engine: Literal["native","reference"] = "native"
+    geometry: Literal["standard","compact","elongated","midblock","midblock_compact","midblock_wide"] = "standard"
+    epoch: str=Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+    generation: int=Field(ge=0)
+    density: Literal["light","normal","busy"]="normal"
+    seed: int=Field(default=42,ge=0,le=2147483647)
+    duration_seconds: int=Field(default=500,ge=30,le=500)
+    profile: str | None=Field(default=None,max_length=100)
+
+
+def _native_evaluation_service():
+    # Optional evaluation dependencies must not load with legacy experiment routes.
+    from app.services.native_evaluation import native_evaluation_service
+    return native_evaluation_service
+
+
+@router.post("/native-experiments")
+def run_native_comparison(payload: NativeComparisonRequest,request: Request) -> Response:
+    archive=_native_evaluation_service().compare(**payload.model_dump())
+    return Response(content=archive,media_type="application/zip",headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "Content-Disposition":'attachment; filename="mesh-native-comparison.zip"'})

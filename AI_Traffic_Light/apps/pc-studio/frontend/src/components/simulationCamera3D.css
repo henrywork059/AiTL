@@ -106,8 +106,6 @@
   transform-origin: top;
   transform: rotateX(90deg);
 }
-.sim3d-vehicle-pole { left: 36%; top: 26%; }
-.sim3d-person-pole { left: 61%; top: 88%; }
 .sim3d-pole span {
   width: 8px;
   height: 8px;
@@ -118,60 +116,243 @@
 .sim3d-pole span.green, .sim3d-status b.green { color: #57ffed; }
 .sim3d-pole span.amber, .sim3d-status b.amber { color: #ffd274; }
 .sim3d-pole span.red, .sim3d-status b.red { color: #ff777c; }
+
 .sim3d-car {
+  --cabin-left: 28%;
+  --cabin-width: 47%;
+  --cabin-top: 14%;
+  --cabin-height: 72%;
+  --cabin-lift: 16px;
   position: absolute;
   height: 7.2%;
-  border-radius: 9px 9px 4px 4px;
-  border: 2px solid #fff4;
-  box-shadow: 2px 5px 2px #0007;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 0 #ffffff55, 1px 4px 6px #0008;
   transform-style: preserve-3d;
   transition: left 430ms linear, top 430ms linear;
 }
+.sim3d-car--suv {
+  --cabin-left: 20%; --cabin-width: 68%; --cabin-top: 10%;
+  --cabin-height: 80%; --cabin-lift: 23px;
+  height: 8.2%;
+}
+.sim3d-car--van {
+  --cabin-left: 12%; --cabin-width: 80%; --cabin-top: 8%;
+  --cabin-height: 84%; --cabin-lift: 27px;
+  height: 9.2%;
+  border-radius: 3px;
+}
+.sim3d-car--bus {
+  --cabin-left: 7%; --cabin-width: 88%; --cabin-top: 8%;
+  --cabin-height: 84%; --cabin-lift: 34px;
+  height: 10%;
+  border-radius: 3px;
+}
+/* Suppress cross-road interpolation when a recycled vehicle reenters off-screen. */
+.sim3d-car.is-reentering { transition: none; }
 .sim3d-car-roof {
   position: absolute;
-  top: 12%;
-  left: 25%;
-  width: 48%;
-  height: 76%;
-  background: #263f54;
-  border: 2px solid #bed4d8;
-  border-radius: 5px;
-  box-shadow: 0 0 0 2px #ffffff33;
-  transform: translateZ(11px);
+  top: var(--cabin-top);
+  left: var(--cabin-left);
+  width: var(--cabin-width);
+  height: var(--cabin-height);
+  border: 2px solid #bcd1db;
+  border-radius: 6px;
+  background: linear-gradient(110deg, #334f61, #78a3b6 44%, #213748 45%, #203748 83%, #759aad 84%);
+  transform: translateZ(var(--cabin-lift));
+  box-shadow: inset 0 0 0 2px #e8f6ff28;
+  transform-style: preserve-3d;
 }
-.sim3d-car-side {
+.sim3d-car-roof::before, .sim3d-car-roof::after {
+  content: "";
   position: absolute;
-  left: 0;
-  top: 100%;
   width: 100%;
-  height: 15px;
-  border-radius: 0 0 3px 3px;
-  background: #182530;
+  height: 16px;
+  background: linear-gradient(#293b49, #608195);
+  border: 1px solid #acbbc4;
   transform-origin: top;
   transform: rotateX(-90deg);
 }
-.sim3d-person {
+.sim3d-car-roof::before { top: 0; }
+.sim3d-car--van .sim3d-car-roof,
+.sim3d-car--bus .sim3d-car-roof {
+  background: linear-gradient(110deg, #344e5d, #9eb9c6 47%, #354c5b 48%);
+  border-radius: 3px;
+}
+.sim3d-car-window-band {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #eaf4e6;
+  top: 0;
+  left: var(--cabin-left);
+  width: var(--cabin-width);
+  height: 14px;
+  border: 1px solid #a9beca;
+  background: repeating-linear-gradient(90deg, #183749 0 20%, #90b3c5 21% 24%, #183749 25% 43%);
+  transform-origin: top;
+  transform: translateZ(calc(var(--cabin-lift) - 4px)) rotateX(-90deg);
+}
+.sim3d-car--car .sim3d-car-window-band { background: linear-gradient(90deg, #163346 5%, #7399ad 44%, #1d3446 48%); }
+.sim3d-car--suv .sim3d-car-window-band { background: linear-gradient(90deg, #1c4359 0 43%, #88a7b9 45% 49%, #1c4359 52%); }
+.sim3d-car-roof::after { top: 100%; }
+.sim3d-car-side {
+  position: absolute;
+  width: 100%;
+  height: 18px;
+  background: inherit;
+  filter: brightness(.66);
+  transform-origin: top;
+  transform: rotateX(-90deg);
+  border-bottom: 2px solid #10182088;
+}
+.sim3d-car-side-near { top: 100%; }
+.sim3d-car-side-far { top: 0; filter: brightness(.82); }
+.sim3d-car-end {
+  position: absolute;
+  width: 18px;
+  height: 100%;
+  background: inherit;
+  filter: brightness(.7);
+  transform-origin: left;
+  transform: rotateY(90deg);
+}
+.sim3d-car-end-front { left: 100%; }
+.sim3d-car-end-rear { left: 0; }
+.sim3d-car-end-front::after, .sim3d-car-end-rear::after {
+  content: "";
+  position: absolute;
+  inset: 6px 3px;
+  border-top: 4px solid #f8ecd0;
+  border-bottom: 4px solid #d44e56;
+  box-shadow: 0 1px 3px #1118;
+}
+.sim3d-car-wheel {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 4px solid #171d22;
+  background: #5c6d78;
   border-radius: 50%;
-  transform: translate(-50%, -50%) translateZ(25px);
-  box-shadow: 1px 3px 4px #0007;
+  box-shadow: inset 0 0 0 2px #a7b4bd;
+  transform: translateZ(-11px) rotateX(-90deg);
+}
+.sim3d-car-wheel-front { left: 73%; }
+.sim3d-car-wheel-rear { left: 12%; }
+.sim3d-car-wheel-near { top: 100%; }
+.sim3d-car-wheel-far { top: 0; }
+/* Upright people stand along the Z axis, with dimensional head and torso. */
+.sim3d-person {
+  --skin-light: #ffe5c9;
+  --skin-shadow: #c98f64;
+  --hair: #26323b;
+  --trousers: #263a49;
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
   transition: left 430ms linear, top 430ms linear;
 }
-.sim3d-person span {
-  display: block;
+.sim3d-person--1 { --skin-light: #bd845b; --skin-shadow: #82583d; --hair: #171d24; --trousers: #47586a; }
+.sim3d-person--2 { --skin-light: #f0bd94; --skin-shadow: #b37957; --hair: #62442d; --trousers: #334c66; }
+.sim3d-person.is-reentering { transition: none; }
+.sim3d-person::before {
+  content: "";
   position: absolute;
-  top: 9px;
-  left: 2px;
-  width: 4px;
-  height: 20px;
-  background: inherit;
-  border: 1px solid #dce5dc;
-  transform: rotateX(-75deg);
-  transform-origin: top;
+  width: 22px;
+  height: 10px;
+  background: #15222a77;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) translateZ(1px);
 }
+.sim3d-person-figure {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 28px;
+  height: 65px;
+  transform: translateX(-50%) rotateX(-90deg);
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+}
+.sim3d-person-figure span { position: absolute; display: block; }
+.sim3d-person-head {
+  width: 15px;
+  height: 15px;
+  left: 6.5px;
+  top: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, var(--skin-light), var(--skin-shadow) 75%);
+  box-shadow: inset -2px -2px 3px #0006, 0 1px 4px #0006;
+  transform: translateZ(3px);
+}
+.sim3d-person-head::before {
+  content: "";
+  position: absolute;
+  inset: -2px -2px 8px;
+  background: var(--hair);
+  border-radius: 50% 50% 35% 35%;
+}
+.sim3d-person-head::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  top: 8px;
+  left: 4px;
+  border-radius: 50%;
+  background: #2a2525;
+  box-shadow: 5px 0 0 #2a2525;
+}
+.sim3d-person-torso {
+  left: 5px;
+  top: 16px;
+  width: 18px;
+  height: 24px;
+  border-radius: 6px 6px 3px 3px;
+  background: currentColor;
+  box-shadow: inset -5px 0 6px #0004, 2px 2px 4px #0005;
+  transform: translateZ(3px);
+}
+.sim3d-person-torso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  border-radius: 5px;
+  transform: rotateY(90deg);
+  box-shadow: inset -5px 0 6px #0005;
+}
+.sim3d-person-arm {
+  top: 18px;
+  width: 7px;
+  height: 27px;
+  background: currentColor;
+  border-radius: 5px;
+  box-shadow: inset -2px 0 3px #0006;
+}
+.sim3d-person-arm-left { left: 0; transform: rotate(12deg) translateZ(2px); }
+.sim3d-person-arm-right { right: 0; transform: rotate(-12deg) translateZ(2px); }
+.sim3d-person-leg {
+  top: 38px;
+  width: 8px;
+  height: 27px;
+  background: var(--trousers);
+  border-radius: 4px;
+  box-shadow: inset -2px 0 3px #0007;
+}
+.sim3d-person-leg-left { left: 5px; transform: rotate(6deg) translateZ(3px); }
+.sim3d-person-leg-right { right: 5px; transform: rotate(-6deg) translateZ(3px); }
+.sim3d-person-leg::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 12px;
+  height: 6px;
+  background: #141c25;
+  border-radius: 3px 3px 2px 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim3d-car, .sim3d-person { transition: none; }
+}
+
 .sim3d-head,
 .sim3d-actions,
 .sim3d-status,
@@ -293,3 +474,7 @@
 
 /* Keyboard users can identify the active camera preview without changing overlays. */
 .sim3d-viewport:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
+
+.native-projection-view { position:absolute; inset:0; display:grid; place-items:center; background:#1d2125; cursor:default; }
+.native-projection-view svg { width:100%; height:100%; }
+.native-projection-view > span { position:absolute; bottom:12px; left:12px; padding:6px 10px; background:#1d2125e8; color:#e8f2f1; font-size:12px; }

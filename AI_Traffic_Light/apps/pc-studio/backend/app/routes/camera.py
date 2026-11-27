@@ -11,6 +11,7 @@ from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.models import CameraSimulationSettingsRequest
 from app.services.camera_frames import MAX_FRAME_BYTES, camera_frame_service
+from app.services.native_evaluation import native_evaluation_service
 from app.services.remote_camera_manager import SIMULATION_SOURCE_IDS, remote_camera_manager as remote_camera_service
 
 router = APIRouter()
@@ -123,6 +124,37 @@ def list_camera_sources(request: Request) -> dict:
 @router.get("/status")
 def camera_status(request: Request) -> dict:
     return ok(camera_frame_service.status(), request_id=request.state.request_id)
+
+
+@router.get("/simulation/shadow")
+def simulation_shadow_diagnostics(request: Request) -> dict:
+    return ok(camera_frame_service.shadow_diagnostics(), request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-projection")
+def simulation_native_projection(request: Request, format: Literal["bundle", "scene"] = "bundle") -> dict:
+    """Explicitly opted-in, non-authoritative diagnostic bundle."""
+    return ok(camera_frame_service.native_projection_diagnostics(scene_only=format == "scene"), request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-frame")
+def simulation_native_frame(request: Request, source_id: str,
+                            generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    """Return only the requested current diagnostic tick; never a selected camera."""
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID, "Unknown native simulation view.", status_code=422)
+    frame = camera_frame_service.native_projection_frame(source_id, generation=generation, tick=tick)
+    if frame is None:
+        raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED, "Native observation is disabled, busy or no longer current.", status_code=409)
+    return Response(content=frame.content, media_type=frame.content_type, headers={
+        "Cache-Control": "no-store, max-age=0",
+        "X-Request-ID": request.state.request_id,
+        "X-Camera-Source": frame.source_id,
+        "X-Frame-Number": str(frame.frame_number),
+        "X-Native-Generation": str(generation),
+        "X-Received-At-Ms": str(frame.received_at_ms),
+        "X-Observation-Origin": frame.origin,
+    })
 
 
 @router.get("/live.mjpeg")
@@ -249,22 +281,22 @@ async def upload_camera_frame(
     request: Request,
     source_id: str = Query(default="device_camera", min_length=1, max_length=64),
 ) -> dict:
-    chunks: list[bytes] = []
-    size_bytes = 0
+    content = bytearray()
     async for chunk in request.stream():
-        size_bytes += len(chunk)
-        if size_bytes > MAX_FRAME_BYTES:
+        next_size = len(content) + len(chunk)
+        if next_size > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
                 "The camera frame is larger than the 8 MiB limit.",
                 status_code=413,
-                details={"size_bytes": size_bytes, "max_size_bytes": MAX_FRAME_BYTES},
+                details={"size_bytes": next_size, "max_size_bytes": MAX_FRAME_BYTES},
             )
-        chunks.append(chunk)
+        content.extend(chunk)
     frame = camera_frame_service.store_upload(
         source_id=source_id,
         content_type=request.headers.get("content-type", ""),
-        content=b"".join(chunks),
+        content=bytes(content),
+        validate_decode=True,
     )
     return ok(frame.metadata(), request_id=request.state.request_id)
 
@@ -286,6 +318,8 @@ def latest_camera_frame(request: Request) -> Response:
             "X-Request-ID": request.state.request_id,
             "X-Camera-Source": frame.source_id,
             "X-Frame-Number": str(frame.frame_number),
+            "X-Received-At-Ms": str(frame.received_at_ms),
+            "X-Observation-Origin": frame.origin,
         },
     )
 
@@ -333,5 +367,221 @@ def update_camera_simulation_settings(
     payload: CameraSimulationSettingsRequest,
     request: Request,
 ) -> dict:
-    data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused)
+    data = camera_frame_service.configure_simulation(density=payload.density, paused=payload.paused, engine=payload.engine)
     return ok(data, request_id=request.state.request_id)
+
+
+class NativeEvaluationIdentity(BaseModel):
+    epoch: str = Field(min_length=32, max_length=32, pattern=r"^[0-9a-f]+$")
+    generation: int = Field(ge=0)
+
+
+class NativeEvaluationMutation(NativeEvaluationIdentity):
+    camera_owner: str | None = Field(default=None,min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeCameraHeartbeat(NativeEvaluationIdentity):
+    camera_owner: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeCameraRelease(BaseModel):
+    epoch: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+    generation: int | None = Field(default=None,ge=0)
+    camera_owner: str = Field(min_length=32,max_length=32,pattern=r"^[0-9a-f]+$")
+
+
+class NativeEvaluationStart(NativeEvaluationMutation):
+    engine: Literal["native","reference"] = "native"
+    geometry: Literal["standard","compact","elongated","midblock","midblock_compact","midblock_wide"] = "standard"
+    density: Literal["light","normal","busy"] = "normal"
+    seed: int = Field(default=42, ge=0, le=2147483647)
+    mode: Literal["fixed","adaptive"] = "fixed"
+
+
+class NativeEvaluationStep(NativeEvaluationMutation):
+    tick: int = Field(ge=0)
+    steps: int = Field(ge=1,le=25)
+
+
+class NativeEvaluationPause(NativeEvaluationMutation):
+    tick: int = Field(ge=0)
+    paused: bool
+
+
+@router.get("/simulation/native-evaluation")
+def read_native_evaluation(request: Request) -> dict:
+    return ok(native_evaluation_service.scene(), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/start")
+def start_native_evaluation(payload: NativeEvaluationStart, request: Request) -> dict:
+    return ok(native_evaluation_service.start(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/step")
+def step_native_evaluation(payload: NativeEvaluationStep, request: Request) -> dict:
+    return ok(native_evaluation_service.step(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/pause")
+def pause_native_evaluation(payload: NativeEvaluationPause, request: Request) -> dict:
+    return ok(native_evaluation_service.pause(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/stop")
+def stop_native_evaluation(payload: NativeEvaluationMutation, request: Request) -> dict:
+    return ok(native_evaluation_service.stop(**payload.model_dump()), request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/camera-heartbeat")
+def native_camera_heartbeat(payload: NativeCameraHeartbeat,request: Request) -> dict:
+    return ok(native_evaluation_service.camera_heartbeat(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/camera-release")
+def native_camera_release(payload: NativeCameraRelease,request: Request) -> dict:
+    return ok(native_evaluation_service.release_camera(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-evaluation/frame")
+def native_evaluation_frame(request: Request, source_id: str, epoch: str,
+                            generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    frame=native_evaluation_service.frame(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+    return Response(content=frame.content, media_type=frame.content_type,headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
+        "X-Native-Generation":str(generation),"X-Received-At-Ms":str(frame.received_at_ms),
+        "X-Observation-Origin":frame.origin})
+
+
+@router.get("/simulation/native-evaluation/capture")
+def native_evaluation_capture(request: Request, epoch: str,
+                              generation: int = Query(ge=0), tick: int = Query(ge=0)) -> Response:
+    archive=native_evaluation_service.capture(epoch=epoch,generation=generation,tick=tick)
+    return Response(content=archive,media_type="application/zip",headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "Content-Disposition":f'attachment; filename="mesh-native-g{generation}-t{tick}.zip"'})
+
+
+@router.get("/simulation/native-evaluation/export")
+def native_evaluation_export(request: Request, epoch: str,
+                             generation: int = Query(ge=0), tick: int = Query(ge=0)) -> dict:
+    return ok(native_evaluation_service.export(epoch=epoch,generation=generation,tick=tick), request_id=request.state.request_id)
+
+
+@router.get("/simulation/native-evaluation/view")
+def native_evaluation_view(request: Request,source_id: str,epoch: str,
+                           generation: int=Query(ge=0),tick: int=Query(ge=0)) -> dict:
+    data=native_evaluation_service.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=source_id)
+    return ok(data,request_id=request.state.request_id)
+
+
+class NativeEvaluationRegion(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    coordinate_space: str = Field(max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+
+
+@router.post("/simulation/native-evaluation/region")
+def native_evaluation_region(payload: NativeEvaluationRegion, request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.post("/simulation/native-evaluation/region/views")
+def native_evaluation_region_views(payload: NativeEvaluationRegion, request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region_views(**payload.model_dump()),request_id=request.state.request_id)
+
+
+class LegacyRectanglePreview(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    legacy_layout_id: str = Field(min_length=64,max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+
+
+@router.post("/simulation/native-evaluation/region/legacy-preview")
+def preview_legacy_rectangle(payload: LegacyRectanglePreview, request: Request) -> dict:
+    return ok(native_evaluation_service.preview_legacy_rectangle(**payload.model_dump()),request_id=request.state.request_id)
+
+
+class LegacyRegionDraft(BaseModel):
+    id: str = Field(min_length=1,max_length=128)
+    polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+
+
+class LegacyRegionsPreview(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    legacy_layout_id: str = Field(min_length=64,max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    regions: list[LegacyRegionDraft] = Field(min_length=1,max_length=32)
+
+
+@router.post("/simulation/native-evaluation/region/legacy-regions-preview")
+def preview_legacy_regions(payload: LegacyRegionsPreview,request: Request) -> dict:
+    return ok(native_evaluation_service.preview_legacy_regions(**payload.model_dump()),request_id=request.state.request_id)
+
+
+class NativeRegionProfile(BaseModel):
+    schema_version: Literal[1]
+    coordinate_space: str = Field(max_length=64)
+    layout_id: str = Field(min_length=64,max_length=64)
+    canonical_polygon: list[tuple[float,float]] = Field(min_length=4,max_length=4)
+    count_basis: str = Field(max_length=64)
+    detector_input_eligible: bool
+
+
+class NativeRegionProfileRequest(NativeEvaluationIdentity):
+    tick: int = Field(ge=0)
+    source_id: str = Field(max_length=64)
+    profile: NativeRegionProfile
+
+
+@router.post("/simulation/native-evaluation/region/profile")
+def evaluate_native_region_profile(payload: NativeRegionProfileRequest,request: Request) -> dict:
+    return ok(native_evaluation_service.evaluate_region_profile(**payload.model_dump()),request_id=request.state.request_id)
+
+
+@router.get("/simulation/observation")
+def simulation_observation(request: Request, engine: Literal["legacy","protected","native","reference"] = "legacy",
+                           source_id: str = "simulation_camera") -> dict:
+    """Common read-only scene interface, explicit engine and image plane."""
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
+    if engine in {"legacy","protected"}:
+        scene = camera_frame_service.simulation_scene_for(source_id,engine=engine)
+        if scene is None:
+            raise AppError(ErrorCode.CAMERA_STREAM_NOT_STARTED,"No active legacy simulation.",status_code=409)
+        agents = scene["view_agents"]
+        time_s = scene["simulation_time_seconds"]
+    else:
+        scene = native_evaluation_service.current_simulation_scene(source_id,engine=engine)
+        agents = scene["agents"]
+        time_s = scene["time_s"]
+    return ok({"engine":engine,"observation":scene["observation"],"agents":agents,
+               "time_s":time_s,"paused":scene["paused"],"signal":scene["signal"],
+               "legacy_editor_compatible":engine in {"legacy","protected"},"physical_output_allowed":False},
+              request_id=request.state.request_id)
+
+
+@router.get("/simulation/observation/frame")
+def exact_simulation_observation_frame(request: Request, engine: Literal["legacy","protected","native","reference"],
+                                       source_id: str, epoch: str,
+                                       generation: int=Query(ge=0),tick: int=Query(ge=0),
+                                       layout_id: str=Query(min_length=64,max_length=64)) -> Response:
+    if source_id not in SIMULATION_SOURCE_IDS:
+        raise AppError(ErrorCode.CAMERA_SOURCE_INVALID,"Unknown simulation view.",status_code=422)
+    owner = camera_frame_service if engine in {"legacy","protected"} else native_evaluation_service
+    identity = dict(epoch=epoch,generation=generation,tick=tick,layout_id=layout_id,source_id=source_id)
+    frame = owner.exact_simulation_frame(**identity,engine=engine)
+    return Response(content=frame.content,media_type=frame.content_type,headers={
+        "Cache-Control":"no-store","X-Request-ID":request.state.request_id,
+        "X-Camera-Source":frame.source_id,"X-Frame-Number":str(frame.frame_number),
+        "X-Received-At-Ms":str(frame.received_at_ms),"X-Observation-Origin":frame.origin,
+        "X-Simulation-Engine":engine,"X-Layout-ID":layout_id,
+        "X-Observation-Epoch":epoch,"X-Observation-Generation":str(generation),
+        **({"X-Detector-Input-Eligible":"false","X-Observation-Kind":"synthetic_ground_truth","X-Coordinate-Space":"native_projection_v1"}
+           if engine in {"native","reference"} else {})})

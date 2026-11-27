@@ -1,7 +1,10 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { Detection, Zone } from "../types";
 import { fetchSimulationScene, type SimulationScene } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from "./simulation3dMotion";
+import { ThreeRoadView } from "./ThreeRoadView";
+import { NativeProjectionView } from "./NativeProjectionView";
 import "./simulationCamera3D.css";
 
 type Props = {
@@ -31,14 +34,6 @@ const INITIAL_ORBIT: Record<string, number> = {
 };
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-/** Source images B/C/D are mirror transforms of the canonical A coordinates. */
-function sourcePoint(x: number, y: number, sourceId: string, width: number, height: number) {
-  return {
-    x: sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d" ? width - x : x,
-    y: sourceId === "simulation_camera_b" || sourceId === "simulation_camera_d" ? height - y : y,
-  };
-}
-
 /** Read-only perspective of the actual live camera simulator; never controls its agents. */
 export function SimulationCamera3D({
   sourceId, editing = false, detections = [], zones = [],
@@ -51,13 +46,36 @@ export function SimulationCamera3D({
   const [orbit, setOrbit] = useState(initialOrbit);
   const [pitch, setPitch] = useState(48);
   const [zoom, setZoom] = useState(0.85);
+  const [threeRequested, setThreeRequested] = useState(false);
+  const [nativeRequested, setNativeRequested] = useState(false);
+  const [threeFailed, setThreeFailed] = useState(false);
+  const onThreeFailure = useCallback(() => setThreeFailed(true), []);
   const drag = useRef<{ x: number; y: number; orbit: number; pitch: number } | null>(null);
+  const previousPositions = useRef<{
+    sourceId: string;
+    vehicles: Record<string, number>;
+    pedestrians: Record<string, number>;
+  }>({ sourceId: "", vehicles: {}, pedestrians: {} });
 
-  useSerialPolling(async () => {
+  useEffect(() => {
+    previousPositions.current = {
+      sourceId,
+      vehicles: Object.fromEntries(
+        (scene?.source_id === sourceId ? scene.vehicles : []).map(vehicle => [vehicle.id, vehicle.x]),
+      ),
+      pedestrians: Object.fromEntries(
+        (scene?.source_id === sourceId ? scene.pedestrians : []).map(person => [person.id, person.y]),
+      ),
+    };
+  }, [scene, sourceId]);
+
+  useSerialPolling(async ({isCurrent}) => {
     const next = await fetchSimulationScene(sourceId);
+    if(!isCurrent())return;
     setScene(next);
     setError(null);
   }, 450, {
+    enabled: !nativeRequested || editing || (showRegions&&zones.length>0) || (showBoxes&&detections.length>0),
     restartKey: sourceId,
     onError: (reason) => {
       setScene(null);
@@ -114,18 +132,29 @@ export function SimulationCamera3D({
   const vehicleLight = activeScene?.signal.vehicle_go ? "green" : phase === "vehicle_yellow" ? "amber" : "red";
   const pedestrianLight = activeScene?.signal.pedestrian_walk ? "green" : "red";
   const isFlippedX = sourceId === "simulation_camera_c" || sourceId === "simulation_camera_d";
+  const vehicleSignalPoint = simulationSourcePoint(sizeX * 0.36, sizeY * 0.26, sourceId, sizeX, sizeY);
+  const pedestrianSignalPoint = simulationSourcePoint(sizeX * 0.61, sizeY * 0.88, sourceId, sizeX, sizeY);
   const hasOverlay = !editing && ((showRegions && zones.length > 0) || (showBoxes && detections.length > 0));
+  // The legacy world owns source-pixel overlays and editing until projection parity is tested.
+  const canUseThree = !editing && !hasOverlay && activeScene !== null && sizeX === 1280 && sizeY === 720;
+  // Native uses a separate snapshot; a legacy camera source refresh must not retire it.
+  const usingNative = !editing && !hasOverlay && nativeRequested;
+  const usingThree = canUseThree && threeRequested && !threeFailed && !usingNative;
+  useEffect(() => {
+    if (editing || hasOverlay) setNativeRequested(false);
+  }, [editing, hasOverlay]);
   const normalizedFrameWidth = frameWidth > 0 ? frameWidth : sizeX;
   const normalizedFrameHeight = frameHeight > 0 ? frameHeight : sizeY;
 
   return (
-    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`}>
-      <div className="sim3d-viewport" tabIndex={editing ? undefined : 0}
+    <section className={`sim3d-preview${editing ? " is-editor" : ""}`} aria-label={`Interactive 3D preview of ${sourceId}`} data-renderer={usingNative ? "native" : usingThree ? "three" : "legacy"}>
+      <div className="sim3d-viewport" tabIndex={editing || usingNative ? undefined : 0}
         aria-label="3D camera view: arrow keys orbit and tilt, plus or minus zoom, Home resets"
-        onKeyDown={editing ? undefined : keyboardCamera}
-        onPointerDown={editing ? undefined : beginDrag} onPointerMove={editing ? undefined : moveDrag}
-        onPointerUp={editing ? undefined : endDrag} onPointerCancel={editing ? undefined : endDrag} onWheel={editing ? undefined : changeZoom}>
-        <div className="sim3d-world" aria-hidden="true" style={{
+        onKeyDown={editing || usingNative ? undefined : keyboardCamera}
+        onPointerDown={editing || usingNative ? undefined : beginDrag} onPointerMove={editing || usingNative ? undefined : moveDrag}
+        onPointerUp={editing || usingNative ? undefined : endDrag} onPointerCancel={editing || usingNative ? undefined : endDrag} onWheel={editing || usingNative ? undefined : changeZoom}>
+        {usingNative ? <NativeProjectionView sourceId={sourceId} /> : usingThree ? <ThreeRoadView key={sourceId} sourceId={sourceId} snapshot={activeScene}
+          orbit={orbit} pitch={pitch} zoom={zoom} onFailure={onThreeFailure} /> : <div className="sim3d-world" aria-hidden="true" style={{
           transform: editing
             ? "translate(-50%, -50%) scale(1) rotateX(0deg) rotateZ(0deg)"
             : `translate(-50%, -50%) scale(${zoom}) rotateX(${pitch}deg) rotateZ(${orbit}deg)`,
@@ -140,12 +169,20 @@ export function SimulationCamera3D({
           ))}
           <div className="sim3d-stop sim3d-stop-left" />
           <div className="sim3d-stop sim3d-stop-right" />
-          <div className="sim3d-pole sim3d-vehicle-pole"><span className={vehicleLight} /></div>
-          <div className="sim3d-pole sim3d-person-pole"><span className={pedestrianLight} /></div>
+          <div className="sim3d-pole sim3d-vehicle-pole" style={{
+            left: `${vehicleSignalPoint.x / sizeX * 100}%`, top: `${vehicleSignalPoint.y / sizeY * 100}%`,
+          }}><span className={vehicleLight} /></div>
+          <div className="sim3d-pole sim3d-person-pole" style={{
+            left: `${pedestrianSignalPoint.x / sizeX * 100}%`, top: `${pedestrianSignalPoint.y / sizeY * 100}%`,
+          }}><span className={pedestrianLight} /></div>
           {activeScene?.vehicles.map(vehicle => {
-            const leftEdge = sourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
+            const leftEdge = simulationSourcePoint(vehicle.x, vehicle.y, sourceId, sizeX, sizeY);
             const centerX = isFlippedX ? leftEdge.x - vehicle.width / 2 : leftEdge.x + vehicle.width / 2;
-            return <div className="sim3d-car" key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
+            const previousX = previousPositions.current.sourceId === sourceId
+              ? previousPositions.current.vehicles[vehicle.id] : undefined;
+            const variant = ["car", "suv", "van", "bus"].includes(vehicle.vehicle_type)
+              ? vehicle.vehicle_type : "car";
+            return <div className={`sim3d-car sim3d-car--${variant}${isVehicleReentry(previousX, vehicle.x, sizeX) ? " is-reentering" : ""}`} key={vehicle.id} title={`${vehicle.vehicle_type} · ${vehicle.direction > 0 ? "eastbound" : "westbound"}`}
               style={{
                 left: `${centerX / sizeX * 100}%`,
                 top: `${leftEdge.y / sizeY * 100}%`,
@@ -154,17 +191,34 @@ export function SimulationCamera3D({
                 transform: `translate(-50%, -50%) translateZ(15px) rotateZ(${(isFlippedX ? -vehicle.direction : vehicle.direction) < 0 ? 180 : 0}deg)`,
               }}>
               <div className="sim3d-car-roof" />
-              <div className="sim3d-car-side" />
+              <div className="sim3d-car-window-band" />
+              <div className="sim3d-car-side sim3d-car-side-near" />
+              <div className="sim3d-car-side sim3d-car-side-far" />
+              <div className="sim3d-car-end sim3d-car-end-front" />
+              <div className="sim3d-car-end sim3d-car-end-rear" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-front sim3d-car-wheel-near" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-rear sim3d-car-wheel-near" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-front sim3d-car-wheel-far" />
+              <div className="sim3d-car-wheel sim3d-car-wheel-rear sim3d-car-wheel-far" />
             </div>;
           })}
-          {activeScene?.pedestrians.map(pedestrian => {
-            const point = sourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
-            return <div className="sim3d-person" key={pedestrian.id} title="Simulated pedestrian" style={{
+          {activeScene?.pedestrians.map((pedestrian, index) => {
+            const point = simulationSourcePoint(pedestrian.x, pedestrian.y, sourceId, sizeX, sizeY);
+            const previousY = previousPositions.current.sourceId === sourceId
+              ? previousPositions.current.pedestrians[pedestrian.id] : undefined;
+            return <div className={`sim3d-person sim3d-person--${index % 3}${isPedestrianReentry(previousY, pedestrian.y, sizeY) ? " is-reentering" : ""}`} key={pedestrian.id} title="Simulated pedestrian" style={{
               left: `${point.x / sizeX * 100}%`,
               top: `${point.y / sizeY * 100}%`,
-              backgroundColor: pedestrian.color,
+              color: pedestrian.color,
             }}>
-              <span />
+              <div className="sim3d-person-figure">
+                <span className="sim3d-person-head" />
+                <span className="sim3d-person-torso" />
+                <span className="sim3d-person-arm sim3d-person-arm-left" />
+                <span className="sim3d-person-arm sim3d-person-arm-right" />
+                <span className="sim3d-person-leg sim3d-person-leg-left" />
+                <span className="sim3d-person-leg sim3d-person-leg-right" />
+              </div>
             </div>;
           })}
           {hasOverlay && (
@@ -196,7 +250,7 @@ export function SimulationCamera3D({
               })}
             </svg>
           )}
-        </div>
+        </div>}
       </div>
       <div className="sim3d-head">
         <span className="sim3d-flag">3D CAMERA</span>
@@ -204,22 +258,32 @@ export function SimulationCamera3D({
         {activeScene?.paused && <span className="sim3d-paused">Paused</span>}
       </div>
       {!editing && <div className="sim3d-actions">
-        <button type="button" onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
-        <button type="button" onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
+        <button type="button" disabled={!canUseThree && !usingNative} aria-pressed={usingNative}
+          onClick={() => {setNativeRequested(current => !current); setThreeRequested(false);}}>
+          {usingNative ? "Exit native preview" : "Native SUMO preview"}
+        </button>
+        <button type="button" disabled={!canUseThree || usingNative} aria-pressed={usingThree}
+          title={hasOverlay ? "Hide detection and region overlays to try Three.js" : "Experimental 3D road preview; detailed vehicles"}
+          onClick={() => {
+            if (threeFailed) { setThreeFailed(false); setThreeRequested(true); }
+            else setThreeRequested(current => !current);
+          }}>{usingThree ? "Legacy view" : threeFailed ? "Retry Three.js" : "Three.js preview"}</button>
+        <button type="button" disabled={usingNative} onClick={() => { setOrbit(initialOrbit); setPitch(48); setZoom(0.85); }}>Reset</button>
+        <button type="button" disabled={usingNative} onClick={() => setPitch(current => current === 0 ? 48 : 0)}>
           {pitch === 0 ? "Perspective" : "Top"}
         </button>
-        <label>Zoom <input aria-label="3D camera zoom" type="range" min="0.5" max="1.35" step="0.05"
+        <label>Zoom <input aria-label="3D camera zoom" type="range" disabled={usingNative} min="0.5" max="1.35" step="0.05"
           value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
       </div>}
-      <div className="sim3d-status" aria-live="off">
+      {!usingNative && <div className="sim3d-status" aria-live="off">
         {activeScene ? <>
           <span>Vehicle <b className={vehicleLight}>{vehicleLight}</b></span>
           <span>Pedestrian <b className={pedestrianLight}>{pedestrianLight === "green" ? "walk" : "stop"}</b></span>
           <span>{phase.replaceAll("_", " ")} · {Math.max(0, Math.ceil(activeScene.signal.seconds_remaining))} s</span>
-          <span>{activeScene.vehicles.length} cars · {activeScene.pedestrians.length} people</span>
+          <span>{activeScene.vehicles.length} vehicles · {activeScene.pedestrians.length} people</span>
         </> : <span>{error ?? "Loading 3D simulation scene..."}</span>}
-      </div>
-      {!editing && <span className="sim3d-hint">Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
+      </div>}
+      {!editing && !usingNative && <span className="sim3d-hint">{threeFailed ? "WebGL unavailable · legacy view · " : usingThree ? "Experimental Three.js · " : ""}Drag or arrow keys to orbit · +/- zoom · Home reset · synthetic scene</span>}
       {editing && <span className="sim3d-hint">Aligned 3D top view · drag region vertices</span>}
     </section>
   );

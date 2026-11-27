@@ -24,11 +24,16 @@ def main() -> int:
         "await waitForIdle()",
         "await runNow()",
         "window.setTimeout",
-        "finally",
+        "runScopedSerialTask",
+        "scope.retire()",
         "return { runNow, waitForIdle }",
     ):
         assert marker in hook, marker
     assert "window.setInterval" not in hook
+    core = (FRONTEND_ROOT / "lib" / "pollingScope.ts").read_text(encoding="utf-8")
+    assert "finally" in core and "if (inFlight.current)" in core
+    assert "context.isCurrent()" in read("apps/pc-studio/frontend/src/pages/LiveAiPage.tsx")
+    assert "context.isCurrent()" in read("apps/pc-studio/frontend/src/pages/TrafficAnalyticsPage.tsx")
 
     checked: list[str] = []
     for relative_path in SERIAL_POLLING_SURFACES:

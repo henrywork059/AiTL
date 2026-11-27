@@ -577,7 +577,10 @@ def _assert_service_projection_and_backfill() -> None:
 
         from fastapi import FastAPI, Request
         from fastapi.testclient import TestClient
+        # The optional native service must not be imported by legacy routes.
+        before_native = sys.modules.get("app.services.native_evaluation")
         from app.routes import experiments as experiment_routes
+        assert sys.modules.get("app.services.native_evaluation") is before_native
 
         experiment_routes.network_simulation_experiment_service = service
         app = FastAPI()

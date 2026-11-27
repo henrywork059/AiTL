@@ -382,6 +382,9 @@ export type CameraStatus = {
   simulation_enabled: boolean;
   simulation_paused: boolean;
   simulation_density: SimulationDensity;
+  simulation_engine?: "legacy" | "protected";
+  simulation_fault?: string | null;
+  simulation_applied_phase?: string | null;
   simulation_signal_phase?: string | null;
   simulation_signal_seconds_remaining?: number | null;
   simulation_signal_cycle_seconds?: number | null;
@@ -416,6 +419,7 @@ export type CaptureRecord = {
   height: number;
   source_frame_number: number;
   source_received_at_ms: number;
+  content_sha256?: string;
   captured_at_ms: number;
   size_bytes: number;
   quality_tag: CaptureQualityTag;
@@ -465,6 +469,7 @@ export type TrainingDatasetStatus = {
   labeled_frame_count: number;
   eligible_frame_count: number;
   excluded_bad_count: number;
+  excluded_evaluation_count?: number;
   label_box_count: number;
   train_count: number;
   val_count: number;
@@ -507,6 +512,7 @@ export type TrainingStatus = {
   training_available: boolean;
   backend: string;
   active_run_id: string | null;
+  dataset_integrity_sha256?: string | null;
   progress: number;
   status: "idle" | "running" | "completed" | "early_stopped" | "failed" | string;
   message: string;

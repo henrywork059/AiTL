@@ -1,0 +1,178 @@
+"""Execute bounded native policy pairs across seed and demand; retain all raw data."""
+from pathlib import Path
+import io
+import json
+import sys
+import tempfile
+import time
+from unittest.mock import patch
+from zipfile import ZipFile
+
+# Existing native trial establishes the backend and test import paths.
+from sumo_migration_trial import processes
+from app.services.native_evaluation import NativeEvaluationService
+from app.services.signal_rules import SignalRulesService
+from app.services.simulation_experiments import _ModeSimulation
+from app.services.simulation_finite_fixture import Segment, Trip, FiniteReference, RouteGateAdapter
+from app.services.simulation_gate_metrics import GateMetrics
+import hashlib
+
+
+def replay_reference(arm):
+    """Same declared route geometry/offers and requested phases; not legacy PC Studio."""
+    def segment(row):
+        return Segment(row["road_id"],row["kind"],tuple(tuple(pt) for pt in row["points"]))
+    trips=tuple(Trip(t["ident"],t["kind"],t["depart_s"],t["desired_speed"],
+                     tuple(segment(s) for s in t["path"]),
+                     tuple(tuple(segment(s) for s in path) for path in t["alternatives"]))
+                for t in arm["demand_manifest"])
+    digest=hashlib.sha256(json.dumps(arm["demand_manifest"],sort_keys=True,separators=(",",":")).encode()).hexdigest()
+    assert digest==arm["demand_digest"]
+    model=FiniteReference(trips)
+    adapter=RouteGateAdapter(trips)
+    metrics=GateMetrics()
+    timeline=[]
+    for row in arm["timeline"]:
+        agents=model.advance(row["phase"])
+        timeline.append({**metrics.sample(row["tick"],adapter.observations(agents)),"requested_phase":row["phase"]})
+    return {"engine":"finite_reference","demand_digest":digest,"layout_id":arm["layout_id"],
+            "summary":metrics.summary(),"waiting_episodes":metrics.waiting_episodes(),
+            "timeline":timeline,"arrived":sorted(model.arrived),
+            "active":sorted(model.active),"pending":sorted(t.ident for t in model.pending),
+            "production_experiment_parity":False}
+
+
+def main(out):
+    out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    reference_runtime = []
+    protected_pairs = []
+    with tempfile.TemporaryDirectory(prefix="mesh-policy-matrix-") as tmp:
+        root = Path(tmp)
+        policy = SignalRulesService(config_path=root/"policy.json",
+            history_path=root/"history.jsonl", respect_environment=False)
+        policy.save_config(policy.defaults())
+        original = policy.config_path.read_bytes()
+        service = NativeEvaluationService(enabled=True)
+        try:
+            with patch("app.services.native_evaluation.signal_rules_service", policy):
+                cases=[(seed,density,"standard") for seed in (42,73) for density in ("light","normal","busy")]
+                cases += [(42,"normal",geometry) for geometry in ("compact","elongated")]
+                for seed,density,geometry in cases:
+                    start = time.perf_counter()
+                    archive = service.compare(epoch=service.epoch,
+                        generation=service.generation, seed=seed,
+                        density=density, duration_seconds=120, geometry=geometry)
+                    elapsed = time.perf_counter()-start
+                    name = f"{seed}-{density}-{geometry}.zip"
+                    (out/name).write_bytes(archive)
+                    with ZipFile(io.BytesIO(archive)) as z:
+                        manifest = json.loads(z.read("manifest.json"))
+                        deltas = json.loads(z.read("deltas.json"))
+                        summaries = {}
+                        for mode in ("fixed", "adaptive"):
+                            arm = json.loads(z.read(mode+".json"))
+                            assert len(arm["timeline"]) == 600
+                            assert arm["seed"] == seed and arm["density"] == density and arm["geometry"] == geometry
+                            for kind, waits in arm["waiting_episodes"].items():
+                                assert waits["observed_agent_seconds"] == arm["summary"][kind+"_wait_agent_s"]
+                            summaries[mode] = arm["summary"]
+                            # Execute the existing production benchmark, not a new substitute.
+                            if geometry=="standard":
+                                legacy_root=root/f"{seed}-{density}-{mode}-historical"
+                                legacy_root.mkdir()
+                                legacy=_ModeSimulation(mode=mode,density=density,seed=seed,duration_seconds=120,
+                                    sample_interval_seconds=1,policy_config=json.loads(z.read("policy.json")),
+                                    zones=[],temp_root=legacy_root,normalized_gate_evidence=True).run()
+                                common=legacy["normalized_gate_evidence"]
+                                assert len(common["timeline"])==600
+                                for kind,waits in common["waiting_episodes"].items():
+                                    assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
+                                (out/f"{seed}-{density}-{mode}-production-legacy.json").write_text(json.dumps(legacy,indent=2),encoding="utf-8")
+                                live_root=root/f"{seed}-{density}-{mode}-live"
+                                live_root.mkdir()
+                                live=_ModeSimulation(mode=mode,density=density,seed=seed,duration_seconds=120,
+                                    sample_interval_seconds=1,policy_config=json.loads(z.read("policy.json")),
+                                    zones=[],temp_root=live_root,normalized_gate_evidence=True,live_slot_demand=True).run()
+                                live_common=live["normalized_gate_evidence"]
+                                assert live_common["demand_model"]=="production_live_slots"
+                                assert live_common["movement_step_seconds"]==.05 and len(live_common["timeline"])==600
+                                for kind,waits in live_common["waiting_episodes"].items():
+                                    assert waits["observed_agent_seconds"]==live_common["summary"][kind+"_wait_agent_s"]
+                                (out/f"{seed}-{density}-{mode}-live-slot-legacy.json").write_text(json.dumps(live,indent=2),encoding="utf-8")
+                                protected_root=root/f"{seed}-{density}-{mode}-protected"
+                                protected_root.mkdir()
+                                protected=_ModeSimulation(mode=mode,density=density,seed=seed,duration_seconds=120,
+                                    sample_interval_seconds=1,policy_config=json.loads(z.read("policy.json")),
+                                    zones=[],temp_root=protected_root,normalized_gate_evidence=True,protected_slots=True).run()
+                                evidence=protected["normalized_gate_evidence"]
+                                assert len(evidence["timeline"])==600 and evidence["demand_model"]=="protected_slots_v2"
+                                assert not protected["metrics"]["diagnostics"]["protected_overlap_detected"]
+                                signal=protected["metrics"]["signal"]
+                                cursor=1
+                                holds=0
+                                applied={}
+                                for span in protected["admission_trace"]["spans"]:
+                                    assert span["first_tick"]==cursor and span["last_tick"]>=cursor
+                                    assert span["applied"] in {span["requested"],"all_red"}
+                                    n=span["last_tick"]-cursor+1
+                                    cursor+=n
+                                    applied[span["applied"]]=applied.get(span["applied"],0)+n
+                                    if span["requested"] in {"vehicle_green","pedestrian_green"} and span["requested"]!=span["applied"]:
+                                        holds+=n
+                                assert cursor==2401
+                                assert {k:round(n*.05,3) for k,n in applied.items()}==signal["applied_phase_time_seconds"]
+                                assert round(holds*.05,3)==signal["admission_hold_seconds"]
+                                for kind,waits in evidence["waiting_episodes"].items():
+                                    assert waits["observed_agent_seconds"]==evidence["summary"][kind+"_wait_agent_s"]
+                                digest=protected["protected_demand"]["digest"]
+                                if mode=="fixed":
+                                    protected_pairs.append({"seed":seed,"density":density,"demand_digest":digest})
+                                else:
+                                    assert protected_pairs[-1]=={"seed":seed,"density":density,"demand_digest":digest}
+                                (out/f"{seed}-{density}-{mode}-protected-slots.json").write_text(json.dumps(protected,indent=2),encoding="utf-8")
+                            reference=replay_reference(arm)
+                            assert len(reference["timeline"])==len(arm["timeline"])
+                            (out/f"{seed}-{density}-{geometry}-{mode}-reference.json").write_text(json.dumps(reference,indent=2),encoding="utf-8")
+                        rows.append({"archive":name,"seed":seed,"density":density,"geometry":geometry,"layout_id":manifest["layout_id"],
+                            "wall_s":elapsed,"demand_digest":manifest["demand_digest"],
+                            "summaries":summaries,"deltas":deltas})
+                # Execute two independent-policy arms via the same actual lifecycle,
+                # not a replay of native phase schedules. Both manifests must match.
+                native_case=next(row for row in rows if row["seed"]==42 and row["density"]=="normal" and row["geometry"]=="standard")
+                start=time.perf_counter()
+                archive=service.compare(epoch=service.epoch,generation=service.generation,
+                    seed=42,density="normal",duration_seconds=120,geometry="standard",engine="reference")
+                (out/"42-normal-standard-reference-runtime.zip").write_bytes(archive)
+                with ZipFile(io.BytesIO(archive)) as z, ZipFile(out/native_case["archive"]) as native_zip:
+                    manifest=json.loads(z.read("manifest.json"))
+                    assert manifest["engine"]=="reference"
+                    assert manifest["layout_id"]==native_case["layout_id"] and manifest["demand_digest"]==native_case["demand_digest"]
+                    for mode in ("fixed","adaptive"):
+                        arm=json.loads(z.read(mode+".json"))
+                        native_arm=json.loads(native_zip.read(mode+".json"))
+                        assert arm["engine"]=="reference" and len(arm["timeline"])==600
+                        assert arm["demand_manifest"]==native_arm["demand_manifest"]
+                        assert arm["policy_config"]==native_arm["policy_config"]
+                        assert not arm["unknown_roads"]
+                        parts=arm["trip_accounting"]
+                        groups=[set(parts[k]) for k in ("active","arrived","not_observed_due","not_yet_due","retired_without_arrival")]
+                        assert sum(map(len,groups))==len(set().union(*groups))==len(parts["offered"])
+                        assert set().union(*groups)==set(parts["offered"])
+                        for kind,waits in arm["waiting_episodes"].items():
+                            assert waits["observed_agent_seconds"]==arm["summary"][kind+"_wait_agent_s"]
+                        reference_runtime.append({"mode":mode,"summary":arm["summary"],"trip_accounting":parts})
+                assert service.scene()["status"]=="idle"
+            assert len({row["layout_id"] for row in rows}) == 3
+            assert policy.config_path.read_bytes() == original
+        finally:
+            service.close()
+    result = {"evidence":"executed synthetic native policy matrix",
+              "duration_seconds":120,"step_seconds":.2,"pairs":rows,
+              "reference_replays":16,"production_legacy_arms":12,"live_slot_legacy_arms":12,"protected_slot_arms":12,"protected_pairs":protected_pairs,"reference_runtime_arms":2,"reference_runtime":reference_runtime,"production_experiment_parity":False,"physical_output_allowed":False}
+    (out/"matrix.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
+    print(json.dumps(result,indent=2))
+
+
+if __name__ == "__main__":
+    main(Path(sys.argv[1]))

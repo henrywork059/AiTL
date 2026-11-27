@@ -368,8 +368,6 @@ if (Test-Path $versionFile) {
     Get-Content $versionFile
 }
 
-$preflightTests = @("test_update_test_run_script.py")
-
 if (-not $SkipTests) {
     Push-Location $projectRoot
     try {
@@ -409,36 +407,13 @@ else {
 if (-not $SkipTests) {
     Push-Location $projectRoot
     try {
-        $manualHardwareTests = @(
-            "test_camera_transport_benchmark.py",
-            "test_camera_transport_isolation.py"
-        )
-
-        $tests = Get-ChildItem ".\scripts\test_*.py" |
-            Where-Object {
-                $_.Name -ne "test_backend_smoke.py" -and
-                $_.Name -notin $manualHardwareTests -and
-                $_.Name -notin $preflightTests
-            } |
-            Sort-Object Name
-
+        # Shared discovery with CI; preflight already ran above.
+        $offlineArgs = @("--skip-preflight")
         if ($ChangedTests -and -not $runAllRegressions) {
-            $tests = @($tests | Where-Object { $_.Name -in $selectedTests })
+            $offlineArgs += "--focused"
+            $offlineArgs += @($selectedTests)
         }
-        if ($ChangedTests) {
-            Write-Host "Offline regressions selected: $($tests.Count)" -ForegroundColor DarkCyan
-        }
-
-        foreach ($test in $tests) {
-            Run-Step "Backend regression: $($test.Name)" { & $python $test.FullName }
-        }
-
-        foreach ($manualTest in $manualHardwareTests) {
-            if (Test-Path (Join-Path ".\scripts" $manualTest)) {
-                Write-Host "`n=== Hardware camera test excluded: $manualTest ===" -ForegroundColor DarkCyan
-                Write-Host "Run manually with --host after flashing matching diagnostic firmware."
-            }
-        }
+        Run-Step "Offline regressions" { & $python ".\scripts\run_offline_tests.py" @offlineArgs }
     }
     finally {
         Pop-Location

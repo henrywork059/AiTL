@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import ipaddress
 import json
 import socket
-import struct
 from threading import Condition, Event, RLock, Thread, current_thread
 import time
 from typing import BinaryIO, Callable
@@ -16,6 +15,11 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
 from app.services.camera_frames import CameraFrame, MAX_FRAME_BYTES, camera_frame_service
+# Retain legacy imports for diagnostics, test seams and existing consumers.
+from app.services.camera_tcp_transport import (
+    FRAME_HEADER, FRAME_MAGIC, _FramePacket, _TcpFrameStream,
+    _encode_frame_packet, _read_exact, _read_frame_packet,
+)
 
 logger = get_logger(__name__)
 
@@ -41,8 +45,6 @@ RECONNECT_BACKOFF_MAX_SECONDS = 1.5
 
 MAX_JSON_RESPONSE_BYTES = 32 * 1024
 TCP_STREAM_PORT = 81
-FRAME_MAGIC = b"ATL1"
-FRAME_HEADER = struct.Struct("!4sIII")
 FRAME_PROTOCOL = "aitl-tcp-jpeg-v1"
 CAMERA_PROTOCOL = "aitl-camera-v037"
 COMPATIBLE_CAMERA_PROTOCOLS = {CAMERA_PROTOCOL, "aitl-camera-v036"}
@@ -91,110 +93,9 @@ class RemoteCapture:
     http_status: int
 
 
-@dataclass(frozen=True)
-class _FramePacket:
-    """One V037/V036-compatible source frame after the fixed binary header is decoded."""
-
-    sequence: int
-    source_uptime_ms: int
-    content: bytes
-
-
-class _TcpFrameStream:
-    """Small socket wrapper with exact-length reads and deterministic shutdown."""
-
-    def __init__(self, sock: socket.socket) -> None:
-        self._socket = sock
-        self.closed = False
-
-    def read_exact(self, size: int) -> bytes:
-        if size <= 0:
-            return b""
-
-        buffer = bytearray(size)
-        view = memoryview(buffer)
-        offset = 0
-        while offset < size:
-            received = self._socket.recv_into(view[offset:])
-            if received == 0:
-                if offset == 0:
-                    return b""
-                raise EOFError("TCP JPEG frame ended before the declared length was received.")
-            offset += received
-        return bytes(buffer)
-
-    def close(self) -> None:
-        if self.closed:
-            return
-        self.closed = True
-        try:
-            self._socket.shutdown(socket.SHUT_RDWR)
-        except OSError:
-            pass
-        self._socket.close()
-
-
 JsonRequester = Callable[[str, str, str, dict[str, str] | None], dict]
 StreamOpener = Callable[[str], BinaryIO]
 FrameSink = Callable[[str, _FramePacket], int]
-
-
-def _read_exact(stream: BinaryIO, size: int) -> bytes:
-    """Read exactly size bytes from real or test stream objects."""
-    exact_reader = getattr(stream, "read_exact", None)
-    if callable(exact_reader):
-        return exact_reader(size)
-
-    chunks = bytearray()
-    while len(chunks) < size:
-        chunk = stream.read(size - len(chunks))
-        if not chunk:
-            if not chunks:
-                return b""
-            raise EOFError("TCP JPEG frame ended before the declared length was received.")
-        chunks.extend(chunk)
-    return bytes(chunks)
-
-
-def _encode_frame_packet(
-    content: bytes,
-    *,
-    sequence: int = 1,
-    source_uptime_ms: int = 0,
-) -> bytes:
-    """Test/helper encoder for the V037/V036-compatible fixed-header JPEG stream."""
-    return FRAME_HEADER.pack(
-        FRAME_MAGIC,
-        len(content),
-        sequence & 0xFFFFFFFF,
-        source_uptime_ms & 0xFFFFFFFF,
-    ) + content
-
-
-def _read_frame_packet(stream: BinaryIO) -> _FramePacket | None:
-    header = _read_exact(stream, FRAME_HEADER.size)
-    if not header:
-        return None
-    if len(header) != FRAME_HEADER.size:
-        raise EOFError("TCP JPEG frame header was incomplete.")
-
-    magic, payload_length, sequence, source_uptime_ms = FRAME_HEADER.unpack(header)
-    if magic != FRAME_MAGIC:
-        raise ValueError("ESP stream protocol magic did not match AiTL TCP JPEG v1.")
-    if payload_length <= 0 or payload_length > MAX_FRAME_BYTES:
-        raise ValueError("ESP TCP JPEG payload length is outside the accepted frame size.")
-
-    content = _read_exact(stream, payload_length)
-    if len(content) != payload_length:
-        raise EOFError("ESP TCP JPEG payload ended before the declared length was received.")
-    if not content.startswith(b"\xff\xd8") or not content.endswith(b"\xff\xd9"):
-        raise ValueError("ESP TCP frame did not contain a complete JPEG image.")
-
-    return _FramePacket(
-        sequence=sequence,
-        source_uptime_ms=source_uptime_ms,
-        content=content,
-    )
 
 
 def normalize_private_lan_ipv4(value: str) -> str:
@@ -268,6 +169,9 @@ class RemoteCameraService:
         self._stream_bytes_received = 0
         self._dropped_stale_frames = 0
         self._source_sequence_gaps = 0
+        self._repeated_source_frames = 0
+        self._source_sequence_resets = 0
+        self._last_frame_monotonic: float | None = None
         self._last_remote_sequence: int | None = None
         self._last_source_uptime_ms: int | None = None
         self._last_frame_interval_ms: float | None = None
@@ -475,12 +379,31 @@ class RemoteCameraService:
         query["stream_fps"] = str(target_fps)
         return query
 
+    def _worker_current_locked(self, stop_event: Event) -> bool:
+        """Check session ownership while holding the state lock."""
+        return (
+            self._stop_event is stop_event
+            and not stop_event.is_set()
+            and self._streaming_requested
+        )
+
+    def cancel_pending_frames(self) -> None:
+        """Retire delivery immediately; the normal stop/start path joins the worker."""
+        with self._lock:
+            self._stop_event.set()
+            self._streaming_requested = False
+            self._stream_connected = False
+            self._frame_condition.notify_all()
+
     def _stop_worker(self) -> None:
         with self._lock:
             thread = self._thread
             stop_event = self._stop_event
             active_stream = self._active_stream
             stop_event.set()
+            # Retire the captured socket immediately; never clear a later worker's state.
+            self._active_stream = None
+            self._stream_connected = False
             self._frame_condition.notify_all()
 
         if active_stream is not None:
@@ -493,12 +416,9 @@ class RemoteCameraService:
             thread.join(timeout=2.5)
 
         with self._lock:
-            if self._thread is thread:
+            if self._stop_event is stop_event and self._thread is thread:
                 self._thread = None
-            if self._active_stream is active_stream:
-                self._active_stream = None
-            self._stream_connected = False
-            self._frame_condition.notify_all()
+                self._frame_condition.notify_all()
 
     @staticmethod
     def _sequence_gap(previous: int | None, current: int) -> int:
@@ -509,10 +429,14 @@ class RemoteCameraService:
             return 0
         return delta - 1
 
-    def _record_frame(self, packet: _FramePacket, frame_number: int) -> None:
+    def _record_frame(self, packet: _FramePacket, frame_number: int, *, stop_event: Event | None = None) -> None:
         now_ms = int(time.time() * 1000)
+        received_monotonic = time.monotonic()
         with self._frame_condition:
-            previous_success = self._last_success_at_ms
+            if stop_event is not None and not self._worker_current_locked(stop_event):
+                return
+            previous_monotonic = self._last_frame_monotonic
+            self._last_frame_monotonic = received_monotonic
             self._source_sequence_gaps += self._sequence_gap(self._last_remote_sequence, packet.sequence)
             self._last_remote_sequence = packet.sequence
             self._last_source_uptime_ms = packet.source_uptime_ms
@@ -527,8 +451,9 @@ class RemoteCameraService:
             self._current_backoff_ms = 0
             self._last_error = None
 
-            if previous_success is not None:
-                interval_ms = max(1.0, float(now_ms - previous_success))
+            # A monotonic receive clock avoids wall-clock adjustments and 1 ms rounding.
+            if previous_monotonic is not None and received_monotonic > previous_monotonic:
+                interval_ms = (received_monotonic - previous_monotonic) * 1000.0
                 instantaneous_fps = 1000.0 / interval_ms
                 self._last_frame_interval_ms = interval_ms
                 if self._measured_fps <= 0:
@@ -538,17 +463,22 @@ class RemoteCameraService:
 
             self._frame_condition.notify_all()
 
-    def _record_stream_failure(self, message: str, http_status: int | None = None) -> None:
+    def _record_stream_failure(
+        self, message: str, http_status: int | None = None, *, stop_event: Event | None = None
+    ) -> bool:
         now_ms = int(time.time() * 1000)
         with self._lock:
+            if stop_event is not None and not self._worker_current_locked(stop_event):
+                return False
             self._last_attempt_at_ms = now_ms
             self._last_http_status = http_status
             self._failed_fetches += 1
             self._consecutive_failures += 1
             self._stream_connected = False
             self._last_error = message
+            return True
 
-    def _store_packet(self, *, source_id: str, packet: _FramePacket) -> None:
+    def _store_packet(self, *, source_id: str, packet: _FramePacket, stop_event: Event | None = None) -> None:
         if len(packet.content) > MAX_FRAME_BYTES:
             raise AppError(
                 ErrorCode.CAMERA_FRAME_TOO_LARGE,
@@ -558,7 +488,7 @@ class RemoteCameraService:
             )
 
         if self._frame_sink is not None:
-            frame_number = int(self._frame_sink(source_id, packet))
+            frame_number = int(self._frame_sink(source_id, replace(packet, worker_stop=stop_event)))
         else:
             frame = camera_frame_service.store_upload(
                 source_id=source_id,
@@ -566,7 +496,7 @@ class RemoteCameraService:
                 content=packet.content,
             )
             frame_number = frame.frame_number
-        self._record_frame(packet, frame_number)
+        self._record_frame(packet, frame_number, stop_event=stop_event)
 
     def _consume_tcp_stream(
         self,
@@ -580,15 +510,31 @@ class RemoteCameraService:
                 return "paused_for_simulation"
 
             packet = _read_frame_packet(stream)
+            # The blocking read may finish after stop or a simulation switch.
+            if stop_event.is_set():
+                return "stopped"
+            if camera_frame_service.simulation_enabled:
+                return "paused_for_simulation"
             if packet is None:
-                if stop_event.is_set():
-                    return "stopped"
                 return "stream_ended"
 
             with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return "stopped"
                 self._stream_bytes_received += FRAME_HEADER.size + len(packet.content)
+                # A repeated wire packet is not a new observation or FPS sample.
+                if (self._last_remote_sequence == packet.sequence
+                        and self._last_source_uptime_ms == packet.source_uptime_ms):
+                    self._repeated_source_frames += 1
+                    continue
+                if (self._last_remote_sequence is not None
+                        and self._last_source_uptime_ms is not None
+                        and packet.sequence < self._last_remote_sequence
+                        and packet.source_uptime_ms < self._last_source_uptime_ms):
+                    self._source_sequence_resets += 1
+                    self._last_remote_sequence = None
 
-            self._store_packet(source_id=source_id, packet=packet)
+            self._store_packet(source_id=source_id, packet=packet, stop_event=stop_event)
 
         return "stopped"
 
@@ -636,15 +582,25 @@ class RemoteCameraService:
     def connect(self, *, host: str, source_id: str) -> dict:
         """Connect to status/control only; zero image transfer is preserved."""
         normalized_host = normalize_private_lan_ipv4(host)
-        device = self._request_control(normalized_host, "/status", "GET", None)
-        if device.get("camera_ready") is False:
-            raise AppError(
-                ErrorCode.CAMERA_NOT_CONNECTED,
-                "ESP32-CAM reports that its camera sensor is not ready.",
-                status_code=502,
-                details={"host": normalized_host},
-            )
-        self._assert_matching_firmware(device, normalized_host)
+        try:
+            device = self._request_control(normalized_host, "/status", "GET", None)
+            if device.get("camera_ready") is False:
+                raise AppError(
+                    ErrorCode.CAMERA_NOT_CONNECTED,
+                    "ESP32-CAM reports that its camera sensor is not ready.",
+                    status_code=502,
+                    details={"host": normalized_host},
+                )
+            self._assert_matching_firmware(device, normalized_host)
+        except AppError as exc:
+            # Preserve a failed initial connection for the saved profile's
+            # diagnostics without marking an unverified host configured.
+            with self._lock:
+                if self._host is None or self._host == normalized_host:
+                    self._device_reachable = False
+                    self._last_error = exc.message
+                    self._last_probe_at_ms = int(time.time() * 1000)
+            raise
 
         self.disconnect()
         now_ms = int(time.time() * 1000)
@@ -668,63 +624,93 @@ class RemoteCameraService:
         )
         return self.status()
 
-    def _arm_esp_session(self, host: str, settings: dict, fps: int) -> dict:
-        # Keep config -> start atomic relative to background status polling.
+    def _recovery_allowed_locked(self, host: str, stop_event: Event) -> bool:
+        return (
+            self._worker_current_locked(stop_event)
+            and self._host == host
+            and not camera_frame_service.simulation_enabled
+        )
+
+    def _arm_esp_session(
+        self, host: str, settings: dict, fps: int, *, stop_event: Event | None = None
+    ) -> dict | None:
+        # Keep config -> start atomic relative to status polling and replacement control.
+        # Never hold the state lock across blocking HTTP.
         with self._control_lock:
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
             applied = self._request_control(host, "/config", "POST", self._settings_query(settings, fps))
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
             started = self._request_control(host, "/start", "POST", None)
-        self._assert_matching_firmware(started, host)
-        if started.get("session_active") is not True:
-            raise AppError(
-                ErrorCode.CAMERA_STREAM_NOT_STARTED,
-                "ESP32-CAM did not confirm an active camera session.",
-                status_code=502,
-                details={"host": host},
-            )
+            with self._lock:
+                if stop_event is not None and not self._recovery_allowed_locked(host, stop_event):
+                    return None
+                self._assert_matching_firmware(started, host)
+                if started.get("session_active") is not True:
+                    raise AppError(
+                        ErrorCode.CAMERA_STREAM_NOT_STARTED,
+                        "ESP32-CAM did not confirm an active camera session.",
+                        status_code=502,
+                        details={"host": host},
+                    )
+                self._settings = applied.get("settings") if isinstance(applied.get("settings"), dict) else dict(settings)
+                self._device_status = started
+                self._device_reachable = True
+            return started
 
-        with self._lock:
-            self._settings = applied.get("settings") if isinstance(applied.get("settings"), dict) else dict(settings)
-            self._device_status = started
-            self._device_reachable = True
-        return started
+    def _recover_esp_session_if_needed(self, host: str, *, stop_event: Event | None = None) -> bool:
+        # Serialize the entire recovery with replacement stop/config/start. An already
+        # issued HTTP request may finish, but cannot run after replacement control
+        # commands or publish its response into the replacement's local state.
+        with self._control_lock:
+            with self._lock:
+                if stop_event is None:
+                    stop_event = self._stop_event
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                settings = dict(self._settings) if isinstance(self._settings, dict) else None
+                fps = self._target_fps
 
-    def _recover_esp_session_if_needed(self, host: str) -> bool:
-        with self._lock:
-            settings = dict(self._settings) if isinstance(self._settings, dict) else None
-            fps = self._target_fps
-            requested = self._streaming_requested
+            if settings is None:
+                return False
 
-        if not requested or settings is None:
-            return False
+            device = self._request_control(host, "/status", "GET", None)
+            now_ms = int(time.time() * 1000)
+            with self._lock:
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                self._assert_matching_firmware(device, host)
+                self._device_status = device
+                self._device_reachable = True
+                self._last_probe_at_ms = now_ms
+                self._last_probe_monotonic = time.monotonic()
 
-        device = self._request_control(host, "/status", "GET", None)
-        self._assert_matching_firmware(device, host)
-        now_ms = int(time.time() * 1000)
-        with self._lock:
-            self._device_status = device
-            self._device_reachable = True
-            self._last_probe_at_ms = now_ms
-            self._last_probe_monotonic = time.monotonic()
+            if device.get("camera_ready") is False:
+                raise AppError(
+                    ErrorCode.CAMERA_NOT_CONNECTED,
+                    "ESP32-CAM came back online but reports that the camera sensor is not ready.",
+                    status_code=502,
+                    details={"host": host},
+                )
 
-        if device.get("camera_ready") is False:
-            raise AppError(
-                ErrorCode.CAMERA_NOT_CONNECTED,
-                "ESP32-CAM came back online but reports that the camera sensor is not ready.",
-                status_code=502,
-                details={"host": host},
-            )
+            if device.get("session_active") is True:
+                return False
 
-        if device.get("session_active") is True:
-            return False
-
-        self._arm_esp_session(host, settings, fps)
-        with self._lock:
-            self._session_recoveries += 1
-            self._last_recovery_at_ms = int(time.time() * 1000)
+            if self._arm_esp_session(host, settings, fps, stop_event=stop_event) is None:
+                return False
+            with self._lock:
+                if not self._recovery_allowed_locked(host, stop_event):
+                    return False
+                self._session_recoveries += 1
+                self._last_recovery_at_ms = int(time.time() * 1000)
+                source_id = self._source_id
 
         logger.warning(
             "Recovered ESP camera session after transport/session loss",
-            extra={"host": host, "source_id": self._source_id, "target_fps": fps},
+            extra={"host": host, "source_id": source_id, "target_fps": fps},
         )
         return True
 
@@ -787,6 +773,9 @@ class RemoteCameraService:
             self._stream_bytes_received = 0
             self._dropped_stale_frames = 0
             self._source_sequence_gaps = 0
+            self._repeated_source_frames = 0
+            self._source_sequence_resets = 0
+            self._last_frame_monotonic = None
             self._last_remote_sequence = None
             self._last_source_uptime_ms = None
             self._last_http_status = None
@@ -872,11 +861,12 @@ class RemoteCameraService:
     def _run(self, stop_event: Event) -> None:
         while not stop_event.is_set():
             with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return
                 host = self._host
                 source_id = self._source_id
-                requested = self._streaming_requested
 
-            if host is None or not requested:
+            if host is None:
                 return
 
             if camera_frame_service.simulation_enabled:
@@ -888,10 +878,21 @@ class RemoteCameraService:
             try:
                 stream = self._stream_opener(host)
                 with self._lock:
+                    # Opening can finish after a stop or replacement worker starts.
+                    if not self._worker_current_locked(stop_event):
+                        return
+                    if camera_frame_service.simulation_enabled:
+                        continue
                     self._active_stream = stream
                     self._stream_connected = True
                     self._device_reachable = True
                     self._last_stream_connected_at_ms = int(time.time() * 1000)
+                    # TCP reopening starts a new sequence and FPS sampling epoch.
+                    self._last_remote_sequence = None
+                    self._last_source_uptime_ms = None
+                    self._last_frame_monotonic = None
+                    self._last_frame_interval_ms = None
+                    self._measured_fps = 0.0
                     self._last_error = None
 
                 outcome = self._consume_tcp_stream(
@@ -903,18 +904,19 @@ class RemoteCameraService:
                 if outcome in {"stopped", "paused_for_simulation"}:
                     continue
 
-                failed = True
-                self._record_stream_failure("ESP TCP JPEG stream ended unexpectedly.")
+                failed = self._record_stream_failure(
+                    "ESP TCP JPEG stream ended unexpectedly.", stop_event=stop_event
+                )
             except AppError as exc:
-                failed = True
-                self._record_stream_failure(
+                failed = self._record_stream_failure(
                     exc.message,
                     exc.details.get("http_status") if exc.details else None,
+                    stop_event=stop_event,
                 )
             except (OSError, TimeoutError, EOFError, ValueError) as exc:
-                if not stop_event.is_set():
-                    failed = True
-                    self._record_stream_failure(f"ESP TCP JPEG transport error: {exc}")
+                failed = self._record_stream_failure(
+                    f"ESP TCP JPEG transport error: {exc}", stop_event=stop_event
+                )
             finally:
                 if stream is not None:
                     try:
@@ -922,28 +924,38 @@ class RemoteCameraService:
                     except Exception:
                         pass
                 with self._lock:
-                    if self._active_stream is stream:
+                    if (self._stop_event is stop_event and stream is not None
+                            and self._active_stream is stream):
                         self._active_stream = None
-                    self._stream_connected = False
+                        self._stream_connected = False
 
-            if stop_event.is_set() or camera_frame_service.simulation_enabled:
-                continue
-
-            if failed:
-                with self._lock:
+            with self._lock:
+                if not self._worker_current_locked(stop_event):
+                    return
+                if camera_frame_service.simulation_enabled:
+                    continue
+                if failed:
                     self._stream_reconnects += 1
 
+            if failed:
                 try:
-                    self._recover_esp_session_if_needed(host)
+                    self._recover_esp_session_if_needed(host, stop_event=stop_event)
                 except AppError as exc:
                     with self._lock:
+                        if not self._worker_current_locked(stop_event):
+                            return
                         self._device_reachable = False
-                    self._record_stream_failure(
-                        exc.message,
-                        exc.details.get("http_status") if exc.details else None,
-                    )
+                        self._record_stream_failure(
+                            exc.message,
+                            exc.details.get("http_status") if exc.details else None,
+                            stop_event=stop_event,
+                        )
 
-                stop_event.wait(self._reconnect_backoff_seconds())
+                with self._lock:
+                    if not self._worker_current_locked(stop_event):
+                        return
+                    delay = self._reconnect_backoff_seconds()
+                stop_event.wait(delay)
 
     def _refresh_device_status_if_due(self) -> None:
         with self._lock:
@@ -983,6 +995,14 @@ class RemoteCameraService:
             device_status = dict(self._device_status)
             settings = dict(self._settings) if isinstance(self._settings, dict) else None
             target_fps = self._target_fps
+            now_ms = int(time.time() * 1000)
+            frame_age_ms = (max(0, now_ms - self._last_success_at_ms)
+                            if self._last_success_at_ms is not None else None)
+            frame_stale = bool(
+                (requested and frame_age_ms is None)
+                or (frame_age_ms is not None
+                    and (not requested or not self._stream_connected or frame_age_ms > 5000))
+            )
 
             return {
                 "configured": host is not None,
@@ -1002,7 +1022,9 @@ class RemoteCameraService:
                 "stream_url": self._stream_url(host) if host else None,
                 "target_fps": target_fps,
                 "fetch_interval_ms": round(1000 / max(1, target_fps)),
-                "measured_fps": round(self._measured_fps, 2),
+                "measured_fps": round(self._measured_fps, 2) if requested and self._stream_connected and not frame_stale else 0.0,
+                "frame_age_ms": frame_age_ms,
+                "frame_stale": frame_stale,
                 "last_frame_interval_ms": (
                     round(self._last_frame_interval_ms, 1)
                     if self._last_frame_interval_ms is not None
@@ -1015,6 +1037,8 @@ class RemoteCameraService:
                 "stream_bytes_received": self._stream_bytes_received,
                 "dropped_stale_frames": self._dropped_stale_frames,
                 "source_sequence_gaps": self._source_sequence_gaps,
+                "repeated_source_frames": self._repeated_source_frames,
+                "source_sequence_resets": self._source_sequence_resets,
                 "last_remote_sequence": self._last_remote_sequence,
                 "last_source_uptime_ms": self._last_source_uptime_ms,
                 "connected_at_ms": self._connected_at_ms,

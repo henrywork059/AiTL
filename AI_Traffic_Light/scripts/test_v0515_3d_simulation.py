@@ -1,5 +1,7 @@
 """Focused test: the simulated camera's 3D preview mirrors live agent state."""
 from pathlib import Path
+import json
+import subprocess
 import sys
 import time
 
@@ -30,14 +32,14 @@ def main() -> None:
         assert scene["frame_number"] > 0
         assert scene["density"] == "normal"
         assert len(scene["vehicles"]) == 8
+        assert {vehicle["vehicle_type"] for vehicle in scene["vehicles"]} == {"car", "suv", "van", "bus"}
         assert len(scene["pedestrians"]) == 7
         assert scene["signal"]["vehicle_go"] is True
         assert scene["signal"]["pedestrian_walk"] is False
-        # Compare the snapshot before another read refreshes moving agents.
+        # Compare to the exact published raster snapshot, not a newer world step.
         with service._lock:
-            assert scene["vehicles"][0]["x"] == round(service._vehicles[0].x, 2)
-            assert scene["vehicles"][0]["width"] == service._vehicles[0].width
-            assert scene["pedestrians"][0]["y"] == round(service._pedestrians[0].y, 2)
+            assert scene["vehicles"] == service._simulation_scene["vehicles"]
+            assert scene["pedestrians"] == service._simulation_scene["pedestrians"]
         assert service.simulation_frame_for(source_id) is not None
 
     service.configure_simulation(paused=True)
@@ -68,6 +70,37 @@ def main() -> None:
     assert "setScene(null)" in component, "Old source must not remain visible after failed polling"
     assert "setOrbit" in component and "setPitch" in component and "setZoom" in component
     assert "sim3d-world" in styles and "transform-style: preserve-3d" in styles
+    assert "sim3d-car-roof" in styles and "sim3d-car-wheel" in styles and "sim3d-car-end" in styles
+    assert "sim3d-person-figure" in styles and "rotateX(-90deg)" in styles
+    assert "sim3d-person-head" in component and "sim3d-person-leg" in component
+    assert "sim3d-car--bus" in styles and "sim3d-car--van" in styles and "sim3d-car--suv" in styles
+    assert "sim3d-car-window-band" in styles and "sim3d-person-head::before" in styles
+    assert "sim3d-person.is-reentering { transition: none; }" in styles
+    assert "isPedestrianReentry(previousY, pedestrian.y, sizeY)" in component
+    assert ".sim3d-car.is-reentering { transition: none; }" in styles
+    assert "isVehicleReentry(previousX, vehicle.x, sizeX)" in component
+    motion = FRONTEND / "components/simulation3dMotion.ts"
+    assert motion.is_file()
+    script = """
+import assert from "node:assert/strict";
+import { isPedestrianReentry, isVehicleReentry, simulationSourcePoint } from MOTION_URI;
+assert.equal(isVehicleReentry(undefined, -260, 1280), false);
+assert.equal(isVehicleReentry(100, 140, 1280), false);
+assert.equal(isVehicleReentry(1100, 1070, 1280), false);
+assert.equal(isVehicleReentry(1420, -260, 1280), true);
+assert.equal(isVehicleReentry(-280, 1420, 1280), true);
+assert.equal(isVehicleReentry(500, 510, 1280), false);
+assert.equal(isPedestrianReentry(undefined, 50, 720), false);
+assert.equal(isPedestrianReentry(130, 170, 720), false);
+assert.equal(isPedestrianReentry(750, 40, 720), true);
+assert.equal(isPedestrianReentry(20, 745, 720), true);
+assert.equal(isPedestrianReentry(674, 674, 720), false);
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera", 1280, 720), { x: 460, y: 190 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_b", 1280, 720), { x: 460, y: 530 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_c", 1280, 720), { x: 820, y: 190 });
+assert.deepEqual(simulationSourcePoint(460, 190, "simulation_camera_d", 1280, 720), { x: 820, y: 530 });
+""".replace("MOTION_URI", json.dumps(motion.as_uri()))
+    subprocess.run(["node", "--experimental-strip-types", "--input-type=module", "-e", script], check=True, cwd=ROOT)
     assert "requestJsonStrict<SimulationScene>" in api
     assert '@router.get("/simulation/scene")' in route
     assert "source_id not in SIMULATION_SOURCE_IDS" in route
@@ -91,7 +124,10 @@ def main() -> None:
     assert 'cameraStatus?.simulation_enabled && previewUrl' in capture
     assert 'Capture saves its original 2D synthetic image' in capture
     assert 'className="camera-frame"' in capture, "Physical camera captures must remain visible"
-    assert 'sourcePoint(x: number, y: number, sourceId: string' in component
+    assert 'simulationSourcePoint(sizeX * 0.36, sizeY * 0.26, sourceId, sizeX, sizeY)' in component
+    assert 'simulationSourcePoint(sizeX * 0.61, sizeY * 0.88, sourceId, sizeX, sizeY)' in component
+    assert 'left: `${vehicleSignalPoint.x / sizeX * 100}%`' in component
+    assert 'top: `${pedestrianSignalPoint.y / sizeY * 100}%`' in component
     assert 'scene?.source_id === sourceId' in component  # Never display a stale source
     assert 'hasOverlay = !editing' in component
     assert 'viewBox={`0 0 ${sizeX} ${sizeY}`}' in component
@@ -104,6 +140,7 @@ def main() -> None:
     print("[PASS] Live agent coordinates, all camera IDs, pause, density and disabled-state 3D scene")
     print("[PASS] Camera Settings, Crosswalk pair, Region Editor, AI Preview and Capture share 3D simulations")
     print("[PASS] Physical ESP, source-frame AI coordinates and saved capture image files remain unchanged")
+    print("[PASS] Distinct 3D vehicle models and human figures; off-screen vehicle and pedestrian respawn")
 
 
 if __name__ == "__main__":

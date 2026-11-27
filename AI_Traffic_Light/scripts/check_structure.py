@@ -36,6 +36,8 @@ REQUIRED_PATHS = (
     "apps/pc-studio/frontend/src/styles/components.css",
     "apps/pc-studio/frontend/src/api.ts",
     "apps/pc-studio/frontend/src/lib/useSerialPolling.ts",
+    "apps/pc-studio/frontend/src/lib/pollingScope.ts",
+    "apps/pc-studio/frontend/tests/frontendDataAccess.cjs",
     "apps/pc-studio/frontend/src/lib/junctionNetworkApi.ts",
     "apps/pc-studio/frontend/src/lib/junctionNetworkView.ts",
     "apps/pc-studio/frontend/src/pages/DashboardPage.tsx",
@@ -72,6 +74,13 @@ REQUIRED_PATHS = (
     "scripts/update_test_run.ps1",
     "scripts/test_update_test_run_script.py",
     "scripts/select_changed_tests.py",
+    "scripts/run_offline_tests.py",
+    "scripts/evaluate_simulation_engine.py",
+    "scripts/test_v0564_engine_evaluation.py",
+    "scripts/test_v0565_simulation_adapter.py",
+    "apps/pc-studio/backend/app/services/simulation_adapter.py",
+    "docs/SIMULATION_ENGINE_EVALUATION.md",
+    "scripts/test_offline_test_discovery.py",
     "scripts/test_select_changed_tests.py",
     "scripts/test_object_tracking_flow.py",
     "scripts/test_signal_rules_service.py",
@@ -381,9 +390,12 @@ def validate_frontend_polling(root: Path, errors: list[str]) -> None:
     hook = root / "apps/pc-studio/frontend/src/lib/useSerialPolling.ts"
     if hook.exists():
         hook_text = hook.read_text(encoding="utf-8")
-        for required in ("window.setTimeout", "finally", "inFlightRef", "runNow", "waitForIdle"):
+        for required in ("window.setTimeout", "runScopedSerialTask", "scope.retire()", "inFlightRef", "runNow", "waitForIdle"):
             if required not in hook_text:
                 add_error(errors, f"Serial polling hook is missing required single-flight operation: {required}")
+        core = hook.with_name("pollingScope.ts")
+        if not core.exists() or not all(marker in core.read_text(encoding="utf-8") for marker in ("finally", "if (inFlight.current)", "controller.abort()")):
+            add_error(errors, "Serial polling core must preserve single-flight cleanup and scope retirement.")
         if "window.setInterval" in hook_text:
             add_error(errors, "Serial polling hook must not use setInterval because async polls may overlap.")
 

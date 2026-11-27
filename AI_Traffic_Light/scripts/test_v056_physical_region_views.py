@@ -75,8 +75,13 @@ def main() -> None:
     editor = (ROOT / "apps/pc-studio/frontend/src/pages/CrosswalkRegionEditor.tsx").read_text(encoding="utf-8")
     assert "Backend region ID" not in editor
     assert "vertices_by_side:" in editor and "verticesForSide(region, sideKey)" in editor
-    assert 'onClick={() => setSide("camera_side_a_id")}' in editor
-    assert 'onClick={() => setSide("camera_side_b_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_a_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_b_id")}' in editor
+    side_handler = editor.split("function selectSide(next: Side) {", 1)[1].split("\n  }", 1)[0]
+    assert "dragRef.current = null;" in side_handler
+    assert "setSide(next);" in side_handler
+    assert "setSelectedId" not in side_handler
+    assert "drag.side !== sideKey" in editor
     print("[PASS] One physical region has independent top/bottom camera polygons and class counts")
     print("[PASS] Separate camera IDs, shared physical ID, validation and legacy compatibility")
     print("[PASS] Region Editor hides backend IDs and retains selection while switching views")

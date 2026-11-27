@@ -526,3 +526,8 @@ Individual normalized records intentionally omit the random experiment `run_id`;
 For V031+ runs, each simulated intersection may also contain `scenario_evidence_events`. These store a ranked winner/active-rule snapshot, phase, reason/action, local observations, and available base/effective timing when the active scenario changes for a protected phase. Pre-V031 stored runs cannot retroactively recover scenario observation snapshots that were never persisted.
 
 `source_ref` points to the detailed source record (for example `class_aware_cooperative.vehicle_class_priority_events[4]`). The detailed histories are preserved to avoid making the compact normalized projection the only evidence source.
+
+
+## 0_5_76 — capture and evidence integrity addendum
+
+New captures include content_sha256, SHA-256 of exact saved bytes. Previously saved capture metadata remains valid without it. Managed yolo/manifest.json adds artifact_sha256 keyed by generated relative YAML/image/label paths; source signature includes origin/source ID/content digest/coordinate identity, split membership, labels and class schema checked before optional training. New generated data.yaml first line # aitl-managed-yolo-v1 identifies managed configuration even when manifest missing. Historical manifests lacking hashes need explicit rebuild, not rewriting original captures. Verification is not authentication or continuous tamper protection. Managed training status retains dataset_integrity_sha256 for the current run.

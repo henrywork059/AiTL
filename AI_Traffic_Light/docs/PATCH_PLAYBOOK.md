@@ -215,3 +215,7 @@ Passed baseline remains:
 ```
 
 Never say a test passed unless it actually ran. Never promote the candidate based on agent judgment.
+
+## 10. Owner-approved milestone-sized development batches (2026-11-26)
+
+Group tightly related implementation, integration, regressions and evidence into substantial functional milestones rather than one conversational turn per small fix. Follow the numbered ROADMAP; batching is execution scope, not a replacement schedule. Resolve known failures first, then combine compatible changes with an atomic non-force branch update. Use focused local checks where available and consolidated standard/native/renderer CI on exact HEAD. Keep intermediate commits at the current version; each publishable candidate still increments Z exactly once, and owner PASS alone advances the accepted baseline. Do not bypass migration, safety, provenance, resource or owner acceptance gates to enlarge a batch. Record unresolved blockers and verified evidence explicitly; never claim pending CI or unrun Windows/hardware checks passed. Do not repeatedly ask the owner to trigger small changes when several related changes can be completed together.

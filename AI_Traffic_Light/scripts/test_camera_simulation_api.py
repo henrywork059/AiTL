@@ -77,6 +77,31 @@ def main() -> int:
     )
     assert invalid["error"]["code"] == "ATL-API-002"
 
+    shared=assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"legacy","source_id":"simulation_camera_b"}))["data"]
+    assert shared["legacy_editor_compatible"] and shared["observation"]["detector_input_eligible"]
+    identity=shared["observation"]
+    exact={k:identity[k] for k in ("epoch","generation","tick","layout_id")}
+    exact.update(engine="legacy",source_id="simulation_camera_b")
+    same=client.get("/api/camera/simulation/observation/frame",params=exact)
+    assert same.status_code==200 and same.headers["x-frame-number"]==str(identity["frame_number"])
+    assert same.headers["x-layout-id"]==identity["layout_id"]
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"layout_id":"0"*64}),expected_status=409)
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**exact,"engine":"native"}),expected_status=409)
+    switched=assert_envelope(client.post("/api/camera/simulation/settings",json={"engine":"protected"}))["data"]
+    assert switched["simulation_engine"]=="protected" and switched["simulation_paused"]
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params=exact),expected_status=409)
+    protected=assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"protected","source_id":"simulation_camera_b"}))["data"]
+    assert protected["legacy_editor_compatible"] and protected["observation"]["detector_input_eligible"]
+    assert protected["observation"]["layout_id"]==identity["layout_id"]
+    assert protected["observation"]["simulation_engine"]=="protected"
+    fresh={k:protected["observation"][k] for k in ("epoch","generation","tick","layout_id")}
+    fresh.update(engine="protected",source_id="simulation_camera_b")
+    assert client.get("/api/camera/simulation/observation/frame",params=fresh).status_code==200
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params={**fresh,"engine":"legacy"}),expected_status=409)
+    assert_envelope(client.get("/api/camera/simulation/observation",params={"engine":"native"}),expected_status=409)
+    restored=assert_envelope(client.post("/api/camera/simulation/settings",json={"engine":"legacy"}))["data"]
+    assert restored["simulation_engine"]=="legacy" and restored["simulation_paused"]
+    assert_envelope(client.get("/api/camera/simulation/observation/frame",params=fresh),expected_status=409)
     resumed = assert_envelope(client.post("/api/camera/simulation/settings", json={"paused": False}))
     assert resumed["data"]["simulation_paused"] is False
 

@@ -1,5 +1,5 @@
-version: 0_5_29
-status: Bounded camera upload candidate
-previous_version: 0_5_28
+version: 0_5_76
+status: Independent P3/P4/P5 capture integrity, managed training and S04 evidence candidate (partial 30/33/37/38)
+previous_version: 0_5_75
 passed_baseline: 0_5_0
-notes: Limit HTTP camera frame upload body accumulation to the existing 8 MiB image limit before buffering the complete payload. Preserve the existing success envelope, image validation, stable 413 error code, simulation/ESP camera routes, network safety and disabled physical actuation. Windows/ESP and owner PASS pending.
+notes: Application/browser/native evidence qualified; exact release CI and owner PASS pending; S04 gates remain open; legacy default preserved.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
@@ -12,7 +11,7 @@ from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
-from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, _image_dimensions, camera_frame_service
+from app.services.camera_frames import CameraFrame, SIMULATION_CAMERA_PAIRS, SIMULATION_CAMERA_SOURCE_IDS, camera_frame_service
 from app.services.remote_camera import (
     CAMERA_SETTING_KEYS,
     DEFAULT_TARGET_FPS,
@@ -22,6 +21,8 @@ from app.services.remote_camera import (
     _FramePacket,
     normalize_private_lan_ipv4,
 )
+
+from app.services.device_capabilities import project_camera_device
 
 logger = get_logger(__name__)
 
@@ -81,12 +82,6 @@ BOOL_SETTING_KEYS = {
 }
 
 
-@dataclass(frozen=True)
-class _CachedPacket:
-    packet: _FramePacket
-    received_at_ms: int
-
-
 class RemoteCameraManager:
     """Persist and coordinate several V037/V036-compatible ESP32-CAM sessions.
 
@@ -115,7 +110,8 @@ class RemoteCameraManager:
         self._profiles: dict[str, dict[str, Any]] = {}
         self._sessions: dict[str, RemoteCameraService] = {}
         self._session_generations: dict[str, int] = {}
-        self._latest_packets: dict[str, _CachedPacket] = {}
+        self._latest_frames: dict[str, CameraFrame] = {}
+        self._observation_epochs: dict[str, int] = {}
         self._active_source_id: str | None = None
         self._active_frame_number: int | None = None
         self._registry_warning: str | None = None
@@ -318,11 +314,26 @@ class RemoteCameraManager:
             self._sessions[source_id] = session
         return session
 
+    def _invalidate_observations_locked(self, source_id: str) -> None:
+        """Called under publication lock; invalidate one source, not its neighbours."""
+        with self._frame_condition:
+            self._observation_epochs[source_id] = self._observation_epochs.get(source_id, 0) + 1
+            self._latest_frames.pop(source_id, None)
+            if self._active_source_id == source_id:
+                self._active_frame_number = None
+            camera_frame_service.clear_uploaded_source(source_id)
+            self._frame_condition.notify_all()
+
+    def _retire_delivery_locked(self, source_id: str, session: RemoteCameraService | None) -> None:
+        if session is not None:
+            session.cancel_pending_frames()
+        self._invalidate_observations_locked(source_id)
+
     def _invalidate_session_locked(self, source_id: str) -> RemoteCameraService | None:
         """Retire one session so any late worker frame is rejected by generation."""
         session = self._sessions.pop(source_id, None)
         self._session_generations[source_id] = self._session_generations.get(source_id, 0) + 1
-        self._latest_packets.pop(source_id, None)
+        self._retire_delivery_locked(source_id, session)
         return session
 
     def _ingest_frame(
@@ -332,32 +343,37 @@ class RemoteCameraManager:
         *,
         generation: int | None = None,
     ) -> int:
-        """Cache every current session; publish only the selected source without switch races."""
+        """Allocate one immutable observation per accepted packet, selected or not."""
         now_ms = self._now_ms()
-        with self._frame_condition:
-            if generation is not None and self._session_generations.get(source_id) != generation:
-                return int(packet.sequence)
-            self._latest_packets[source_id] = _CachedPacket(packet=packet, received_at_ms=now_ms)
-
-        # Selection and session replacement also take _publish_lock. Re-check both
-        # active identity and generation while holding it so a late frame from a
-        # retired ESP/session cannot overwrite a newly selected or re-addressed ESP.
+        # Serialize generation checks, cache replacement and selected publication.
+        # The same frame object is also consumed by background inference.
         with self._publish_lock:
             with self._lock:
                 if generation is not None and self._session_generations.get(source_id) != generation:
                     return int(packet.sequence)
-                active = self._active_source_id == source_id
-            if not active or camera_frame_service.simulation_enabled:
-                return int(packet.sequence)
+                session = self._sessions.get(source_id)
+                if session is None or not session.streaming_requested:
+                    return int(packet.sequence)
+                if packet.worker_stop is not None and packet.worker_stop.is_set():
+                    return int(packet.sequence)
+                if camera_frame_service.simulation_enabled:
+                    return int(packet.sequence)
+                accepted_generation = self._session_generations.get(source_id)
+                source_epoch = self._observation_epochs.get(source_id, 0)
 
-            frame = camera_frame_service.store_upload(
-                source_id=source_id,
-                content_type="image/jpeg",
-                content=packet.content,
+            frame = camera_frame_service.prepare_upload(
+                source_id=source_id, content_type="image/jpeg",
+                content=packet.content, received_at_ms=now_ms,
+                session_generation=accepted_generation, source_epoch=source_epoch,
             )
-            with self._frame_condition:
-                self._active_frame_number = frame.frame_number
-                self._frame_condition.notify_all()
+            with self._lock:
+                self._latest_frames[source_id] = frame
+                active = self._active_source_id == source_id
+            if active and not camera_frame_service.simulation_enabled:
+                camera_frame_service.publish_cached_upload(frame)
+                with self._frame_condition:
+                    self._active_frame_number = frame.frame_number
+                    self._frame_condition.notify_all()
             return frame.frame_number
 
     @staticmethod
@@ -394,7 +410,7 @@ class RemoteCameraManager:
 
         with self._lock:
             source_id = self._active_source_id
-            cached = self._latest_packets.get(source_id) if source_id else None
+            cached = self._latest_frames.get(source_id) if source_id else None
             session = self._sessions.get(source_id) if source_id else None
             max_cache_age_ms = self._switch_cache_max_age_ms_locked(source_id) if source_id else 0
 
@@ -403,7 +419,7 @@ class RemoteCameraManager:
             and cached is not None
             and session is not None
             and session.streaming_requested
-            and self._now_ms() - cached.received_at_ms <= max_cache_age_ms
+            and 0 <= self._now_ms() - cached.received_at_ms <= max_cache_age_ms
         )
         if not fresh or source_id is None or cached is None:
             with self._frame_condition:
@@ -411,11 +427,7 @@ class RemoteCameraManager:
                 self._frame_condition.notify_all()
             return
 
-        frame = camera_frame_service.store_upload(
-            source_id=source_id,
-            content_type="image/jpeg",
-            content=cached.packet.content,
-        )
+        frame = camera_frame_service.publish_cached_upload(cached)
         with self._frame_condition:
             self._active_frame_number = frame.frame_number
             self._frame_condition.notify_all()
@@ -618,8 +630,10 @@ class RemoteCameraManager:
             select=True,
         )
 
-        with self._lock:
-            session = self._session_locked(normalized_source, create=True)
+        with self._publish_lock:
+            with self._lock:
+                session = self._session_locked(normalized_source, create=True)
+                self._retire_delivery_locked(normalized_source, session)
         assert session is not None
         session.connect(host=normalized_host, source_id=normalized_source)
         return self.status(refresh_device=False)
@@ -658,6 +672,11 @@ class RemoteCameraManager:
             target_fps=normalized_fps,
             select=True,
         )
+        with self._publish_lock:
+            with self._lock:
+                if self._sessions.get(source_id) is not session:
+                    raise AppError(ErrorCode.CAMERA_NOT_CONNECTED, "Camera session was replaced.", status_code=409)
+                self._retire_delivery_locked(source_id, session)
         session.start_stream(
             settings=normalized_settings,
             target_fps=normalized_fps,
@@ -666,26 +685,35 @@ class RemoteCameraManager:
         return self.status(refresh_device=False)
 
     def stop_stream(self, *, best_effort: bool = False) -> dict:
-        with self._lock:
-            profile = self._get_profile_locked()
-            session = self._session_locked(profile["source_id"], create=False)
+        with self._publish_lock:
+            with self._lock:
+                profile = self._get_profile_locked()
+                source_id = profile["source_id"]
+                session = self._session_locked(source_id, create=False)
+                self._retire_delivery_locked(source_id, session)
         if session is None:
             return self.status()
         session.stop_stream(best_effort=best_effort)
         return self.status(refresh_device=False)
 
     def disconnect(self) -> dict:
-        with self._lock:
-            profile = self._get_profile_locked()
-            session = self._session_locked(profile["source_id"], create=False)
+        with self._publish_lock:
+            with self._lock:
+                profile = self._get_profile_locked()
+                source_id = profile["source_id"]
+                session = self._session_locked(source_id, create=False)
+                self._retire_delivery_locked(source_id, session)
         if session is not None:
             session.disconnect()
         return self.status(refresh_device=False)
 
     def disconnect_all(self) -> None:
-        with self._lock:
-            sessions = list(self._sessions.values())
-        for session in sessions:
+        with self._publish_lock:
+            with self._lock:
+                sessions = list(self._sessions.items())
+                for source_id, session in sessions:
+                    self._retire_delivery_locked(source_id, session)
+        for _, session in sessions:
             try:
                 session.disconnect()
             except Exception:
@@ -737,6 +765,9 @@ class RemoteCameraManager:
             }
         session = self._sessions.get(source_id)
         session_status = session.status(refresh_device=refresh_device) if session is not None else None
+        cached_frame = self._latest_frames.get(source_id)
+        cached_age_ms = (max(0, self._now_ms() - cached_frame.received_at_ms)
+                         if cached_frame is not None else None)
         return {
             "kind": "esp32",
             "source_id": source_id,
@@ -752,6 +783,18 @@ class RemoteCameraManager:
             "paused_for_simulation": bool(session_status and session_status.get("paused_for_simulation")),
             "measured_fps": float(session_status.get("measured_fps", 0.0)) if session_status else 0.0,
             "last_success_at_ms": session_status.get("last_success_at_ms") if session_status else None,
+            "frame_age_ms": cached_age_ms,
+            "frame_stale": bool(session_status and
+                                ((session_status.get("streaming") and cached_age_ms is None)
+                                 or (cached_age_ms is not None and
+                                     (not session_status.get("stream_connected")
+                                      or cached_age_ms > 5000)))),
+            "last_frame_interval_ms": session_status.get("last_frame_interval_ms") if session_status else None,
+            "source_sequence_gaps": session_status.get("source_sequence_gaps", 0) if session_status else 0,
+            "repeated_source_frames": session_status.get("repeated_source_frames", 0) if session_status else 0,
+            "source_sequence_resets": session_status.get("source_sequence_resets", 0) if session_status else 0,
+            "stream_reconnects": session_status.get("stream_reconnects", 0) if session_status else 0,
+            "session_recoveries": session_status.get("session_recoveries", 0) if session_status else 0,
             "last_error": session_status.get("last_error") if session_status else None,
         }
 
@@ -759,30 +802,61 @@ class RemoteCameraManager:
         """Snapshot fresh frames for every saved stream, independently of selected camera."""
         with self._lock:
             profiles = list(self._profiles.values())
-            cached = dict(self._latest_packets)
+            cached = dict(self._latest_frames)
+            streaming = {source_id for source_id, session in self._sessions.items()
+                         if session.streaming_requested}
         if camera_frame_service.simulation_enabled:
-            return [frame for profile in profiles if profile["kind"] == "simulation"
-                    if (frame := camera_frame_service.simulation_frame_for(profile["source_id"])) is not None]
+            return camera_frame_service.simulation_frames_for(
+                profile["source_id"] for profile in profiles if profile["kind"] == "simulation")
         now_ms = self._now_ms()
         frames: list[CameraFrame] = []
         for profile in profiles:
             source_id = profile["source_id"]
             item = cached.get(source_id)
-            if profile["kind"] != "esp32" or item is None or now_ms - item.received_at_ms > 5000:
+            if (profile["kind"] != "esp32" or source_id not in streaming or item is None
+                    or not 0 <= now_ms - item.received_at_ms <= 5000):
                 continue
-            dims = _image_dimensions(item.packet.content, "image/jpeg")
-            if dims:
-                frames.append(CameraFrame(
-                    content=item.packet.content, content_type="image/jpeg", source_id=source_id,
-                    width=dims[0], height=dims[1], received_at_ms=item.received_at_ms,
-                    frame_number=max(1, int(item.packet.sequence)), origin="upload",
-                ))
+            frames.append(item)
         uploaded = camera_frame_service.latest_frame()
         if uploaded and uploaded.source_id not in {f.source_id for f in frames} and not any(
             x["source_id"] == uploaded.source_id for x in profiles
-        ) and now_ms - uploaded.received_at_ms <= 5000:
+        ) and 0 <= now_ms - uploaded.received_at_ms <= 5000:
             frames.append(uploaded)
         return frames
+
+    def inference_inputs(self) -> list[tuple[CameraFrame, tuple[tuple[bool, int], int]]]:
+        """Snapshot observations and their source/mode retirement token together."""
+        with self._publish_lock:
+            mode = camera_frame_service.observation_mode_token
+            frames = self.frames_for_inference()
+            if camera_frame_service.observation_mode_token != mode:
+                return []
+            with self._lock:
+                return [(frame, (mode, self._observation_epochs.get(frame.source_id, 0)))
+                        for frame in frames]
+
+    def observation_is_current(
+        self, source_id: str, token: tuple[tuple[bool, int], int], received_at_ms: int,
+    ) -> bool:
+        """Validate lifetime without requiring a slow inference to be the newest frame."""
+        with self._publish_lock:
+            if camera_frame_service.observation_mode_token != token[0]:
+                return False
+            if not 0 <= self._now_ms() - received_at_ms <= 5000:
+                return False
+            with self._lock:
+                if self._observation_epochs.get(source_id, 0) != token[1]:
+                    return False
+                profile = self._profiles.get(source_id)
+                session = self._sessions.get(source_id)
+                if token[0][0]:
+                    return bool(profile and profile["kind"] == "simulation")
+                if profile is not None:
+                    return bool(profile["kind"] == "esp32" and session
+                                and session.streaming_requested and source_id in self._latest_frames)
+            # Ordinary receiver uploads are not registered ESP sessions.
+            uploaded = camera_frame_service.latest_frame()
+            return bool(uploaded and uploaded.source_id == source_id and uploaded.origin == "upload")
 
     def frame_for_preview(self, source_id: str) -> CameraFrame | None:
         """Read the same cached source as global inference without changing selection."""
@@ -791,64 +865,87 @@ class RemoteCameraManager:
         return next((frame for frame in self.frames_for_inference() if frame.source_id == source_id), None)
 
     def status(self, *, refresh_device: bool = False) -> dict:
+        # The potentially slow network probe must stay outside the registry lock.
+        with self._lock:
+            probe_session = self._sessions.get(self._active_source_id)
+        if refresh_device and probe_session is not None:
+            probe_session.status(refresh_device=True)
+
+        # Take one coherent selection/session/profile snapshot after probing.
+        # Local session status never sends device requests.
         with self._lock:
             active_id = self._active_source_id
             profile = self._profiles.get(active_id) if active_id else None
             session = self._sessions.get(active_id) if active_id else None
-
-        if session is not None:
-            active_status = session.status(refresh_device=refresh_device)
-        else:
-            active_status = {
-                "configured": False,
-                "device_reachable": False,
-                "worker_running": False,
-                "streaming": False,
-                "stream_connected": False,
-                "paused_for_simulation": False,
-                "transport": "idle",
-                "stream_protocol": None,
-                "host": profile["host"] if profile else None,
-                "source_id": profile["source_id"] if profile else None,
-                "status_url": f"http://{profile['host']}/status" if profile and profile["kind"] == "esp32" else None,
-                "capture_url": f"http://{profile['host']}/capture" if profile and profile["kind"] == "esp32" else None,
-                "stream_url": f"tcp://{profile['host']}:81" if profile and profile["kind"] == "esp32" else None,
-                "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
-                "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
-                "measured_fps": 0.0,
-                "last_frame_interval_ms": None,
-                "stream_reconnects": 0,
-                "session_recoveries": 0,
-                "consecutive_failures": 0,
-                "reconnect_backoff_ms": 0,
-                "stream_bytes_received": 0,
-                "dropped_stale_frames": 0,
-                "source_sequence_gaps": 0,
-                "last_remote_sequence": None,
-                "last_source_uptime_ms": None,
-                "connected_at_ms": None,
-                "stream_started_at_ms": None,
-                "last_stream_connected_at_ms": None,
-                "last_recovery_at_ms": None,
-                "last_probe_at_ms": None,
-                "last_attempt_at_ms": None,
-                "last_success_at_ms": None,
-                "last_http_status": None,
-                "last_frame_number": None,
-                "last_frame_bytes": 0,
-                "successful_fetches": 0,
-                "failed_fetches": 0,
-                "last_error": None,
-                "settings": dict(profile["settings"]) if profile else dict(DEFAULT_CAMERA_SETTINGS),
-                "device": {},
-                "control_sequence": ["select", "connect", "config", "start", "persistent_tcp_jpeg", "stop"],
-                "prototype_only": True,
-            }
-
-        with self._lock:
-            # Re-read after optional status refresh in case another request changed selection.
-            active_id = self._active_source_id
-            profile = self._profiles.get(active_id) if active_id else None
+            if session is not None:
+                active_status = session.status(refresh_device=False)
+            else:
+                active_status = {
+                    "configured": False,
+                    "device_reachable": False,
+                    "worker_running": False,
+                    "streaming": False,
+                    "stream_connected": False,
+                    "paused_for_simulation": False,
+                    "transport": "idle",
+                    "stream_protocol": None,
+                    "host": profile["host"] if profile else None,
+                    "source_id": profile["source_id"] if profile else None,
+                    "status_url": f"http://{profile['host']}/status" if profile and profile["kind"] == "esp32" else None,
+                    "capture_url": f"http://{profile['host']}/capture" if profile and profile["kind"] == "esp32" else None,
+                    "stream_url": f"tcp://{profile['host']}:81" if profile and profile["kind"] == "esp32" else None,
+                    "target_fps": profile["target_fps"] if profile else DEFAULT_TARGET_FPS,
+                    "fetch_interval_ms": round(1000 / (profile["target_fps"] if profile else DEFAULT_TARGET_FPS)),
+                    "measured_fps": 0.0,
+                    "frame_age_ms": None,
+                    "frame_stale": False,
+                    "last_frame_interval_ms": None,
+                    "stream_reconnects": 0,
+                    "session_recoveries": 0,
+                    "consecutive_failures": 0,
+                    "reconnect_backoff_ms": 0,
+                    "stream_bytes_received": 0,
+                    "dropped_stale_frames": 0,
+                    "source_sequence_gaps": 0,
+                    "repeated_source_frames": 0,
+                    "source_sequence_resets": 0,
+                    "last_remote_sequence": None,
+                    "last_source_uptime_ms": None,
+                    "connected_at_ms": None,
+                    "stream_started_at_ms": None,
+                    "last_stream_connected_at_ms": None,
+                    "last_recovery_at_ms": None,
+                    "last_probe_at_ms": None,
+                    "last_attempt_at_ms": None,
+                    "last_success_at_ms": None,
+                    "last_http_status": None,
+                    "last_frame_number": None,
+                    "last_frame_bytes": 0,
+                    "successful_fetches": 0,
+                    "failed_fetches": 0,
+                    "last_error": None,
+                    "settings": dict(profile["settings"]) if profile else dict(DEFAULT_CAMERA_SETTINGS),
+                    "device": {},
+                    "control_sequence": ["select", "connect", "config", "start", "persistent_tcp_jpeg", "stop"],
+                    "prototype_only": True,
+                }
+            # The manager cache retains the original frame timestamp across selection.
+            # Do not derive selected-frame age from status poll time or cache promotion.
+            selected_frame = self._latest_frames.get(active_id) if active_id else None
+            if session is not None:
+                active_status["frame_age_ms"] = (
+                    max(0, self._now_ms() - selected_frame.received_at_ms)
+                    if selected_frame is not None else None
+                )
+                active_status["frame_stale"] = bool(
+                    (active_status.get("streaming") and selected_frame is None)
+                    or (selected_frame is not None and
+                        (not active_status.get("stream_connected")
+                         or active_status["frame_age_ms"] > 5000))
+                )
+                if active_status["frame_stale"]:
+                    active_status["measured_fps"] = 0.0
+            # Selection remains stable throughout the local snapshot.
             if profile is not None:
                 active_status["host"] = profile["host"]
                 active_status["source_id"] = profile["source_id"]
@@ -870,11 +967,21 @@ class RemoteCameraManager:
                     key=lambda value: (-int(value["last_used_ms"]), value["source_id"]),
                 )
             ]
+            # Additive, read-only projection; the registry and sessions retain ownership.
+            # Use the source-qualified summaries for the selected capability.
+            for camera in summaries:
+                camera["device_contract"] = project_camera_device(camera)
+            selected_contract = next(
+                (camera["device_contract"] for camera in summaries
+                 if camera["source_id"] == active_id),
+                None,
+            )
             warning = self._registry_warning
 
         active_status.update(
             {
                 "active_source_id": active_id,
+                "device_contract": selected_contract,
                 "camera_count": len(summaries),
                 "cameras": summaries,
                 "registry_warning": warning,

@@ -125,7 +125,7 @@ types/        shared contracts
 
 ## 5. Regression design
 
-The normal Windows runner auto-discovers zero-argument `scripts/test_*.py` regressions.
+The normal Windows runner auto-discovers zero-argument `scripts/test_*.py` regressions via `scripts/run_offline_tests.py`, also used by CI. From the project directory, `python scripts/run_offline_tests.py --list` lists the suite and `python scripts/run_offline_tests.py` executes it without launching PC Studio or requiring ESP hardware. Install the backend requirements first. Camera/inference/model and firmware changes conservatively run all offline tests in focused mode. The Windows runner runs its own preflight once, then passes `--skip-preflight` to the shared runner. Fresh Windows setup targets Python 3.11 like CI; existing environments are preserved.
 
 For new behavior:
 

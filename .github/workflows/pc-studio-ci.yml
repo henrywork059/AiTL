@@ -1,7 +1,7 @@
 name: PC Studio candidate CI
 on:
   push:
-    branches: [main]
+    branches: [main, feature/interactive-3d-simulation]
   pull_request:
     branches: [main]
 permissions:
@@ -27,19 +27,34 @@ jobs:
         run: python scripts/check_structure.py
       - name: Offline regressions
         working-directory: AI_Traffic_Light
-        shell: pwsh
-        run: |
-          $excluded = @('test_backend_smoke.py','test_camera_transport_benchmark.py','test_camera_transport_isolation.py')
-          Get-ChildItem scripts/test_*.py | Where-Object { $_.Name -notin $excluded } | Sort-Object Name | ForEach-Object {
-            python $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Failed: $($_.Name)" }
-          }
+        run: python scripts/run_offline_tests.py
+      - name: Execute paired seeded network evidence batch
+        if: github.event_name == 'push'
+        working-directory: AI_Traffic_Light
+        run: python scripts/seeded_network_batch.py --output "$env:RUNNER_TEMP/mesh-seeded-network" --duration 120
+      - name: Independently verify seeded network evidence
+        if: github.event_name == 'push'
+        working-directory: AI_Traffic_Light
+        run: python scripts/verify_seeded_network_evidence.py "$env:RUNNER_TEMP/mesh-seeded-network"
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'push'
+        with:
+          name: mesh-seeded-network-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/mesh-seeded-network/
       - name: npm ci
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm ci
+      - name: Frontend data access regressions
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: npm run test:data-access
       - name: Typecheck
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm run typecheck
       - name: Build
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm run build
+      - name: Blocking dependency audit (no automatic fixes)
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: npm audit --audit-level=high --json

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
@@ -22,7 +23,6 @@ from app.services.remote_camera_manager import (  # noqa: E402
     SIMULATION_SOURCE_ID,
     SIMULATION_MIRROR_SOURCE_ID,
     RemoteCameraManager,
-    _CachedPacket,
 )
 
 
@@ -56,6 +56,9 @@ class FakeSession:
         self.target_fps = target_fps
         self.streaming_requested = True
         return self.status()
+
+    def cancel_pending_frames(self) -> None:
+        self.streaming_requested = False
 
     def stop_stream(self, *, best_effort: bool = False) -> dict:
         del best_effort
@@ -157,17 +160,17 @@ def main() -> int:
         # Force an in-flight A publication to overlap a switch to B. Selection and
         # shared-frame publication must serialize so A cannot overwrite B afterward.
         manager.select("cam_a")
-        original_store = camera_frame_service.store_upload
+        original_store = camera_frame_service.publish_cached_upload
         publish_entered = threading.Event()
         release_publish = threading.Event()
 
-        def blocking_store(*, source_id: str, content_type: str, content: bytes):
-            if source_id == "cam_a" and threading.current_thread().name == "race-cam-a":
+        def blocking_store(frame):
+            if frame.source_id == "cam_a" and threading.current_thread().name == "race-cam-a":
                 publish_entered.set()
                 assert release_publish.wait(1.0)
-            return original_store(source_id=source_id, content_type=content_type, content=content)
+            return original_store(frame)
 
-        camera_frame_service.store_upload = blocking_store  # type: ignore[method-assign]
+        camera_frame_service.publish_cached_upload = blocking_store  # type: ignore[method-assign]
         emitter = threading.Thread(target=lambda: session_a.emit(3, jpeg(90)), name="race-cam-a")
         selector = threading.Thread(target=lambda: manager.select("cam_b"), name="race-select-b")
         emitter.start()
@@ -178,19 +181,27 @@ def main() -> int:
         release_publish.set()
         emitter.join(1.0)
         selector.join(1.0)
-        camera_frame_service.store_upload = original_store  # type: ignore[method-assign]
+        camera_frame_service.publish_cached_upload = original_store  # type: ignore[method-assign]
         assert not emitter.is_alive() and not selector.is_alive()
-        assert camera_frame_service.latest_frame().source_id == "cam_b"
+        assert manager.status()["active_source_id"] == "cam_b"
+        selected_frame = camera_frame_service.latest_frame()
+        # The blocked handoff may consume B's cache freshness window under a
+        # loaded Windows runner. Expiry must fail closed, never publish A.
+        assert selected_frame is None or selected_frame.source_id == "cam_b"
 
-        # Selecting A publishes its cached newest frame immediately.
+        # A newly received inactive-source frame must remain cached without
+        # overwriting B; selecting A then publishes that verified fresh cache.
+        session_a.emit(4, jpeg(95))
+        after_a_background = camera_frame_service.latest_frame()
+        assert after_a_background is None or after_a_background.source_id == "cam_b"
         manager.select("cam_a")
         assert camera_frame_service.latest_frame().source_id == "cam_a"
 
         # At normal video rates, the promotion window scales to only a few
         # frame periods rather than accepting the full absolute 1.5 s cap.
-        recent_b = manager._latest_packets["cam_b"]
-        manager._latest_packets["cam_b"] = _CachedPacket(
-            packet=recent_b.packet,
+        recent_b = manager._latest_frames["cam_b"]
+        manager._latest_frames["cam_b"] = replace(
+            recent_b,
             received_at_ms=manager._now_ms() - 800,
         )
         manager.select("cam_b")
@@ -200,9 +211,9 @@ def main() -> int:
         manager.select("cam_a")
 
         # A stale cache must never be re-stamped as a fresh selected frame.
-        stale_b = manager._latest_packets["cam_b"]
-        manager._latest_packets["cam_b"] = _CachedPacket(
-            packet=stale_b.packet,
+        stale_b = manager._latest_frames["cam_b"]
+        manager._latest_frames["cam_b"] = replace(
+            stale_b,
             received_at_ms=manager._now_ms() - MAX_SWITCH_CACHE_AGE_MS - 1,
         )
         manager.select("cam_b")
@@ -236,7 +247,7 @@ def main() -> int:
             target_fps=20,
         )
         assert camera_frame_service.latest_frame() is None
-        assert "cam_b" not in manager._latest_packets
+        assert "cam_b" not in manager._latest_frames
         manager.connect(host="192.168.50.83", source_id="cam_b")
         manager.start_stream(settings=settings_b, target_fps=20)
         replacement_session_b = manager._sessions["cam_b"]

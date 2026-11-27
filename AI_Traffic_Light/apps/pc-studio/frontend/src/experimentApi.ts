@@ -3,6 +3,7 @@ import { requestJsonStrict } from "./lib/apiClient";
 import type { SimulationExperiment, SimulationExperimentList } from "./types/experiments";
 
 export type SimulationExperimentInput = {
+  demand_model?: "historical" | "live_slots" | "protected_slots";
   duration_seconds: number;
   density: "light" | "normal" | "busy";
   seed: number;

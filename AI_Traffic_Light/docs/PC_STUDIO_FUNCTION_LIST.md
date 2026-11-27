@@ -109,3 +109,15 @@ Multiple ESP image streams, Junction Network configuration, simulated network ex
 - Camera AI Preview: pick any registered camera, show its current frame with detection boxes and class/confidence labels, overlay saved Side A/B regions, and present counts per region/class outside the frame. Viewing a different camera does not alter global source selection.
 - Settings UI is removed; persistent backend settings API remains for compatibility.
 - Limits: YOLO/Ultralytics must be installed and valid weights activated. Model latency and number of cameras limit throughput. Other analytics, Network overview and signal logic remain selected-source-only, without cross-camera identity fusion.
+
+### Optional Three.js road preview
+
+Three.js 0.187.0 (MIT, exact pin) renders canonical 1280×720 synthetic road geometry, crossing, markings, pavements/kerbs, virtual signals and coarse agent proxies. SimulationCamera3D retains polling, camera controls and source matching; ThreeRoadView owns WebGL lifecycle and RoadRenderer is shared with the trial. Default CSS rendering is retained; select Three.js preview explicitly for compatible snapshots without visible region/detection overlays. Editor/overlay modes, incompatible or absent snapshots and WebGL failures fall back to legacy. Retry or select Legacy view. No API, coordinate, simulator/controller authority or physical output changes.
+
+### Vehicle presentation
+
+The opt-in Three.js preview uses distinct procedural car, SUV, van and bus meshes with body/cabin proportions, windows, wheels and lights. RoadRenderer retains mesh groups by backend vehicle slot ID and shape signature; removes absent groups and disposes owned materials. VehicleMotion interpolates authoritative observed centers and shortest-angle headings for at most 450 ms, without extrapolation or simulator-clock mutation. Large jumps, backwards straight movement, changed shape, source/density change, clock rollback or a gap over one simulation second reset the affected motion; pause/resume snaps to the authoritative pose. RequestAnimationFrame runs only during active interpolation. The legacy CSS renderer remains default and preserves editing/overlay fallback, camera coordinates and all backend APIs and signal authority. No dependency or physical output changes.
+
+### Pedestrian presentation
+
+The optional Three.js preview replaces pedestrian box proxies with persistent volumetric figures (head, torso, separate arms, legs, shoes). PedestrianMotion follows canonical observed positions, bounds interpolation to 450 ms, derives gait from observed displacement, stops gait when stationary/paused, and resets on backwards/large jumps, source/density/clock changes or gaps. RoadRenderer retains mesh groups by existing pedestrian slot ID and color; removes absent groups and disposes owned materials. Shared geometry, mirrored heading, curb elevation and existing animation scheduling are retained. No extrapolation, new crossing authorization, simulator speed or controller change. Legacy CSS remains default and retains the source-coordinate editor and overlays. No API, dependency or physical-output changes.

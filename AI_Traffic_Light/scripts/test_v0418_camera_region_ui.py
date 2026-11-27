@@ -41,8 +41,13 @@ def main() -> None:
     assert 'aria-pressed={side === "camera_side_a_id"}' in editor
     assert 'aria-pressed={side === "camera_side_b_id"}' in editor
     # One logical region remains selected while switching camera perspectives.
-    assert 'onClick={() => setSide("camera_side_a_id")}' in editor
-    assert 'onClick={() => setSide("camera_side_b_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_a_id")}' in editor
+    assert 'onClick={() => selectSide("camera_side_b_id")}' in editor
+    side_handler = editor.split("function selectSide(next: Side) {", 1)[1].split("\n  }", 1)[0]
+    assert "dragRef.current = null;" in side_handler
+    assert "setSide(next);" in side_handler
+    assert "drag.pointerId !== event.pointerId || drag.side !== sideKey" in editor
+    assert "onLostPointerCapture={endDrag}" in editor
     assert "verticesForSide(region, sideKey)" in editor
     assert "<label>Camera side" not in editor
     assert 'fill="none"' not in editor
@@ -66,13 +71,18 @@ def main() -> None:
     source = (BACKEND / "camera_frames.py").read_text(encoding="utf-8")
     render = source.split("def _refresh_simulation_locked(", 1)[1].split('encoded_ok, encoded = cv2.imencode(".png", canvas)', 1)[0]
     agents = source.split("def _initialize_agents_locked(", 1)[1].split("def _advance_simulation_locked(", 1)[0]
-    assert 'vehicle_type = "car"' in agents
-    assert 'vehicle_type = "bus"' not in agents
+    world = (BACKEND / "legacy_world.py").read_text(encoding="utf-8")
+    assert 'kind = ("car", "suv", "van", "bus")[index % 4]' in world
+    assert '"bus": (220, 255)' in world
+    assert "vehicle_specs(self._simulation_density,self._simulation_rng)" in agents
+    assert "vehicle_type=v.vehicle_type" in agents
     assert "cv2.putText(" not in render
     assert "_draw_signal_heads(" not in render
-    assert "self._simulation_signal_state_locked()" in source  # real signal policy still runs
-    assert "_advance_pedestrians_locked(step)" in source
-    assert "_advance_vehicles_locked(step)" in source
+    # Both agent types receive the same controller phase per integration step.
+    integrator = source.split("def _advance_simulation_locked(", 1)[1].split("def _advance_vehicles_locked(", 1)[0]
+    assert 'phase = self._simulation_signal_state_locked()["phase"]' in integrator
+    assert "self._advance_vehicles_locked(step, phase)" in integrator
+    assert "self._advance_pedestrians_locked(step, phase)" in integrator
 
     backup = ROOT / "docs" / "backups" / "V0417_PRE_V0418_CODE.md"
     assert backup.is_file()

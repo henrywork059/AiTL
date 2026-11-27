@@ -13,6 +13,7 @@ from typing import Any
 from app.core.error_codes import ErrorCode
 from app.core.exceptions import AppError
 from app.core.logging_config import get_logger
+from app.services.traffic_observations import event_attribution
 
 logger = get_logger(__name__)
 
@@ -140,9 +141,13 @@ class TrafficFlowService:
                 {"id": zone["id"], "label": zone["label"], "type": zone["type"]}
                 for zone in regions.values()
             ],
-            "events": records,
+            "events": [{**record, "source_id": event_attribution(record)[0],
+                        "intersection_id": event_attribution(record)[1],
+                        "provenance": event_attribution(record)[2]} for record in records],
             "buckets": self._minute_buckets(records),
             "summary": self._summary(records),
+            "summary_scope": "legacy_aggregate_events_not_unique_objects_across_cameras",
+            "by_source": self._source_summaries(records),
         }
 
     def export_csv(
@@ -253,6 +258,18 @@ class TrafficFlowService:
             elif event_type == "region_exit":
                 bucket["region_exits"] += 1
         return [buckets[key] for key in sorted(buckets)]
+
+    @classmethod
+    def _source_summaries(cls, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        grouped: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
+        for event in records:
+            grouped[event_attribution(event)].append(event)
+        return [
+            {"source_id": source, "intersection_id": intersection, "provenance": provenance,
+             "event_count": len(events), "summary": cls._summary(events),
+             "count_semantics": "track_line_events_not_unique_objects_across_cameras"}
+            for (source, intersection, provenance), events in grouped.items()
+        ]
 
     @staticmethod
     def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:

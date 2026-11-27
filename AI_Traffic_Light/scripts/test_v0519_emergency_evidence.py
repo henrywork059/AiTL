@@ -106,6 +106,29 @@ def main() -> None:
         state = ingest(service, frame("sim_a", 4, t0 + 2300, ["ambulance"]), frame("sim_b", 4, t0 + 2300, []))
         assert state["crosswalks"]["cross_b"]["emergency_priority"], state
 
+        # A camera reconnect can reset its frame number while timestamps advance.
+        service = setup(root, clock)
+        ingest(service, frame("sim_a", 48, t0, ["ambulance"]), frame("sim_b", 48, t0, []))
+        state = ingest(service, frame("sim_a", 1, t0 + 1100, ["ambulance"]),
+                       frame("sim_b", 1, t0 + 1100, []))
+        assert state["crosswalks"]["cross_b"]["emergency_priority"], state
+
+        # A new negative frame after reconnect must clear previous positive evidence.
+        service = setup(root, clock)
+        ingest(service, frame("sim_a", 48, t0, ["ambulance"]), frame("sim_b", 48, t0, []))
+        ingest(service, frame("sim_a", 1, t0 + 1100, []), frame("sim_b", 1, t0 + 1100, []))
+        state = ingest(service, frame("sim_a", 2, t0 + 1200, ["ambulance"]),
+                       frame("sim_b", 2, t0 + 1200, []))
+        assert state["crosswalks"]["cross_b"]["emergency_priority"] is None, state
+
+        # A larger frame number cannot override an older/replayed timestamp.
+        service = setup(root, clock)
+        ingest(service, frame("sim_a", 2, t0 + 1100, ["ambulance"]),
+               frame("sim_b", 2, t0 + 1100, []))
+        state = ingest(service, frame("sim_a", 99, t0 + 1000, ["ambulance"]),
+                       frame("sim_b", 99, t0 + 1000, []))
+        assert state["crosswalks"]["cross_b"]["emergency_priority"] is None, state
+
         # Missing or stale camera data and a model switch clear evidence.
         service = setup(root, clock)
         ingest(service, frame("sim_a", 1, t0, ["ambulance"]), frame("sim_b", 1, t0, []))
@@ -127,6 +150,7 @@ def main() -> None:
     print("[PASS] repeated frames and unrelated camera updates cannot confirm emergency priority")
     print("[PASS] synchronized views do not satisfy the time gap; distinct fresh frames can")
     print("[PASS] negative, missing and model-switched evidence is cleared; hardware remains disabled")
+    print("[PASS] reconnect frame resets allow fresh evidence; negative resets clear positives; replay blocked")
 
 
 if __name__ == "__main__":

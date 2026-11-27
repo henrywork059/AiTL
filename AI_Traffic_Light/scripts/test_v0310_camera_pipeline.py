@@ -13,6 +13,7 @@ ARDUINO_LEGACY = (
     / "apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_V037/AiTL_ESP32_CAM_V037.ino"
 )
 PC_RECEIVER = PROJECT_ROOT / "apps/pc-studio/backend/app/services/remote_camera.py"
+PC_TRANSPORT = PROJECT_ROOT / "apps/pc-studio/backend/app/services/camera_tcp_transport.py"
 R10_DIAG = (
     PROJECT_ROOT
     / "apps/device-camera/esp32-cam/arduino/AiTL_ESP32_CAM_ARCH_DIAG/AiTL_ESP32_CAM_ARCH_DIAG.ino"
@@ -30,7 +31,7 @@ def assert_tuned_wrapper(text: str) -> None:
 
 
 def main() -> int:
-    for path in (PLATFORMIO, WRAPPER, LEGACY, ARDUINO, ARDUINO_LEGACY, PC_RECEIVER, R10_DIAG):
+    for path in (PLATFORMIO, WRAPPER, LEGACY, ARDUINO, ARDUINO_LEGACY, PC_RECEIVER, PC_TRANSPORT, R10_DIAG):
         assert path.exists(), path
 
     platformio = PLATFORMIO.read_text(encoding="utf-8")
@@ -39,6 +40,7 @@ def main() -> int:
     arduino = ARDUINO.read_text(encoding="utf-8")
     arduino_legacy = ARDUINO_LEGACY.read_text(encoding="utf-8")
     receiver = PC_RECEIVER.read_text(encoding="utf-8")
+    transport = PC_TRANSPORT.read_text(encoding="utf-8")
     r10_diag = R10_DIAG.read_text(encoding="utf-8")
 
     assert_tuned_wrapper(wrapper)
@@ -64,7 +66,12 @@ def main() -> int:
         assert "{'A', 'T', 'L', '1'}" in source
         assert "config.fb_count = 1" in source
 
-    assert 'FRAME_MAGIC = b"ATL1"' in receiver
+    # V0560 separates the packet codec from the existing session service.
+    # The protocol constant must be checked at its owner, not duplicated.
+    assert 'FRAME_MAGIC = b"ATL1"' in transport
+    assert 'FRAME_HEADER = struct.Struct("!4sIII")' in transport
+    assert "from app.services.camera_tcp_transport import (" in receiver
+    assert "_read_frame_packet(stream)" in receiver
     assert 'FRAME_PROTOCOL = "aitl-tcp-jpeg-v1"' in receiver
     assert 'CAMERA_PROTOCOL = "aitl-camera-v037"' in receiver
 

@@ -15,13 +15,15 @@ apps/pc-studio/backend/app/
 
 ### Camera ownership
 
-- `services/camera_frames.py` — canonical selected physical frame plus built-in simulation state;
+- `services/camera_frames.py` — canonical selected physical frame plus built-in simulation state; its 50 ms integrator reads one protected signal phase per substep and applies it consistently to vehicles and pedestrians;
 - `services/remote_camera.py` — one ESP32-CAM HTTP-control + persistent TCP-JPEG transport session, protocol validation, recovery and telemetry;
 - `services/remote_camera_manager.py` — persistent saved-camera profiles, one session per ESP, per-camera newest-frame caches and selected-source arbitration into the shared frame service;
 - `routes/camera.py` — thin camera HTTP surface;
 - `main.py` — shuts down every remote-camera session during backend shutdown.
 
 Production camera transport tuning belongs in the device-camera firmware/transport implementation, not in inference or traffic services. Multi-camera selection is an input-routing function, not a second traffic controller.
+
+**Simulation ownership invariant:** `signal_rules.py` owns the stateful protected phase and clearance rules; `camera_frames.py` owns agent positions, image rendering and advancing the simulated clock. Do not make separate signal-state evaluations inside vehicle and pedestrian movement helpers. Fetch the phase once per integrator substep, and retain the deterministic stop-line/WALK and phase-query-count regression in `scripts/test_camera_frame_service.py`.
 
 ### Junction/network ownership
 

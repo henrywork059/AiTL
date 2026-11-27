@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-import csv
-from io import StringIO
 import json
 import math
 from pathlib import Path
@@ -20,27 +18,21 @@ from app.core.json_store import read_json, write_json_atomic
 from app.core.logging_config import get_logger
 from app.services.signal_rules import SignalRulesService, signal_rules_service
 from app.services.zones import zone_service
+from app.services.experiment_timeline_csv import serialize_experiment_timeline
+from app.services.protected_crosswalk import ProtectedCrosswalk
+from app.services.simulation_wait_metrics import blocked_motion, LegacyWaitSamples
+from app.services.legacy_world import (FRAME_WIDTH, FRAME_HEIGHT, ROAD_TOP, ROAD_BOTTOM,
+    CROSSING_LEFT, CROSSING_RIGHT, EASTBOUND_STOP_LINE, WESTBOUND_STOP_LINE,
+    TOP_PEDESTRIAN_WAIT_Y, BOTTOM_PEDESTRIAN_WAIT_Y, DENSITY_COUNTS, DENSITY_SEED_OFFSETS,
+    vehicle_specs, pedestrian_specs, advance_vehicles, advance_pedestrians)
 
 logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 DEFAULT_STORAGE_ROOT = PROJECT_ROOT / "outputs" / "simulation_experiments"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,96}$")
-DENSITIES = {"light", "normal", "busy"}
+DENSITIES = set(DENSITY_COUNTS)
 
-# Keep these numeric reference points aligned with the V024 camera simulator. The
-# experiment runner intentionally avoids touching the live CameraFrameService so
-# a benchmark cannot reset or perturb the operator's current simulation state.
-FRAME_WIDTH = 1280
-FRAME_HEIGHT = 720
-ROAD_TOP = 179
-ROAD_BOTTOM = 625
-CROSSING_LEFT = 520
-CROSSING_RIGHT = 760
-EASTBOUND_STOP_LINE = 495
-WESTBOUND_STOP_LINE = 785
-TOP_PEDESTRIAN_WAIT_Y = 126
-BOTTOM_PEDESTRIAN_WAIT_Y = 674
 JUNCTION_CENTRE_X = (CROSSING_LEFT + CROSSING_RIGHT) / 2
 
 STEP_SECONDS = 0.1
@@ -79,9 +71,9 @@ class _BenchmarkSignalRulesService(SignalRulesService):
     production controller's phase/rule/cooldown/arbitration implementation.
     """
 
-    def __init__(self, *, config_path: Path, history_path: Path) -> None:
+    def __init__(self, *, config_path: Path, history_path: Path, respect_environment: bool = True) -> None:
         self._benchmark_clock_s = 0.0
-        super().__init__(config_path=config_path, history_path=history_path)
+        super().__init__(config_path=config_path, history_path=history_path, respect_environment=respect_environment)
 
     def set_benchmark_clock(self, clock_s: float) -> None:
         self._benchmark_clock_s = max(0.0, float(clock_s))
@@ -148,6 +140,9 @@ class _ModeSimulation:
         policy_config: dict[str, Any],
         zones: list[dict[str, Any]],
         temp_root: Path,
+        normalized_gate_evidence: bool = False,
+        live_slot_demand: bool = False,
+        protected_slots: bool = False,
     ) -> None:
         self.mode = mode
         self.density = density
@@ -155,7 +150,9 @@ class _ModeSimulation:
         self.duration_seconds = duration_seconds
         self.sample_interval_seconds = sample_interval_seconds
         self.zones = deepcopy(zones)
-        density_offset = {"light": 101, "normal": 211, "busy": 307}[density]
+        self.live_slot_demand = live_slot_demand or protected_slots
+        self.step_seconds = .05 if self.live_slot_demand else STEP_SECONDS
+        density_offset = DENSITY_SEED_OFFSETS[density]
         self.rng = random.Random(seed + density_offset)
 
         config = deepcopy(policy_config)
@@ -164,11 +161,16 @@ class _ModeSimulation:
         config_path = temp_root / f"{mode}_policy.json"
         history_path = temp_root / f"{mode}_controller_history.jsonl"
         config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-        self.controller = _BenchmarkSignalRulesService(config_path=config_path, history_path=history_path)
+        self.controller = _BenchmarkSignalRulesService(config_path=config_path, history_path=history_path, respect_environment=False)
         self.controller_history_path = history_path
 
         self.vehicles = self._make_vehicles()
         self.pedestrians = self._make_pedestrians()
+        self.protected_world = ProtectedCrosswalk(self.vehicles,self.pedestrians,self.rng) if protected_slots else None
+        self.applied_phase_seconds: dict[str,float] = {}
+        self.admission_hold_seconds = 0.0
+        self._admission_tick = 0
+        self._admission_trace = []
         self.vehicle_waits: list[float] = []
         self.pedestrian_waits: list[float] = []
         self.vehicle_passages = 0
@@ -187,54 +189,22 @@ class _ModeSimulation:
         self.timeline: list[dict[str, Any]] = []
         self._previous_phase_key: str | None = None
         self._sample_at_s = 0.0
+        self._gate_metrics = None
+        self._gate_timeline = []
+        self._wait_ledger=LegacyWaitSamples() if normalized_gate_evidence else None
+        self._wait_retired=set()
+        if normalized_gate_evidence:
+            from app.services.simulation_gate_metrics import GateMetrics
+            self._gate_metrics = GateMetrics()
 
     def _make_vehicles(self) -> list[_Vehicle]:
-        count = {"light": 4, "normal": 8, "busy": 12}[self.density]
-        vehicles: list[_Vehicle] = []
-        for index in range(count):
-            direction = 1 if index % 2 == 0 else -1
-            lane_index = index // 2
-            vehicle_type = "bus" if index % 5 == 4 else "car"
-            width = 220 if vehicle_type == "bus" else self.rng.randint(125, 170)
-            if direction > 0:
-                x = -240.0 + lane_index * 300
-                y = 265
-            else:
-                x = float(FRAME_WIDTH + 60 - width - lane_index * 300)
-                y = 455
-            vehicles.append(
-                _Vehicle(
-                    vehicle_id=f"v{index + 1}",
-                    x=x,
-                    y=y,
-                    width=width,
-                    speed=float(self.rng.randint(92, 125)),
-                    direction=direction,
-                    class_name=vehicle_type,
-                )
-            )
-        return vehicles
+        return [_Vehicle(vehicle_id=f"v{i+1}",x=v.x,y=v.y,width=v.width,speed=v.speed,
+                         direction=v.direction,class_name=v.vehicle_type)
+                for i,v in enumerate(vehicle_specs(self.density,self.rng,live_slots=self.live_slot_demand))]
 
     def _make_pedestrians(self) -> list[_Pedestrian]:
-        count = {"light": 4, "normal": 7, "busy": 11}[self.density]
-        pedestrians: list[_Pedestrian] = []
-        for index in range(count):
-            direction = 1 if index % 2 == 0 else -1
-            x = CROSSING_LEFT + 42 + (index * 47) % (CROSSING_RIGHT - CROSSING_LEFT - 84)
-            if direction > 0:
-                y = float(max(65, TOP_PEDESTRIAN_WAIT_Y - (index // 2) * 22))
-            else:
-                y = float(min(710, BOTTOM_PEDESTRIAN_WAIT_Y + (index // 2) * 18))
-            pedestrians.append(
-                _Pedestrian(
-                    pedestrian_id=f"p{index + 1}",
-                    x=x,
-                    y=y,
-                    speed=float(self.rng.randint(88, 106)),
-                    direction=direction,
-                )
-            )
-        return pedestrians
+        return [_Pedestrian(pedestrian_id=f"p{i+1}",x=v.x,y=v.y,speed=v.speed,direction=v.direction)
+                for i,v in enumerate(pedestrian_specs(self.density,self.rng))]
 
     @staticmethod
     def _pedestrian_waiting(pedestrian: _Pedestrian) -> bool:
@@ -297,7 +267,7 @@ class _ModeSimulation:
         self._sample_at_s = 0.0
 
         while clock < self.duration_seconds - 1e-9:
-            dt = min(STEP_SECONDS, self.duration_seconds - clock)
+            dt = min(self.step_seconds, self.duration_seconds - clock)
             observation = self._current_observation(vehicle_waiting)
             self.controller.set_benchmark_clock(clock)
             self.controller.observe({**observation, "data_source": "simulation_experiment"})
@@ -305,12 +275,16 @@ class _ModeSimulation:
             last_signal = signal
 
             self._record_signal_time(signal, dt)
-            vehicle_waiting = self._advance_vehicles(dt, clock, signal)
-            self._advance_pedestrians(dt, clock, signal)
+            self._wait_retired.clear()
+            vehicle_waiting, applied = self._advance_world(dt,clock,signal)
 
             ped_waiting_count = sum(1 for item in self.pedestrians if self._pedestrian_waiting(item))
             self.vehicle_queue_seconds += len(vehicle_waiting) * dt
             self.pedestrian_queue_seconds += ped_waiting_count * dt
+            if self._wait_ledger is not None:
+                queued={("vehicle",i) for i in vehicle_waiting}
+                queued.update(("pedestrian",p.pedestrian_id) for p in self.pedestrians if self._pedestrian_waiting(p))
+                self._wait_ledger.sample(dt,queued,self._wait_retired)
             if vehicle_waiting:
                 self.vehicle_queue_occupied_seconds += dt
             if ped_waiting_count:
@@ -320,13 +294,47 @@ class _ModeSimulation:
             self._record_overlap(signal, dt)
 
             clock += dt
+            if self._gate_metrics is not None:
+                from app.services.simulation_gate_metrics import STEP_S
+                from app.services.simulation_gate_adapters import legacy_observations
+                tick = self._gate_metrics.tick + 1
+                if clock + 1e-9 >= tick * STEP_S:
+                    self._gate_timeline.append({**self._gate_metrics.sample(tick,
+                        legacy_observations(self.vehicles,self.pedestrians)),
+                        "phase":signal["phase"],"t":round(tick*STEP_S,6),
+                        **({"applied_phase":applied} if self.protected_world else {})})
             if clock + 1e-9 >= self._sample_at_s:
                 self._append_timeline(clock, signal, vehicle_waiting, ped_waiting_count)
+                if self.protected_world:
+                    self.timeline[-1]["applied_phase"] = applied
                 self._sample_at_s += self.sample_interval_seconds
 
         self._finalize_open_waits(self.duration_seconds)
         controller_stats = self._controller_stats()
-        return self._build_result(last_signal, controller_stats)
+        result = self._build_result(last_signal, controller_stats)
+        if self.protected_world:
+            result["metrics"]["signal"].update(applied_phase_time_seconds={k:round(v,3) for k,v in sorted(self.applied_phase_seconds.items())},
+                admission_hold_seconds=round(self.admission_hold_seconds,3))
+            green=self.applied_phase_seconds.get("vehicle_green",0.)
+            result["metrics"]["throughput"]["vehicle_passages_per_green_minute"]=round(self.vehicle_passages/(green/60),2) if green else 0.0
+            result["admission_trace"]={"step_seconds":self.step_seconds,"spans":self._admission_trace}
+            result["protected_demand"]={"digest":self.protected_world.demand_digest,"schema":"protected_slots_v2",
+                "manifest":deepcopy(self.protected_world.demand_manifest),
+                "vehicle_reentries":sum(self.protected_world.vehicle_visits), "pedestrian_reentries":sum(self.protected_world.pedestrian_visits)}
+        if self._gate_metrics is not None:
+            from app.services.simulation_gate_reporting import normalized_report_metrics
+            result["normalized_gate_evidence"] = {
+                "engine":"production_protected_experiment" if self.protected_world else "production_legacy_experiment",
+                "metric_contract":"normalized_physical_service_gate_v1",
+                "summary":self._gate_metrics.summary(),
+                "waiting_episodes":self._gate_metrics.waiting_episodes(),
+                "normalized_report_metrics":normalized_report_metrics(self._gate_timeline,self._gate_metrics.summary(),self._gate_metrics.waiting_episodes()),
+                "timeline":self._gate_timeline,
+                "actual_legacy_wait":self._wait_ledger.report(),
+                "geometry_demand_matched_to_native":False,
+                "demand_model":"protected_slots_v2" if self.protected_world else ("production_live_slots" if self.live_slot_demand else "historical_benchmark_slots"),
+                "movement_step_seconds":self.step_seconds}
+        return result
 
     def _record_signal_time(self, signal: dict[str, Any], dt: float) -> None:
         phase = str(signal["phase"])
@@ -338,114 +346,79 @@ class _ModeSimulation:
                 self.cycles_completed += 1
         self._previous_phase_key = phase_key
 
+    def _vehicle_callbacks(self, dt, clock, waiting_now):
+
+        def record(vehicle, old_x, committed):
+            blocked = blocked_motion(vehicle.x-old_x,vehicle.speed*dt,.05,committed)
+            if blocked:
+                waiting_now.add(vehicle.vehicle_id)
+                if vehicle.wait_started_s is None:
+                    vehicle.wait_started_s = clock
+            elif vehicle.wait_started_s is not None:
+                self.vehicle_waits.append(max(0.0, clock-vehicle.wait_started_s))
+                vehicle.wait_started_s = None
+            old_centre = old_x+vehicle.width/2
+            new_centre = vehicle.x+vehicle.width/2
+            crossed = ((vehicle.direction>0 and old_centre<JUNCTION_CENTRE_X<=new_centre) or
+                       (vehicle.direction<0 and old_centre>JUNCTION_CENTRE_X>=new_centre))
+            if crossed and not vehicle.passed_centre:
+                self.vehicle_passages += 1
+                vehicle.passed_centre = True
+
+        def respawn(vehicle):
+            if self._wait_ledger is not None:
+                self._wait_retired.add(("vehicle",vehicle.vehicle_id))
+            vehicle.passed_centre = False
+            vehicle.wait_started_s = None
+
+        return record,respawn
+
     def _advance_vehicles(self, dt: float, clock: float, signal: dict[str, Any]) -> set[str]:
-        vehicle_go = bool(signal.get("vehicle_go"))
-        gap = 22.0
         waiting_now: set[str] = set()
-
-        def move_group(group: list[_Vehicle]) -> None:
-            ahead: _Vehicle | None = None
-            for vehicle in group:
-                old_x = vehicle.x
-                expected = old_x + vehicle.speed * dt * vehicle.direction
-                proposed = expected
-                if vehicle.direction > 0:
-                    front = old_x + vehicle.width
-                    committed = front > EASTBOUND_STOP_LINE
-                    if not vehicle_go and not committed:
-                        proposed = min(proposed, EASTBOUND_STOP_LINE - 8 - vehicle.width)
-                    if ahead is not None:
-                        proposed = min(proposed, ahead.x - gap - vehicle.width)
-                else:
-                    front = old_x
-                    committed = front < WESTBOUND_STOP_LINE
-                    if not vehicle_go and not committed:
-                        proposed = max(proposed, WESTBOUND_STOP_LINE + 8)
-                    if ahead is not None:
-                        proposed = max(proposed, ahead.x + ahead.width + gap)
-
-                vehicle.x = proposed
-                moved = abs(vehicle.x - old_x)
-                expected_movement = abs(vehicle.speed * dt)
-                blocked = moved + 0.05 < expected_movement and not committed
-                if blocked:
-                    waiting_now.add(vehicle.vehicle_id)
-                    if vehicle.wait_started_s is None:
-                        vehicle.wait_started_s = clock
-                elif vehicle.wait_started_s is not None:
-                    self.vehicle_waits.append(max(0.0, clock - vehicle.wait_started_s))
-                    vehicle.wait_started_s = None
-
-                old_centre = old_x + vehicle.width / 2
-                new_centre = vehicle.x + vehicle.width / 2
-                crossed = (
-                    vehicle.direction > 0 and old_centre < JUNCTION_CENTRE_X <= new_centre
-                ) or (
-                    vehicle.direction < 0 and old_centre > JUNCTION_CENTRE_X >= new_centre
-                )
-                if crossed and not vehicle.passed_centre:
-                    self.vehicle_passages += 1
-                    vehicle.passed_centre = True
-                ahead = vehicle
-
-        eastbound = sorted((v for v in self.vehicles if v.direction > 0), key=lambda item: item.x, reverse=True)
-        westbound = sorted((v for v in self.vehicles if v.direction < 0), key=lambda item: item.x)
-        move_group(eastbound)
-        move_group(westbound)
-
-        for vehicle in self.vehicles:
-            if vehicle.direction > 0 and vehicle.x > FRAME_WIDTH + 120:
-                peers = [item.x for item in self.vehicles if item.direction > 0 and item is not vehicle]
-                vehicle.x = min(
-                    -vehicle.width - self.rng.randint(80, 180),
-                    min(peers, default=-120.0) - vehicle.width - self.rng.randint(70, 140),
-                )
-                vehicle.passed_centre = False
-                vehicle.wait_started_s = None
-            elif vehicle.direction < 0 and vehicle.x + vehicle.width < -120:
-                peers = [item.x + item.width for item in self.vehicles if item.direction < 0 and item is not vehicle]
-                vehicle.x = max(
-                    float(FRAME_WIDTH + self.rng.randint(80, 180)),
-                    max(peers, default=float(FRAME_WIDTH + 120)) + self.rng.randint(70, 140),
-                )
-                vehicle.passed_centre = False
-                vehicle.wait_started_s = None
+        record,respawn=self._vehicle_callbacks(dt,clock,waiting_now)
+        advance_vehicles(self.vehicles,self.rng,dt,bool(signal.get("vehicle_go")),on_move=record,on_respawn=respawn)
         return waiting_now
 
-    def _advance_pedestrians(self, dt: float, clock: float, signal: dict[str, Any]) -> None:
-        can_start_crossing = bool(signal.get("pedestrian_walk"))
-        for pedestrian in self.pedestrians:
-            old_y = pedestrian.y
-            was_waiting = self._pedestrian_waiting(pedestrian)
-            if pedestrian.direction > 0:
-                if pedestrian.y < TOP_PEDESTRIAN_WAIT_Y:
-                    pedestrian.y = min(TOP_PEDESTRIAN_WAIT_Y, pedestrian.y + pedestrian.speed * dt)
-                elif pedestrian.y <= TOP_PEDESTRIAN_WAIT_Y + 0.5 and not can_start_crossing:
-                    pedestrian.y = float(TOP_PEDESTRIAN_WAIT_Y)
-                else:
-                    pedestrian.y += pedestrian.speed * dt
-                completed = old_y < BOTTOM_PEDESTRIAN_WAIT_Y <= pedestrian.y
-                if pedestrian.y > FRAME_HEIGHT + 25:
-                    pedestrian.y = float(70 - self.rng.randint(0, 42))
-            else:
-                if pedestrian.y > BOTTOM_PEDESTRIAN_WAIT_Y:
-                    pedestrian.y = max(BOTTOM_PEDESTRIAN_WAIT_Y, pedestrian.y - pedestrian.speed * dt)
-                elif pedestrian.y >= BOTTOM_PEDESTRIAN_WAIT_Y - 0.5 and not can_start_crossing:
-                    pedestrian.y = float(BOTTOM_PEDESTRIAN_WAIT_Y)
-                else:
-                    pedestrian.y -= pedestrian.speed * dt
-                completed = old_y > TOP_PEDESTRIAN_WAIT_Y >= pedestrian.y
-                if pedestrian.y < 20:
-                    pedestrian.y = float(FRAME_HEIGHT - 10 + self.rng.randint(0, 36))
-
+    def _pedestrian_callback(self, clock):
+        def record(pedestrian, old_y, completed):
+            if self._wait_ledger is not None and abs(pedestrian.y-old_y)>pedestrian.speed*self.step_seconds+1e-6:
+                self._wait_retired.add(("pedestrian",pedestrian.pedestrian_id))
+            curb = TOP_PEDESTRIAN_WAIT_Y if pedestrian.direction>0 else BOTTOM_PEDESTRIAN_WAIT_Y
+            was_waiting = abs(old_y-curb)<=.5
             is_waiting = self._pedestrian_waiting(pedestrian)
             if is_waiting and pedestrian.wait_started_s is None:
                 pedestrian.wait_started_s = clock
             elif was_waiting and not is_waiting and pedestrian.wait_started_s is not None:
-                self.pedestrian_waits.append(max(0.0, clock - pedestrian.wait_started_s))
+                self.pedestrian_waits.append(max(0.0,clock-pedestrian.wait_started_s))
                 pedestrian.wait_started_s = None
             if completed:
                 self.pedestrian_crossings += 1
+
+        return record
+
+    def _advance_pedestrians(self, dt: float, clock: float, signal: dict[str, Any]) -> None:
+        advance_pedestrians(self.pedestrians,self.rng,dt,bool(signal.get("pedestrian_walk")),on_move=self._pedestrian_callback(clock))
+
+    def _advance_world(self,dt,clock,signal):
+        if self.protected_world is None:
+            waiting=self._advance_vehicles(dt,clock,signal)
+            self._advance_pedestrians(dt,clock,signal)
+            return waiting,signal["phase"]
+        waiting=set()
+        record,respawn=self._vehicle_callbacks(dt,clock,waiting)
+        requested=signal["phase"]
+        applied=self.protected_world.step(dt,requested,on_vehicle_move=record,
+            on_vehicle_respawn=respawn,on_pedestrian_move=self._pedestrian_callback(clock))
+        self._admission_tick += 1
+        if self._admission_trace and (self._admission_trace[-1]["requested"],self._admission_trace[-1]["applied"])==(requested,applied):
+            self._admission_trace[-1]["last_tick"]=self._admission_tick
+        else:
+            self._admission_trace.append({"first_tick":self._admission_tick,"last_tick":self._admission_tick,
+                                          "requested":requested,"applied":applied})
+        self.applied_phase_seconds[applied]=self.applied_phase_seconds.get(applied,0.)+dt
+        if requested in {"vehicle_green","pedestrian_green"} and applied!=requested:
+            self.admission_hold_seconds+=dt
+        return waiting,applied
 
     def _record_overlap(self, signal: dict[str, Any], dt: float) -> None:
         if signal.get("phase") not in {"pedestrian_green", "pedestrian_flashing"}:
@@ -643,7 +616,10 @@ class SimulationExperimentService:
         sample_interval_seconds: int,
         profile: str | None,
         label: str = "",
+        demand_model: str = "historical",
     ) -> dict[str, Any]:
+        if demand_model not in {"historical","live_slots","protected_slots"}:
+            raise AppError(ErrorCode.TRAFFIC_RULE_INVALID,"Unknown experiment demand model.",status_code=422)
         density = density.strip().lower()
         if density not in DENSITIES:
             raise AppError(ErrorCode.TRAFFIC_RULE_INVALID, "Experiment density must be light, normal, or busy.", status_code=422)
@@ -678,6 +654,9 @@ class SimulationExperimentService:
                 policy_config=policy,
                 zones=zones,
                 temp_root=temp_root,
+                live_slot_demand=demand_model=="live_slots",
+                protected_slots=demand_model=="protected_slots",
+                normalized_gate_evidence=demand_model=="protected_slots",
             ).run()
             adaptive = _ModeSimulation(
                 mode="adaptive",
@@ -688,6 +667,9 @@ class SimulationExperimentService:
                 policy_config=policy,
                 zones=zones,
                 temp_root=temp_root,
+                live_slot_demand=demand_model=="live_slots",
+                protected_slots=demand_model=="protected_slots",
+                normalized_gate_evidence=demand_model=="protected_slots",
             ).run()
 
         result = {
@@ -713,6 +695,16 @@ class SimulationExperimentService:
             "prototype_only": True,
             "scope_note": "Controlled local simulation benchmark only; results do not establish public-road performance or safety.",
         }
+        # Historical runs retain their exact existing response and stored schema.
+        if demand_model=="live_slots":
+            result["scenario"].update(demand_model="live_slots",movement_step_seconds=.05,
+                geometry="legacy_camera_pixels_v1",native_demand_matched=False)
+        if demand_model=="protected_slots":
+            if fixed["protected_demand"]["digest"]!=adaptive["protected_demand"]["digest"]:
+                raise AppError(ErrorCode.TRAFFIC_RULE_INVALID,"Protected demand mismatch.",status_code=500)
+            result["scenario"].update(demand_model=demand_model,movement_step_seconds=.05,
+                geometry="legacy_camera_pixels_v1",native_demand_matched=False,
+                demand_digest=fixed["protected_demand"]["digest"])
         self._write_run(result)
         self._trim_old_runs()
         return result
@@ -757,26 +749,7 @@ class SimulationExperimentService:
         return {"deleted": True, "run_id": run_id}
 
     def export_csv(self, run_id: str) -> str:
-        result = self.get(run_id)
-        fixed_timeline = result.get("fixed", {}).get("timeline", [])
-        adaptive_timeline = result.get("adaptive", {}).get("timeline", [])
-        rows = max(len(fixed_timeline), len(adaptive_timeline))
-        output = StringIO()
-        writer = csv.writer(output, lineterminator="\n")
-        writer.writerow([
-            "t_seconds",
-            "fixed_phase", "fixed_vehicle_queue", "fixed_pedestrian_queue", "fixed_vehicle_passages", "fixed_pedestrian_crossings", "fixed_active_rules",
-            "adaptive_phase", "adaptive_vehicle_queue", "adaptive_pedestrian_queue", "adaptive_vehicle_passages", "adaptive_pedestrian_crossings", "adaptive_active_rules",
-        ])
-        for index in range(rows):
-            fixed = fixed_timeline[index] if index < len(fixed_timeline) else {}
-            adaptive = adaptive_timeline[index] if index < len(adaptive_timeline) else {}
-            writer.writerow([
-                fixed.get("t", adaptive.get("t", "")),
-                fixed.get("phase", ""), fixed.get("vehicle_queue", ""), fixed.get("pedestrian_queue", ""), fixed.get("vehicle_passages", ""), fixed.get("pedestrian_crossings", ""), "|".join(fixed.get("active_rules", [])),
-                adaptive.get("phase", ""), adaptive.get("vehicle_queue", ""), adaptive.get("pedestrian_queue", ""), adaptive.get("vehicle_passages", ""), adaptive.get("pedestrian_crossings", ""), "|".join(adaptive.get("active_rules", [])),
-            ])
-        return output.getvalue()
+        return serialize_experiment_timeline(self.get(run_id))
 
     def _write_run(self, result: dict[str, Any]) -> None:
         try:

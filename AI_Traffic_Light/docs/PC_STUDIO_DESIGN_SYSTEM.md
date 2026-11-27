@@ -141,6 +141,8 @@ Panels remain neutral and compact. Avoid gradients, glass effects, neon glows, d
 
 ## Control hierarchy
 
+Keep navigation and title regions non-interactive. A control that changes available views needs its own labeled native button, a visible pressed state and keyboard focus. Show version once in the persistent status bar; avoid repeating a legacy label already carried by a page title.
+
 - Default button: neutral action.
 - `.primary`: dominant workflow action.
 - `.secondary`: secondary emphasis/selective action.

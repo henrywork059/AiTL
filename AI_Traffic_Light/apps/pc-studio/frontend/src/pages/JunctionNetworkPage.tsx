@@ -17,6 +17,7 @@ import {
   nextJunctionNetworkId,
 } from "../lib/junctionNetworkView";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import type { PollingContext } from "../lib/pollingScope";
 import type { CameraStatus } from "../types";
 import { JUNCTION_EDGES, JUNCTION_EDGE_LABELS } from "../types/junctionNetwork";
 import type {
@@ -38,6 +39,7 @@ type Props = {
 
 export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changingMode, onSimulationChange }: Props) {
   const [overview, setOverview] = useState<JunctionNetworkOverview | null>(null);
+  const [overviewAvailable, setOverviewAvailable] = useState(false);
   const [savedConfig, setSavedConfig] = useState<JunctionNetworkConfig | null>(null);
   const [draft, setDraft] = useState<JunctionNetworkConfig | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,9 +55,11 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; pointerId: number; offsetX: number; offsetY: number } | null>(null);
 
-  const load = useCallback(async (replaceDraft: boolean) => {
-    const next = await fetchJunctionNetworkOverview();
+  const load = useCallback(async (replaceDraft: boolean, context?: PollingContext) => {
+    const next = await fetchJunctionNetworkOverview(context?.signal);
+    if (context && !context.isCurrent()) return;
     setOverview(next);
+    setOverviewAvailable(true);
     if (replaceDraft) {
       const config = cloneJunctionNetworkConfig(next.network);
       setSavedConfig(config);
@@ -86,16 +90,16 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   }, [refreshCrosswalks]);
   useSerialPolling(refreshCrosswalks, 5000, { immediate: false });
 
-  const pollOverview = useCallback(async () => {
+  const pollOverview = useCallback(async (context: PollingContext) => {
     try {
-      await load(false);
-      setError(null);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Live junction status could not be refreshed.");
+      await load(false, context);
+    } catch {
+      if (context.isCurrent()) setOverviewAvailable(false);
     }
   }, [load]);
 
-  useSerialPolling(pollOverview, 1000, { enabled: Boolean(draft), immediate: false });
+  const { waitForIdle: waitForOverviewIdle } = useSerialPolling(pollOverview, 1000, { enabled: Boolean(draft) && !saving, immediate: false });
+  const currentOverview = overviewAvailable && !saving ? overview : null;
 
   const dirty = useMemo(
     () => Boolean(savedConfig && draft && JSON.stringify(savedConfig) !== JSON.stringify(draft)),
@@ -108,8 +112,8 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   );
 
   const overviewById = useMemo(
-    () => new Map((overview?.junctions ?? []).map((item) => [item.id, item])),
-    [overview],
+    () => new Map((currentOverview?.junctions ?? []).map((item) => [item.id, item])),
+    [currentOverview],
   );
 
   const configById = useMemo(
@@ -176,6 +180,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   }, [linkTarget, linkTargets]);
 
   function mutateConfig(mutator: (next: JunctionNetworkConfig) => void) {
+    if (saving) return;
     setDraft((current) => {
       if (!current) return current;
       const next = cloneJunctionNetworkConfig(current);
@@ -193,14 +198,16 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   }
 
   async function save() {
-    if (!draft) return;
+    if (!draft || saving) return;
     setSaving(true);
     setError(null);
     try {
+      await waitForOverviewIdle();
+      setOverviewAvailable(false);
       const saved = await saveJunctionNetwork(draft);
       setSavedConfig(cloneJunctionNetworkConfig(saved));
       setDraft(cloneJunctionNetworkConfig(saved));
-      await load(false);
+      try { await load(false); } catch { setOverviewAvailable(false); }
       setSelectedId((current) => current && saved.intersections.some((item) => item.id === current)
         ? current
         : saved.active_intersection_id);
@@ -213,15 +220,17 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   }
 
   async function reset() {
-    if (!window.confirm("Reset the junction network to the default single-junction configuration?")) return;
+    if (saving || !window.confirm("Reset the junction network to the default single-junction configuration?")) return;
     setSaving(true);
     setError(null);
     try {
+      await waitForOverviewIdle();
+      setOverviewAvailable(false);
       const saved = await resetJunctionNetwork();
       setSavedConfig(cloneJunctionNetworkConfig(saved));
       setDraft(cloneJunctionNetworkConfig(saved));
       setSelectedId(saved.active_intersection_id);
-      await load(false);
+      try { await load(false); } catch { setOverviewAvailable(false); }
       setNotice("Junction network reset to defaults.");
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Junction network could not be reset.");
@@ -366,7 +375,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
   if (!draft || !overview) {
     return (
       <div className="page-stack junction-network-page">
-        {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
+        {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={currentOverview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
         <section className="panel">
           <h2>Network</h2>
           <p className="placeholder-copy">Loading legacy junction topology and camera status...</p>
@@ -380,10 +389,11 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
 
   return (
     <div className="page-stack junction-network-page">
-      {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={overview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
+      {crosswalkConfig && <CrosswalkNetworkPanel config={crosswalkConfig} overview={currentOverview} onSaved={setCrosswalkConfig} onRefresh={refreshCrosswalks} simulationEnabled={Boolean(cameraStatus?.simulation_enabled && !cameraStatus.simulation_paused)} />}
       {crosswalkError && <p role="alert" className="error-message">{crosswalkError}</p>}
+      {!currentOverview && <p role="status" className="warning-box">Live junction status unavailable. Saved topology and draft edits retained.</p>}
       <details className="junction-advanced-config">
-        <summary>Advanced junction configuration (existing)</summary>
+        <summary>Junction topology and source assignments{dirty ? " · Unsaved changes" : ""}</summary>
       <section className="panel junction-network-toolbar">
         <div className="junction-network-title-row">
           <div>
@@ -399,10 +409,10 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
         <div className="junction-network-summary">
           <div><strong>{draft.intersections.length}</strong><span>Junctions</span></div>
           <div><strong>{draft.links.length}</strong><span>Links</span></div>
-          <div><strong>{summary.assigned_esp_camera_count}/{summary.saved_esp_camera_count}</strong><span>ESP assigned</span></div>
-          <div><strong>{summary.reachable_esp_camera_count}</strong><span>ESP reachable</span></div>
-          <div><strong>{summary.event_count}</strong><span>Events</span></div>
-          <div><strong>{summary.warning_junction_count}</strong><span>Warnings</span></div>
+          <div><strong>{currentOverview ? `${summary.assigned_esp_camera_count}/${summary.saved_esp_camera_count}` : "—"}</strong><span>ESP assigned</span></div>
+          <div><strong>{currentOverview ? summary.reachable_esp_camera_count : "—"}</strong><span>ESP reachable</span></div>
+          <div><strong>{currentOverview ? summary.event_count : "—"}</strong><span>Events</span></div>
+          <div><strong>{currentOverview ? summary.warning_junction_count : "—"}</strong><span>Warnings</span></div>
         </div>
         <div className="junction-network-status-row">
           <span className={cameraStatus?.simulation_enabled ? "status-pill status-implemented" : "status-pill muted"}>
@@ -498,29 +508,30 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
               </div>
 
               <section className="junction-inspector-section">
-                <div className="junction-section-title"><h4>Live state</h4><span className="status-pill muted">{selectedOverview.live.observation_provenance}</span></div>
-                <div className="junction-live-grid">
+                <div className="junction-section-title"><h4>Last reported observation</h4><span className="status-pill muted">{selectedOverview.live.available ? selectedOverview.live.observation_provenance : "Unavailable"}</span></div>
+                {!selectedOverview.live.available && <p className="small-note">No verified observation for this junction. Counts and phase are unavailable, not zero.</p>}
+                {selectedOverview.live.available && <div className="junction-live-grid">
                   <div><span>Vehicle load</span><strong className={junctionLoadClass(selectedOverview.live.vehicle.load)}>{JUNCTION_LOAD_LABELS[selectedOverview.live.vehicle.load]}</strong><small>{selectedOverview.live.vehicle.total} total · {selectedOverview.live.vehicle.waiting} waiting</small></div>
                   <div><span>Pedestrian load</span><strong className={junctionLoadClass(selectedOverview.live.pedestrian.load)}>{JUNCTION_LOAD_LABELS[selectedOverview.live.pedestrian.load]}</strong><small>{selectedOverview.live.pedestrian.total} total · {selectedOverview.live.pedestrian.waiting} waiting · {selectedOverview.live.pedestrian.crossing} crossing</small></div>
                   <div><span>Phase</span><strong>{junctionPhaseLabel(selectedOverview.live.phase)}</strong></div>
                   <div><span>Decision</span><strong>{selectedOverview.live.decision ?? "Unavailable"}</strong></div>
-                </div>
-                {selectedOverview.live.decision_reason && <p className="small-note junction-decision-reason">{selectedOverview.live.decision_reason}</p>}
+                </div>}
+                {selectedOverview.live.available && selectedOverview.live.decision_reason && <p className="small-note junction-decision-reason">{selectedOverview.live.decision_reason}</p>}
               </section>
 
               <section className="junction-inspector-section">
                 <div className="junction-section-title"><h4>ESP cameras</h4><span className="status-pill muted">{selectedConfig.source_ids.length} assigned</span></div>
                 <div className="junction-camera-list">
-                  {availableCameras.length === 0 && <p className="small-note">No saved ESP cameras. Add cameras on Camera Sources first.</p>}
+                  {availableCameras.length === 0 && <p className="small-note">No saved ESP cameras. Add cameras in Devices → Cameras first.</p>}
                   {availableCameras.map((camera) => {
                     const owner = cameraOwner(camera.source_id);
                     const checked = selectedConfig.source_ids.includes(camera.source_id);
                     return (
                       <label key={camera.source_id} className="junction-camera-row">
                         <input type="checkbox" checked={checked} onChange={(event) => toggleCamera(camera.source_id, event.target.checked)} />
-                        <span className={`junction-camera-state junction-camera-state-${camera.state}`} />
+                        <span className={`junction-camera-state${currentOverview ? ` junction-camera-state-${camera.state}` : ""}`} />
                         <span className="junction-camera-copy"><strong>{camera.source_id}</strong><small>{camera.host ?? camera.kind}{owner && owner.id !== selectedConfig.id ? ` · ${owner.label}` : ""}</small></span>
-                        <span className="junction-camera-fps">{camera.measured_fps.toFixed(1)} FPS</span>
+                        <span className="junction-camera-fps">{currentOverview ? `${camera.measured_fps.toFixed(1)} FPS` : "Unavailable"}</span>
                       </label>
                     );
                   })}
@@ -580,7 +591,7 @@ export function JunctionNetworkPage({ cameraStatus, showSimulationTools, changin
                   </select>
                 </label>
                 {crosswalkError && <p className="error-message">{crosswalkError}</p>}
-                {crosswalks.length === 0 && !crosswalkError && <p className="small-note">No defined crosswalks. Create one under Traffic → Crosswalks first.</p>}
+                {crosswalks.length === 0 && !crosswalkError && <p className="small-note">No defined crosswalks. Create one under Network → Crosswalks first.</p>}
                 {JUNCTION_EDGES.some((edge) => {
                   const id = selectedConfig.crosswalk_edges[edge];
                   return Boolean(id && !crosswalkById.has(id));

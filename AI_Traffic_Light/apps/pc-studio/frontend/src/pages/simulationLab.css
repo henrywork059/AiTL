@@ -98,3 +98,7 @@
   .experiment-tab-panel { overflow: visible; }
   .experiment-empty { height: auto; min-height: 180px; }
 }
+
+.native-lab-page { overflow:auto; }
+.native-lab-workspace { display:grid; gap:var(--space-3); }
+.native-lab-preview.sim3d-viewport { position:relative; width:100%; height:auto; min-height:360px; aspect-ratio:16 / 9; overflow:hidden; }

@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 def inference_status(request: Request) -> dict:
     """Return trained-model discovery and live inference status."""
     data = inference_service.status()
-    data["tracking"] = object_tracking_service.status()
+    frame = camera_frame_service.latest_frame()
+    data["tracking"] = object_tracking_service.status_for_observation(frame.observation if frame is not None else None)
     logger.info("Inference status returned", extra={"request_id": request.state.request_id})
     return ok(data, request_id=request.state.request_id)
 
@@ -66,7 +67,7 @@ def live_detections(
     """Run/cached detections for the newest frame and assign frame-deduplicated prototype track IDs."""
     frame = camera_frame_service.latest_frame()
     raw = inference_service.detect_frame(frame, confidence_threshold=confidence)
-    data = object_tracking_service.update(raw, zone_service.zones())
+    data = object_tracking_service.update(raw, zone_service.zones(), observation=frame.observation if frame is not None else None)
     logger.info(
         "Live tracked detections returned",
         extra={

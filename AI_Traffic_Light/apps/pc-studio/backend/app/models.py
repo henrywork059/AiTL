@@ -70,6 +70,7 @@ class TrafficState(BaseModel):
 
 
 class CameraSimulationSettingsRequest(BaseModel):
+    engine: Literal["legacy", "protected"] | None = None
     density: Literal["light", "normal", "busy"] | None = None
     paused: bool | None = None
 
@@ -78,6 +79,9 @@ class CaptureFrameRequest(BaseModel):
     session_id: str = Field(default="default", min_length=1, max_length=64)
     quality_tag: Literal["unreviewed", "useful", "bad"] = "unreviewed"
     note: str = Field(default="", max_length=500)
+    # Preflight identity is optional for pre-existing API clients.
+    expected_source_id: str | None = Field(default=None, min_length=1, max_length=160)
+    expected_origin: Literal["upload", "simulation"] | None = None
 
 
 class DatasetLabelBoxRequest(BaseModel):
@@ -148,6 +152,7 @@ class SignalRulesPreviewRequest(BaseModel):
 
 
 class SimulationExperimentRunRequest(BaseModel):
+    demand_model: Literal["historical","live_slots","protected_slots"] = "historical"
     duration_seconds: int = Field(default=300, ge=30, le=1800)
     density: Literal["light", "normal", "busy"] = "normal"
     seed: int = Field(default=25025, ge=0, le=2_147_483_647)

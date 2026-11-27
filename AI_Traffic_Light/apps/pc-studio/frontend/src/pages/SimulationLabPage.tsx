@@ -10,6 +10,7 @@ import {
 } from "../experimentApi";
 import type { ExperimentDelta, ExperimentModeResult, SimulationExperiment, SimulationExperimentSummary } from "../types/experiments";
 import "./simulationLab.css";
+import {NativeSimulationWorkspace} from "./NativeSimulationWorkspace";
 
 type TabId = "summary" | "waiting" | "throughput" | "signal" | "samples";
 type SampleMode = "fixed" | "adaptive";
@@ -54,7 +55,7 @@ function directionClass(delta: ExperimentDelta): string {
 
 function scenarioLabel(item: SimulationExperimentSummary): string {
   const name = item.label.trim() || new Date(item.created_at_ms).toLocaleString();
-  return `${name} · ${item.scenario.density} · ${item.scenario.duration_seconds}s`;
+  return `${name} · ${item.scenario.density} · ${item.scenario.duration_seconds}s${item.scenario.demand_model==="live_slots"?" · live slots":item.scenario.demand_model==="protected_slots"?" · protected slots":""}`;
 }
 
 function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
@@ -70,9 +71,11 @@ function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
 }
 
 export function SimulationLabPage() {
+  const [nativeWorkspace,setNativeWorkspace]=useState(false);
   const [tab, setTab] = useState<TabId>("summary");
   const [sampleMode, setSampleMode] = useState<SampleMode>("adaptive");
   const [duration, setDuration] = useState(300);
+  const [demandModel,setDemandModel]=useState<"historical"|"live_slots"|"protected_slots">("historical");
   const [density, setDensity] = useState<"light" | "normal" | "busy">("normal");
   const [seed, setSeed] = useState(25025);
   const [sampleInterval, setSampleInterval] = useState(1);
@@ -117,6 +120,7 @@ export function SimulationLabPage() {
       const next = await runSimulationExperiment({
         duration_seconds: duration,
         density,
+        demand_model:demandModel,
         seed,
         sample_interval_seconds: sampleInterval,
         profile: profile || null,
@@ -177,6 +181,8 @@ export function SimulationLabPage() {
     [sampleSource, clampedSamplePage, pageSize],
   );
 
+  if(nativeWorkspace)return <div className="experiment-page native-lab-page"><button type="button" onClick={()=>setNativeWorkspace(false)}>Back to legacy experiments</button><NativeSimulationWorkspace profile={profile||undefined}/></div>;
+
   return (
     <div className="experiment-page">
       <section className="panel experiment-workspace">
@@ -185,13 +191,20 @@ export function SimulationLabPage() {
             <h2>Fixed vs Adaptive Simulation Lab</h2>
             <p className="placeholder-copy">Run the same seeded prototype junction in Fixed and Adaptive modes, then compare waiting, queues, throughput, signal use, scenario activity, and conflict diagnostics.</p>
           </div>
-          <span className="status-pill muted">isolated benchmark</span>
+          <div className="button-row"><span className="status-pill muted">isolated benchmark</span><button type="button" onClick={()=>setNativeWorkspace(true)}>Native evaluation workspace</button></div>
         </div>
 
         <div className="experiment-control-grid">
           <label>Density
             <select value={density} onChange={(event: ChangeEvent<HTMLSelectElement>) => setDensity(event.target.value as typeof density)}>
               <option value="light">Light</option><option value="normal">Normal</option><option value="busy">Busy</option>
+            </select>
+          </label>
+          <label>Demand model
+            <select value={demandModel} disabled={busy} onChange={(event: ChangeEvent<HTMLSelectElement>) => setDemandModel(event.target.value as typeof demandModel)}>
+              <option value="historical">Historical benchmark</option>
+              <option value="live_slots">Live camera slots (50 ms)</option>
+              <option value="protected_slots">Protected crosswalk slots (50 ms)</option>
             </select>
           </label>
           <label>Duration
@@ -229,7 +242,7 @@ export function SimulationLabPage() {
             <button type="button" disabled={!result} onClick={() => result && window.location.assign(simulationExperimentExportUrl(result.run_id))}>Export samples CSV</button>
             <button className="danger" type="button" disabled={!result || busy} onClick={() => void deleteRun()}>Delete run</button>
           </div>
-          {result && <div className="experiment-scenario-strip"><strong>{result.scenario.profile}</strong><span>{result.scenario.density}</span><span>{result.scenario.duration_seconds}s</span><span>seed {result.scenario.seed}</span><span>{new Date(result.created_at_ms).toLocaleString()}</span></div>}
+          {result && <div className="experiment-scenario-strip"><strong>{result.scenario.profile}</strong><span>{result.scenario.density}</span><span>{result.scenario.duration_seconds}s</span><span>seed {result.scenario.seed}</span>{result.scenario.demand_model==="live_slots"&&<span>Live camera slots · 50 ms</span>}{result.scenario.demand_model==="protected_slots"&&<span>Protected crosswalk · 50 ms</span>}<span>{new Date(result.created_at_ms).toLocaleString()}</span></div>}
         </div>
 
         {error && <p className="error-message experiment-error">{error}</p>}
@@ -352,11 +365,14 @@ function ThroughputTab({ fixed, adaptive }: { fixed: ExperimentModeResult; adapt
 function SignalTab({ fixed, adaptive }: { fixed: ExperimentModeResult; adaptive: ExperimentModeResult }) {
   const f = fixed.metrics.signal; const a = adaptive.metrics.signal;
   const phases = Array.from(new Set([...Object.keys(f.phase_time_seconds), ...Object.keys(a.phase_time_seconds)]));
+  const applied=Array.from(new Set([...Object.keys(f.applied_phase_time_seconds??{}),...Object.keys(a.applied_phase_time_seconds??{})]));
   const rules = Object.entries(a.rule_applications).sort((left, right) => right[1] - left[1]);
   return (
     <div className="experiment-table-grid">
       <ComparisonTable title="Signal utilization" rows={[
         ...phases.map((phase) => metricRow(`${phase.replaceAll("_", " ")} time`, f.phase_time_seconds[phase] ?? 0, a.phase_time_seconds[phase] ?? 0, "s")),
+        ...applied.map(phase=>metricRow(`Applied ${phase.replaceAll("_"," ")}`,f.applied_phase_time_seconds?.[phase]??0,a.applied_phase_time_seconds?.[phase]??0,"s")),
+        ...(f.admission_hold_seconds!==undefined&&a.admission_hold_seconds!==undefined?[metricRow("Protective admission holds",f.admission_hold_seconds,a.admission_hold_seconds,"s")]:[]),
         metricRow("Phase transitions", f.phase_transitions, a.phase_transitions),
         metricRow("Completed cycles", f.cycles_completed, a.cycles_completed),
         metricRow("Clearance time", f.clearance_time_seconds, a.clearance_time_seconds, "s"),
@@ -398,7 +414,7 @@ function SamplesTab({ mode, onModeChange, pageSize, onPageSizeChange, page, page
         <span>{total} samples · page {page + 1}/{pageCount}</span>
         <div className="button-row"><button disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Previous</button><button disabled={page >= pageCount - 1} onClick={() => onPageChange(page + 1)}>Next</button></div>
       </div>
-      <div className="experiment-sample-table-wrap"><table className="experiment-data-table"><thead><tr><th>t</th><th>Phase</th><th>Vehicle queue</th><th>Ped queue</th><th>Vehicles served</th><th>Ped served</th><th>Active scenario</th></tr></thead><tbody>{samples.map((sample) => <tr key={`${mode}-${sample.t}`}><td>{sample.t.toFixed(1)}s</td><td>{sample.phase.replaceAll("_", " ")}</td><td>{sample.vehicle_queue}</td><td>{sample.pedestrian_queue}</td><td>{sample.vehicle_passages}</td><td>{sample.pedestrian_crossings}</td><td>{sample.active_rules.length ? sample.active_rules.join(", ") : "—"}</td></tr>)}</tbody></table></div>
+      <div className="experiment-sample-table-wrap"><table className="experiment-data-table"><thead><tr><th>t</th><th>Requested phase</th><th>Applied admission</th><th>Vehicle queue</th><th>Ped queue</th><th>Vehicles served</th><th>Ped served</th><th>Active scenario</th></tr></thead><tbody>{samples.map((sample) => <tr key={`${mode}-${sample.t}`}><td>{sample.t.toFixed(1)}s</td><td>{sample.phase.replaceAll("_", " ")}</td><td>{sample.applied_phase?.replaceAll("_"," ")??"—"}</td><td>{sample.vehicle_queue}</td><td>{sample.pedestrian_queue}</td><td>{sample.vehicle_passages}</td><td>{sample.pedestrian_crossings}</td><td>{sample.active_rules.length ? sample.active_rules.join(", ") : "—"}</td></tr>)}</tbody></table></div>
     </div>
   );
 }

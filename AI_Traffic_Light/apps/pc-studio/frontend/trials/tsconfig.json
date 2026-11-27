@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "rendererTrial.ts",
+    "nativeRendererTrial.ts",
+    "integrationTrial.tsx",
+    "workspaceTrial.tsx",
+    "RoadRenderer.ts"
+  ]
+}

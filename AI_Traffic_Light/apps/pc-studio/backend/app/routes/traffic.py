@@ -171,7 +171,8 @@ def clear_traffic_history(request: Request) -> dict:
 
 @router.get("/tracks")
 def tracking_status(request: Request) -> dict:
-    data = object_tracking_service.status()
+    frame = camera_frame_service.latest_frame()
+    data = object_tracking_service.status_for_observation(frame.observation if frame is not None else None)
     logger.info("Traffic tracking status returned", extra={"request_id": request.state.request_id, "active_track_count": data.get("active_track_count")})
     return ok(data, request_id=request.state.request_id)
 

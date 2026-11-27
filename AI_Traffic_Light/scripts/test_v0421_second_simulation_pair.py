@@ -28,7 +28,10 @@ def main() -> None:
     assert "selected_simulation = self._active_source_id in SIMULATION_SOURCE_IDS" in manager
     assert "camera_frame_service.set_simulation_source(self._active_source_id)" in manager
 
-    assert '"simulation_camera_b": 0, "simulation_camera_c": 1, "simulation_camera_d": -1' in frames
+    identity = read(BACKEND, "services/observation_identity.py")
+    assert '"simulation_camera_b": 0' in identity
+    assert '"simulation_camera_c": 1, "simulation_camera_d": -1' in identity
+    assert "flip = SIMULATION_VIEW_FLIPS[source_id]" in frames
     assert "self._simulation_view_frames[source_id] = cached" in frames
     assert "if cached is None or cached.frame_number != original.frame_number:" in frames
     assert "if source_id not in SIMULATION_CAMERA_SOURCE_IDS:" in frames

@@ -15,6 +15,7 @@ from app.core.exceptions import AppError
 from app.services.crosswalks import CrosswalkService, crosswalk_service
 from app.services.crosswalk_observations import MAX_FRAME_AGE_MS, crosswalk_observation
 from app.services.crosswalk_signal_coordinator import coordinate_crosswalk_signals
+from app.services.emergency_evidence import confirmed_emergency
 from app.services.signal_rules import (
     PROJECT_ROOT, SignalRulesService, signal_rules_service,
 )
@@ -124,13 +125,7 @@ class CrosswalkSignalService:
                 for link in links
                 if link.get("movement_conflicts") and link.get("emergency_route", "off") != "off"
             }
-            for target_id, request in list(self._priority_requests.items()):
-                if (now >= request["expires_at"]
-                        or (request["source_crosswalk_id"], target_id) not in enabled_routes):
-                    controller = self._controllers.get(target_id)
-                    if controller:
-                        controller.cancel_simulated_emergency_vehicle()
-                    del self._priority_requests[target_id]
+            self._withdraw_invalid_priority_locked(now, enabled_routes)
             states: dict[str, dict[str, Any]] = {}
             for item in crosswalks:
                 crosswalk_id = item["id"]
@@ -219,6 +214,18 @@ class CrosswalkSignalService:
             },
         }
 
+    def _withdraw_invalid_priority_locked(self, now: float, enabled_routes: set[tuple[str, str]]) -> None:
+        """Withdraw pending virtual priority when its source evidence or route expires."""
+        now_ms = int(time.time() * 1000)
+        for target_id, request in list(self._priority_requests.items()):
+            source_id = request["source_crosswalk_id"]
+            if (now >= request["expires_at"] or (source_id, target_id) not in enabled_routes
+                    or not confirmed_emergency(self._emergency_evidence.get(source_id), now_ms, MAX_FRAME_AGE_MS)):
+                controller = self._controllers.get(target_id)
+                if controller:
+                    controller.cancel_simulated_emergency_vehicle()
+                del self._priority_requests[target_id]
+
     def ingest_camera_results(
         self, results: dict[str, dict[str, Any]], *, simulation_enabled: bool,
         simulation_paused: bool = False, model_id: str | None = None,
@@ -263,13 +270,20 @@ class CrosswalkSignalService:
                     evidence = self._emergency_evidence.get(crosswalk_id)
                     if evidence is None or evidence["model_id"] != model_id:
                         evidence = {"model_id": model_id, "latest": {}, "positive": {}}
+                    current_sources = {frame["source_id"] for frame in frame_observations}
+                    evidence["positive"] = {key: stamp for key, stamp in evidence["positive"].items()
+                                            if key[0] in current_sources}
+                    evidence["latest"] = {key: value for key, value in evidence["latest"].items()
+                                          if key in current_sources}
                     for frame in frame_observations:
                         source = frame["source_id"]
                         frame_number = frame["source_frame_number"]
                         timestamp = frame["timestamp_ms"]
                         identity = (source, frame_number, timestamp, frame["model_id"])
                         previous = evidence["latest"].get(source)
-                        if previous and (frame_number <= previous[0] or timestamp <= previous[1]):
+                        # Source counters may reset on reconnect; a newer timestamp
+                        # is authoritative, while repeated/older samples stay ignored.
+                        if previous and (timestamp <= previous[1] or frame_number == previous[0]):
                             continue
                         evidence["latest"][source] = (frame_number, timestamp)
                         if frame["ambulance_observed"]:
@@ -279,13 +293,10 @@ class CrosswalkSignalService:
                                 key: value for key, value in evidence["positive"].items()
                                 if key[0] != source
                             }
-                    newest_timestamp = max(
-                        (frame["timestamp_ms"] for frame in frame_observations),
-                        default=0,
-                    )
+                    now_ms = int(time.time() * 1000)
                     evidence["positive"] = {
                         key: timestamp for key, timestamp in evidence["positive"].items()
-                        if 0 <= newest_timestamp - timestamp <= MAX_FRAME_AGE_MS
+                        if 0 <= now_ms - timestamp <= MAX_FRAME_AGE_MS
                     }
                     self._emergency_evidence[crosswalk_id] = evidence
 
@@ -293,6 +304,7 @@ class CrosswalkSignalService:
             # virtual vehicle phase. All-red/pedestrian transitions remain local.
             now = self._clock()
             eligible: set[str] = set()
+            enabled_routes: set[tuple[str, str]] = set()
             for link in self._crosswalks.get().get("network", {}).get("links", []):
                 if not link.get("movement_conflicts"):
                     continue  # Never request adjacent priority without explicit movement conflicts.
@@ -303,15 +315,9 @@ class CrosswalkSignalService:
                     source_id, target_id = link["destination_crosswalk_id"], link["source_crosswalk_id"]
                 else:
                     continue
-                evidence = self._emergency_evidence.get(source_id)
-                # Both positives must be from one source: different views alone
-                # cannot establish longitudinal ambulance persistence.
-                by_source: dict[str, set[int]] = {}
-                if evidence:
-                    for identity, timestamp in evidence["positive"].items():
-                        by_source.setdefault(identity[0], set()).add(timestamp)
-                if not any(len(times) >= 2 and max(times) - min(times) >= 1000
-                           for times in by_source.values()):
+                enabled_routes.add((source_id, target_id))
+                if not confirmed_emergency(self._emergency_evidence.get(source_id),
+                                           int(time.time() * 1000), MAX_FRAME_AGE_MS):
                     continue
                 eligible.add(link["id"])
                 if link["id"] in self._active_routes:
@@ -325,6 +331,7 @@ class CrosswalkSignalService:
                         "expires_at": now + 30.0,
                     }
             self._active_routes.intersection_update(eligible)
+            self._withdraw_invalid_priority_locked(now, enabled_routes)
 
     def observe(self, crosswalk_id: str, observation: dict[str, Any]) -> None:
         """Future camera/region adapter: update only one existing simulation controller."""

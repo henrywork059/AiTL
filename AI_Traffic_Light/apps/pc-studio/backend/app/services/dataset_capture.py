@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -46,16 +47,30 @@ class CaptureRecord:
     note: str
     image_path: str
     metadata_path: str
+    simulation_engine: str | None = None
+    simulation_demand_digest: str | None = None
+    coordinate_space: str | None = None
+    layout_id: str | None = None
+    observation_epoch: str | None = None
+    detector_input_eligible: bool | None = None
+    content_sha256: str | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        if self.simulation_engine is None:
+            data.pop("simulation_engine")
+        if self.simulation_demand_digest is None:
+            data.pop("simulation_demand_digest")
+        for key in ("coordinate_space","layout_id","observation_epoch","detector_input_eligible","content_sha256"):
+            if data[key] is None: data.pop(key)
+        return data
 
 
 class DatasetCaptureService:
     """Persist and remove camera captures inside the project dataset folder."""
 
-    def __init__(self, dataset_root: Path | None = None) -> None:
-        configured_root = os.environ.get("AITL_DATASET_DIR")
+    def __init__(self, dataset_root: Path | None = None, *, respect_environment: bool = True) -> None:
+        configured_root = os.environ.get("AITL_DATASET_DIR") if respect_environment else None
         self._dataset_root = Path(configured_root) if configured_root else (dataset_root or DEFAULT_DATASET_ROOT)
         self._dataset_root = self._dataset_root.expanduser().resolve()
         self._capture_root = self._dataset_root / "captures"
@@ -129,6 +144,11 @@ class DatasetCaptureService:
             note=note.strip(),
             image_path=image_relative,
             metadata_path=metadata_relative,
+            simulation_engine=frame.simulation_engine,
+            simulation_demand_digest=frame.simulation_demand_digest,
+            coordinate_space=frame.coordinate_space,layout_id=frame.layout_id,observation_epoch=frame.observation_epoch,
+            detector_input_eligible=False if frame.evaluation_only else None,
+            content_sha256=hashlib.sha256(frame.content).hexdigest(),
         )
 
         with self._lock:

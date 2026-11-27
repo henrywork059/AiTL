@@ -1,0 +1,32 @@
+# V0576 — Capture freshness, managed dataset integrity and independent S04 evidence candidate
+
+Candidate `0_5_76`; previous `0_5_75`; accepted baseline `0_5_0`. Reconciled authorized HEAD 00f4d542c20899816758114b012e83650a8e9263 retained, including 8 MiB bounded upload regression and historical main integration. Concurrent P3/P4/P5 independent candidate; Updates 30/33/37/38 remain partial, S04 / Update 28 gated. Delivered milestones remain 30/39 (76.9%), not acceptance.
+
+## Implementation
+
+P3: backend snapshot admission rejects upload age outside 0–5000 ms with existing CAMERA_NOT_CONNECTED/HTTP 409; camera status uses the same receiver freshness limit; paused simulation remains capturable. Latest snapshot selection is not an exact preview-frame lock. P4: new persisted capture records add optional content_sha256. Managed YOLO builder excludes recognized isolated-evaluation origins, engines and native coordinate space even without the historical explicit flag; verifies label identity/dimensions; records SHA-256 of generated YAML/images/labels. Legacy managed manifests without integrity hashes become rebuild-required without rewriting captures. Training start resolves dataset path, detects newly marked managed YAML even if the manifest was removed, and verifies source image bytes, capture digest when present, normalized labels, YAML/classes, disjoint complete split membership and exact tracked split files before the optional trainer. Build and launch share the existing managed lock. Status returns optional dataset_integrity_sha256, displayed compactly with full value in the UI. Older explicit unmanaged YAML remains supported; deleted marker/manifest from older unmarked builds cannot always be distinguished from unmanaged configuration. Verification is at admission, not continuous authentication; existing historical un-hashed captures are not retroactively authenticated, and trainer-generated cache files are outside the audited input split folders. No real YOLO training, physical actuation or default simulator migration.
+
+## Application qualification
+
+Application CI 46030780891 passed on 6bf86a149f330ead6a7920e2449bfaad2a7d8dc3 (126 offline scripts, independent evidence verification, frontend regression/typecheck/build and blocking audit). Existing bounded upload test passed. Initial P3/P4/P5 push/PR CI 46030002243/46030011877 passed; intermediate CI 46030592921 passed. Managed service regression rejects modified copied images/labels, untracked split files, changed original bytes, path alias bypass and missing marked manifest, then admits verified data with deterministic fake trainer; no weights loaded. Real-clock Windows Edge browser CI 46030781055 passed capture, training, review, junction, region and renderer workflows including verified dataset identity. Artifact 15213763479 SHA-256 49b413d570dbdbef84dc106b06b9acb6d1ecc49f03027a5cbf0f224eb82b55b3; capture and training screenshots inspected; synthetic API responses and pre-version-bump footer 0_5_75. Fresh native CI 46030002341 passed; archive 15213988017 SHA-256 6d9342e98d7c5f58b7532f38fd73af99a6ddc1c11af48c441e6e0a6317850d2a verified independently, 44 new capture content digests matched, actual native detail screenshot inspected. Integrated native audit CI 46030592878 passed completely.
+
+## Reproducible experiment evidence
+
+P5: seeded network verifier additionally independently enforces local vehicle/pedestrian flow balances, transfer-pipeline counts, monotone cumulative counts, waiting-episode count reconciliation, signal-phase time sum and local/network wait sum. Rehashed raw-only arrival-count tampering rejected. Exact application CI evidence archive 15213359475 SHA-256 8431162908d5d087df196935491af8fe1cd17def78de4994aca37e70847c2677: 12 matched cases, 48 policy arms, 43 member hashes, 732 timeline samples and 19,725 decisions. Cooperative pedestrian wait increased in 11/12 matched cases; do not suppress negative outcomes. Actual executed synthetic queue model, not field measurements.
+
+## S04 mandatory gate audit
+
+S04: standalone stdlib verifier scripts/verify_s04_evidence.py exact locally tested Git blob 06c16b163d90bde25bc9e5736f5272f6275f8247 accepts directory or archive plus independent SHA-256; audits 20,000 normalized samples over eight repeated CSV timelines, corresponding raw summaries/digests, six 400+400 HTTP workloads (raw scene/frame mean and linear p95, process working-set sums and CPU deltas), 11 capture archives and 44 synthetic coordinate views, four mirrored half-open footprint transforms, content/inner/outer hashes and nonauthority flags. Three nonmutating negative controls rejected changed wait, latency and capture digest. Locally verified old archive 15204881978 and fresh 15213988017, plus integrated CI audit. Fresh resource mean frame latency: indexed lean 10.4560 ms, RGB lean 17.6045 ms, indexed spawn 11.3491 ms (800 frame reads/configuration); mean final combined working sets 158711808, 173279232, 210978816 bytes. Nonrandomized Windows CI diagnostic workload, not owner budget. Finite native/reference passages each 8 vehicle and 14 pedestrian crossings; waits 129.4 vs 144.0 vehicle-agent-s and 15.4 vs 57.2 pedestrian-agent-s; not equivalent. Palette-only synthetic control canonical vehicle 96/96 matched, pedestrian 40/43 truth and 40/41 predictions, not trained detector performance. No production calibration/common wait estimand, trusted trained holdout, owner Windows/ESP resource/rollback approval; S04 stays gated. Legacy remains default, native isolated evaluation only; no public-road authority.
+
+## Owner test
+
+From repository root:
+
+```powershell
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+Remove-Item Env:MESH_SUMO_SHADOW -ErrorAction SilentlyContinue
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+Verify footer 0_5_76 Candidate. With disposable reviewed captures and authorized controlled cameras, check expired/source-switched capture rejection, fresh/paused simulation capture, saved SHA, evaluation-only exclusion, managed build/review and rejection of corrupted/missing-manifest data. Rebuild old managed datasets explicitly from saved reviews if requested; original captures stay intact. Run training only with approved local dependencies/weights/data; the fake trainer and browser fixture are not actual model validation. Verify protected simulation/physical transitions and saved profiles. Explicit owner PASS required.

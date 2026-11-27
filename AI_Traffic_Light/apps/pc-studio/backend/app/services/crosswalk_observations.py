@@ -138,7 +138,8 @@ def crosswalk_observation(
         # Region polygons describe physical occupancy, not waiting or crossing roles.
         "available_metrics": [],
         "pedestrians_waiting": 0, "pedestrians_crossing": 0, "vehicles_waiting": 0,
-        "source_timestamp_ms": latest,
+        # Freshness of fused evidence is limited by the oldest contributing view.
+        "source_timestamp_ms": min(view[2]["timestamp_ms"] for view in views),
         "source_frame_number": max(view[2]["source_frame_number"] for view in views),
         "data_source": "crosswalk_camera_ai",
     }

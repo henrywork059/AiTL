@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CameraStatus, Zone } from "../types";
 import { liveCameraMjpegUrl, refreshCameraAfterRemoteChange, selectRemoteCamera, type RemoteCameraProfile } from "../lib/remoteCameraApi";
@@ -39,18 +39,19 @@ type Props = {
   onRegionsChange: (regions: CrosswalkRegion[]) => void;
   onSave: () => Promise<void>;
   saving: boolean;
+  saveError: string | null;
   hasUnsavedChanges: boolean;
   onClose: () => void;
 };
 
 export function CrosswalkRegionEditor({
   crosswalk, cameras, cameraStatus, showSimulationTools, changingMode,
-  onSimulationChange, onCameraStatusChange, onRegionsChange, onSave, saving, hasUnsavedChanges, onClose,
+  onSimulationChange, onCameraStatusChange, onRegionsChange, onSave, saving, saveError, hasUnsavedChanges, onClose,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(crosswalk.regions[0]?.id ?? null);
   const [perspectiveView, setPerspectiveView] = useState(true);
   const [side, setSide] = useState<Side>("camera_side_a_id");
-  const [drag, setDrag] = useState<{ id: string; index: number } | null>(null);
+  const dragRef = useRef<{ id: string; index: number; pointerId: number; side: "a" | "b" } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +63,7 @@ export function CrosswalkRegionEditor({
   const simulated = Boolean(cameraStatus?.simulation_enabled);
   const previewReady = (showSimulationTools || selectedCamera?.kind !== "simulation") && (simulated
     ? Boolean(cameraStatus?.frame_available && selectedCamera?.kind === "simulation")
-    : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && !cameraStatus?.stale));
+    : Boolean(sourceId && selectedCamera?.stream_connected && cameraStatus?.active_source_id === sourceId && cameraStatus.frame_available && !cameraStatus.stale));
   const previewName = sourceId ?? "No camera assigned";
   const polygon = (region: CrosswalkRegion) => verticesForSide(region, sideKey).map(([x, y]) => x + "," + y).join(" ");
   const previewIs3d = Boolean(simulated && selectedCamera?.kind === "simulation" && showSimulationTools && sourceId);
@@ -72,11 +73,12 @@ export function CrosswalkRegionEditor({
   }));
 
   function updateRegion(id: string, patch: Partial<CrosswalkRegion>) {
+    if (saving) return;
     onRegionsChange(crosswalk.regions.map((region) => region.id === id ? { ...region, ...patch } : region));
   }
 
   function addRegion() {
-    if (crosswalk.regions.length >= MAX_REGIONS) return;
+    if (saving || crosswalk.regions.length >= MAX_REGIONS) return;
     const region = newRegion(crosswalk.regions);
     onRegionsChange([...crosswalk.regions, region]);
     setSelectedId(region.id);
@@ -84,26 +86,31 @@ export function CrosswalkRegionEditor({
   }
 
   function removeRegion() {
-    if (!selected) return;
+    if (saving || !selected) return;
     const remaining = crosswalk.regions.filter((region) => region.id !== selected.id);
     onRegionsChange(remaining);
     setSelectedId(remaining.find((region) => !region.camera_side || region.camera_side === sideKey)?.id ?? null);
   }
 
   function onVertexDown(event: ReactPointerEvent<SVGCircleElement>, id: string, index: number) {
+    if (saving || event.button !== 0 || dragRef.current) return;
     event.preventDefault();
     event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    svg.setPointerCapture(event.pointerId);
+    dragRef.current = { id, index, pointerId: event.pointerId, side: sideKey };
     setSelectedId(id);
-    setDrag({ id, index });
-    event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId);
   }
 
   function moveVertex(event: ReactPointerEvent<SVGSVGElement>) {
-    if (!drag) return;
-    const box = event.currentTarget.getBoundingClientRect();
-    if (!box.width || !box.height) return;
-    const x = Math.max(0, Math.min(WIDTH, Math.round((event.clientX - box.left) / box.width * WIDTH)));
-    const y = Math.max(0, Math.min(HEIGHT, Math.round((event.clientY - box.top) / box.height * HEIGHT)));
+    const drag = dragRef.current;
+    if (!drag || saving || drag.pointerId !== event.pointerId || drag.side !== sideKey) return;
+    const transform = event.currentTarget.getScreenCTM();
+    if (!transform) return;
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
+    const x = Math.max(0, Math.min(WIDTH, Math.round(point.x)));
+    const y = Math.max(0, Math.min(HEIGHT, Math.round(point.y)));
     const region = crosswalk.regions.find((item) => item.id === drag.id);
     if (!region) return;
     const vertices = structuredClone(verticesForSide(region, sideKey));
@@ -112,10 +119,16 @@ export function CrosswalkRegionEditor({
   }
 
   function endDrag(event: ReactPointerEvent<SVGSVGElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    setDrag(null);
+  }
+
+  function selectSide(next: Side) {
+    dragRef.current = null;
+    setSide(next);
   }
 
   async function previewPhysicalCamera() {
@@ -153,10 +166,11 @@ export function CrosswalkRegionEditor({
         </div>
         <div className="button-row">
           <button className="primary" type="button" onClick={() => void onSave()} disabled={saving || !hasUnsavedChanges}>{saving ? "Saving…" : "Save regions"}</button>
-          <button type="button" onClick={onClose}>Back to crosswalks</button>
+          <button type="button" disabled={saving} onClick={onClose}>Back to crosswalks</button>
           {hasUnsavedChanges && <span className="status-pill status-planned">Unsaved changes</span>}
         </div>
       </div>
+      {saveError && <p className="error-message" role="alert">{saveError}</p>}
       <div className="crosswalk-region-layout">
         <aside className="panel compact-panel crosswalk-region-tools">
           <div className="panel-header">
@@ -174,14 +188,15 @@ export function CrosswalkRegionEditor({
             {visibleRegions.length === 0 && <p className="small-note">No regions on this camera side.</p>}
           </div>
           <div className="button-row">
-            <button className="primary" type="button" onClick={addRegion} disabled={crosswalk.regions.length >= MAX_REGIONS}>Add region</button>
-            <button type="button" onClick={removeRegion} disabled={!selected}>Delete</button>
+            <button className="primary" type="button" onClick={addRegion} disabled={saving || crosswalk.regions.length >= MAX_REGIONS}>Add region</button>
+            <button type="button" onClick={removeRegion} disabled={saving || !selected}>Delete</button>
           </div>
           {selected && (
             <label>
               Region name
               <input
                 maxLength={120}
+                disabled={saving}
                 value={selected.label}
                 onChange={(event) => updateRegion(selected.id, { label: event.target.value })}
               />
@@ -194,17 +209,17 @@ export function CrosswalkRegionEditor({
             <>
               <div className="crosswalk-region-side-toggle" role="group" aria-label="Camera side">
                 <button type="button" aria-pressed={side === "camera_side_a_id"}
-                  onClick={() => setSide("camera_side_a_id")} disabled={busy}>Side A</button>
+                  onClick={() => selectSide("camera_side_a_id")} disabled={busy || saving}>Side A</button>
                 <button type="button" aria-pressed={side === "camera_side_b_id"}
-                  onClick={() => setSide("camera_side_b_id")} disabled={busy}>Side B</button>
+                  onClick={() => selectSide("camera_side_b_id")} disabled={busy || saving}>Side B</button>
               </div>
               {!simulated && <button type="button" onClick={() => void previewPhysicalCamera()}
-                disabled={busy || changingMode || !selectedCamera}>
+                disabled={busy || saving || changingMode || !selectedCamera}>
                 Select camera for preview
               </button>}
             </>
           )}
-          {showSimulationTools && <button type="button" onClick={() => void toggleSimulation()} disabled={busy || changingMode}>
+          {showSimulationTools && <button type="button" onClick={() => void toggleSimulation()} disabled={busy || saving || changingMode}>
             {simulated ? "Stop simulation" : "Use simulation camera"}
           </button>}
           {showSimulationTools && <p className="small-note">Simulation cameras share one 3D world. Inspect regions in perspective, then use Edit regions to drag vertices in the coordinate-aligned overhead view.</p>}
@@ -239,6 +254,7 @@ export function CrosswalkRegionEditor({
               onPointerMove={moveVertex}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
+              onLostPointerCapture={endDrag}
             >
               {visibleRegions.map((region) => (
                 <g key={region.id}>
@@ -247,7 +263,7 @@ export function CrosswalkRegionEditor({
                     className={selected?.id === region.id ? "crosswalk-region-polygon is-selected" : "crosswalk-region-polygon"}
                   />
                   {selected?.id === region.id && verticesForSide(region, sideKey).map(([x, y], index) => (
-                    <g key={index}>
+                    <g key={`${sideKey}-${index}`}>
                       <circle
                         cx={x} cy={y} r="17"
                         className="crosswalk-region-vertex"

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { createPollingScope, runScopedSerialTask, type PollingContext } from "./pollingScope";
 import { logWarn } from "./logger";
 
 type SerialPollingOptions = {
@@ -23,13 +24,14 @@ const MIN_POLL_INTERVAL_MS = 50;
  * running the latest task, so old and new query scopes cannot overlap.
  */
 export function useSerialPolling(
-  task: () => Promise<void>,
+  task: (context: PollingContext) => Promise<void>,
   intervalMs: number,
   options: SerialPollingOptions = {},
 ): SerialPollingController {
   const taskRef = useRef(task);
   const errorRef = useRef(options.onError);
   const inFlightRef = useRef<Promise<void> | null>(null);
+  const scopeRef = useRef(createPollingScope());
   taskRef.current = task;
   errorRef.current = options.onError;
 
@@ -38,31 +40,28 @@ export function useSerialPolling(
   const restartKey = options.restartKey ?? null;
   const safeIntervalMs = Math.max(MIN_POLL_INTERVAL_MS, intervalMs);
 
+  // Retire the committed scope before paint on key changes, disable or unmount.
+  // A new disabled scope still permits explicit refresh after a mutation.
+  useLayoutEffect(() => {
+    const scope = createPollingScope();
+    scopeRef.current = scope;
+    return () => scope.retire();
+  }, [enabled, restartKey]);
+
   const waitForIdle = useCallback(async () => {
     const active = inFlightRef.current;
     if (active) await active;
   }, []);
 
   const runNow = useCallback((): Promise<void> => {
-    const active = inFlightRef.current;
-    if (active) return active;
-
-    const current = Promise.resolve()
-      .then(() => taskRef.current())
-      .catch((error) => {
-        try {
-          if (errorRef.current) errorRef.current(error);
-          else logWarn("polling", "Serial poll failed", { error });
-        } catch (handlerError) {
-          logWarn("polling", "Serial poll error handler failed", { error: handlerError });
-        }
-      })
-      .finally(() => {
-        if (inFlightRef.current === current) inFlightRef.current = null;
-      });
-
-    inFlightRef.current = current;
-    return current;
+    return runScopedSerialTask(inFlightRef, scopeRef.current, taskRef.current, (error) => {
+      try {
+        if (errorRef.current) errorRef.current(error);
+        else logWarn("polling", "Serial poll failed", { error });
+      } catch (handlerError) {
+        logWarn("polling", "Serial poll error handler failed", { error: handlerError });
+      }
+    });
   }, []);
 
   useEffect(() => {

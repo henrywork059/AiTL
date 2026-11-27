@@ -1,25 +1,647 @@
-# V0529 — Bounded camera upload body
+# V0576 — Capture freshness, managed dataset integrity and independent S04 evidence candidate
 
-Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0` on `main`. The HTTP camera-frame receiver now enforces its existing 8 MiB limit incrementally while streaming the request, rather than buffering an unbounded request body before validation. Valid JPEG/PNG upload handling and API envelopes remain unchanged; camera transport, inference, virtual signals and physical outputs are untouched.
+Candidate `0_5_76`; previous `0_5_75`; accepted baseline `0_5_0`. Reconciled authorized HEAD 00f4d542c20899816758114b012e83650a8e9263 retained, including 8 MiB bounded upload regression and historical main integration. Concurrent P3/P4/P5 independent candidate; Updates 30/33/37/38 remain partial, S04 / Update 28 gated. Delivered milestones remain 30/39 (76.9%), not acceptance.
+
+- [x] Authorized reconciled HEAD and push/PR CI 46028075101 / 46028088239 verified.
+- [x] Application CI 46030780891 passed offline, bounded upload, managed launch and evidence regressions, build and audit.
+- [x] Browser CI 46030781055 passed; artifact 15213763479 SHA checked and capture/training screenshots inspected.
+- [x] Fresh native CI 46030002341 passed; actual archive 15213988017 verified including 44 content digests and renderer screenshot.
+- [x] Independent S04 verifier passed both retained archives and CI audit step 46030592878, three tamper checks.
+- [x] Integrated native full CI 46030592878 passed.
+- [ ] Exact 0_5_76 release commit CI after version synchronization.
+- [ ] Owner Windows/ESP controlled integration and PASS.
+- [ ] Trusted trained holdout, calibrated production coordinates, accepted common wait estimand, resource budget and migration/rollback gate approval.
+
+See [PATCH_0_5_76](PATCH_0_5_76.md).
 
 ---
 
-- [ ] Chunked valid image uploads still reach the existing image validator.
-- [ ] Exactly 8 MiB can pass the HTTP body limit, subject to normal image validation.
-- [ ] Larger uploads return HTTP 413 and stable project error without consuming subsequent chunks.
-- [ ] Existing camera/simulation, CI and frontend checks pass.
-- [ ] Windows/ESP validation and explicit owner PASS remain outstanding.
+# V0575 — Independent source-qualified capture, training-safety and evidence-verification candidate
 
-# V0528 — Main-branch CI after consolidation
+Candidate 0_5_75; previous 0_5_74; accepted baseline 0_5_0. Independent concurrent P3/P4/P5 progress, partial Updates 30/33/37/38. Updates 31 and 36 remain delivered candidates from 0_5_74. 30/39 delivered candidate milestones (76.9%), not owner acceptance. Update 28 / S04 remains gated.
 
-Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. The feature branch was fast-forwarded into `main` without altering history. Switch the existing Windows GitHub Actions push trigger from the now-inactive feature branch to `main`, so subsequent main-branch maintenance is validated. No app runtime, signal controller or hardware behavior changes.
+- [x] Initial 0_5_74 exact release CI 46019581638 passed, including verifier and tampering regression.
+- [x] P3/P4/P5 application CI 46022866121 passed and newer 46025214608 completed offline regression checks, including source-switch race.
+- [x] Browser CI 46025031969 passed all real-clock capture, training, crosswalk, network, review and renderer fixtures; evidence ZIP checksum verified and screenshots inspected.
+- [x] Independent archive 15209410327 reconciled all member digests, local/primary rows, timeline samples, decisions and busy repeats.
+- [x] Exact pre-reconciliation 0_5_75 release commit CI 46025843286 passed.
+- [ ] Main reconciliation CI, including preserved upload-stream boundary regression.
+- [ ] Authorized Windows/ESP bench and owner manual editor/source-mode/physical integration PASS.
+- [ ] Qualified trusted holdout, production calibration/common waiting metric, owner resource budget and migration/rollback approval for S04.
+
+See [PATCH_0_5_75](PATCH_0_5_75.md).
 
 ---
 
-- [ ] Main-branch GitHub Actions run succeeds on the candidate commit.
-- [ ] All previous feature-branch commits remain reachable from main.
-- [ ] Existing code, safety behavior and baseline are unchanged.
-- [ ] Windows/ESP owner validation and explicit PASS still pending.
+# V0574 — Independent network, region, AI review and reproducible experiment candidate
+
+Candidate `0_5_74`; previous `0_5_73`; accepted baseline `0_5_0`. Updates 31 / U02 and 36 / E02 delivered as software candidate milestones. Updates 30, 33, 37 and 38 partial; Update 28 / S04 remains gated. Owner PASS pending.
+
+- [x] Application standard CI 46018941752; full offline suite, build and audit.
+- [x] Browser CI 46016827486; real-clock junction, region and review pointer/identity workflows, inspected screenshots.
+- [x] Latest paired evidence archive independently checked; adverse cases retained; read-only verifier tested locally against two archives and tampered inputs.
+- [ ] Exact release standard CI, including new verifier integration and tamper smoke regression.
+- [ ] Owner Windows/live authorized bench and manual acceptance; remaining 30/33/37/38 evidence.
+- [ ] S04 migration qualification; legacy default and all safety restrictions retained.
+
+See [PATCH_0_5_74](PATCH_0_5_74.md).
+
+---
+
+# V0573 — Independent P4 hardware-first workspace candidate
+
+Candidate `0_5_73`; previous `0_5_72`; accepted baseline `0_5_0`. Update 29 / U01 delivered as candidate; Updates 30–31 / U02 and 33 / U02 partial. Owner PASS pending.
+
+- [x] Application revision standard CI, 126 offline regression scripts, frontend tests, typecheck, build, blocking audit.
+- [x] Browser CI; navigation, camera state transitions, keyboard link/save/reload, model activation/failure/recovery.
+- [x] Verified artifact checksum and inspected corrected camera/network screenshots.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP and manual editor/visual PASS; partial Updates 30, 31 and 33 acceptance.
+- [ ] S04 migration gates, legacy default and physical restrictions unchanged.
+
+See [Patch 0_5_73](PATCH_0_5_73.md).
+
+---
+
+# V0572 — Isolated SUMO two-junction corridor and spillback
+
+Candidate `0_5_72`; previous `0_5_71`; accepted baseline `0_5_0`; Update 27 / S04. Owner PASS pending.
+
+- [x] Standard CI, compile, structure, offline regressions, frontend tests/build and blocking audit passed on 27a.
+- [x] Pinned native dependencies, previous trials and corridor permissions/capacity regressions passed.
+- [x] Actual two-junction identity, reproducible travel times, blocked admission/spillback, independent permissions and pedestrian WALK/CLEAR verified in native logs.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, editor drag/save and manual visual acceptance.
+- [ ] Replacement default migration: matched parity/resource tests, API/capture/editor and four-view integration, experiment export and rollback; physical gates unchanged.
+
+See [Patch 0_5_72](PATCH_0_5_72.md).
+
+---
+
+# V0571 — Isolated SUMO lane queues and turning scenarios
+
+Candidate `0_5_71`; previous `0_5_70`; accepted baseline `0_5_0`; Update 26 / S04. Owner PASS pending.
+
+- [x] Standard CI, compile, structure, offline regressions, frontend tests/build and blocking audit passed on 26b.
+- [x] Native pinned dependency, shadow lifecycle, deterministic demand and lane trials passed.
+- [x] Actual stop-line queue, blocked exit, straight and turning movement, entry permission, WALK/CLEAR and completed journeys verified in native logs.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, editor drag/save and manual visual acceptance.
+- [ ] Multi-intersection transfer/spillback, matched parity/resource checks, native endurance and physical gates.
+
+See [Patch 0_5_71](PATCH_0_5_71.md).
+
+---
+
+# V0570 — Persistent articulated pedestrians and observed gait
+
+Candidate `0_5_70`; previous `0_5_69`; accepted baseline `0_5_0`; Update 25 / S03. Owner PASS pending.
+
+- [x] Standard CI, exact dependencies, typecheck/build and blocking audit passed on application revision.
+- [x] Three actual movement-helper fixtures for WALK/CLEAR, curb holds, slow motion and seeded reentry passed.
+- [x] Deterministic presentation motion and actual WebGL pedestrian group identity, gait, interpolation, pause and removal passed; screenshot inspected.
+- [x] React legacy editor/overlay fallback, retry and rollback passed.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save, full motion and four-camera visual acceptance.
+- [ ] Physical-obstruction/collision and downstream-capacity tests, full clearance safety, GPU benchmarks and endurance; physical gates unchanged.
+
+See [Patch 0_5_70](PATCH_0_5_70.md).
+
+---
+
+# V0569 — Persistent vehicle meshes and bounded motion interpolation
+
+Candidate `0_5_69`; previous `0_5_68`; accepted baseline `0_5_0`; Update 24 / S03. Owner PASS pending.
+
+- [x] Standard CI, locked dependencies, typecheck/build and blocking audit passed on application revision.
+- [x] Deterministic motion, mirrored heading, reentry, pause/resume, reset and removal fixtures passed.
+- [x] Actual WebGL mesh variants, drawing, context-loss/disposal and React fallback tests passed; downloaded screenshot inspected.
+- [x] Stable group mapping reviewed in source; direct browser reference-identity test remains outstanding.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save, full motion and four-camera visual acceptance.
+- [ ] Native GPU benchmarks, endurance and physical gates.
+
+See [Patch 0_5_69](PATCH_0_5_69.md).
+
+---
+
+# V0568 — Opt-in Three.js road renderer
+
+Candidate `0_5_68`; previous `0_5_67`; accepted baseline `0_5_0`; Update 23 / S03. Owner PASS pending.
+
+- [x] Exact dependencies, geometry, audit, typecheck/build passed.
+- [x] Actual WebGL draw/pixels/top/context-loss/disposal and React integration fallback/retry/rollback passed.
+- [x] Standard CI passed on application revision 6380561a6038d0dc3ee85a4bd7cf2bd1a0dc705f.
+- [ ] Exact release commit CI.
+- [ ] Owner Windows/ESP, actual editor drag/save round trip, four-view manual check.
+- [ ] GPU benchmarks, detailed agents and interpolation; physical gates unchanged.
+
+See [Patch 0_5_68](PATCH_0_5_68.md).
+
+---
+
+# V0567 — Optional SUMO shadow integration
+
+Candidate `0_5_67`; previous `0_5_66`; accepted baseline `0_5_0`; Update 22 / S02. Owner PASS pending.
+
+- [x] Pinned SUMO/TraCI/libsumo reference and controlled native repeatability trials passed.
+- [x] Python 3.10.11 native compatibility, package closure and advisory metadata checks passed.
+- [x] Camera integration, asynchronous worker, lifecycle, error recovery and virtual permission tests passed in CI.
+- [x] Standard frontend build/typecheck/regressions and blocking audit passed on application revision.
+- [ ] Exact release metadata commit CI (pending at publication).
+- [ ] Owner Windows default-mode acceptance and optional shadow end-to-end exercise.
+- [ ] Matched legacy comparison, native dependency binary audit, endurance and physical hardware validation.
+
+See [Patch 0_5_67](PATCH_0_5_67.md).
+
+---
+
+# V0566 — Frontend dependency security remediation
+
+Candidate `0_5_66`; previous `0_5_65`; accepted baseline `0_5_0`; security prerequisite 21b (not a numbered roadmap completion).
+
+- [x] Exact Windows trial dependency resolution and npm ci passed.
+- [x] Trial blocking audit reported zero vulnerabilities; frontend regression, typecheck and build passed.
+- [x] Complete generated manifests recovered and dependency diff reviewed.
+- [x] Committed 0_5_66 full CI and blocking audit passed (45644478903; zero reported vulnerabilities).
+- [ ] Owner Windows/ESP PASS and browser acceptance.
+- [ ] Real SUMO smoke and new dependency review before Update 22.
+
+See [Patch 0_5_66](PATCH_0_5_66.md).
+
+---
+
+# V0565 — Fixed-step legacy simulator adapter
+
+Candidate `0_5_65`; previous `0_5_64`; accepted baseline `0_5_0`; Update 21 / S02.
+
+- [x] Fixed-step clock adapter, seed/monotonic injection and legacy ownership retained.
+- [x] Three isolated scheduler tests and syntax checks passed; exact hashes verified.
+- [x] Fourth actual legacy-agent regression, integrated compile/test/API parity and full CI passed (45621580527).
+- [ ] Owner Windows/ESP PASS.
+- [ ] Remediate identified npm vulnerabilities and execute pinned SUMO smoke before engine adoption.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_65](PATCH_0_5_65.md).
+
+---
+
+# V0564 — Simulation engine evaluation foundation
+
+Candidate `0_5_64`; previous `0_5_63`; accepted baseline `0_5_0`; Update 20 / S01.
+
+- [x] Upstream comparison and conditional selection documented.
+- [x] Offline fixture, trace and missing-binary regressions passed; compile and exact source hashes verified.
+- [x] Real invocation attempted; blocked explicitly, zero external trials.
+- [ ] Current CI and owner PASS.
+- [ ] Pinned SUMO Windows smoke, matched engine/render benchmarks and dependency security review before adoption.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_64](PATCH_0_5_64.md) and [engine evaluation](SIMULATION_ENGINE_EVALUATION.md).
+
+---
+
+# V0563 — Centralized frontend polling and cancellation
+
+Candidate `0_5_63`; previous `0_5_62`; accepted baseline `0_5_0`; Update 19 / A04.
+
+- [x] Shared polling scope and API cancellation implemented.
+- [x] Mocked core/API runtime regression and isolated strict TypeScript compilation passed.
+- [x] Initial CI failure localized to obsolete V059 source predicate; corrected predicates checked directly.
+- [x] Correction 19a full offline regressions passed in CI.
+- [x] Correction 19b replaces incompatible TypeScript compiler API; corrected harness passed locally on TypeScript 5.8.3, exact staged hashes verified.
+- [ ] Locked TypeScript 7.0.2 Windows CI, integrated typecheck/build, browser and owner acceptance.
+- [ ] Investigate two high-severity npm audit findings before adopting new dependencies.
+- [ ] Physical gates unchanged.
+
+See [Patch 0_5_63](PATCH_0_5_63.md).
+
+---
+
+# V0562 — Source-qualified traffic observations
+
+Candidate `0_5_62`; previous `0_5_61`; accepted baseline `0_5_0`; Update 18 / A03.
+
+- [x] Source-qualified analytics and observation lifetime guards staged.
+- [x] Isolated observation helper checks and compilation passed.
+- [ ] Full trajectory/queue/history/network/signal regressions, candidate CI and owner PASS.
+- [ ] Physical gates and matched ESP throughput/CPU measurements remain outstanding.
+
+See [Patch 0_5_62](PATCH_0_5_62.md).
+
+---
+
+# V0561 — Scope selected-source tracking by camera and junction
+
+Candidate `0_5_61`; previous `0_5_60`; accepted baseline `0_5_0`; Update 17 / A03.
+
+- [x] Camera/junction/acquisition scope and bounded replay watermark implemented.
+- [x] Isolated continuity helper checks and compilation passed.
+- [ ] Full tracker/route regressions, candidate CI and owner Windows/ESP acceptance.
+- [ ] Matched ESP throughput/CPU comparison and physical peripheral prerequisites.
+
+See [Patch 0_5_61](PATCH_0_5_61.md).
+
+---
+
+# V0560 — Separate ATL1 transport framing from camera lifecycle
+
+Candidate `0_5_60`; previous `0_5_59`; accepted baseline `0_5_0`; Update 16 / A04.
+
+- [x] Existing packet and socket-read implementation extracted without changing wire framing or worker ownership.
+- [x] Isolated transport regression groups and compilation passed.
+- [x] Initial CI failure localized to outdated legacy source assertion; corrected static predicates checked directly against parent source.
+- [ ] Corrected legacy test and new compatibility-import regression execution in CI.
+- [ ] Full candidate CI and Windows/ESP owner acceptance.
+- [ ] Matched before/after ESP throughput and PC CPU measurements.
+- [ ] Physical lighting/speaker remain blocked.
+
+See [Patch 0_5_60](PATCH_0_5_60.md).
+
+---
+
+# V0559 — Unified camera observation identity
+
+Candidate `0_5_59`; previous `0_5_58`; accepted baseline `0_5_0`; Update 15 / A02.
+
+- [x] Immutable internal identity contract, existing public frame metadata preserved by design.
+- [x] Isolated contract assertions and compilation.
+- [ ] Full producer and freshness regression CI, Windows/ESP owner acceptance.
+- [ ] Physical lighting/speaker authorization and hardware prerequisites remain blocked.
+
+See [Patch 0_5_59](PATCH_0_5_59.md).
+
+---
+
+# V0558 — Synthetic speaker preparation
+
+Candidate `0_5_58`; previous `0_5_57`; accepted baseline `0_5_0`; roadmap Update 14 / H07.
+
+- [x] Fixed synthetic notice catalog, normalized volume/duration bounds and explicit arming; existing fake controller reused.
+- [x] Seven speaker and six lighting focused tests and isolated compilation passed locally.
+- [x] No actual audio, physical output, live route, driver or firmware integration.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Physical speaker BLOCKED: confirm hardware/electrical/acoustic specs, driver, independent fail-safe and authorization before real output. Physical lighting gate remains open.
+
+---
+
+# V0557 — Synthetic lighting preparation
+
+Candidate `0_5_57`; previous `0_5_56`; accepted baseline `0_5_0`; roadmap Update 13 / H07.
+
+- [x] Existing fake controller reused, disabled by default, synthetic-only binary pulse.
+- [x] Six focused tests and isolated Python compilation passed locally.
+- [x] No physical output, firmware, network command, live route or physical capability advertisement.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Physical lighting gate BLOCKED: verify hardware model, voltage/current, driver/interface, controlled-bench authorization and independent hardware fail-safe before real output.
+
+---
+
+# V0556 — Fake-only bench output abstraction
+
+Candidate `0_5_56`; previous `0_5_55`; baseline `0_5_0`.
+
+- [x] Disabled-by-default, explicit local test authorization, fake adapter only.
+- [x] Bounded commands, matched acknowledgment, timeout, disconnect, explicit off and monotonic expiry; eight local deterministic tests and compilation passed.
+- [x] No public route, live controller integration, GPIO, network transport or physical output.
+- [ ] Full candidate CI and owner acceptance.
+- [ ] Before any future physical lighting adapter: verify actual hardware/interface, authorization, electrical safety and independent fail-safe design.
+
+---
+
+# V0555 — Camera setup and connection workflow
+
+Candidate `0_5_55`; previous `0_5_54`; accepted baseline `0_5_0`.
+
+- [x] Source-coherent selected status; network probe outside manager lock.
+- [x] Validated camera form, source-qualified error/stale/waiting labels, retry and saved profile retention; stale poll/preview guards.
+- [ ] Focused backend and UI regression, full offline suite, structure, TypeScript typecheck and frontend build pass in CI.
+- [ ] Windows application validation, two-camera selection, unplug/retry, restart and explicit owner PASS.
+- [ ] Preserve disabled physical/public-road outputs.
+
+---
+
+# V0554 — Derived device capability contract
+
+Candidate `0_5_54`, previous `0_5_53`, accepted baseline `0_5_0`.
+
+- [x] Source-qualified capability/health projector passes 3/3 isolated pytest cases, 11 physical states, simulated mode and unknown/unsupported module guards.
+- [x] Unsupported lighting/speaker output always unavailable and physical output explicitly disabled; existing saved profile fields unchanged by implementation.
+- [x] New V0554 registry round-trip and existing saved-camera lifecycle tests passed in CI run 45425380717.
+- [x] V0525 token-aware diagnostics fixture correction resolved CI run 45424883577's failure, preserving retired-source invalidation.
+- [x] CI structure, targeted API/source tests, full offline suite, TypeScript typecheck and frontend build passed (run 45425380717, commit 1840f9bc).
+- [ ] Complete Windows owner runner, real ESP failure/recovery checks and obtain explicit owner PASS.
+- [ ] Do not promote baseline or activate any public-road signal output.
+
+---
+
+# V0553 — Camera endurance benchmarking
+
+Candidate `0_5_53`, previous `0_5_52`, accepted baseline `0_5_0`.
+
+- [x] Read-only, hardware-free recorder using existing `/api/camera/remote/status` per-camera projection; no stream control or decoding.
+- [x] Deterministic, locally executed synthetic two-camera/counter/reset/outage/CSV/JSON/privacy tests (3/3 passed); compiled local Python sources.
+- [ ] Full repository offline regressions and `scripts/check_structure.py`, Windows UI/backend runner, frontend build.
+- [ ] Actual ESP test records firmware, settings, power/Wi-Fi conditions, duration, frame age/FPS, missing frames and observed recovery.
+- [ ] Process CPU/memory separately measured with an identified backend PID and optional psutil, or explicitly reported unavailable.
+- [ ] Explicit owner PASS before baseline promotion; no physical/public-road signal output.
+
+---
+
+# V0552 — Camera transport diagnostics
+
+Candidate `0_5_52`, previous `0_5_51`, accepted baseline `0_5_0`.
+
+- [ ] Repeated sequence packets do not publish duplicate observations; gaps, resets and TCP reopens are counted/baselined correctly.
+- [ ] Measured FPS/interval use monotonic receive timing; original per-source cache age and disconnected/stale state are correct.
+- [ ] Multi-camera isolation, retired worker, source selection and existing response fields remain compatible.
+- [ ] Run V0552 and existing camera lifecycle regressions, full offline suite, structure, frontend typecheck/build, Windows smoke.
+- [ ] Run actual ESP/reboot/weak Wi-Fi verification separately. Explicit owner PASS required; no hardware signal output.
+
+---
+
+# V0551 — Emergency evidence and virtual network clearance
+
+Candidate `0_5_51`, previous `0_5_50`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Compatible grant preserves prior conflict clearance; overlapping release histories and standalone invalid lamps safe.
+- [ ] Distinct fresh same-source frames required; negative/missing/expired evidence and route removal withdraw pending priority.
+- [ ] Protected clearance and configured conflict regression; V0551 and prior emergency/network tests, full structure/offline/typecheck/build and live smoke pass.
+- [ ] Explicit owner PASS required. No physical actuation.
+
+---
+
+# V0550 — Stale-input virtual signal fallback
+
+Candidate `0_5_50`, previous `0_5_49`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Camera source-time expiry and replay; missing/future/unavailable observations suppressed.
+- [ ] Persistence restarts after gaps; unverified class conditions unavailable; fused evidence age uses oldest view.
+- [ ] Protected amber, all-red, WALK and CLEAR sequence maintained without conflicting virtual permissions.
+- [ ] V0550 and related signal/crosswalk regressions, full structure/offline/typecheck/build and live smoke pass.
+- [ ] Explicit owner PASS required. No physical actuation.
+
+---
+
+# V0549 — Reproducible offline regression execution
+
+Candidate `0_5_49`, previous `0_5_48`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Shared offline discovery lists the same suite in Windows and CI; hardware and live smoke remain excluded from offline tests.
+- [ ] Focused camera/inference/model/firmware changes select full offline suite; unknown/deleted tests fall back safely.
+- [ ] Runner and selector regressions, structure, full offline suite, frontend typecheck/build and live smoke pass in owner environment.
+- [ ] Owner Windows/ESP acceptance pending; explicit owner PASS before baseline promotion. No physical actuation.
+
+---
+
+# V0548 — Invalidate disconnected camera observations
+
+Candidate `0_5_48`, previous `0_5_47`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Stop/disconnect/restart clears only affected source and rejects old worker delivery.
+- [ ] Retired/mode-obsolete inference results unavailable; active neighbour and normal inference survive.
+- [ ] V0548, V0544–V0547, multi-camera and inference-shutdown regressions; full structure/offline/typecheck/build pass.
+- [ ] Windows/ESP acceptance; explicit owner PASS required. No physical actuation.
+
+---
+
+# V0547 — Preserve ESP cached-frame identity
+
+Candidate `0_5_47`, previous `0_5_46`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Cached promotion preserves timestamp, source and frame ID, including A/B/A replay and simulation return.
+- [ ] New accepted packets get distinct IDs, including equal receive milliseconds; background frames do not replace the selected source.
+- [ ] Stale cache rejected; ordinary receiver upload remains functional; multi-camera publication race and V0544–V0546 regressions pass.
+- [ ] Full offline checks, typecheck/build and Windows/ESP acceptance pass. Explicit owner PASS required; no physical actuation.
+
+---
+
+# V0546 — ESP worker retirement and recovery
+
+Candidate `0_5_46`, previous `0_5_45`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Retired-worker errors, cleanup and recovery do not change replacement socket, status, settings or counters.
+- [ ] Join remains bounded; normal transport/reconnect and V0544/V0545 regressions pass.
+- [ ] V0546 deterministic cases, remote-camera integrations, structure, full offline tests and frontend typecheck/build pass.
+- [ ] Windows/ESP reboot, start/stop and mode switching verified; owner PASS before promotion. No physical signal actuation.
+
+---
+
+# V0545 — ESP TCP socket-open cancellation
+
+Candidate `0_5_45`, previous `0_5_44`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] A socket returned after cancellation, replacement or simulation entry is closed without publishing connection state or entering the receive loop.
+- [ ] Cleanup of an unowned socket does not clear the replacement connection; normal open and reconnect behavior is preserved.
+- [ ] Focused V0545/V0544 and remote camera regressions, structure, full offline checks, frontend typecheck/build pass.
+- [ ] Owner Windows/ESP checks pass; explicit owner PASS before any baseline change. No physical signal actuation.
+
+---
+
+# V0544 — ESP TCP post-read cancellation boundary
+
+Candidate `0_5_44`, previous `0_5_43`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Late packet completed after stop or simulation entry is not counted or published by the receive loop.
+- [ ] Ordinary packet delivery and EOF remain unchanged; stop/simulation EOF outcomes are not misclassified as unexpected stream endings.
+- [ ] Focused TCP cancellation and existing remote camera regressions, structure, full offline checks, frontend typecheck/build pass.
+- [ ] Windows/ESP repeated stop/start and simulation switching pass; no physical signal actuation; explicit owner PASS before baseline changes.
+
+---
+
+# V0543 — Bounded fragmented camera upload buffering
+
+Candidate `0_5_43`, previous `0_5_42`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] HTTP upload body aggregation uses one bounded bytearray; no per-chunk list and join remain.
+- [ ] Valid fragmented JPEG/PNG bytes survive exactly, including empty chunks.
+- [ ] 8 MiB boundary accepted; first oversized chunk rejected immediately with existing 413 envelope and exact size details.
+- [ ] Strict HTTP decode, ESP TCP fast path, simulation signals, 3D scene and original-image coordinates are unchanged.
+- [ ] V0540/V0541/remote camera regressions, structure, full offline suite, frontend typecheck/build and Windows owner runner pass; explicit owner PASS before baseline changes.
+
+---
+
+# V0542 — Separate HTTP image validity from ESP TCP transport
+
+Candidate `0_5_42`, previous `0_5_41`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Legacy HTTP uploads require fully decodable MIME-matched images and ≤16,777,216 pixels, while preserving the 8 MiB streaming byte limit.
+- [ ] ESP TCP frame path uses existing lightweight header validation, with no redundant OpenCV decode or changed camera transport framing.
+- [ ] Old remote-camera TCP fixture regressions, V0540/V0541 upload tests and unchanged signal/3D tests pass.
+- [ ] Structure, offline regressions, frontend TypeScript/build, Windows `update_test_run.ps1 -SkipUpdate`, actual ESP hardware and owner acceptance.
+- [ ] No baseline promotion or merge without explicit owner PASS.
+
+---
+
+# V0541 — Decodable camera frames
+
+Candidate `0_5_41`, previous `0_5_40`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Complete JPEG/PNG uploads pass with correct metadata; truncated and MIME-mismatched uploads return stable 422 without mutating the latest frame or counter.
+- [ ] More than 16,777,216 declared pixels are rejected before image decoding; the existing 8 MiB upload-body cap is preserved.
+- [ ] Camera inference, 3D simulation, signal interlocks and ESP transport/preview remain unaffected.
+- [ ] Focused V0541/V0540/camera service/API regressions, structure, offline suite, TypeScript typecheck/build, Windows `update_test_run.ps1 -SkipUpdate`.
+- [ ] Owner explicitly confirms PASS before baseline change or merge.
+
+---
+
+# V0540 — Bounded camera-frame upload
+
+Candidate `0_5_40`, previous `0_5_39`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] `POST /api/camera/frame` consumes an 8 MiB stream but immediately rejects bytes above the limit without reading the rest.
+- [ ] Oversized requests retain `CAMERA_FRAME_TOO_LARGE`, HTTP 413, request ID and error metadata; no invalid frame reaches service storage.
+- [ ] Existing 3D simulation, vehicle/pedestrian signals, physical camera previews, uploads and image-coordinate editor remain unchanged.
+- [ ] Focused streaming, camera service/API, structure, full offline regressions, frontend typecheck/build and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Explicit owner PASS before baseline promotion or any merge to `main`.
+
+---
+
+# V0539 — Shared 3D keyboard/mirror regression
+
+Candidate `0_5_39`, previous `0_5_38`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] V0523 regression checks the exported `simulationSourcePoint` helper and preview wiring, not the removed inline declaration.
+- [ ] Keyboard orbit/tilt/zoom/Home, editor safety, four 3D camera views and signal-post mirroring remain unchanged.
+- [ ] Focused V0523 and V0515 regressions, structure, offline suite, frontend typecheck/build and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Explicit owner PASS before acceptance, baseline promotion or merging to `main`.
+
+---
+
+# V0537 — Mirrored 3D signal post placement
+
+Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Both 3D signal posts mirror with Camera B/C/D along with agents.
+- [ ] `test_v0515_3d_simulation.py`, structure, offline regressions and frontend typecheck/build pass.
+- [ ] Run Windows `update_test_run.ps1 -SkipUpdate`; inspect four views and confirm PASS before baseline promotion.
+
+---
+
+# V0538 — Documentation restoration
+
+Candidate `0_5_38`, previous `0_5_37`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Full changelog and local-testing history are retained.
+- [ ] `0_5_37` mirrored signal-post code remains unchanged.
+- [ ] Run the Windows owner test and confirm PASS before baseline promotion.
+
+---
+
+# V0537 — Mirrored 3D signal post placement
+
+Candidate `0_5_37`, previous `0_5_36`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Both 3D signal posts mirror with Camera B/C/D along with agents.
+- [ ] `test_v0515_3d_simulation.py`, structure, offline regressions and frontend typecheck/build pass.
+- [ ] Run Windows `update_test_run.ps1 -SkipUpdate`; inspect four views and confirm PASS before baseline promotion.
+
+---
+
+# V0536 — Correct vehicle-type layout regression
+
+Candidate `0_5_36`, previous `0_5_35`, accepted baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Legacy source-frame test accepts all four synthetic vehicle types and still rejects metadata banners/signal lamps.
+- [ ] V0535 3D visuals, pedestrian reentry, phases, image-coordinate editor and ESP preview remain unchanged.
+- [ ] Focused layout/3D/legacy tests, structure, offline regressions and frontend typecheck/build pass.
+- [ ] Run Windows `update_test_run.ps1 -SkipUpdate` and explicitly confirm PASS before baseline promotion.
+
+---
+
+# V0535 — Diverse vehicles, better people and safe respawn presentation
+
+Candidate `0_5_35`, previous `0_5_34`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] Car, SUV, van and bus are visibly distinct from all four simulated camera viewpoints.
+- [ ] Pedestrians show head/hair, clothing, arms, legs and feet, and do not slide backwards when recycled after exiting.
+- [ ] Ordinary movement remains smooth; pause/resume, orbit, zoom, overlays and camera editing/capture remain unchanged.
+- [ ] Focused agent/legacy tests, structure, offline regressions, frontend typecheck/build, and Windows `update_test_run.ps1 -SkipUpdate` pass.
+- [ ] Owner confirms PASS before any baseline change or merge to `main`.
+
+---
+
+# V0534 — Volumetric 3D preview
+
+Candidate \`0_5_34\`, previous \`0_5_33\`, accepted baseline \`0_5_0\`, branch \`feature/interactive-3d-simulation\`.
+
+- [ ] Cars have raised cabins/body walls/wheels; pedestrians stand upright with heads and limbs on all four cameras.
+- [ ] Eastbound/westbound cars respawn off-screen without backwards animation; regular motion interpolates smoothly.
+- [ ] Orbit, zoom, top/editor view, overlays, pause/resume, signals, source-image coordinates, capture and ESP views still work.
+- [ ] Run focused `test_v0515_3d_simulation.py`, structure, offline regressions, TypeScript typecheck, build and Windows `update_test_run.ps1 -SkipUpdate`.
+- [ ] Explicit owner PASS before baseline promotion or any merge to `main`.
+
+---
+
+# V0533 — Correct Hallmark shell test
+
+Candidate `0_5_33`, previous `0_5_32`, baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] The V0532 regression verifies dashboard redirection only when tools are being hidden from Simulation Experiments.
+- [ ] Existing V0532 UI remains unchanged and the full offline CI suite, structure and frontend typecheck/build pass.
+- [ ] Run `update_test_run.ps1 -SkipUpdate` after pulling the feature branch on Windows; verify pointer/keyboard, light/dark and narrow layouts.
+- [ ] Confirm explicit owner PASS before baseline or `main` changes.
+
+---
+
+# V0532 — Hallmark sidebar clarity
+
+Candidate `0_5_32`, previous `0_5_31`, accepted baseline `0_5_0`; feature branch `feature/interactive-3d-simulation`.
+
+- [ ] Brand panel is not interactive; a labeled native Simulation tools button responds to mouse and keyboard and indicates `aria-pressed`.
+- [ ] When tools are hidden from Simulation Experiments, existing navigation returns to Dashboard; no other page/state behavior changes.
+- [ ] Light/dark theme, visible focus, narrow layout, legacy descriptions and persistent version/status still work.
+- [ ] `test_v0532_hallmark_shell.py`, related navigation/style regressions, structure, full offline CI and frontend typecheck/build pass.
+- [ ] Pull the feature branch and run `update_test_run.ps1 -SkipUpdate` on Windows; explicitly confirm PASS before baseline promotion.
+
+---
+
+# V0531 — Align legacy camera-region structure regression
+
+Candidate `0_5_31`, previous `0_5_30`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] V0418 camera/region test checks the shared phase lookup and both phase-aware movement calls.
+- [ ] The `0_5_30` runtime optimization remains unchanged: one controller evaluation per 50 ms simulator substep, with protected vehicle/pedestrian phase behavior.
+- [ ] Full candidate CI passes, including all offline regressions and frontend typecheck/build.
+- [ ] Pull feature branch, run `update_test_run.ps1 -SkipUpdate`, verify synthetic movement/camera views and unchanged ESP preview on Windows.
+- [ ] Explicit owner PASS before accepting a baseline or merging to `main`.
+
+---
+
+# V0530 — Shared protected simulation phase snapshot
+
+Candidate `0_5_30`, previous `0_5_29`, accepted baseline `0_5_0`; branch `feature/interactive-3d-simulation`.
+
+- [ ] Regression confirms exactly one protected controller query per 50 ms substep (four for 200 ms), used for both vehicle and pedestrian movement.
+- [ ] Vehicle stop-line queuing and release, curb waiting/WALK and yellow/all-red/pedestrian-clear phases remain correct.
+- [ ] Camera simulation API, 3D scene, previous mirror-render optimization and complete candidate CI pass.
+- [ ] Pull the feature branch; run `update_test_run.ps1 -SkipUpdate` from the repository root (default runner updates `main`).
+- [ ] Confirm normal simulated movement, pause/resume, density changes and unaffected ESP preview on Windows.
+- [ ] Owner explicitly confirms PASS before accepting the baseline or merging.
+
+---
+
+# V0529 — Simulation mirror-render optimization
+
+Candidate `0_5_29`, previous `0_5_28`, baseline `0_5_0`, branch `feature/interactive-3d-simulation`.
+
+- [ ] Mirror B/C/D frames are pixel-identical to the expected flips without re-decoding canonical PNG.
+- [ ] Simulation API and 3D scene regressions pass; full candidate CI passes.
+- [ ] Pull the feature branch and run `update_test_run.ps1 -SkipUpdate` (default runner targets `main`).
+- [ ] Inspect four virtual camera orientations, pause/resume, density change, capture and real ESP camera preview on Windows.
+- [ ] Explicit owner PASS before changing the baseline or merging into `main`.
+
+---
+
+# V0528 — Emergency evidence after camera reconnect
+
+Candidate `0_5_28`, previous `0_5_27`, accepted baseline `0_5_0`. Trust strictly newer source timestamps for emergency-evidence freshness even if a camera reconnect resets its frame counter. A negative reconnect frame clears older ambulance evidence, while equal/older timestamp replays remain rejected. Confirmation still requires two distinct positive observations at least one second apart from the same camera; protected virtual traffic signals and disabled physical outputs are unchanged.
+
+---
+
+- [ ] A newer ambulance-positive frame with reset frame number may complete valid same-source confirmation.
+- [ ] A fresh negative with reset counter clears old positives; an older-timestamp replay cannot confirm priority.
+- [ ] Existing emergency, camera freshness and virtual safety regressions pass; CI and Windows/ESP owner PASS pending.
 
 # V0527 — Late inference shutdown guard
 
@@ -489,3 +1111,19 @@ status: Responsive text layout and clear selected-region outline candidate
 - [ ] `python scripts/test_junction_network_frontend_structure.py` passes.
 - [ ] `python scripts/check_structure.py`, frontend typecheck/build and full Windows runner pass.
 - [ ] Owner confirms PASS, otherwise `0_4_0` remains accepted baseline.
+
+
+Security remediation preparation 21a: Preparation 21a (same candidate, no package or runtime changes): [0_5_65 CI 45621580527](https://github.com/henrywork059/AiTL/actions/runs/45621580527) passed the complete offline suite, including all four V0565 scheduler/agent tests, frontend regression, typecheck and build. Its non-blocking audit still reports two high-severity vulnerable packages and exit 1. Local npm registry DNS resolution failed; integrity metadata and regenerated lockfile cannot be guessed. A feature-branch-only, read-only Windows CI trial resolves Vite 8.3.8 and an exact source-map-js 1.2.2 override using npm, emits the generated manifests for inspection, verifies installed versions, tests frontend compatibility and runs a blocking high-severity audit. The trial never commits, publishes or changes the existing candidate's lockfile. Review the generated dependency diff and CI evidence before an atomic 0_5_66 remediation candidate; retain the current owner-accepted baseline. Update 22 remains blocked by security and real SUMO smoke.
+
+
+Update 22a: Preparation 22a / S02 (same candidate; CI-only evaluation, not engine integration): [committed 0_5_66 CI 45644478903](https://github.com/henrywork059/AiTL/actions/runs/45644478903) passed full offline suite, frontend regressions, typecheck, production build and blocking npm audit (0 total, 0 high, 0 critical at audit time). Select Eclipse SUMO 1.28.0 for isolated Windows x64 trial, official PyPI wheel published 8 Oct 2026, SHA-256 c8c898237d0a98f7f87ae762195a62114baca7b54394a430a06bbfc166145aa8, no trusted-publishing provenance reported; upstream sources: https://sumo.dlr.de/docs/Downloads.php and https://pypi.org/project/eclipse-sumo/1.28.0/. Do not treat the checksum as proof of software safety. Feature-branch-only read-only CI installs the hash-pinned binary wheel without dependencies in a disposable runner (not PC requirements), verifies both executable versions, runs the existing two seeded smoke trials, then a separate diagnostic of the identical fixture. Diagnostic retains network, routes, trajectories, trip info, collision file and subprocess logs in temporary CI artifacts (14-day retention); requires the eight expected directed edges, pedestrian-accessible lane on each edge, a signalized center, generated crossings, all 12 expected person IDs observed on crossings and zero reported collisions. Report completed trip counts separately; not a calibrated safety test. Executed local Python 3.13.5 compile and three synthetic XML parser checks (valid, missing crossing observation, missing pedestrian lane); no actual SUMO run locally: neither executable installed and PyPI/GitHub DNS failed. CI-only script staged hash must match local 1504a0d14506e528c6fcb7b407a63bb371132cf9. Actual smoke, geometry/trace inspection, optional dependency review (including any future TraCI package) and owner PASS pending. No runtime, dependencies, signal or renderer changes; existing engine remains default. Update 22 is not delivered; no version increment for trial-only preparation.
+
+
+## SUMO evaluation setup correction 22b
+
+Correction 22b / S02 (same candidate 0_5_66; no production changes): [22a standard CI 45730286292](https://github.com/henrywork059/AiTL/actions/runs/45730286292) passed full regressions/build/blocking audit. [Pinned SUMO trial 45730286356](https://github.com/henrywork059/AiTL/actions/runs/45730286356), job 139610312735, downloaded and hash-verified the 158 MB eclipse-sumo 1.28.0 wheel and installed successfully; setup then failed because wheel metadata listed two sumo.exe paths (Scripts launcher and native site-packages/sumo/bin). The prior no-deps install also omitted the declared sumo-data dependency. No simulation or topology check ran, and no artifacts were produced. Correct workflow explicitly pins both wheels (sumo-data 1.28.0 Windows x64 SHA-256 48120c1b0174fe7af69a5711d936fc4d3b6d41f28e48326602d7d6d6b6efcc42, upstream https://pypi.org/project/sumo-data/1.28.0/; no trusted-publishing provenance), retains --require-hashes/--no-deps and read-only permissions, selects only metadata's native sumo/bin/sumo.exe alongside netconvert.exe, checks matching data version, explicitly probes native executable versions, and adds a discovery fixture test before installation. Local synthetic metadata unittest: 2/2 passed (dual location, missing binary and launcher-only rejection); both files compiled; no actual local SUMO run. Exact test source hashes ac0daa6049bf3438ab0f837193c893ca8bc804cf and 607d9cd21c6616bdaa165c091e1f266783005d5b. Corrective Windows trial pending; production dependency manifests, simulator and all control interfaces unchanged. Update 22 remains incomplete and shadow integration blocked until actual smoke, topology and proposed-dependency review.
+
+
+## SUMO version verification correction 22c
+
+Correction 22c / S02 (same candidate 0_5_66; CI-only): [22b standard CI 45732266973](https://github.com/henrywork059/AiTL/actions/runs/45732266973) completed successfully. [22b SUMO trial 45732267014](https://github.com/henrywork059/AiTL/actions/runs/45732267014), job 139616902352, passed discovery regression, strict hash-pinned installation of eclipse-sumo and sumo-data 1.28.0 and actual execution of native sumo.exe --version. The executable returned success and printed `Eclipse SUMO sumo 1.28.0`; the workflow incorrectly required the literal word Version. netconvert version probe, smoke runs and topology diagnostic were skipped, no evidence artifacts produced. Replace the brittle PowerShell pattern with a tested standard-library verifier that resolves the native directory from matching pinned distribution metadata, calls each exact executable path with --version and a 30-second timeout, requires successful exit and an exact tool-specific first-line banner for 1.28.0 (optional literal Version), and rejects wrong versions, suffixes, wrong tools and later-line matches. Hash and dependency pinning, read-only workflow and topology requirements unchanged. Executed four local unittest cases (including actual logged banner and synthetic netconvert banner, negative cases and prior discovery tests), all passed; both files compiled; staged blobs must match local hashes 71d584e9b765ce079fb528cc90bcfbb9745774d5 and 6db59fa467e641da1968c45dd8c5ed95defec8fd. No actual netconvert or simulation run locally; CI-only corrective trial pending. No production runtime or dependency changes; existing simulator remains default; Update 22 incomplete until smoke, topology and proposed-dependency review pass.

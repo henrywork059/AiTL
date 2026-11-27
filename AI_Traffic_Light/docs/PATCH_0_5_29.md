@@ -1,7 +1,29 @@
-# Patch 0_5_29 — Bounded HTTP camera uploads
+# Patch 0_5_29 — Simulation camera mirror-render optimization
 
-Candidate `0_5_29`, previous `0_5_28`, accepted baseline `0_5_0`, development branch `main`.
+**Candidate:** `0_5_29` | **Previous:** `0_5_28` | **Accepted baseline:** `0_5_0` | **Branch:** `feature/interactive-3d-simulation`
 
-`POST /api/camera/frame` previously buffered the complete request with `request.body()`, then called the existing `CameraFrameService.store_upload()` 8 MiB check. A very large request could occupy unbounded memory before returning HTTP 413. The route now reads stream chunks, accumulates at most 8 MiB, rejects the first oversized chunk with the existing `CAMERA_FRAME_TOO_LARGE` error code, and delegates accepted bytes to the unchanged image validator. The response envelope and request-ID handling are preserved.
+## Code optimization
 
-Validation: `python scripts/test_v0529_camera_upload_stream_limit.py`, existing camera-frame and simulation API scripts, structure checks and full Windows GitHub Actions CI. Physical ESP and local Windows testing are separate owner checks. No network signal changes or physical signal actuation.
+The simulation renderer already produces a 1280 × 720 BGR canvas before encoding the canonical PNG. Previously, the first request for each of the three alternate simulated cameras decoded this same PNG independently to produce the flipped view. `CameraFrameService` now retains and reuses the rendered canvas for these views, eliminating up to three redundant decodes per tick when all three alternate views are requested.
+
+The render cache is bounded to one current tick (approximately 2.6 MiB) and cleared on simulation reset, stop and resume. Existing view-specific PNG caching remains intact. The canonical image, flipped pixel orientation, frame metadata, 3D scene coordinates, AI input contract, routes, safety phases, real ESP streaming and physical-output restrictions are unchanged. Runtime performance improvement has not been benchmarked.
+
+## Tests and acceptance
+
+- `python scripts/test_camera_frame_service.py`: prohibit `cv2.imdecode` during first-time mirrored view generation, check exact expected flipped pixels and verify cache release.
+- `python scripts/test_camera_simulation_api.py` and `python scripts/test_v0515_3d_simulation.py`: camera control/3D scene regressions.
+- Candidate CI: Python compilation, structure/version validation, full offline regression suite, frontend typecheck and build.
+- Owner Windows/hardware: check all four synthetic views, pause/resume and density changes, captured source images and unchanged ESP preview. Explicit PASS is necessary to accept the candidate.
+
+## Feature-branch pull and test
+
+The normal runner updates `main`, so from a **clean** local repository root:
+
+```powershell
+git fetch origin
+git switch feature/interactive-3d-simulation
+git pull --ff-only origin feature/interactive-3d-simulation
+& ".\AI_Traffic_Light\scripts\update_test_run.ps1" -SkipUpdate
+```
+
+No merge to `main`, hardware actuation or accepted-baseline promotion is included.

@@ -128,7 +128,7 @@ def main() -> int:
     assert 'select_changed_tests.py' in text
     assert '$runAllRegressions' in text
     assert '$runFrontendChecks' in text
-    assert '$_.Name -in $selectedTests' in text
+    assert '$offlineArgs += @($selectedTests)' in text
     assert 'Run-Step "Changed Python compile"' in text
     assert 'Run-Step "Live backend smoke"' in text
 
@@ -156,14 +156,14 @@ def main() -> int:
     assert text.index('Run-Step "Project structure and release consistency"') < dependency_step
     assert text.index('Run-Step "Update/test/run runner regression"') < dependency_step
 
-    # Automatic regressions and hardware-only exclusions remain deterministic.
-    assert 'Get-ChildItem ".\\scripts\\test_*.py"' in text
-    assert '$manualHardwareTests' in text
-    assert '$preflightTests' in text
-    assert '$preflightTests = @("test_update_test_run_script.py")' in text
-    assert 'Sort-Object Name' in text
-    assert 'Run-Step "Backend regression: $($test.Name)"' in text
-    assert '$_.Name -notin $preflightTests' in text
+    # Windows and CI delegate deterministic discovery to the same Python runner.
+    assert 'Run-Step "Offline regressions"' in text
+    assert '".\\scripts\\run_offline_tests.py" @offlineArgs' in text
+    assert '$offlineArgs = @("--skip-preflight")' in text
+    assert '$offlineArgs += "--focused"' in text
+    assert 'Get-ChildItem ".\\scripts\\test_*.py"' not in text
+    assert 'Run-Step "Update/test/run runner regression"' in text
+    assert (PROJECT_ROOT / "scripts" / "run_offline_tests.py").is_file()
 
     # Existing AiTL processes may be replaced, but unrelated port owners are protected.
     assert "Get-CimInstance Win32_Process" in text

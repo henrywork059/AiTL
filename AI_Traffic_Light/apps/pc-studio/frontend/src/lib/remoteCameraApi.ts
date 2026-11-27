@@ -59,9 +59,43 @@ export const DEFAULT_REMOTE_CAMERA_SETTINGS: RemoteCameraSettings = {
 };
 
 
+export type CameraDeviceCapability = {
+  direction: "input" | "output";
+  support: "implemented" | "simulation-only" | "unavailable";
+  available: boolean;
+};
+
+export type CameraDeviceHealth = {
+  state: "not_connected" | "unreachable" | "connected" | "reconnecting" |
+    "waiting_for_frame" | "streaming" | "stale" | "paused" | "error" |
+    "simulated" | "idle";
+  control_connected: boolean | null;
+  reachable: boolean | null;
+  streaming: boolean;
+  transport_connected: boolean;
+  frame_fresh: boolean;
+  frame_age_ms: number | null;
+  last_error: string | null;
+};
+
+export type CameraDeviceContract = {
+  schema_version: 1;
+  source_id: string;
+  device_type: "esp32_camera" | "simulation_camera";
+  control_owner: "pc_studio";
+  capabilities: {
+    camera_input: CameraDeviceCapability;
+    lighting_output: CameraDeviceCapability;
+    speaker_output: CameraDeviceCapability;
+  };
+  health: CameraDeviceHealth;
+  physical_output_allowed: false;
+};
+
 export type RemoteCameraProfile = {
   source_id: string;
   kind: "esp32" | "simulation";
+  device_contract?: CameraDeviceContract;
   host: string;
   target_fps: number;
   settings: RemoteCameraSettings;
@@ -74,11 +108,20 @@ export type RemoteCameraProfile = {
   paused_for_simulation: boolean;
   measured_fps: number;
   last_success_at_ms: number | null;
+  frame_age_ms?: number | null;
+  frame_stale?: boolean;
+  last_frame_interval_ms?: number | null;
+  source_sequence_gaps?: number;
+  repeated_source_frames?: number;
+  source_sequence_resets?: number;
+  stream_reconnects?: number;
+  session_recoveries?: number;
   last_error: string | null;
 };
 
 export type RemoteCameraStatus = {
   active_source_id: string | null;
+  device_contract?: CameraDeviceContract | null;
   camera_count: number;
   cameras: RemoteCameraProfile[];
   registry_warning: string | null;
@@ -100,6 +143,10 @@ export type RemoteCameraStatus = {
   target_fps: number;
   fetch_interval_ms: number;
   measured_fps: number;
+  frame_age_ms?: number | null;
+  frame_stale?: boolean;
+  repeated_source_frames?: number;
+  source_sequence_resets?: number;
   last_frame_interval_ms: number | null;
   stream_reconnects: number;
   session_recoveries: number;
@@ -133,7 +180,12 @@ export function liveCameraMjpegUrl(): string {
   return `${API_BASE}/api/camera/live.mjpeg`;
 }
 
+export type SimulationObservation = {epoch:string;generation:number;tick:number;source_id:string;view_id:string;frame_number:number;received_at_ms:number;coordinate_space:string;layout_id:string;width:number;height:number;provenance:string;tick_kind:string;observation_kind:"synthetic_ground_truth";detector_observation:false;authoritative:false;detector_input_eligible:boolean;physical_output_allowed:false};
+
 export type SimulationScene = {
+  simulation_engine?: "legacy" | "protected";
+  observation?: SimulationObservation;
+  view_agents?: Array<{id:string;kind:"vehicle"|"pedestrian";x:number;y:number}>;
   source_id: string;
   frame_number: number;
   received_at_ms: number;
@@ -147,9 +199,11 @@ export type SimulationScene = {
     vehicle_go: boolean;
     pedestrian_walk: boolean;
     seconds_remaining: number;
+    applied_phase?: string;
   };
   vehicles: Array<{
     id: string;
+    visit?: number;
     x: number;
     y: number;
     width: number;
@@ -159,6 +213,7 @@ export type SimulationScene = {
   }>;
   pedestrians: Array<{
     id: string;
+    visit?: number;
     x: number;
     y: number;
     direction: number;
@@ -237,4 +292,142 @@ export async function disconnectRemoteCamera(): Promise<RemoteCameraStatus> {
 
 export async function refreshCameraAfterRemoteChange(): Promise<CameraStatus> {
   return fetchCameraStatus();
+}
+
+export type NativeProjectionScene = {
+  schema_version: 1;
+  provenance: "synthetic_sumo_projection" | "synthetic_finite_reference_projection";
+  generation: number;
+  seed: number;
+  tick: number;
+  time_s: number;
+  pixels_per_m?: number;
+  coordinate_space?: "native_projection_v1";
+  layout_id?: string;
+  legacy_editor_compatible?: false;
+  paused?: boolean;
+  received_at_ms?: number;
+  signal?: {phase:string;vehicle_go:boolean;pedestrian_walk:boolean;applied_permission:string;applied_vehicle_go?:boolean;applied_pedestrian_walk?:boolean}|null;
+  width: 1280;
+  height: 720;
+  legacy_preview_layout_id?:string;
+  legacy_preview_crossing?:[number,number][];
+  lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number;surface?:"polygon"}>;
+  agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number;
+    slot_id?:string;visit?:number;vehicle_type?:"car"|"suv"|"van"|"bus";length_m?:number;width_m?:number;eastbound?:boolean}>;
+};
+export type NativeProjectionResponse = {
+  status: "disabled" | "idle" | "starting" | "running" | "busy" | "unavailable";
+  provenance: "synthetic_sumo_projection" | "synthetic_finite_reference_projection";
+  generation?: number;
+  snapshot: NativeProjectionScene | null;
+};
+export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjectionResponse> {
+  return requestJsonStrict<NativeProjectionResponse>(
+    `${API_BASE}/api/camera/simulation/native-projection?format=scene`, { signal, cache: "no-store" },
+  );
+}
+
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|"midblock_compact"|"midblock_wide"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
+const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
+export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
+  return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
+}
+export function nativeEvaluationCommand(action:"start"|"step"|"pause"|"stop",body:Record<string,unknown>,signal:AbortSignal):Promise<NativeEvaluationState>{
+  return requestJsonStrict<NativeEvaluationState>(`${nativeEvaluationBase}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal});
+}
+export function renewNativeCamera(state:NativeEvaluationState,camera_owner:string,signal:AbortSignal){
+  return requestJsonStrict<{epoch:string;generation:number;camera_owned:true}>(`${nativeEvaluationBase}/camera-heartbeat`,{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,camera_owner}),signal});
+}
+export function releaseNativeCamera(epoch:string,generation:number,camera_owner:string){
+  // Best-effort cleanup on navigation. Server lease expiry also handles
+  // closed tabs, lost connections and a start whose response never arrived.
+  return fetch(`${nativeEvaluationBase}/camera-release`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({epoch,generation,camera_owner}),keepalive:true}).catch(()=>undefined);
+}
+export function nativeEvaluationCaptureUrl(state:NativeEvaluationState){
+  return `${nativeEvaluationBase}/capture?${new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)})}`;
+}
+
+
+function evaluationQuery(state:NativeEvaluationState){
+  return new URLSearchParams({epoch:state.epoch,generation:String(state.generation),tick:String(state.snapshot?.tick??-1)});
+}
+export function nativeEvaluationFrameUrl(state:NativeEvaluationState,sourceId:string){
+  const params=evaluationQuery(state);params.set("source_id",sourceId);
+  // New shared exact publication path; no implicit selection or fallback to legacy.
+  if(state.snapshot?.layout_id){
+    params.set("engine",state.engine??"native");params.set("layout_id",state.snapshot.layout_id);
+    return `${API_BASE}/api/camera/simulation/observation/frame?${params}`;
+  }
+  return `${nativeEvaluationBase}/frame?${params}`;
+}
+export async function fetchExactNativeFrame(state:NativeEvaluationState,sourceId:string,signal:AbortSignal):Promise<Blob>{
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id||snapshot.coordinate_space!=="native_projection_v1"||state.status!=="running"||!Number.isSafeInteger(snapshot.received_at_ms))
+    throw new Error("Native frame coordinate contract unavailable");
+  const engine=state.engine??"native";
+  const response=await fetch(nativeEvaluationFrameUrl(state,sourceId),{signal,cache:"no-store"});
+  const expected:Record<string,string>={
+    "X-Camera-Source":`${engine==="reference"?"reference_eval":"native_eval"}_g${state.generation}_${sourceId}`,
+    "X-Frame-Number":String(snapshot.tick),
+    "X-Received-At-Ms":String(snapshot.received_at_ms),
+    "X-Observation-Origin":state.provenance,
+    "X-Simulation-Engine":engine,
+    "X-Layout-ID":snapshot.layout_id,
+    "X-Observation-Epoch":state.epoch,
+    "X-Observation-Generation":String(state.generation),
+    "X-Detector-Input-Eligible":"false",
+    "X-Observation-Kind":"synthetic_ground_truth",
+    "X-Coordinate-Space":"native_projection_v1"
+  };
+  if(!response.ok||!response.headers.get("content-type")?.startsWith("image/png")||
+      Object.entries(expected).some(([name,value])=>response.headers.get(name)!==value))
+    throw new Error("Retired or inconsistent native camera frame");
+  const blob=await response.blob();
+  if(!blob.size)throw new Error("Empty native camera frame");
+  return blob;
+}
+
+export function nativeEvaluationExportUrl(state:NativeEvaluationState){
+  return `${nativeEvaluationBase}/export?${evaluationQuery(state)}`;
+}
+export async function runNativeComparison(state:NativeEvaluationState,density:string,signal:AbortSignal,seed=42,duration=500,profile?:string,geometry="standard",engine:"native"|"reference"="native"):Promise<Blob>{
+  const response=await fetch(`${API_BASE}/api/traffic/native-experiments`,{
+    method:"POST",headers:{"Content-Type":"application/json"},signal,
+    body:JSON.stringify({epoch:state.epoch,generation:state.generation,density,seed,duration_seconds:duration,profile:profile||null,geometry,engine}),
+  });
+  if(!response.ok||!response.headers.get("content-type")?.includes("application/zip"))
+    throw new Error("Native comparison rejected or unavailable");
+  return response.blob();
+}
+
+export type NativeRegionProfile={schema_version:1;coordinate_space:"native_projection_v1";layout_id:string;canonical_polygon:[number,number][];count_basis:"observed_agent_anchor";detector_input_eligible:false};
+export type NativeRegionResult={counts:{vehicle:number;pedestrian:number};agent_ids:string[];epoch:string;generation:number;tick:number;source_id:string;layout_id:string;persisted:false;views?:Record<string,{polygon:[number,number][];counts:{vehicle:number;pedestrian:number};agent_ids:string[]}>;canonical_polygon?:[number,number][];count_basis?:string;region_profile?:NativeRegionProfile};
+export function evaluateNativeRegion(state:NativeEvaluationState,sourceId:string,polygon:[number,number][],signal:AbortSignal,allViews=false):Promise<NativeRegionResult>{
+  const snapshot=state.snapshot;
+  if(snapshot?.coordinate_space!=="native_projection_v1"||!snapshot.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
+  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region${allViews?"/views":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,coordinate_space:snapshot.coordinate_space,layout_id:snapshot.layout_id,polygon}),signal});
+}
+
+export function evaluateNativeRegionProfile(state:NativeEvaluationState,sourceId:string,profile:unknown,signal:AbortSignal):Promise<NativeRegionResult>{
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id)return Promise.reject(new Error("Native coordinate contract unavailable"));
+  return requestJsonStrict<NativeRegionResult>(`${nativeEvaluationBase}/region/profile`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,profile}),signal});
+}
+
+
+export function previewLegacyCrossing(state:NativeEvaluationState,sourceId:string,signal:AbortSignal){
+  const snapshot=state.snapshot;
+  if(!snapshot?.layout_id||!snapshot.legacy_preview_layout_id||snapshot.legacy_preview_crossing?.length!==4)
+    return Promise.reject(new Error("Qualified legacy crossing preview unavailable"));
+  const polygon=snapshot.legacy_preview_crossing.map(([x,y])=>[
+    sourceId==="simulation_camera_c"||sourceId==="simulation_camera_d"?1279-x:x,
+    sourceId==="simulation_camera_b"||sourceId==="simulation_camera_d"?719-y:y
+  ]);
+  return requestJsonStrict<{mapping:{calibrated:false;persisted:false};evaluation:NativeRegionResult;production_coordinate_parity:false}>(
+    `${nativeEvaluationBase}/region/legacy-preview`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,
+        legacy_layout_id:snapshot.legacy_preview_layout_id,layout_id:snapshot.layout_id,polygon}),signal});
 }

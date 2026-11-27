@@ -5,12 +5,13 @@ import {
   captureImageUrl,
   deleteDatasetCapture,
   fetchCaptureLabels,
-  fetchDatasetCaptures,
-  fetchTrainingDatasetStatus,
+  fetchDatasetCapturesStrict,
+  fetchTrainingDatasetStatusStrict,
   saveCaptureLabels,
 } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { LabelingCanvas } from "../components/LabelingCanvas";
+import { createPollingScope } from "../lib/pollingScope";
 import type {
   CaptureLabelDocument,
   CaptureSummary,
@@ -33,6 +34,13 @@ export function DatasetReviewPage() {
   const [deleting, setDeleting] = useState(false);
   const [building, setBuilding] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [labelLoading, setLabelLoading] = useState(false);
+  const [labelRevision, setLabelRevision] = useState(0);
+  const [loadedLabelRevision, setLoadedLabelRevision] = useState<number | null>(null);
+  const [decodedImage, setDecodedImage] = useState<{captureId: string; revision: number; width: number; height: number; url: string} | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [listAvailable, setListAvailable] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +49,14 @@ export function DatasetReviewPage() {
     [captures, selectedCaptureId],
   );
 
+  const busy = loading || refreshing || saving || deleting || building;
+  const currentDocument = loadedLabelRevision === labelRevision && selectedCapture && labelDocument?.capture_id === selectedCapture.capture_id && labelDocument.width === selectedCapture.width && labelDocument.height === selectedCapture.height ? labelDocument : null;
+
+  const imageReady = Boolean(selectedCapture && decodedImage?.captureId === selectedCapture.capture_id && decodedImage.revision === labelRevision && decodedImage.width === selectedCapture.width && decodedImage.height === selectedCapture.height && currentDocument);
+
   async function refreshCaptures(preferredCaptureId?: string | null) {
-    const data = await fetchDatasetCaptures();
+    const data = await fetchDatasetCapturesStrict();
+    setListAvailable(true);
     setCaptures(data.captures);
     setClasses(data.classes);
     setSelectedClassId((current) => data.classes.some((item) => item.id === current) ? current : (data.classes[0]?.id ?? 0));
@@ -54,16 +68,30 @@ export function DatasetReviewPage() {
   }
 
   async function refreshTrainingDataset() {
-    setTrainingDataset(await fetchTrainingDatasetStatus());
+    try { setTrainingDataset(await fetchTrainingDatasetStatusStrict()); }
+    catch (reason) { setTrainingDataset(null); throw reason; }
   }
 
   async function refreshCaptureList() {
+    if (busy || (dirty && listAvailable)) return;
+    if (dirty && !window.confirm("The capture state is unverified. Discard unsaved edits and reload?")) return;
+    setRefreshing(true);
     try {
       await refreshCaptures(selectedCaptureId);
+      // Invalidate the previous document and object URL before requesting the next revision.
+      setLabelDocument(null);
+      setLoadedLabelRevision(null);
+      setDecodedImage(null);
+      setImageError(null);
+      setLabelRevision(value => value + 1);
       setError(null);
+      // Dataset-build status is independent of the capture list and review retry.
+      try { await refreshTrainingDataset(); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : "Managed dataset status unavailable."); }
     } catch (nextError) {
+      setListAvailable(false);
       setError(nextError instanceof Error ? nextError.message : "Capture list could not be refreshed.");
-    }
+    } finally { setRefreshing(false); }
   }
 
   useEffect(() => {
@@ -81,47 +109,91 @@ export function DatasetReviewPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedCaptureId) {
-      setLabelDocument(null);
-      setLabels([]);
-      return;
-    }
-    let active = true;
+    setLabelDocument(null);
+    setLoadedLabelRevision(null);
+    setLabels([]);
+    setDirty(false);
+    if (!selectedCaptureId || !selectedCapture) { setLabelLoading(false); return; }
+    setLabelLoading(true);
+    const scope = createPollingScope();
     setError(null);
-    void fetchCaptureLabels(selectedCaptureId)
+    void fetchCaptureLabels(selectedCaptureId, scope.signal)
       .then((document) => {
-        if (!active) return;
+        if (!scope.isCurrent()) return;
+        if (document.capture_id !== selectedCaptureId) throw new Error("Label response capture identity mismatch.");
+        if (document.width !== selectedCapture.width || document.height !== selectedCapture.height) throw new Error("Label response dimensions differ from capture.");
         setLabelDocument(document);
+        setLoadedLabelRevision(labelRevision);
         setLabels(document.labels);
         setDirty(false);
       })
       .catch((nextError) => {
-        if (!active) return;
+        if (!scope.isCurrent()) return;
         setError(nextError instanceof Error ? nextError.message : "Labels could not be loaded.");
-      });
-    return () => { active = false; };
-  }, [selectedCaptureId]);
+      }).finally(() => { if (scope.isCurrent()) setLabelLoading(false); });
+    return () => scope.retire();
+  }, [selectedCaptureId, selectedCapture?.width, selectedCapture?.height, labelRevision]);
+
+  useEffect(() => {
+    setDecodedImage(null);
+    setImageError(null);
+    if (!selectedCaptureId || !selectedCapture || !currentDocument || !listAvailable) return;
+    const scope = createPollingScope();
+    let url: string | null = null;
+    const captureId = selectedCaptureId;
+    const width = selectedCapture.width, height = selectedCapture.height;
+    async function loadImage() {
+      try {
+        const response = await fetch(captureImageUrl(captureId), { signal: scope.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Captured image unavailable.");
+        const blob = await response.blob();
+        if (!/^image\/(jpeg|png|webp)$/.test(blob.type)) throw new Error("Captured image format unavailable.");
+        if (!scope.isCurrent()) return;
+        url = URL.createObjectURL(blob);
+        const image = new Image();
+        image.src = url;
+        try { await image.decode(); }
+        catch { throw new Error("Captured image could not be decoded."); }
+        if (!scope.isCurrent()) return;
+        if (image.naturalWidth !== width || image.naturalHeight !== height) throw new Error("Captured image dimensions differ from labels.");
+        setDecodedImage({captureId, revision: labelRevision, width, height, url});
+      } catch (reason) {
+        if (scope.isCurrent()) setImageError(reason instanceof Error ? reason.message : "Captured image could not be decoded.");
+        if (url) { URL.revokeObjectURL(url); url = null; }
+      }
+    }
+    void loadImage();
+    return () => { scope.retire(); if (url) { URL.revokeObjectURL(url); url = null; } };
+  }, [selectedCaptureId, selectedCapture?.width, selectedCapture?.height, Boolean(currentDocument), listAvailable, labelRevision]);
 
   function updateLabels(nextLabels: DatasetLabelBox[]) {
+    if (!currentDocument || !imageReady || busy || labelLoading) return;
     setLabels(nextLabels);
     setDirty(true);
     setMessage(null);
   }
 
   async function saveLabels() {
-    if (!selectedCapture) return;
+    if (!selectedCapture || !currentDocument || !imageReady || busy || labelLoading || !listAvailable) return;
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
       const saved = await saveCaptureLabels(selectedCapture.capture_id, labels);
+      if (saved.capture_id !== selectedCapture.capture_id || saved.width !== selectedCapture.width || saved.height !== selectedCapture.height) {
+        setListAvailable(false);
+        setDecodedImage(null);
+        setLoadedLabelRevision(null);
+        // Preserve the unsaved draft until explicit reload confirmation; no further save is allowed.
+        throw new Error("Saved label identity mismatch; reload before editing.");
+      }
       setLabelDocument(saved);
       setLabels(saved.labels);
       setDirty(false);
       setMessage(saved.labels.length === 0
         ? "Review saved as a negative example with zero objects."
         : `Saved ${saved.labels.length} bounding box${saved.labels.length === 1 ? "" : "es"}.`);
-      await Promise.all([refreshCaptures(selectedCapture.capture_id), refreshTrainingDataset()]);
+      await Promise.all([refreshCaptures(selectedCapture.capture_id).catch(reason => { setListAvailable(false); throw reason; }), refreshTrainingDataset()]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Labels could not be saved.");
     } finally {
@@ -130,7 +202,7 @@ export function DatasetReviewPage() {
   }
 
   async function deleteSelectedCapture() {
-    if (!selectedCapture) return;
+    if (!selectedCapture || !currentDocument || busy || labelLoading || !listAvailable) return;
     if (dirty && !window.confirm("This image has unsaved label changes. Delete the capture and discard those edits?")) return;
     if (!window.confirm(`Permanently delete capture ${selectedCapture.capture_id}? The image, metadata, and saved manual labels will be removed.`)) return;
     setDeleting(true);
@@ -138,11 +210,17 @@ export function DatasetReviewPage() {
     setMessage(null);
     try {
       const result = await deleteDatasetCapture(selectedCapture.capture_id);
+      if (!result.deleted || result.capture_id !== selectedCapture.capture_id || result.session_id !== selectedCapture.session_id) {
+        setListAvailable(false);
+        setDecodedImage(null);
+        setLoadedLabelRevision(null);
+        throw new Error("Delete response capture identity mismatch; reload before editing.");
+      }
       setLabelDocument(null);
       setLabels([]);
       setDirty(false);
       setTrainingDataset(result.training_dataset);
-      await refreshCaptures(null);
+      await refreshCaptures(null).catch(reason => { setListAvailable(false); throw reason; });
       setMessage(result.training_dataset.stale
         ? `Deleted ${result.capture_id}. Rebuild the managed YOLO dataset before the next training run.`
         : `Deleted ${result.capture_id}.`);
@@ -154,12 +232,16 @@ export function DatasetReviewPage() {
   }
 
   async function buildDataset() {
+    if (busy || dirty || labelLoading || !listAvailable) return;
     setBuilding(true);
     setError(null);
     setMessage(null);
     try {
       const status = await buildTrainingDataset(0.2);
       setTrainingDataset(status);
+      if (!status.ready || status.stale || status.train_count < 1 || status.val_count < 1) {
+        throw new Error(status.message || "Managed dataset was not built; review eligible captures and retry.");
+      }
       setMessage(`Managed dataset ready: ${status.train_count} train / ${status.val_count} validation frames.`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Training dataset could not be built.");
@@ -177,17 +259,24 @@ export function DatasetReviewPage() {
               <h2>Captured images</h2>
               <p className="placeholder-copy">Select an image to review or label.</p>
             </div>
-            <span className="status-pill muted">{captures.length} saved</span>
+            <span className="status-pill muted">{listAvailable ? `${captures.length} saved` : "Unavailable"}</span>
           </div>
-          <button onClick={() => void refreshCaptureList()} disabled={loading || deleting}>Refresh list</button>
+          <button onClick={() => void refreshCaptureList()} disabled={busy || (dirty && listAvailable)}>Refresh list</button>
           <div className="capture-browser-list">
             {captures.map((capture) => (
               <button
                 key={capture.capture_id}
                 className={`capture-browser-item ${capture.capture_id === selectedCaptureId ? "active" : ""}`}
                 aria-pressed={capture.capture_id === selectedCaptureId}
+                disabled={busy || !listAvailable}
                 onClick={() => {
+                  if (capture.capture_id === selectedCaptureId) return;
                   if (dirty && !window.confirm("Discard unsaved label changes and switch images?")) return;
+                  setDecodedImage(null);
+                  setLabelDocument(null);
+                  setLoadedLabelRevision(null);
+                  setLabels([]);
+                  setDirty(false);
                   setSelectedCaptureId(capture.capture_id);
                   setMessage(null);
                 }}
@@ -197,7 +286,7 @@ export function DatasetReviewPage() {
                 <span>{capture.labeled ? `${capture.label_count} boxes · reviewed` : "not reviewed"}</span>
               </button>
             ))}
-            {!loading && captures.length === 0 && (
+            {!loading && listAvailable && captures.length === 0 && (
               <p className="small-note">No captures yet. Save at least two usable frames before building a train/validation dataset.</p>
             )}
           </div>
@@ -209,12 +298,12 @@ export function DatasetReviewPage() {
               <h2>Annotation workspace</h2>
               <p className="placeholder-copy">Choose a class, then drag on the saved image to draw a bounding box.</p>
             </div>
-            <span className={`status-pill ${labelDocument?.reviewed ? "status-implemented" : "status-planned"}`}>
-              {labelDocument?.reviewed ? "reviewed" : "not reviewed"}
+            <span className={`status-pill ${currentDocument?.reviewed ? "status-implemented" : "status-planned"}`}>
+              {currentDocument?.reviewed ? "reviewed" : "not reviewed"}
             </span>
           </div>
 
-          {selectedCapture && labelDocument ? (
+          {selectedCapture && currentDocument && !labelLoading && listAvailable ? (
             <>
               <div className="label-toolbar">
                 <label>Class
@@ -223,22 +312,24 @@ export function DatasetReviewPage() {
                   </select>
                 </label>
                 <div className="label-toolbar-actions">
-                  <button onClick={() => updateLabels([])} disabled={labels.length === 0 || deleting}>Clear boxes</button>
-                  <button className="primary" onClick={() => void saveLabels()} disabled={saving || deleting}>{saving ? "Saving..." : "Save review"}</button>
-                  <button className="danger" onClick={() => void deleteSelectedCapture()} disabled={saving || deleting}>
+                  <button onClick={() => updateLabels([])} disabled={!imageReady || labels.length === 0 || busy}>Clear boxes</button>
+                  <button className="primary" onClick={() => void saveLabels()} disabled={busy || !imageReady}>{saving ? "Saving..." : "Save review"}</button>
+                  <button className="danger" onClick={() => void deleteSelectedCapture()} disabled={busy}>
                     {deleting ? "Deleting..." : "Delete capture"}
                   </button>
                 </div>
               </div>
-              <LabelingCanvas
-                imageUrl={captureImageUrl(selectedCapture.capture_id)}
+              {imageReady && decodedImage ? <LabelingCanvas
+                key={selectedCapture.capture_id + ":" + labelRevision}
+                imageUrl={decodedImage.url}
                 width={selectedCapture.width}
                 height={selectedCapture.height}
                 classes={classes}
                 selectedClassId={selectedClassId}
                 labels={labels}
                 onChange={updateLabels}
-              />
+                disabled={busy || labelLoading || !listAvailable}
+              /> : <div className="label-empty-state" role="status">{imageError ?? "Loading captured image..."}</div>}
               <p className="small-note">
                 Saving zero boxes marks this as a reviewed negative example. Deleting a capture also removes its metadata and saved labels.
               </p>
@@ -246,14 +337,14 @@ export function DatasetReviewPage() {
                 {labels.map((label, index) => (
                   <div key={`${label.class_id}-${index}`}>
                     <span>{index + 1}. {label.class_name} · [{label.box_xyxy.map((value) => Math.round(value)).join(", ")}]</span>
-                    <button onClick={() => updateLabels(labels.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>
+                    <button disabled={busy || !imageReady} onClick={() => updateLabels(labels.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>
                   </div>
                 ))}
                 {labels.length === 0 && <p className="small-note">No boxes on this image.</p>}
               </div>
             </>
           ) : (
-            <div className="label-empty-state">Select a captured image to begin review.</div>
+            <div className="label-empty-state">{labelLoading ? "Loading labels..." : selectedCapture ? "Labels unavailable for this capture. Select another capture or refresh the list." : "Select a captured image to begin review."}</div>
           )}
           {dirty && <p className="warning-box">This image has unsaved label changes.</p>}
           {message && <p className="success-message">{message}</p>}
@@ -268,17 +359,18 @@ export function DatasetReviewPage() {
             <p className="placeholder-copy">Builds the default <code>datasets/yolo/data.yaml</code> used by the training page from reviewed, eligible captures.</p>
           </div>
           <span className={`status-pill ${trainingDataset?.ready ? "status-implemented" : trainingDataset?.stale ? "status-planned" : ""}`}>
-            {trainingDataset?.ready ? "ready" : trainingDataset?.stale ? "rebuild required" : "not built"}
+            {!trainingDataset ? "unavailable" : trainingDataset.ready ? "ready" : trainingDataset.stale ? "rebuild required" : "not built"}
           </span>
         </div>
         <div className="managed-dataset-metrics">
-          <div><span>Reviewed</span><strong>{trainingDataset?.labeled_frame_count ?? 0}</strong></div>
-          <div><span>Eligible</span><strong>{trainingDataset?.eligible_frame_count ?? 0}</strong></div>
-          <div><span>Boxes</span><strong>{trainingDataset?.label_box_count ?? 0}</strong></div>
-          <div><span>Train / Val</span><strong>{trainingDataset?.train_count ?? 0} / {trainingDataset?.val_count ?? 0}</strong></div>
+          <div><span>Reviewed</span><strong>{trainingDataset?.labeled_frame_count ?? "—"}</strong></div>
+          <div><span>Eligible</span><strong>{trainingDataset?.eligible_frame_count ?? "—"}</strong></div>
+          <div><span>Boxes</span><strong>{trainingDataset?.label_box_count ?? "—"}</strong></div>
+          <div><span>Evaluation-only excluded</span><strong>{trainingDataset?.excluded_evaluation_count ?? 0}</strong></div>
+          <div><span>Train / Val</span><strong>{trainingDataset?.train_count ?? "—"} / {trainingDataset?.val_count ?? "—"}</strong></div>
         </div>
         <p className="small-note">{trainingDataset?.message ?? "Checking managed dataset status..."}</p>
-        <button className="primary" onClick={() => void buildDataset()} disabled={building || (trainingDataset?.eligible_frame_count ?? 0) < 2}>
+        <button className="primary" onClick={() => void buildDataset()} disabled={busy || dirty || labelLoading || !listAvailable || (trainingDataset?.eligible_frame_count ?? 0) < 2}>
           {building ? "Building..." : trainingDataset?.ready ? "Rebuild managed dataset" : "Build managed dataset"}
         </button>
       </section>

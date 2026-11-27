@@ -1,0 +1,236 @@
+name: Pinned SUMO evaluation trial
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/sumo-evaluation-trial.yml'
+      - '.github/scripts/sumo_topology_trial.py'
+      - '.github/scripts/locate_sumo_bin.py'
+      - '.github/scripts/test_locate_sumo_bin.py'
+      - '.github/scripts/sumo_shadow_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_adapter.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_shadow_adapter.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_process.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_shadow_process.py'
+      - 'AI_Traffic_Light/scripts/evaluate_simulation_engine.py'
+      - '.github/scripts/sumo_controlled_shadow_trial.py'
+      - '.github/scripts/sumo_lane_trial.py'
+      - '.github/scripts/sumo_corridor_trial.py'
+      - '.github/scripts/sumo_migration_trial.py'
+      - '.github/scripts/sumo_projection_trial.py'
+      - '.github/scripts/sumo_density_capture_trial.py'
+      - '.github/scripts/sumo_publisher_trial.py'
+      - '.github/scripts/sumo_gate_metric_trial.py'
+      - '.github/scripts/sumo_finite_fixture_trial.py'
+      - '.github/scripts/sumo_native_evaluation_trial.py'
+      - '.github/scripts/sumo_http_compatibility_trial.py'
+      - '.github/scripts/sumo_policy_matrix_trial.py'
+      - 'AI_Traffic_Light/scripts/native_detector_batch.py'
+      - 'AI_Traffic_Light/scripts/test_native_detector_batch.py'
+      - '.github/scripts/sumo_midblock_trial.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_fixture.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_session.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_midblock_transport.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/routes/experiments.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation_geometry.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/native_evaluation_experiments.py'
+      - 'AI_Traffic_Light/apps/pc-studio/frontend/src/components/NativeRoadRenderer.ts'
+      - 'AI_Traffic_Light/scripts/test_native_evaluation_api.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_reference_session.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/observation_identity.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/legacy_world.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/protected_crosswalk.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_experiments.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_finite_fixture.py'
+      - 'AI_Traffic_Light/scripts/test_simulation_finite_fixture.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_metrics.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/simulation_gate_adapters.py'
+      - 'AI_Traffic_Light/scripts/test_simulation_gate_metrics.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_frame_publisher.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/experiment_timeline_csv.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_frame_publisher.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection_capture.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_density_capture.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_projection_api.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/routes/camera.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_projection_session.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_projection.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_corridor_session.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_corridor.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_lane_scenarios.py'
+      - 'AI_Traffic_Light/scripts/test_sumo_lane_scenarios.py'
+      - '.github/scripts/check_sumo_shadow_dependencies.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_fixture.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/sumo_shadow_runtime.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/requirements-sumo-shadow-win-x64.txt'
+      - 'AI_Traffic_Light/scripts/test_sumo_shadow_runtime.py'
+      - 'AI_Traffic_Light/apps/pc-studio/backend/app/services/camera_frames.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-smoke:
+    if: github.ref == 'refs/heads/feature/interactive-3d-simulation'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          architecture: x64
+      - name: Test native binary discovery and version checks
+        run: python .github/scripts/test_locate_sumo_bin.py
+      - name: Verify and install isolated SUMO wheels
+        run: |
+          $requirements = 'AI_Traffic_Light/apps/pc-studio/backend/requirements-sumo-shadow-win-x64.txt'
+          python -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r $requirements
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip show eclipse-sumo sumo-data
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin = python .github/scripts/locate_sumo_bin.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify exact Python package advisory metadata
+        run: python .github/scripts/check_sumo_shadow_dependencies.py
+      - name: Verify actual executable versions
+        id: verified_engine
+        run: python .github/scripts/locate_sumo_bin.py --verify-versions
+      - name: Execute two seeded smoke runs
+        working-directory: AI_Traffic_Light
+        run: python scripts/evaluate_simulation_engine.py --output "$env:RUNNER_TEMP/mesh-sumo-smoke.json"
+      - name: Execute topology and crossing diagnostic
+        if: always() && steps.verified_engine.outcome == 'success'
+        run: python .github/scripts/sumo_topology_trial.py --output-dir "$env:RUNNER_TEMP/mesh-sumo-topology"
+      - name: Check isolated Python dependency closure
+        run: |
+          python -m pip show traci sumolib libsumo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip check
+      - name: Run shadow adapter contract tests
+        run: python AI_Traffic_Light/scripts/test_sumo_shadow_adapter.py
+      - name: Test isolated child process lifecycle
+        run: python AI_Traffic_Light/scripts/test_sumo_shadow_process.py
+      - name: Execute pinned native libsumo shadow trial
+        run: python .github/scripts/sumo_shadow_trial.py "$env:RUNNER_TEMP/mesh-sumo-topology" "$env:RUNNER_TEMP/mesh-sumo-shadow.json"
+      - name: Test asynchronous runtime and phase mapping
+        run: python AI_Traffic_Light/scripts/test_sumo_shadow_runtime.py
+      - name: Execute controlled native shadow trial
+        run: python .github/scripts/sumo_controlled_shadow_trial.py "$env:RUNNER_TEMP/mesh-sumo-controlled-shadow.json"
+      - name: Test lane scenario admission and demand
+        run: python AI_Traffic_Light/scripts/test_sumo_lane_scenarios.py
+      - name: Execute pinned native lane and turning trial
+        run: python .github/scripts/sumo_lane_trial.py "$env:RUNNER_TEMP/mesh-sumo-lanes.json"
+      - name: Test independent corridor permissions and capacity
+        run: python AI_Traffic_Light/scripts/test_sumo_corridor.py
+      - name: Execute pinned native two-junction corridor trial
+        run: python .github/scripts/sumo_corridor_trial.py "$env:RUNNER_TEMP/mesh-sumo-corridor.json"
+      - name: Install existing backend requirements for application trial
+        id: application_dependencies
+        run: python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt
+      - name: Execute pinned native midblock cyclic runtime and paired experiments
+        id: midblock_trial
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_midblock_trial.py "$env:RUNNER_TEMP/mesh-sumo-midblock"
+      - name: Execute matched camera and native shadow resource trial
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_migration_trial.py "$env:RUNNER_TEMP/mesh-sumo-migration.json"
+      - name: Execute isolated native projection and export trial
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_projection_trial.py "$env:RUNNER_TEMP/mesh-sumo-projection"
+      - name: Execute finite native density slow pedestrian and capture evaluation
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_density_capture_trial.py "$env:RUNNER_TEMP/mesh-sumo-density-capture.json"
+      - name: Execute isolated native-only matched read workload and partial export
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_publisher_trial.py "$env:RUNNER_TEMP/mesh-sumo-publisher.json"
+      - name: Execute repeated actual native and legacy normalized gate metric trial
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_gate_metric_trial.py "$env:RUNNER_TEMP/mesh-sumo-gate-metrics"
+      - name: Execute finite-demand common physical service gate fixture
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_finite_fixture_trial.py "$env:RUNNER_TEMP/mesh-sumo-finite-fixture"
+      - name: Execute native-only HTTP fixed adaptive and capture milestone trial
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_native_evaluation_trial.py "$env:RUNNER_TEMP/mesh-sumo-native-evaluation"
+      - name: Execute repeated matched HTTP camera workload and saved-policy comparison
+        id: http_compatibility
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_http_compatibility_trial.py "$env:RUNNER_TEMP/mesh-sumo-http-compatibility"
+      - name: Execute native multi-seed multi-density policy matrix
+        if: "!cancelled() && steps.verified_engine.outcome == 'success' && steps.application_dependencies.outcome == 'success'"
+        run: python .github/scripts/sumo_policy_matrix_trial.py "$env:RUNNER_TEMP/mesh-sumo-policy-matrix"
+      - name: Score qualified midblock capture batch (palette control, not trained model)
+        if: "!cancelled() && steps.midblock_trial.outcome == 'success'"
+        run: python AI_Traffic_Light/scripts/native_detector_batch.py --capture-root "$env:RUNNER_TEMP/mesh-sumo-midblock" --output "$env:RUNNER_TEMP/mesh-native-detector-batch.json"
+      - name: Independently reconcile retained S04 metric, resource and coordinate evidence
+        if: "success() && steps.midblock_trial.outcome == 'success'"
+        run: |
+          python AI_Traffic_Light/scripts/verify_s04_evidence.py "$env:RUNNER_TEMP" --tamper-check | Tee-Object -FilePath "$env:RUNNER_TEMP/mesh-s04-independent-audit.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-node@v4
+        if: "!cancelled() && (steps.http_compatibility.outcome == 'success' || steps.midblock_trial.outcome == 'success')"
+        with:
+          node-version: '22'
+      - name: Render retained actual native capture in Edge WebGL
+        if: "!cancelled() && steps.http_compatibility.outcome == 'success'"
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: |
+          $source = "$env:RUNNER_TEMP/mesh-sumo-http-compatibility/1-0/capture.zip"
+          Expand-Archive -Path $source -DestinationPath "$env:RUNNER_TEMP/mesh-native-scene" -Force
+          New-Item -ItemType Directory -Force trials/public | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/mesh-native-scene/scene.json" trials/public/native-scene.json
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node node_modules/vite/bin/vite.js build --config trials/vite.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node trials/browserTrial.mjs --native-only
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Render actual midblock capture in Edge WebGL
+        if: "!cancelled() && steps.midblock_trial.outcome == 'success'"
+        working-directory: AI_Traffic_Light/apps/pc-studio/frontend
+        run: |
+          $source = "$env:RUNNER_TEMP/mesh-sumo-midblock/42-normal-fixed/capture.zip"
+          Expand-Archive -Path $source -DestinationPath "$env:RUNNER_TEMP/mesh-midblock-scene" -Force
+          New-Item -ItemType Directory -Force trials/public | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/mesh-midblock-scene/scene.json" trials/public/native-scene.json
+          if (!(Test-Path node_modules)) { npm ci --no-audit --no-fund; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+          node node_modules/vite/bin/vite.js build --config trials/vite.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node trials/browserTrial.mjs --native-only --midblock
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sumo-1.28.0-synthetic-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/mesh-sumo-smoke.json
+            ${{ runner.temp }}/mesh-sumo-topology/
+            ${{ runner.temp }}/mesh-sumo-shadow.json
+            ${{ runner.temp }}/mesh-sumo-controlled-shadow.json
+            ${{ runner.temp }}/mesh-sumo-lanes.json
+            ${{ runner.temp }}/mesh-sumo-corridor.json
+            ${{ runner.temp }}/mesh-sumo-migration.json
+            ${{ runner.temp }}/mesh-sumo-projection/
+            ${{ runner.temp }}/mesh-sumo-density-capture.json
+            ${{ runner.temp }}/mesh-sumo-publisher.json
+            ${{ runner.temp }}/mesh-sumo-gate-metrics/
+            ${{ runner.temp }}/mesh-sumo-finite-fixture/
+            ${{ runner.temp }}/mesh-sumo-native-evaluation/
+            ${{ runner.temp }}/mesh-sumo-http-compatibility/
+            ${{ runner.temp }}/mesh-native-actual.png
+            ${{ runner.temp }}/mesh-native-actual-detail.png
+            ${{ runner.temp }}/mesh-sumo-policy-matrix/
+            ${{ runner.temp }}/mesh-sumo-midblock/
+            ${{ runner.temp }}/mesh-native-detector-batch.json
+            ${{ runner.temp }}/mesh-s04-independent-audit.json
+            ${{ runner.temp }}/mesh-midblock-actual.png
+            ${{ runner.temp }}/mesh-midblock-actual-detail.png

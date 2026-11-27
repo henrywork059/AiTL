@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
@@ -30,6 +32,19 @@ def capture_latest_frame(payload: CaptureFrameRequest, request: Request) -> dict
         raise AppError(
             ErrorCode.CAMERA_NOT_CONNECTED,
             "No camera frame is available to capture. Upload a frame or start simulation mode.",
+            status_code=409,
+        )
+    if ((payload.expected_source_id is not None and frame.source_id != payload.expected_source_id)
+            or (payload.expected_origin is not None and frame.origin != payload.expected_origin)):
+        raise AppError(
+            ErrorCode.CAMERA_NOT_CONNECTED,
+            "Camera source or mode changed before capture. Refresh the preview and retry.",
+            status_code=409,
+        )
+    if not frame.fresh_for_capture(int(time.time() * 1000)):
+        raise AppError(
+            ErrorCode.CAMERA_NOT_CONNECTED,
+            "Receiver frame expired before capture. Wait for a fresh camera frame.",
             status_code=409,
         )
     record = dataset_capture_service.capture_frame(

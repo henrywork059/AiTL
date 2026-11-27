@@ -32,6 +32,7 @@ class MultiCameraInferenceService:
         self._thread: Thread | None = None
         self._results: dict[str, dict[str, Any]] = {}
         self._keys: dict[str, tuple[Any, ...]] = {}
+        self._tokens: dict[str, tuple[tuple[bool, int], int]] = {}
 
     def start(self) -> None:
         with self._lock:
@@ -53,10 +54,18 @@ class MultiCameraInferenceService:
                 self._thread = None
             self._results.clear()
             self._keys.clear()
+            self._tokens.clear()
+
+    @staticmethod
+    def _result_is_current(source_id, item, token) -> bool:
+        timestamp = (item.get("diagnostics") or {}).get("source_timestamp_ms")
+        return bool(token is not None and isinstance(timestamp, int)
+                    and remote_camera_manager.observation_is_current(source_id, token, timestamp))
 
     def result(self, source_id: str) -> dict[str, Any]:
         with self._lock:
             item = self._results.get(source_id)
+            token = self._tokens.get(source_id)
             payload = dict(item) if item else {"source_id": source_id, "frame": None, "error": None}
         frame = payload.get("frame")
         now_ms = int(time.time() * 1000)
@@ -64,7 +73,9 @@ class MultiCameraInferenceService:
         if timestamp is None:
             timestamp = (payload.get("diagnostics") or {}).get("source_timestamp_ms")
         age = now_ms - timestamp if isinstance(timestamp, (int, float)) else None
-        if frame is not None and payload.get("model_id") != inference_service.status()["active_model_id"]:
+        if item is not None and not self._result_is_current(source_id, item, token):
+            payload["frame"], payload["error"] = None, "Camera observation unavailable"
+        elif frame is not None and payload.get("model_id") != inference_service.status()["active_model_id"]:
             payload["frame"], payload["error"] = None, "Model changed"
         elif frame is not None and (age is None or not 0 <= age <= STALE_RESULT_MS):
             payload["frame"], payload["error"] = None, "Frame is stale"
@@ -85,20 +96,25 @@ class MultiCameraInferenceService:
                     with self._lock:
                         self._results.clear()
                         self._keys.clear()
+                        self._tokens.clear()
                 else:
-                    frames = remote_camera_manager.frames_for_inference()
-                    seen = {frame.source_id for frame in frames}
+                    inputs = remote_camera_manager.inference_inputs()
+                    seen = {frame.source_id for frame, _ in inputs}
                     with self._lock:
                         for source_id in list(self._results):
                             if source_id not in seen:
                                 self._results.pop(source_id, None)
                                 self._keys.pop(source_id, None)
-                    for frame in frames:
+                                self._tokens.pop(source_id, None)
+                    for frame, token in inputs:
                         if self._stop.is_set():
                             break
                         key = (model_id, settings["default_confidence"], frame.frame_number, frame.received_at_ms)
+                        if not remote_camera_manager.observation_is_current(frame.source_id, token, frame.received_at_ms):
+                            continue
                         with self._lock:
-                            if not _is_new_source_frame(self._keys.get(frame.source_id), key):
+                            if (self._tokens.get(frame.source_id) == token
+                                    and not _is_new_source_frame(self._keys.get(frame.source_id), key)):
                                 continue
                         started_inference = time.perf_counter()
                         try:
@@ -115,6 +131,8 @@ class MultiCameraInferenceService:
                             "source_frame_number": frame.frame_number,
                             "source_origin": frame.origin,
                         }
+                        if not remote_camera_manager.observation_is_current(frame.source_id, token, frame.received_at_ms):
+                            continue
                         with self._lock:
                             # Stop may finish while inference is still blocked; discard
                             # that late result instead of reviving the cleared cache.
@@ -122,10 +140,14 @@ class MultiCameraInferenceService:
                                 return
                             self._results[frame.source_id] = item
                             self._keys[frame.source_id] = key
+                            self._tokens[frame.source_id] = token
                 # Publish per-camera detections to the correct simulated crossing
                 # irrespective of whether the Network page is currently open.
                 with self._lock:
                     snapshot = dict(self._results)
+                    tokens = dict(self._tokens)
+                snapshot = {source_id: item for source_id, item in snapshot.items()
+                            if self._result_is_current(source_id, item, tokens.get(source_id))}
                 active_model_id = inference_service.status()["active_model_id"]
                 simulation_enabled = camera_frame_service.simulation_enabled
                 now_ms = int(time.time() * 1000)

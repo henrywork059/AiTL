@@ -11,7 +11,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.services.signal_rules import signal_rules_service  # noqa: E402
-from app.services.simulation_experiments import SimulationExperimentService  # noqa: E402
+from app.services.simulation_experiments import SimulationExperimentService, _ModeSimulation  # noqa: E402
 
 
 
@@ -68,6 +68,26 @@ def main() -> int:
             storage_root=Path(temporary) / "experiments",
             config_provider=signal_rules_service.get_config,
         )
+        # The optional normalized metric path must not change the original
+        # production benchmark result or its existing metric schema.
+        args=dict(mode="fixed",density="normal",seed=42,duration_seconds=30,
+                  sample_interval_seconds=1,policy_config=signal_rules_service.get_config(),
+                  zones=[],temp_root=Path(temporary))
+        ordinary=_ModeSimulation(**args).run()
+        measured=_ModeSimulation(**args,normalized_gate_evidence=True).run()
+        common=measured.pop("normalized_gate_evidence")
+        assert ordinary==measured
+        assert common["engine"]=="production_legacy_experiment"
+        assert len(common["timeline"])==150
+        assert not common["geometry_demand_matched_to_native"]
+        assert not common["normalized_report_metrics"]["production_experiment_parity"]
+        assert common["normalized_report_metrics"]["duration_seconds"]==30.
+        actual=common["actual_legacy_wait"]
+        for kind,wait in actual["waiting"].items():
+            assert abs(sum(wait["completed_seconds"]+wait["censored_observed_seconds"])-wait["observed_agent_seconds"])<1e-5
+            assert abs(wait["observed_agent_seconds"]-ordinary["metrics"]["queues"][kind]["queue_seconds"])<.011
+        for kind,waits in common["waiting_episodes"].items():
+            assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
         first = service.run(
             duration_seconds=90,
             density="busy",
@@ -118,6 +138,61 @@ def main() -> int:
         assert zone_run["scenario"]["zones"][0]["id"] == "whole_scene"
         assert zone_run["adaptive"]["metrics"]["signal"]["rule_applications"].get("whole_scene_car_demand", 0) > 0
         assert zone_run["fixed"]["metrics"]["signal"]["rule_application_count"] == 0
+
+        live_service=SimulationExperimentService(storage_root=Path(temporary)/"live_slots",
+            config_provider=signal_rules_service.get_config,zones_provider=lambda:[])
+        live_args=dict(duration_seconds=30,density="normal",seed=42,sample_interval_seconds=1,
+                       profile="Normal",demand_model="live_slots")
+        live_first=live_service.run(**live_args)
+        live_second=live_service.run(**live_args)
+        assert comparable(live_first)==comparable(live_second)
+        assert live_first["scenario"]["movement_step_seconds"]==.05
+        assert live_first["scenario"]["demand_model"]=="live_slots"
+        assert not live_first["scenario"]["native_demand_matched"]
+        assert live_service.get(live_first["run_id"])["scenario"]==live_first["scenario"]
+        assert "fixed_vehicle_queue" in live_service.export_csv(live_first["run_id"])
+        assert "demand_model" not in first["scenario"]
+
+        protected_args={**live_args,"demand_model":"protected_slots","duration_seconds":90}
+        protected_first=live_service.run(**protected_args)
+        protected_second=live_service.run(**protected_args)
+        assert comparable(protected_first)==comparable(protected_second)
+        digest=protected_first["scenario"]["demand_digest"]
+        assert len(digest)==64
+        for mode in ("fixed","adaptive"):
+            arm=protected_first[mode]
+            assert arm["protected_demand"]["digest"]==digest
+            import hashlib, json
+            assert hashlib.sha256(json.dumps(arm["protected_demand"]["manifest"],sort_keys=True,separators=(",",":")).encode()).hexdigest()==digest
+            metrics=arm["metrics"]
+            assert abs(sum(metrics["signal"]["applied_phase_time_seconds"].values())-90)<1e-6
+            trace=arm["admission_trace"]
+            assert trace["step_seconds"]==.05
+            cursor=1
+            holds=0
+            totals={}
+            for span in trace["spans"]:
+                assert span["first_tick"]==cursor and span["last_tick"]>=cursor
+                n=span["last_tick"]-cursor+1
+                cursor+=n
+                totals[span["applied"]]=totals.get(span["applied"],0)+n
+                assert span["applied"] in {span["requested"],"all_red"}
+                if span["requested"] in {"vehicle_green","pedestrian_green"} and span["requested"]!=span["applied"]: holds+=n
+            assert cursor==1801
+            assert {k:round(n*.05,3) for k,n in totals.items()}==metrics["signal"]["applied_phase_time_seconds"]
+            assert round(holds*.05,3)==metrics["signal"]["admission_hold_seconds"]
+            assert not metrics["diagnostics"]["protected_overlap_detected"]
+            common=arm["normalized_gate_evidence"]
+            assert len(common["timeline"])==450
+            assert all(row["applied_phase"] in {row["phase"],"all_red"} for row in common["timeline"])
+            report=common["normalized_report_metrics"]
+            assert report["duration_seconds"]==90. and not report["production_experiment_parity"]
+            for kind,waits in common["waiting_episodes"].items():
+                assert waits["observed_agent_seconds"]==common["summary"][kind+"_wait_agent_s"]
+                assert report["waiting"][kind]["observed_agent_seconds"]==waits["observed_agent_seconds"]
+        assert "fixed_applied_phase,adaptive_applied_phase" in live_service.export_csv(protected_first["run_id"])
+        assert "fixed_applied_phase" not in live_service.export_csv(live_first["run_id"])
+        assert live_service.get(protected_first["run_id"])==protected_first
 
         listing = service.list()
         assert listing["total"] == 2
