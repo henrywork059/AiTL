@@ -94,6 +94,12 @@ def load_trips(network: Path, routes: Path, *, midblock=False) -> tuple[Trip, ..
                 graph.setdefault(b,set()).add(a)
 
     def pedestrian_paths(first,last):
+        # The retained native network has one connected west-side crossing.
+        # SUMO footpaths are bidirectional: the return trip uses the very same
+        # external lanes, not the disconnected opposite sidewalk approaches.
+        if midblock and (first,last)==("CS","NC"):
+            return tuple(tuple(Segment(s.road_id,s.kind,tuple(reversed(s.points)))
+                               for s in reversed(path)) for path in pedestrian_paths("NC","CS"))
         pending=[(first,)]
         found=[]
         while pending:
@@ -151,7 +157,7 @@ def load_trips(network: Path, routes: Path, *, midblock=False) -> tuple[Trip, ..
     for person in demand.findall("person"):
         walk=person.find("walk")
         path=tuple(walk.attrib["edges"].split())
-        allowed=(("NC","CS"),("SC","CN")) if midblock else (("WC","CN"),)
+        allowed=(("NC","CS"),("CS","NC")) if midblock else (("WC","CN"),)
         if path not in allowed:
             raise ValueError("Unsupported walking route")
         options=pedestrian_paths(*path)

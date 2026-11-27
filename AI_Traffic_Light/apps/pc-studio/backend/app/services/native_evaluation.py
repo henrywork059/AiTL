@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from io import BytesIO
 import json
+import logging
 import hashlib
 import os
 from pathlib import Path
@@ -33,6 +34,7 @@ from app.services.observation_identity import (synthetic_scene_identity, evaluat
     REFERENCE_EVALUATION_ORIGIN)
 from app.services.simulation_reference_session import GeneratedReferenceSession
 from app.services.sumo_midblock_session import CyclicMidblockSession
+from app.services.sumo_midblock_fixture import LENGTHS, WIDTHS
 
 
 def valid_geometry(engine,geometry):
@@ -42,6 +44,7 @@ ENGINES = {"native": PROVENANCE, "reference": REFERENCE_EVALUATION_ORIGIN}
 
 MAX_TICKS = 2500
 MAX_BATCH = 25
+logger = logging.getLogger(__name__)
 
 
 class NativeEvaluationService:
@@ -147,7 +150,13 @@ class NativeEvaluationService:
                 self._adapter = SumoShadowAdapter(open_session)
                 self._adapter.reset(seed=seed)
                 network = self._session.network_path
-                self._projection = NativeProjection(Projection.load(network), self.generation, provenance=ENGINES[engine])
+                profiles=None
+                if cyclic:
+                    profiles={slot.ident:{"kind":slot.kind,**({"vehicle_type":slot.type_id,
+                        "length_m":LENGTHS[slot.type_id],"width_m":WIDTHS[slot.type_id],
+                        "eastbound":slot.route==("WC","CE")} if slot.kind=="vehicle" else {})}
+                        for slot in self._session.ledger.slots.values()}
+                self._projection = NativeProjection(Projection.load(network), self.generation, provenance=ENGINES[engine],slot_profiles=profiles)
                 trips = (self._session.trips if engine=="reference" or cyclic else
                          self._trip_loader(network, network.parent/"routes.xml"))
                 self._trips = tuple(trips)
@@ -163,6 +172,7 @@ class NativeEvaluationService:
                 self._state = "running"
                 return self.scene()
             except Exception as exc:
+                logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
     def step(self, *, epoch, generation, tick, steps, _return_scene=True):
@@ -222,6 +232,7 @@ class NativeEvaluationService:
                 self._received_at_ms = time.time_ns() // 1_000_000
                 return self.scene() if _return_scene else None
             except Exception as exc:
+                logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
     def pause(self, *, epoch, generation, tick, paused):
@@ -261,10 +272,7 @@ class NativeEvaluationService:
                 if self._geometry=="midblock":
                     snapshot["demand_model"]="native_cyclic_slots_v1"
                     snapshot["demand_digest"]=self._demand_digest
-                    for agent in snapshot["agents"]:
-                        ident=agent["id"].split(":")[-1]
-                        slot,visit=ident.rsplit("_",1)
-                        agent.update(slot_id=slot,visit=int(visit))
+                    # Slot and vehicle geometry metadata is owned by the shared projection.
             return {"status":self._state,"provenance":ENGINES.get(self._engine,PROVENANCE),"epoch":self.epoch,
                 "generation":self.generation,"snapshot":snapshot,"mode":self._mode,
                 "density":self._density,"geometry":self._geometry,"max_ticks":MAX_TICKS,"native_only":self._engine!="reference","engine":self._engine,
@@ -286,6 +294,7 @@ class NativeEvaluationService:
                 self._ensure_frames()
                 return self._publisher.frame_for(source_id)
             except Exception as exc:
+                logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
     def exact_simulation_frame(self, *, epoch, generation, tick, layout_id, source_id, engine="native"):
@@ -326,6 +335,7 @@ class NativeEvaluationService:
                         z.writestr("observations.json",json.dumps([self.view_scene(epoch=epoch,generation=generation,tick=tick,source_id=sid)["observation"] for sid in VIEW_FLIPS],indent=2))
                     return stream.getvalue()
             except Exception as exc:
+                logger.exception("Isolated native evaluation operation failed; retiring session")
                 raise self._failure() from exc
 
     def _trip_accounting(self):

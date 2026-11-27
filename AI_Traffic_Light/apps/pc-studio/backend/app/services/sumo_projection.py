@@ -107,12 +107,13 @@ class Projection:
 
 class NativeProjection:
     """One immutable layout per generation; callers own native session lifecycle."""
-    def __init__(self, layout: Projection, generation: int, *, provenance=PROVENANCE):
+    def __init__(self, layout: Projection, generation: int, *, provenance=PROVENANCE, slot_profiles=None):
         if provenance not in EVALUATION_ORIGINS:
             raise ValueError("Invalid isolated projection provenance")
         self.provenance = provenance
         self.layout = layout
         self.generation = generation
+        self._slot_profiles = deepcopy(slot_profiles) if slot_profiles is not None else None
         # Scene-only runs do not allocate the full raster.
         self._background = None
         # Static geometry is projected once per generation and view. Public
@@ -126,6 +127,9 @@ class NativeProjection:
         manifest = {"schema":1,"width":WIDTH,"height":HEIGHT,"bounds":layout.bounds,
                     "scale":layout.scale,"offsets":[layout.offset_x,layout.offset_y],
                     "lanes":[(lane.ident,lane.kind,lane.points,lane.width_m) for lane in layout.lanes]}
+        if self._slot_profiles is not None:
+            # Rendering contract is qualified independently of density/seed.
+            manifest["agent_anchor"]="native_front_center_footprints_v1"
         self.layout_id = hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
     def metadata(self, snapshot: ShadowSnapshot) -> dict:
@@ -137,6 +141,15 @@ class NativeProjection:
             row = {"id": a.id, "kind": a.kind, "road_id": a.road_id,
                    "x_m": a.x_m, "y_m": a.y_m, "speed_m_s": a.speed_m_s,
                    "x": x, "y": y}
+            if self._slot_profiles is not None:
+                slot,visit=a.engine_id.rsplit("_",1)
+                profile=self._slot_profiles[slot]
+                if profile["kind"]!=a.kind or not visit.isdigit():
+                    raise ValueError("Invalid native slot projection")
+                row.update(slot_id=slot,visit=int(visit))
+                if a.kind=="vehicle":
+                    row.update(vehicle_type=profile["vehicle_type"],length_m=profile["length_m"],
+                               width_m=profile["width_m"],eastbound=profile["eastbound"])
             rows.append(row)
         return {"schema_version": 1, "provenance": self.provenance, "generation": self.generation,
                 "coordinate_space": "native_projection_v1", "layout_id": self.layout_id,
@@ -164,9 +177,20 @@ class NativeProjection:
             self._background = self.layout.geometry_canvas()
         image = self._background.copy()
         for row in meta["agents"]:
-            # Position markers, not detection boxes.
-            cv2.circle(image, (round(row["x"]), round(row["y"])), 4 if row["kind"] == "vehicle" else 3,
-                       (255, 170, 65) if row["kind"] == "vehicle" else (65, 220, 245), -1)
+            # Native vehicle position is its front centre. Draw a physically
+            # dimensioned footprint behind that anchor, not a detector box.
+            if "length_m" in row:
+                x,y=row["x"],row["y"]
+                tail=x+(-1 if row["eastbound"] else 1)*row["length_m"]*self.layout.scale
+                half=row["width_m"]*self.layout.scale/2
+                left,right=sorted((round(x),round(tail)))
+                top,bottom=round(y-half),round(y+half)
+                cv2.rectangle(image,(left,top),(right,bottom),(255,170,65),-1)
+                cv2.line(image,(round(x),top),(round(x),bottom),(225,240,255),1)
+            else:
+                radius=max(1,round(.25*self.layout.scale)) if self._slot_profiles is not None else (4 if row["kind"]=="vehicle" else 3)
+                cv2.circle(image,(round(row["x"]),round(row["y"])),radius,
+                           (255,170,65) if row["kind"]=="vehicle" else (65,220,245),-1)
         return meta, image
 
     def render(self, snapshot: ShadowSnapshot) -> tuple[dict, dict[str, bytes]]:
@@ -188,7 +212,7 @@ def export_csv(meta: dict) -> str:
     fields = ("provenance", "generation", "seed", "tick", "time_s", "id", "kind", "road_id",
               "x_m", "y_m", "speed_m_s", "x", "y")
     if meta.get("demand_model")=="native_cyclic_slots_v1":
-        fields += ("slot_id","visit")
+        fields += ("slot_id","visit","vehicle_type","length_m","width_m","eastbound")
     writer = csv.DictWriter(output, fieldnames=fields)
     writer.writeheader()
     for agent in meta["agents"]:

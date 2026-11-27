@@ -19,6 +19,7 @@ ROAD_EDGES = frozenset({"WC","CW","EC","CE"})
 WALK_EDGES = frozenset({"NC","CN","SC","CS"})
 STRAIGHT = frozenset({("WC","CE"),("EC","CW")})
 LENGTHS = {"car":4.5,"suv":4.9,"van":6.0,"bus":12.0}
+WIDTHS = {"car":1.8,"suv":1.95,"van":2.1,"bus":2.5}
 MAX_LENGTH = max(LENGTHS.values())
 
 
@@ -44,7 +45,7 @@ def slots_for(seed, density):
     slots = [Slot(f"v{i}","vehicle",("WC","CE") if v.direction>0 else ("EC","CW"),
                   v.vehicle_type,round(v.speed/11,3),float(i//2*3),rng.getrandbits(64))
              for i,v in enumerate(vehicles)]
-    slots += [Slot(f"p{i}","pedestrian",("NC","CS") if v.direction>0 else ("SC","CN"),
+    slots += [Slot(f"p{i}","pedestrian",("NC","CS") if v.direction>0 else ("CS","NC"),
                    "DEFAULT_PEDTYPE",.65 if i==0 else round(v.speed/75,3),float(i//2*2),rng.getrandbits(64))
               for i,v in enumerate(people)]
     return tuple(slots)
@@ -77,7 +78,7 @@ def write_midblock(root: Path, seed, density):
     for slot in slots:
         if slot.kind=="vehicle":
             ET.SubElement(routes,"vType",id="slot_"+slot.ident,vClass="passenger",length=str(LENGTHS[slot.type_id]),
-                          maxSpeed=str(slot.speed),speedFactor="1",speedDev="0",sigma="0",minGap="2.5")
+                          width=str(WIDTHS[slot.type_id]),maxSpeed=str(slot.speed),speedFactor="1",speedDev="0",sigma="0",minGap="2.5")
     for route in (("WC","CE"),("EC","CW")):
         ET.SubElement(routes,"route",id="_".join(route),edges=" ".join(route))
     # First visits and later visits share the same dynamic insertion path.

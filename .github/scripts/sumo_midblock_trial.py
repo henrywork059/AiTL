@@ -57,14 +57,19 @@ def verify_export(result,expected_slots,horizon):
     for ident in a["arrived"]:
         gate=next(s["road_id"] for s in trips[ident]["path"] if s["kind"]==trips[ident]["kind"]+"_gate")
         assert gate in result["observed_routes"][ident]
-    assert {trips[i]["path"][0]["road_id"] for i in result["arrived_pedestrians"]}=={"NC","SC"}
+    assert {trips[i]["path"][0]["road_id"] for i in result["arrived_pedestrians"]}=={"NC","CS"}
 
 
 def run_arm(out,seed,density,mode,*,read_workload=False):
     out.mkdir(parents=True,exist_ok=True)
     sessions=[]
     def factory(seed,*,density):
-        session=CyclicMidblockSession(seed,density=density)
+        try:
+            session=CyclicMidblockSession(seed,density=density)
+        except Exception:
+            import traceback
+            (out/"startup-failure.txt").write_text(traceback.format_exc(),encoding="utf-8")
+            raise
         sessions.append(session)
         for name in ("nodes.xml","edges.xml","connections.xml","routes.xml","slots.json","network.xml","first_visits.xml"):
             shutil.copyfile(session.network_path.parent/name,out/name)
@@ -79,7 +84,10 @@ def run_arm(out,seed,density,mode,*,read_workload=False):
         with patch.object(routes,"native_evaluation_service",svc),patch.object(routes,"camera_frame_service",legacy),TestClient(build_test_app()) as client:
             init=svc.scene()
             identity={k:init[k] for k in ("epoch","generation")}
-            state=assert_envelope(client.post(BASE+"/start",json={**identity,"geometry":"midblock","seed":seed,"mode":mode,"density":density}))["data"]
+            response=client.post(BASE+"/start",json={**identity,"geometry":"midblock","seed":seed,"mode":mode,"density":density})
+            if response.status_code!=200 and (out/"startup-failure.txt").exists():
+                print((out/"startup-failure.txt").read_text(),flush=True)
+            state=assert_envelope(response)["data"]
             identity={k:state[k] for k in ("epoch","generation")}
             pids=[os.getpid(),sessions[0].proc.pid]
             before=processes(pids)

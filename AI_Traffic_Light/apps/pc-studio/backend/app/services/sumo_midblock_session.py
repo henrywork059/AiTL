@@ -86,10 +86,13 @@ def _midblock_worker(pipe, root, seed):
         def insert(ident,depart):
             slot=ledger.slot(ident)
             if slot.kind=="vehicle":
-                engine.vehicle.add(ident,"_".join(slot.route),typeID="slot_"+slot.ident,depart="now")
+                engine.vehicle.add(ident,"_".join(slot.route),typeID="slot_"+slot.ident,depart="now",departLane="1")
             else:
-                engine.person.add(ident,slot.route[0],.5,depart=depart,typeID=slot.type_id)
-                engine.person.appendWalkingStage(ident,list(slot.route),-1,speed=slot.speed)
+                reverse=slot.route==("CS","NC")
+                depart_pos=engine.lane.getLength("CS_0")-.5 if reverse else .5
+                arrival_pos=.5 if reverse else engine.lane.getLength("CS_0")-.5
+                engine.person.add(ident,slot.route[0],depart_pos,depart=depart,typeID=slot.type_id)
+                engine.person.appendWalkingStage(ident,list(slot.route),arrival_pos,speed=slot.speed)
         engine.trafficlight.setRedYellowGreenState("C","r"*len(links))
         submitted=set()
         tick=0
@@ -114,6 +117,8 @@ def _midblock_worker(pipe, root, seed):
                     insert(ident,now)
                     submitted.add(ident)
             engine.simulationStep()
+            if engine.simulation.getCollidingVehiclesIDList() or engine.simulation.getStartingTeleportIDList() or engine.simulation.getEndingTeleportIDList():
+                raise RuntimeError("Native collision or teleport in protected midblock")
             tick+=1
             now=round(tick*STEP_S,6)
             if abs(engine.simulation.getTime()-now)>1e-6 or engine.trafficlight.getRedYellowGreenState("C")!=state:
@@ -163,13 +168,17 @@ class CyclicMidblockSession(LibsumoSession):
                     ET.SubElement(demand.getroot(),"vehicle",**attrs,type="slot_"+slot.ident,route="_".join(slot.route))
                 else:
                     person=ET.SubElement(demand.getroot(),"person",**attrs)
-                    ET.SubElement(person,"walk",edges=" ".join(slot.route),speed=str(slot.speed))
+                    person.set("departPos","-.5" if slot.route==("CS","NC") else ".5")
+                    ET.SubElement(person,"walk",edges=" ".join(slot.route),speed=str(slot.speed),arrivalPos=".5" if slot.route==("CS","NC") else "-.5")
             demand.write(root/"first_visits.xml",encoding="utf-8",xml_declaration=True)
             first=load_trips(root/"network.xml",root/"first_visits.xml",midblock=True)
             self._templates={t.ident.rsplit("_",1)[0]:replace(t,desired_speed=self.ledger.slot(t.ident).speed) for t in first}
             self._trips={t.ident:replace(t,desired_speed=self.ledger.slot(t.ident).speed) for t in first}
             self.tick=0
             self._seen_gate=set()
+            self._last_road={}
+            self._last_route_index={}
+            self._exited_gate=set()
             self.closed=False
             super().__init__(root,seed,controlled=True,_target=_midblock_worker)
         except BaseException:
@@ -209,16 +218,39 @@ class CyclicMidblockSession(LibsumoSession):
             rows,arrived,persons,permission,new=self._receive()
             self.tick+=1
             now=round(self.tick*STEP_S,6)
+            previous_vehicle,previous_pedestrian=self.occupied(self._agents)
+            expected_permission=self.phase_map.state(self._phase,vehicle_inside=previous_vehicle,pedestrian_inside=previous_pedestrian)
+            if permission!=expected_permission:
+                raise RuntimeError("Midblock parent/child permission mismatch")
             for agent in rows:
                 trip=self._trips.get(agent.engine_id)
                 if trip is None or agent.kind!=trip.kind or agent.road_id not in {s.road_id for s in trip.path}:
                     raise RuntimeError("Midblock agent outside validated route")
-                if any(s.road_id==agent.road_id and s.kind==agent.kind+"_gate" for s in trip.path):
-                    self._seen_gate.add(agent.engine_id)
-            if any(i not in self._seen_gate or self._trips[i].kind!="vehicle" for i in arrived) or any(
-                i not in self._seen_gate or self._trips[i].kind!="pedestrian" for i in persons):
-                raise RuntimeError("Arrival without observed protected gate")
-            self._seen_gate.difference_update(tuple(arrived)+tuple(persons))
+                ident=agent.engine_id
+                index=next(i for i,s in enumerate(trip.path) if s.road_id==agent.road_id)
+                prior=self._last_route_index.get(ident)
+                gate=next(i for i,s in enumerate(trip.path) if s.kind==agent.kind+"_gate")
+                if prior is None and index!=0 or prior is not None and index<prior:
+                    raise RuntimeError("Cyclic journey started mid-route or moved backwards")
+                if index==gate and prior!=gate:
+                    group=self.phase_map.vehicles if agent.kind=="vehicle" else self.phase_map.pedestrians
+                    if prior is None or prior>=gate or not any(permission[i]=="G" for i in group):
+                        raise RuntimeError("Midblock entry without applied permission")
+                    self._seen_gate.add(ident)
+                if index>gate:
+                    if ident not in self._seen_gate:
+                        raise RuntimeError("Cyclic journey skipped protected crossing")
+                    self._exited_gate.add(ident)
+                self._last_route_index[ident]=index
+                self._last_road[ident]=agent.road_id
+            if any(i not in self._exited_gate or self._trips[i].kind!="vehicle" for i in arrived) or any(
+                i not in self._exited_gate or self._trips[i].kind!="pedestrian" for i in persons):
+                raise RuntimeError("Arrival without observed protected gate exit")
+            for ident in tuple(arrived)+tuple(persons):
+                self._seen_gate.discard(ident)
+                self._exited_gate.discard(ident)
+                self._last_route_index.pop(ident,None)
+                self._last_road.pop(ident,None)
             expected=self.ledger.reconcile((a.engine_id for a in rows),tuple(arrived)+tuple(persons),now)
             if list(new)!=expected:
                 raise RuntimeError("Cyclic demand readback mismatch")

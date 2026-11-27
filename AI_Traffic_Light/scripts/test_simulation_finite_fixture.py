@@ -30,17 +30,26 @@ class Tests(unittest.TestCase):
                 edge(ident,shape)
             edge(":C_w0","0,8 0,5","walkingarea")
             edge(":C_w1","0,-5 0,-8","walkingarea")
+            edge(":C_w2","2,-8 2,-5","walkingarea")
+            edge(":C_w3","2,5 2,8","walkingarea")
             edge(":C_c0","0,5 0,-5","crossing")
             for a,z in (("NC",":C_w0"),(":C_w0",":C_c0"),(":C_c0",":C_w1"),(":C_w1","CS"),
-                        ("SC",":C_w1"),(":C_w0","CN")):
+                        ("SC",":C_w2"),(":C_w3","CN")):
                 ET.SubElement(net,"connection",{"from":a,"to":z,"fromLane":"0","toLane":"0"})
             ET.ElementTree(net).write(folder/"network.xml")
-            (folder/"routes.xml").write_text('<routes><person id="p0_0" depart="0"><walk edges="NC CS" speed=".65"/></person><person id="p1_0" depart="0"><walk edges="SC CN" speed="1.3"/></person></routes>')
+            (folder/"routes.xml").write_text('<routes><person id="p0_0" depart="0"><walk edges="NC CS" speed=".65"/></person><person id="p1_0" depart="0"><walk edges="CS NC" speed="1.3"/></person></routes>')
             trips=load_trips(folder/"network.xml",folder/"routes.xml",midblock=True)
             self.assertEqual(len(trips),2)
             gates=[next(s for s in t.path if s.kind=="pedestrian_gate") for t in trips]
             self.assertEqual(gates[0].points,tuple(reversed(gates[1].points)))
             self.assertEqual(gates[0].road_id,gates[1].road_id)
+            self.assertEqual([s.road_id for s in trips[0].path],list(reversed([s.road_id for s in trips[1].path])))
+            self.assertEqual(trips[0].path[0].points,tuple(reversed(trips[1].path[-1].points)))
+            route_file=folder/"routes.xml"
+            valid=route_file.read_text()
+            route_file.write_text(valid.replace("CS NC","SC CN"))
+            with self.assertRaises(ValueError): load_trips(folder/"network.xml",route_file,midblock=True)
+            route_file.write_text(valid)
             ET.SubElement(net,"connection",{"from":"NC","to":"CS","fromLane":"0","toLane":"0"})
             ET.ElementTree(net).write(folder/"network.xml")
             with self.assertRaises(ValueError):

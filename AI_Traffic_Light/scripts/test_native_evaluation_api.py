@@ -98,6 +98,9 @@ class Tests(unittest.TestCase):
                 first=assert_envelope(client.post(BASE+"/step",json={**identity,"tick":0,"steps":1}))["data"]
                 self.assertEqual(first["snapshot"]["agents"][0]["slot_id"],"v0")
                 self.assertEqual(first["snapshot"]["agents"][0]["visit"],0)
+                self.assertEqual(first["snapshot"]["agents"][0]["vehicle_type"],"car")
+                self.assertEqual(first["snapshot"]["agents"][0]["length_m"],4.5)
+                self.assertTrue(first["snapshot"]["agents"][0]["eastbound"])
                 with ZipFile(io.BytesIO(service.capture(**identity,tick=1))) as z:
                     self.assertIn("slot_id,visit",z.read("agents.csv").decode())
                     self.assertEqual(json.loads(z.read("coordinate_contract.json"))["demand_digest"],first["snapshot"]["demand_digest"])

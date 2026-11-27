@@ -93,6 +93,33 @@ class Tests(unittest.TestCase):
             self.assertIsNone(pub.frame_for("simulation_camera_d"))
             self.assertFalse(pub.has_tick(2))
 
+    def test_midblock_vehicle_footprint_and_mirror(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"net.xml"
+            path.write_text('<net><edge id="WC"><lane id="WC_1" shape="0,0 100,0"/></edge></net>')
+            layout=Projection.load(path)
+            projection=NativeProjection(layout,1,slot_profiles={
+                "v0":{"kind":"vehicle","vehicle_type":"bus","length_m":12.,"width_m":2.5,"eastbound":True},
+                "v1":{"kind":"vehicle","vehicle_type":"car","length_m":4.5,"width_m":1.8,"eastbound":False}})
+            snap=ShadowSnapshot(42,1,False,(ShadowAgent("vehicle","v0_0",30.,0.,2.,"WC"),
+                ShadowAgent("vehicle","v1_0",70.,0.,2.,"WC")))
+            meta,pixels=projection.render_pixels(snap)
+            self.assertEqual(meta["agents"][0]["vehicle_type"],"bus")
+            self.assertEqual(meta["agents"][1]["visit"],0)
+            x,y=layout.pixel(25.,0.)
+            self.assertEqual(tuple(pixels[round(y),round(x)]),(255,170,65))
+            x,y=layout.pixel(35.,0.)
+            self.assertNotEqual(tuple(pixels[round(y),round(x)]),(255,170,65))
+            x,y=layout.pixel(73.,0.)
+            self.assertEqual(tuple(pixels[round(y),round(x)]),(255,170,65))
+            pub=NativeFramePublisher()
+            pub.begin(1)
+            pub.prepare(meta,pixels,received_at_ms=1)
+            for sid,flip in VIEW_FLIPS.items():
+                frame=pub.frame_for(sid)
+                decoded=cv2.imdecode(np.frombuffer(frame.content,np.uint8),cv2.IMREAD_COLOR)
+                self.assertTrue(np.array_equal(decoded,pixels if flip is None else cv2.flip(pixels,flip)))
+
     def test_retired_tick_releases_raster_without_reopening_old_tick(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"net.xml"

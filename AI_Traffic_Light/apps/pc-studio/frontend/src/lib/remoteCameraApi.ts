@@ -311,7 +311,8 @@ export type NativeProjectionScene = {
   width: 1280;
   height: 720;
   lanes: Array<{id: string; kind: "road" | "walk" | "crossing"; points: [number, number][]; width_px: number}>;
-  agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number}>;
+  agents: Array<{id: string; kind: "vehicle" | "pedestrian"; x: number; y: number; road_id: string; speed_m_s: number;
+    slot_id?:string;visit?:number;vehicle_type?:"car"|"suv"|"van"|"bus";length_m?:number;width_m?:number;eastbound?:boolean}>;
 };
 export type NativeProjectionResponse = {
   status: "disabled" | "idle" | "starting" | "running" | "busy" | "unavailable";

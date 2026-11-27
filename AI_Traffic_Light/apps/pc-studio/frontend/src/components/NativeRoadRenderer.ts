@@ -86,14 +86,20 @@ export class NativeRoadRenderer {
     for(const a of s.agents){
       ids.add(a.id);
       const to=point(a.x,a.y,this.source);
+      // Native SUMO coordinates locate the vehicle front. Centre the mesh
+      // behind that front anchor in the canonical (unmirrored) world.
+      if(a.kind==="vehicle"&&a.length_m!==undefined&&a.eastbound!==undefined)to.x+=(a.eastbound?-1:1)*a.length_m*ppm/2;
       let track=this.tracks.get(a.id);
       if(track&&track.kind!==a.kind){this.remove(track);this.tracks.delete(a.id);track=undefined;}
       if(!track){
-        const visual=a.kind==="vehicle"?makeVehicleVisual({id:a.id,x:0,y:0,width:145,direction:1,vehicle_type:"car",color:"#46a7dc"},this.box):
+        const visual=a.kind==="vehicle"?makeVehicleVisual({id:a.id,x:0,y:0,width:145,direction:1,vehicle_type:a.vehicle_type??"car",color:"#46a7dc"},this.box):
           makePedestrianVisual({id:a.id,x:0,y:0,direction:1,color:"#e5a94c"},this.box,this.sphere);
-        visual.group.scale.setScalar(a.kind==="vehicle"?4.5*ppm/145:1.7*ppm/54);
+        if(a.kind==="vehicle"&&a.length_m!==undefined&&a.width_m!==undefined){
+          const depth={car:58,suv:64,van:70,bus:78}[a.vehicle_type??"car"];
+          visual.group.scale.set(a.length_m*ppm/145,a.width_m*ppm/depth,a.width_m*ppm/depth);
+        }else visual.group.scale.setScalar(a.kind==="vehicle"?4.5*ppm/145:1.7*ppm/54);
         this.scene.add(visual.group);
-        track={kind:a.kind,visual,from:to,to,start:now,duration:0,heading:0};
+        track={kind:a.kind,visual,from:to,to,start:now,duration:0,heading:a.eastbound===false?Math.PI:0};
         this.tracks.set(a.id,track);
       }else if(!same||s.paused){
         const from=pose(track,now),dx=to.x-track.to.x,dz=to.z-track.to.z,distance=Math.hypot(dx,dz);
