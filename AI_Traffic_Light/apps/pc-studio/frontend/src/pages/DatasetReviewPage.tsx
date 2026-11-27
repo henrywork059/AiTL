@@ -37,6 +37,8 @@ export function DatasetReviewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [labelLoading, setLabelLoading] = useState(false);
   const [labelRevision, setLabelRevision] = useState(0);
+  const [decodedImage, setDecodedImage] = useState<{captureId: string; revision: number; url: string} | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [listAvailable, setListAvailable] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +50,8 @@ export function DatasetReviewPage() {
 
   const busy = loading || refreshing || saving || deleting || building;
   const currentDocument = selectedCapture && labelDocument?.capture_id === selectedCapture.capture_id && labelDocument.width === selectedCapture.width && labelDocument.height === selectedCapture.height ? labelDocument : null;
+
+  const imageReady = Boolean(selectedCapture && decodedImage?.captureId === selectedCapture.capture_id && decodedImage.revision === labelRevision);
 
   async function refreshCaptures(preferredCaptureId?: string | null) {
     const data = await fetchDatasetCapturesStrict();
@@ -63,7 +67,8 @@ export function DatasetReviewPage() {
   }
 
   async function refreshTrainingDataset() {
-    setTrainingDataset(await fetchTrainingDatasetStatusStrict());
+    try { setTrainingDataset(await fetchTrainingDatasetStatusStrict()); }
+    catch (reason) { setTrainingDataset(null); throw reason; }
   }
 
   async function refreshCaptureList() {
@@ -71,6 +76,8 @@ export function DatasetReviewPage() {
     setRefreshing(true);
     try {
       await refreshCaptures(selectedCaptureId);
+      await refreshTrainingDataset();
+      setDecodedImage(null);
       setLabelRevision(value => value + 1);
       setError(null);
     } catch (nextError) {
@@ -116,15 +123,46 @@ export function DatasetReviewPage() {
     return () => scope.retire();
   }, [selectedCaptureId, labelRevision]);
 
+  useEffect(() => {
+    setDecodedImage(null);
+    setImageError(null);
+    if (!selectedCaptureId || !selectedCapture || !currentDocument || !listAvailable) return;
+    const scope = createPollingScope();
+    let url: string | null = null;
+    const captureId = selectedCaptureId;
+    const width = selectedCapture.width, height = selectedCapture.height;
+    async function loadImage() {
+      try {
+        const response = await fetch(captureImageUrl(captureId), { signal: scope.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Captured image unavailable.");
+        const blob = await response.blob();
+        if (!/^image\/(jpeg|png|webp)$/.test(blob.type)) throw new Error("Captured image format unavailable.");
+        if (!scope.isCurrent()) return;
+        url = URL.createObjectURL(blob);
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        if (!scope.isCurrent()) return;
+        if (image.naturalWidth !== width || image.naturalHeight !== height) throw new Error("Captured image dimensions differ from labels.");
+        setDecodedImage({captureId, revision: labelRevision, url});
+      } catch (reason) {
+        if (scope.isCurrent()) setImageError(reason instanceof Error ? reason.message : "Captured image could not be decoded.");
+        if (url) { URL.revokeObjectURL(url); url = null; }
+      }
+    }
+    void loadImage();
+    return () => { scope.retire(); if (url) URL.revokeObjectURL(url); };
+  }, [selectedCaptureId, selectedCapture?.width, selectedCapture?.height, Boolean(currentDocument), listAvailable, labelRevision]);
+
   function updateLabels(nextLabels: DatasetLabelBox[]) {
-    if (!currentDocument || busy || labelLoading) return;
+    if (!currentDocument || !imageReady || busy || labelLoading) return;
     setLabels(nextLabels);
     setDirty(true);
     setMessage(null);
   }
 
   async function saveLabels() {
-    if (!selectedCapture || !currentDocument || busy || labelLoading || !listAvailable) return;
+    if (!selectedCapture || !currentDocument || !imageReady || busy || labelLoading || !listAvailable) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -207,6 +245,7 @@ export function DatasetReviewPage() {
                 onClick={() => {
                   if (capture.capture_id === selectedCaptureId) return;
                   if (dirty && !window.confirm("Discard unsaved label changes and switch images?")) return;
+                  setDecodedImage(null);
                   setLabelDocument(null);
                   setLabels([]);
                   setDirty(false);
@@ -232,7 +271,7 @@ export function DatasetReviewPage() {
               <p className="placeholder-copy">Choose a class, then drag on the saved image to draw a bounding box.</p>
             </div>
             <span className={`status-pill ${currentDocument?.reviewed ? "status-implemented" : "status-planned"}`}>
-              {labelDocument?.reviewed ? "reviewed" : "not reviewed"}
+              {currentDocument?.reviewed ? "reviewed" : "not reviewed"}
             </span>
           </div>
 
@@ -245,23 +284,23 @@ export function DatasetReviewPage() {
                   </select>
                 </label>
                 <div className="label-toolbar-actions">
-                  <button onClick={() => updateLabels([])} disabled={labels.length === 0 || busy}>Clear boxes</button>
-                  <button className="primary" onClick={() => void saveLabels()} disabled={busy}>{saving ? "Saving..." : "Save review"}</button>
+                  <button onClick={() => updateLabels([])} disabled={!imageReady || labels.length === 0 || busy}>Clear boxes</button>
+                  <button className="primary" onClick={() => void saveLabels()} disabled={busy || !imageReady}>{saving ? "Saving..." : "Save review"}</button>
                   <button className="danger" onClick={() => void deleteSelectedCapture()} disabled={busy}>
                     {deleting ? "Deleting..." : "Delete capture"}
                   </button>
                 </div>
               </div>
-              <LabelingCanvas
-                key={selectedCapture.capture_id}
-                imageUrl={captureImageUrl(selectedCapture.capture_id)}
+              {imageReady && decodedImage ? <LabelingCanvas
+                key={selectedCapture.capture_id + ":" + labelRevision}
+                imageUrl={decodedImage.url}
                 width={selectedCapture.width}
                 height={selectedCapture.height}
                 classes={classes}
                 selectedClassId={selectedClassId}
                 labels={labels}
                 onChange={updateLabels}
-              />
+              /> : <div className="label-empty-state" role="status">{imageError ?? "Loading captured image..."}</div>}
               <p className="small-note">
                 Saving zero boxes marks this as a reviewed negative example. Deleting a capture also removes its metadata and saved labels.
               </p>
@@ -269,7 +308,7 @@ export function DatasetReviewPage() {
                 {labels.map((label, index) => (
                   <div key={`${label.class_id}-${index}`}>
                     <span>{index + 1}. {label.class_name} · [{label.box_xyxy.map((value) => Math.round(value)).join(", ")}]</span>
-                    <button disabled={busy} onClick={() => updateLabels(labels.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>
+                    <button disabled={busy || !imageReady} onClick={() => updateLabels(labels.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>
                   </div>
                 ))}
                 {labels.length === 0 && <p className="small-note">No boxes on this image.</p>}

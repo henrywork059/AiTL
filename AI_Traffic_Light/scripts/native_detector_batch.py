@@ -34,7 +34,15 @@ def latency_summary(samples):
             "p95_ms": values[math.ceil(.95 * len(values)) - 1], "raw_ms": samples}
 
 
-def evaluate(paths, model=None, confidence=.1, iou=.5):
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1048576), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def evaluate(paths, model=None, confidence=.1, iou=.5, capture_root=None):
     if not paths or not 0 < confidence <= 1 or not 0 < iou <= 1:
         raise ValueError("Invalid batch input")
     records, seen = [], set()
@@ -53,7 +61,8 @@ def evaluate(paths, model=None, confidence=.1, iou=.5):
             views[sid] = {"score": score_footprints(annotations["views"][sid], predictions, iou),
                           "prediction_latency_ms": elapsed, "predictions": predictions,
                           "unmapped_classes": unmapped}
-        records.append({"capture_name": path.name, "identity": list(identity), "integrity": integrity, "views": views})
+        records.append({"capture_name": path.relative_to(capture_root).as_posix() if capture_root is not None else path.name,
+                        "archive_sha256": file_sha256(path), "identity": list(identity), "integrity": integrity, "views": views})
     return {"schema_version": 1, "evidence_class": "executed_synthetic_capture_evaluation",
             "method": "exact_palette_components_not_trained_model" if model is None else "offline_local_yolo",
             "confidence": confidence if model is not None else None, "iou_threshold": iou,
@@ -79,21 +88,22 @@ def main():
     model = None
     digest = None
     # All capture qualification must precede model loading.
+    seen = set()
     for path in paths:
         with ZipFile(path) as archive:
-            qualified_capture(archive)
+            ann, _, _ = qualified_capture(archive)
+        identity = (ann["epoch"], ann["generation"], ann["tick"], ann["layout_id"])
+        if identity in seen:
+            parser.error("Duplicate qualified capture identity")
+        seen.add(identity)
     if args.model is not None:
         path = args.model.resolve()
         if not path.is_file() or path.suffix.lower() != ".pt":
             parser.error("Provide trusted existing .pt weights")
-        with path.open("rb") as source:
-            h = hashlib.sha256()
-            for block in iter(lambda: source.read(1048576), b""):
-                h.update(block)
-        digest = h.hexdigest()
+        digest = file_sha256(path)
         from ultralytics import YOLO
         model = YOLO(str(path))
-    result = evaluate(paths, model, args.confidence, args.iou)
+    result = evaluate(paths, model, args.confidence, args.iou, args.capture_root)
     result["model_sha256"] = digest
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")

@@ -28,6 +28,17 @@ jobs:
       - name: Offline regressions
         working-directory: AI_Traffic_Light
         run: python scripts/run_offline_tests.py
+      - name: Execute paired seeded network evidence batch
+        if: github.event_name == 'push'
+        working-directory: AI_Traffic_Light
+        run: python scripts/seeded_network_batch.py --output "$env:RUNNER_TEMP/mesh-seeded-network" --duration 120
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'push'
+        with:
+          name: mesh-seeded-network-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/mesh-seeded-network/
       - name: npm ci
         working-directory: AI_Traffic_Light/apps/pc-studio/frontend
         run: npm ci
