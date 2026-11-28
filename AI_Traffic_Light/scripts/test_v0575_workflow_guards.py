@@ -70,11 +70,24 @@ def main():
     native = (src / "components/NativeProjectionView.tsx").read_text(encoding="utf-8")
     api = (src / "api.ts").read_text(encoding="utf-8")
     assert "expected_source_id: expectedSource, expected_origin: expectedOrigin" in capture
-    assert "cameraStatus.active_source_id && cameraStatus.origin" in capture and "!cameraStatus.stale" in capture
+    # The source/mode/freshness gate is shared with Camera Settings. Preserve
+    # the contract across extraction rather than requiring an inline check.
+    preview = (src / "lib/cameraPreviewState.ts").read_text(encoding="utf-8")
+    assert "cameraStatus?.active_source_id && matchesSelectedCameraFrame(" in capture
+    assert 'cameraStatus, cameraStatus.active_source_id, cameraStatus.simulation_enabled ? "simulation" : "esp32"' in capture
+    assert "!cameraStatus?.active_source_id || !cameraStatus.origin" in capture
+    for guard in ("status.frame_available", "!status.stale", "!status.simulation_fault",
+                  "status.active_source_id === sourceId", "status.simulation_enabled === simulated",
+                  'status.origin === (simulated ? "simulation" : "upload")'):
+        assert guard in preview, guard
     assert "fetchDatasetStatusStrict" in capture
     assert "fetchTrainingStatusStrict(signal)" in train and "fetchTrainingDatasetStatusStrict(signal)" in train
     assert "setStatus(null);" in train and "setManagedDataset(null);" in train
-    assert "currentDataset.stale" in train and "currentDataset.ready" in train
+    assert 'const dataset = currentDataset.status === "fulfilled" ? currentDataset.value : null;' in train
+    assert 'config.dataset_yaml.trim() === "yolo/data.yaml" && (!dataset?.ready || dataset.stale)' in train
+    assert 'usesManagedDataset && (!managedDataset?.ready || managedDataset.stale)' in train
+    assert "if (!scope.isCurrent()) return;" in train
+    assert "await startTraining(config)" in train
     assert "if (!status.ready || status.stale" in review
     assert "fetchTrainingStatusStrict(signal?: AbortSignal)" in api
     assert "fetchTrainingDatasetStatusStrict(signal?: AbortSignal)" in api
