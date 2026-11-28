@@ -1,5 +1,6 @@
 """Measure actual inference stages on the pinned development cohort; no holdout or live registration."""
 import argparse
+from contextlib import contextmanager, nullcontext
 from collections import Counter
 import json
 import math
@@ -12,6 +13,7 @@ import sys
 from tempfile import TemporaryDirectory
 from importlib.metadata import version
 from time import perf_counter, process_time
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2] / "AI_Traffic_Light"
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -141,6 +143,34 @@ def export_openvino(weights, root):
           "export_wall_ms":(perf_counter()-t)*1000})
 
 
+@contextmanager
+def explicit_fp32_cpu_compile():
+    """Only in isolated shape trials: prevent hardware-dependent auto BF16."""
+    import openvino as ov
+    original = ov.Core.compile_model
+
+    def compile_cpu(core, model, device_name=None, config=None, **kwargs):
+        if device_name not in (None, "CPU", "AUTO"):
+            raise ValueError("Unexpected OpenVINO compilation device: "+str(device_name))
+        settings = dict(config or {})
+        settings.update({"INFERENCE_PRECISION_HINT":ov.Type.f32,
+                         "INFERENCE_NUM_THREADS":2,"NUM_STREAMS":1,
+                         "PERFORMANCE_HINT":"LATENCY"})
+        return original(core, model, device_name="CPU", config=settings, **kwargs)
+
+    with patch.object(ov.Core,"compile_model",compile_cpu):
+        yield
+
+
+def shape_runtime_verified(properties, shape_profile):
+    from native_detector_openvino import PROPERTIES
+    expected_shape = "[?,3,640,640]" if shape_profile=="static-spatial" else "[?,3,?,?]"
+    return (cpu_backend_observed(properties)
+            and all(properties.get(k)==v for k,v in PROPERTIES.items())
+            and properties.get("compiled_input_shape")==expected_shape
+            and properties.get("compiled_input_type")=="f32")
+
+
 def openvino_properties(model):
     # Record actual library-managed CPU configuration, not assumed defaults.
     backend = getattr(getattr(model,"predictor",None),"model",None)
@@ -263,7 +293,30 @@ def self_test():
     import openvino as ov
     parameter=ov.opset13.parameter([-1,3,-1,-1],ov.Type.f32)
     graph=ov.Model([ov.opset13.relu(parameter)],[parameter])
-    specialize_spatial_graph(graph)
+    original_compile = ov.Core.compile_model
+    from native_detector_openvino import PROPERTIES
+    with explicit_fp32_cpu_compile():
+        core = ov.Core()
+        dynamic = core.compile_model(graph,"CPU",{"INFERENCE_PRECISION_HINT":ov.Type.bf16})
+        actual = {"available":True,"compiled_input_shape":str(dynamic.input(0).partial_shape),
+                  "compiled_input_type":dynamic.input(0).element_type.get_type_name(),
+                  **{k:str(dynamic.get_property(k)) for k in PROPERTIES}}
+        assert shape_runtime_verified(actual,"dynamic")
+        assert not shape_runtime_verified({**actual,"INFERENCE_PRECISION_HINT":"<Type: 'bfloat16'>"},"dynamic")
+        assert not shape_runtime_verified(actual,"static-spatial")
+        try:
+            core.compile_model(graph,"GPU")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Unexpected accelerator admitted")
+        specialize_spatial_graph(graph)
+        static = core.compile_model(graph,"CPU")
+        actual = {"available":True,"compiled_input_shape":str(static.input(0).partial_shape),
+                  "compiled_input_type":static.input(0).element_type.get_type_name(),
+                  **{k:str(static.get_property(k)) for k in PROPERTIES}}
+        assert shape_runtime_verified(actual,"static-spatial")
+    assert ov.Core.compile_model is original_compile
     assert graph_interface(graph)[0] == [{"shape":"[?,3,640,640]","type":"f32"}]
     try:
         specialize_spatial_graph(graph)
@@ -314,6 +367,7 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
     runtime = {"backend":backend,"requested_torch_intraop":thread_profile,"omp_num_threads":os.getenv("OMP_NUM_THREADS"),
                "profile_source_sha256":file_sha256(Path(__file__)), "export":export,
                "shape_profile":shape_profile,
+               "compilation_policy":"explicit-fp32-cpu-2-threads-1-stream-latency" if shape_profile is not None else "library-default",
                "qualification_scope":"development-only; not a formal schema-2 method"}
     write(evidence/"plan.json", {"method":descriptor,"model_sha256":CHECKPOINT,
         "reference_artifact":reference_artifact,"capture_artifact":15245454146,
@@ -403,12 +457,12 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
     observed = [c["openvino_properties"] for v in rows for c in v["calls"]] if backend=="openvino" else []
     backend_observed = backend=="pytorch" or (bool(observed) and all(cpu_backend_observed(p) for p in observed))
     if shape_profile is not None:
-        from native_detector_openvino import PROPERTIES
-        expected_shape = "[?,3,640,640]" if shape_profile=="static-spatial" else "[?,3,?,?]"
-        backend_observed = backend_observed and all(
-            {k:p[k] for k in PROPERTIES} == PROPERTIES
-            and p["compiled_input_shape"] == expected_shape
-            and p["compiled_input_type"] == "f32" for p in observed)
+        warmup_observed = [c["openvino_properties"] for c in warmup["calls"]]
+        backend_observed = (backend_observed and bool(warmup_observed)
+                            and all(shape_runtime_verified(p,shape_profile)
+                                    for p in observed+warmup_observed))
+        runtime["warmup_openvino_properties_verified"] = bool(warmup_observed) and all(
+            shape_runtime_verified(p,shape_profile) for p in warmup_observed)
         thread_consistent = thread_consistent and all(v["torch_num_interop_threads"]==4 for v in rows)
     runtime["actual_torch_intraop"] = expected_threads
     runtime["actual_torch_interop"] = sorted({v["torch_num_interop_threads"] for v in rows})
@@ -467,4 +521,5 @@ if __name__=="__main__":
     else:
         if not all((a.captures,a.weights,a.reference,a.evidence)):
             p.error("run requires all inputs")
-        run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir,shape_profile=a.shape_profile,parent_export=a.parent_export)
+        with explicit_fp32_cpu_compile() if a.shape_profile is not None else nullcontext():
+            run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir,shape_profile=a.shape_profile,parent_export=a.parent_export)

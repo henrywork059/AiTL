@@ -84,10 +84,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mesh-28c-openvino-spatial-development
+          name: mesh-28c-openvino-spatial-explicit-fp32-development
           retention-days: 14
           path: |
             ${{ runner.temp }}/profile-evidence/
+            ${{ runner.temp }}/backend-model/
             ${{ runner.temp }}/specialized-model/
             ${{ runner.temp }}/python-packages.txt
             ${{ runner.temp }}/cpu-info.txt
