@@ -1,0 +1,90 @@
+name: Update 28C isolated raster adaptation
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-detector-development.yml'
+      - '.github/scripts/native_detector_development_trial.py'
+permissions:
+  contents: read
+jobs:
+  generate:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          architecture: x64
+      - name: Install verified isolated native engine and backend
+        run: |
+          python -m pip install --index-url https://pypi.org/simple --only-binary=:all: --no-deps --require-hashes -r AI_Traffic_Light/apps/pc-studio/backend/requirements-sumo-shadow-win-x64.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin = python .github/scripts/locate_sumo_bin.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "SUMO_HOME=$(Split-Path -Parent $bin)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt
+      - name: Verify versions and native dependency metadata
+        run: |
+          python .github/scripts/check_sumo_shadow_dependencies.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python .github/scripts/locate_sumo_bin.py --verify-versions
+      - name: Test split and exclusion guards
+        run: python .github/scripts/native_detector_development_trial.py self-test
+      - name: Freeze separate native development captures
+        run: python .github/scripts/native_detector_development_trial.py generate --captures "$env:RUNNER_TEMP/mesh-development-captures"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mesh-28c-development-captures
+          retention-days: 14
+          path: ${{ runner.temp }}/mesh-development-captures/
+          if-no-files-found: error
+  train:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      YOLO_AUTOINSTALL: 'false'
+      HF_HUB_OFFLINE: '1'
+      WANDB_MODE: disabled
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: mesh-28c-development-captures
+          path: ${{ runner.temp }}/mesh-development-captures
+      - name: Install isolated CPU reference training environment
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220
+          python -m pip check
+          python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
+      - name: Retrieve exact publisher checkpoint
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-time 120 --max-filesize 5613764 -o "$RUNNER_TEMP/yolo11n.pt" https://huggingface.co/Ultralytics/YOLO11/resolve/5599de6f3b0ef95f98f37530ed0f3bf149c10b37/yolo11n.pt
+          echo '0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1  '"$RUNNER_TEMP/yolo11n.pt" | sha256sum -c -
+      - name: Execute fixed development fine-tuning and before-after evaluation
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: python .github/scripts/native_detector_development_trial.py train --captures "$RUNNER_TEMP/mesh-development-captures" --work "$RUNNER_TEMP/mesh-development-work" --weights "$RUNNER_TEMP/yolo11n.pt" --evidence "$RUNNER_TEMP/mesh-development-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-development-training
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/mesh-development-evidence/
+            ${{ runner.temp }}/python-packages.txt
+          if-no-files-found: warn
