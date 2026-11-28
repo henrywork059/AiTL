@@ -12,6 +12,7 @@ import type { ExperimentDelta, ExperimentModeResult, SimulationExperiment, Simul
 import { createExperimentOperationGate, chooseStoredRunId, verifiedExperimentResult } from "../lib/experimentRunState";
 import "./simulationLab.css";
 import {NativeSimulationWorkspace} from "./NativeSimulationWorkspace";
+import {FakeJunctionDemoPage} from "./FakeJunctionDemoPage";
 
 type TabId = "summary" | "waiting" | "throughput" | "signal" | "samples";
 type SampleMode = "fixed" | "adaptive";
@@ -73,6 +74,7 @@ function metricRow(label: string, fixed: number, adaptive: number, unit = "") {
 
 export function SimulationLabPage() {
   const [nativeWorkspace,setNativeWorkspace]=useState(false);
+  const [demoWorkspace,setDemoWorkspace]=useState(false);
   const [tab, setTab] = useState<TabId>("summary");
   const [sampleMode, setSampleMode] = useState<SampleMode>("adaptive");
   const [duration, setDuration] = useState(300);
@@ -150,7 +152,7 @@ export function SimulationLabPage() {
   }, []); // Load once; retiring the operation also protects StrictMode remounts.
 
   async function runExperiment() {
-    if (busy || !profile) return;
+    if (busy || !profiles.includes(profile) || !Number.isInteger(seed) || seed < 0 || seed > 2147483647) return;
     await performOperation(async (isCurrent) => {
       const next = await runSimulationExperiment({
         duration_seconds: duration,
@@ -240,6 +242,7 @@ export function SimulationLabPage() {
     [sampleSource, clampedSamplePage, pageSize],
   );
 
+  if(demoWorkspace)return <div className="experiment-page"><button type="button" onClick={()=>setDemoWorkspace(false)}>Back to legacy experiments</button><FakeJunctionDemoPage/></div>;
   if(nativeWorkspace)return <div className="experiment-page native-lab-page"><button type="button" onClick={()=>setNativeWorkspace(false)}>Back to legacy experiments</button><NativeSimulationWorkspace profile={profile||undefined}/></div>;
 
   return (
@@ -250,7 +253,7 @@ export function SimulationLabPage() {
             <h2>Fixed vs Adaptive Simulation Lab</h2>
             <p className="placeholder-copy">Run the same seeded prototype junction in Fixed and Adaptive modes, then compare waiting, queues, throughput, signal use, scenario activity, and conflict diagnostics.</p>
           </div>
-          <div className="button-row"><span className="status-pill muted">isolated benchmark</span><button type="button" disabled={busy} onClick={()=>setNativeWorkspace(true)}>Native evaluation workspace</button></div>
+          <div className="button-row"><span className="status-pill muted">isolated benchmark</span><button type="button" disabled={busy} onClick={()=>setNativeWorkspace(true)}>Native evaluation workspace</button><button type="button" disabled={busy} onClick={()=>setDemoWorkspace(true)}>Simulated demonstration</button></div>
         </div>
 
         <div className="experiment-control-grid">
@@ -277,7 +280,7 @@ export function SimulationLabPage() {
             </select>
           </label>
           <label>Seed
-            <input type="number" min={0} max={2147483647} value={seed} onChange={(event: ChangeEvent<HTMLInputElement>) => setSeed(Number(event.target.value))} />
+            <input type="number" min={0} max={2147483647} aria-label="Experiment seed" value={Number.isNaN(seed) ? "" : seed} onChange={(event: ChangeEvent<HTMLInputElement>) => setSeed(event.target.valueAsNumber)} />
           </label>
           <label>Sample interval
             <select value={sampleInterval} onChange={(event: ChangeEvent<HTMLSelectElement>) => setSampleInterval(Number(event.target.value))}>
@@ -287,7 +290,7 @@ export function SimulationLabPage() {
           <label>Run label
             <input value={label} maxLength={80} placeholder="Optional" onChange={(event: ChangeEvent<HTMLInputElement>) => setLabel(event.target.value)} />
           </label>
-          <button className="primary experiment-run-button" type="button" disabled={busy || !profile} onClick={() => void runExperiment()}>{busy ? "Working..." : "Run comparison"}</button>
+          <button className="primary experiment-run-button" type="button" disabled={busy || !profiles.includes(profile) || !Number.isInteger(seed) || seed < 0 || seed > 2147483647} onClick={() => void runExperiment()}>{busy ? "Working..." : "Run comparison"}</button>
         </div>
 
         <div className="experiment-saved-row">

@@ -65,6 +65,7 @@ function experimentFixture(id:string,seed:number):SimulationExperiment{return {r
   fixed:experimentMode("fixed"),adaptive:experimentMode("adaptive"),
   comparison:Object.fromEntries(["vehicle_wait_average","pedestrian_wait_average","vehicle_throughput","pedestrian_throughput","combined_throughput","simultaneous_queue_time"].map(key=>[key,{fixed:4,adaptive:4,difference:0,percent_change:0,adaptive_direction:"same",lower_is_better:true}])),
   prototype_only:true,scope_note:"Synthetic browser fixture, not measured results"};}
+let demoRequests=0, demoFailure=true;
 let storedExperiments=[experimentFixture("run_a",11),experimentFixture("run_b",22)];
 let experimentDetailFailure=true,experimentProfileFailure=false,experimentListFailure=false,experimentDeletes=0,experimentCreates=0;
 const fixtureError=(message:string)=>new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message}}),{status:503,headers:{"Content-Type":"application/json"}});
@@ -86,6 +87,15 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/dataset/training-dataset/status"){if(trainingStatusFailure||datasetOnlyFailure)return fixtureError("Managed dataset status unavailable");data=datasetStatus();}
   else if(path==="/api/settings/runtime")data=fallbackRuntimeSettings;
   else if(path==="/api/traffic/signal-rules"&&page==="experiments"){if(experimentProfileFailure)return fixtureError("Signal profile unavailable");data={profiles:{fixture:{}},active_profile:"fixture"};}
+  else if(path==="/api/traffic/fake-junction-demo"&&page==="experiments"){
+    const body=JSON.parse(String(init?.body));demoRequests++;
+    if(demoFailure)return fixtureError("Synthetic demonstration unavailable");
+    check(body.scenario==="missing_ack"&&body.authorized===true,"Fake demo request lost authorization or scenario");
+    const off={connected:false,armed:false,active:false,reason:"disconnected",physical_output_allowed:false};
+    const checks=Object.fromEntries(["authorization_matches","activation_matches_scenario","denied_never_active","acknowledgments_match","expected_stop","final_disconnected","physical_and_audio_unavailable"].map(key=>[key,true]));
+    data={schema_version:1,scenario:body.scenario,authorization_requested:body.authorized,provenance:"illustrative/synthetic",time_basis:"virtual_ms",lease_ms:1000,prototype_only:true,physical_output_allowed:false,audio_playback:false,
+      trace:[{time_ms:0,event:"fault_stop",lighting:off,speaker:off,ack:null},{time_ms:0,event:"final_disconnected",lighting:off,speaker:off,ack:null}],checks};
+  }
   else if(path==="/api/traffic/experiments"&&init?.method==="POST"&&page==="experiments"){
     const body=JSON.parse(String(init.body));check(body.profile==="fixture","Wrong experiment profile");experimentCreates++;
     const created=experimentFixture("run_c",body.seed);storedExperiments=[created,...storedExperiments];experimentListFailure=true;data=created;
@@ -336,6 +346,12 @@ async function main(){
     check(findButton("Run comparison")?.disabled,"Unverified profile allowed a new comparison");
     experimentProfileFailure=false;findButton("Refresh stored runs")!.click();
     await waitFor(()=>enabled("Run comparison"),"Profile recovery unavailable");
+    const seedInput=document.querySelector<HTMLInputElement>('input[aria-label="Experiment seed"]')!;
+    const seedSetter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;
+    seedSetter.call(seedInput,"");seedInput.dispatchEvent(new Event("input",{bubbles:true}));
+    await waitFor(()=>findButton("Run comparison")?.disabled,"Blank experiment seed allowed comparison");
+    seedSetter.call(seedInput,"25025");seedInput.dispatchEvent(new Event("input",{bubbles:true}));
+    await waitFor(()=>enabled("Run comparison"),"Valid seed did not recover");
     findButton("Run comparison")!.click();
     await waitFor(()=>experimentCreates===1&&select().value==="run_c"&&enabled("Export samples CSV")&&document.body.textContent?.includes("Experiment saved; the stored-run list could not be refreshed."),"Acknowledged experiment creation lost after list failure");
     window.confirm=()=>true;findButton("Delete run")!.click();
@@ -343,6 +359,20 @@ async function main(){
     check(findButton("Delete run")?.disabled&&findButton("Export samples CSV")?.disabled,"Deleted experiment remained actionable");
     experimentListFailure=false;findButton("Refresh stored runs")!.click();
     await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_a","Stored experiment list recovery failed");
+    findButton("Simulated demonstration")!.click();
+    await waitFor(()=>enabled("Run synthetic demo"),"Demo workspace missing");
+    findButton("Run synthetic demo")!.click();
+    await waitFor(()=>demoRequests===1&&document.body.textContent?.includes("Synthetic demonstration unavailable"),"Demo failure not surfaced");
+    check(!document.querySelector('a[download^="mesh-fake-demo"]'),"Failed demo exposed export");
+    const demoSelect=document.querySelector<HTMLSelectElement>('select[aria-label="Demo scenario"]')!;
+    demoSelect.value="missing_ack";demoSelect.dispatchEvent(new Event("change",{bubbles:true}));
+    document.querySelector<HTMLInputElement>('input[aria-label="Authorize fake leases"]')!.click();
+    demoFailure=false;findButton("Run synthetic demo")!.click();
+    await waitFor(()=>demoRequests===2&&document.body.textContent?.includes("7/7 synthetic checks passed")&&document.body.textContent?.includes("fault stop"),"Demo result missing");
+    const link=document.querySelector<HTMLAnchorElement>('a[download="mesh-fake-demo-missing_ack.json"]');
+    check(link?.href.startsWith("blob:"),"Demo JSON export missing");
+    findButton("Back to legacy experiments")!.click();
+    await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_a","Demo changed stored experiment state");
   }
   if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;load.click();for(let i=0;i<20&&!load.disabled;i++)await pause();await pause();check(activeModel&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model activation");modelFailure=true;const refresh=[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")!;refresh.click();for(let i=0;i<20&&!document.body.textContent?.includes("Model registry unavailable or loading.");i++)await pause();check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")?.click();for(let i=0;i<20&&!document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model");i++)await pause();check(document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Model recovery");}
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";

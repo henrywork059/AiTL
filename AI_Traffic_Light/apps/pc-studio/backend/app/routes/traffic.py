@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Query, Request, Response
+from pydantic import BaseModel, ConfigDict, StrictBool
 
 from app.core.api_response import ok
 from app.core.logging_config import get_logger
 from app.models import IntersectionNetworkConfigRequest, SignalRulesConfigRequest, SignalRulesPreviewRequest, SignalTestInputsRequest
 from app.services.camera_frames import camera_frame_service
+from app.services.fake_junction_demo import DemoScenario, run_fake_junction_demo
 from app.services.decision_context import build_decision_context
 from app.services.intersection_network import intersection_network_service
 from app.services.junction_network_overview import junction_network_overview_service
@@ -17,6 +19,19 @@ from app.services.zones import zone_service
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+
+class FakeJunctionDemoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scenario: DemoScenario = "nominal"
+    authorized: StrictBool = False
+
+
+@router.post("/fake-junction-demo")
+def fake_junction_demo(payload: FakeJunctionDemoRequest, request: Request) -> dict:
+    """Bounded isolated replay; never controls a live or physical device."""
+    return ok(run_fake_junction_demo(payload.scenario, authorized=payload.authorized),
+              request_id=request.state.request_id)
 
 
 def _enrich_network_context(state: dict) -> dict:
