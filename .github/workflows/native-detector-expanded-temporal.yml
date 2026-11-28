@@ -1,0 +1,76 @@
+name: Update 28C expanded temporal detector development
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-detector-expanded-temporal.yml'
+      - '.github/scripts/native_detector_expanded_temporal_trial.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      YOLO_AUTOINSTALL: 'false'
+      HF_HUB_OFFLINE: '1'
+      WANDB_MODE: disabled
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve pinned development metadata and qualified original graph only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/henrywork059/AiTL/actions/artifacts/15260721642/zip > "$RUNNER_TEMP/expanded.zip"
+          echo '305dfc47e1ef2d8fb70ff6aa069c0d5cc89cd688c129c2e457a4337e41b46dd1  '"$RUNNER_TEMP/expanded.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/expanded.zip" -d "$RUNNER_TEMP/expanded-captures"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15260164512/zip > "$RUNNER_TEMP/expanded-review.zip"
+          echo '01a10dd24a3ad0c65ec86d09a6a557f75a57c4d457790b0b2a46f6fe18a2ca70  '"$RUNNER_TEMP/expanded-review.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/expanded-review.zip" tick-truth-review.json > "$RUNNER_TEMP/retained-review.json"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15260061226/zip > "$RUNNER_TEMP/old-temporal.zip"
+          echo 'e9b9b079e13c3067351c34bf33df74d3e312904c3af7d7aa77922718be7dced3  '"$RUNNER_TEMP/old-temporal.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/old-temporal.zip" manifest.json > "$RUNNER_TEMP/old-temporal.json"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15245454146/zip > "$RUNNER_TEMP/prior.zip"
+          echo '86981ee46bfc982bcf064e59e7c64e7afabed2d203306160ec2a09a8f45a2a4e  '"$RUNNER_TEMP/prior.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/prior.zip" manifest.json > "$RUNNER_TEMP/prior.json"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15254202779/zip > "$RUNNER_TEMP/reference.zip"
+          echo '7565741655484d2901b4c26fbece790e52f58cf7aca600462f22233bd353b2ce  '"$RUNNER_TEMP/reference.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/reference.zip" method-evidence/method.json > "$RUNNER_TEMP/reference.json"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15253197259/zip > "$RUNNER_TEMP/backend.zip"
+          echo '03b475ee1ba95b3602f6de7ec5afd262a1c98d6db4a560dfb5a418976286f1ed  '"$RUNNER_TEMP/backend.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/backend.zip" 'backend-model/*' -d "$RUNNER_TEMP"
+      - name: Install isolated bound inference runtime
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220 openvino==2026.0.0 numpy==2.2.1 opencv-python==4.10.0.84
+          python -m pip check
+          python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
+      - name: Test metric and bound model invariants
+        run: |
+          python AI_Traffic_Light/scripts/test_native_detector_temporal_metrics.py
+          python AI_Traffic_Light/scripts/test_native_detector_tick_truth.py
+          python AI_Traffic_Light/scripts/test_native_detector_temporal_review.py
+          python .github/scripts/native_detector_expanded_temporal_trial.py self-test
+          MESH_OPENVINO_REAL_TEST=1 python AI_Traffic_Light/scripts/test_native_detector_openvino.py
+      - name: Execute temporal detector development diagnostics
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: python .github/scripts/native_detector_expanded_temporal_trial.py evaluate --captures "$RUNNER_TEMP/expanded-captures" --prior "$RUNNER_TEMP/prior.json" --old-temporal "$RUNNER_TEMP/old-temporal.json" --retained-review "$RUNNER_TEMP/retained-review.json" --export "$RUNNER_TEMP/backend-model" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/temporal-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-expanded-temporal-detector-evidence
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/temporal-evidence/
+            ${{ runner.temp }}/python-packages.txt
+          if-no-files-found: warn
