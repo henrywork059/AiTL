@@ -12,7 +12,7 @@ function loadModules() {
   try {
     const source = path.join(temporary, 'src');
     fs.mkdirSync(source);
-    const files = ['pollingScope.ts', 'apiClient.ts', 'errorCodes.ts', 'logger.ts', 'cameraPreviewState.ts'];
+    const files = ['pollingScope.ts', 'apiClient.ts', 'errorCodes.ts', 'logger.ts', 'cameraPreviewState.ts', 'experimentRunState.ts'];
     for (const file of files) {
       fs.copyFileSync(path.join(frontend, 'src', 'lib', file), path.join(source, file));
     }
@@ -32,15 +32,41 @@ function loadModules() {
       ...require(path.join(temporary, 'dist', 'pollingScope.js')),
       ...require(path.join(temporary, 'dist', 'apiClient.js')),
       ...require(path.join(temporary, 'dist', 'cameraPreviewState.js')),
+      ...require(path.join(temporary, 'dist', 'experimentRunState.js')),
     };
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
 }
 
-const { createPollingScope, runScopedSerialTask, requestJson, requestJsonStrict, ApiRequestError, matchesSelectedCameraFrame } = loadModules();
+const { createPollingScope, runScopedSerialTask, requestJson, requestJsonStrict, ApiRequestError, matchesSelectedCameraFrame, createExperimentOperationGate, chooseStoredRunId, verifiedExperimentResult } = loadModules();
 
 async function main() {
+  const experimentGate = createExperimentOperationGate();
+  const initial = experimentGate.begin();
+  assert.ok(initial);
+  assert.equal(experimentGate.begin(), null);
+  experimentGate.retire();
+  const current = experimentGate.begin();
+  assert.equal(initial.isCurrent(), false);
+  initial.finish();
+  assert.equal(current.isCurrent(), true);
+  assert.equal(experimentGate.begin(), null);
+  current.finish();
+  assert.equal(current.isCurrent(), false);
+  assert.ok(experimentGate.begin());
+  const storedRuns = [{run_id:'a'}, {run_id:'b'}];
+  assert.equal(chooseStoredRunId(storedRuns), 'a');
+  assert.equal(chooseStoredRunId(storedRuns,'b'), 'b');
+  assert.equal(chooseStoredRunId(storedRuns,'missing'), '');
+  assert.equal(chooseStoredRunId(storedRuns,''), '');
+  assert.equal(chooseStoredRunId([]), '');
+  assert.equal(verifiedExperimentResult('b',storedRuns[0]), null);
+  assert.equal(verifiedExperimentResult('',storedRuns[0]), null);
+  assert.equal(verifiedExperimentResult('a',null), null);
+  assert.equal(verifiedExperimentResult('a',storedRuns[0]), storedRuns[0]);
+  console.log('[PASS] 17 experiment operation/selection assertions');
+
   const physical = {active_source_id:'camera_a',simulation_enabled:false,frame_available:true,stale:false,origin:'upload'};
   const synthetic = {...physical,active_source_id:'simulation_camera_b',simulation_enabled:true,origin:'simulation'};
   assert.equal(matchesSelectedCameraFrame(physical,'camera_a','esp32'),true);
