@@ -16,44 +16,10 @@ from app.services.native_detector_validation import score_footprints
 from app.services.camera_frames import CameraFrame
 from app.services.inference import InferenceService
 
-TILE = 192
-STRIDE = 144
-CONFIDENCE = .1
-IOU = .5
+from native_detector_tiled import TILE, STRIDE, CONFIDENCE, IOU, starts, windows, clip_box, merge, predict_view
 # Retain the same optimizer, six epochs and input resolution as full-frame trial.
 # The development intervention is tiling plus pedestrian-containing tile sampling.
 TILE_SETTINGS = {**SETTINGS, "batch": 8}
-
-
-def starts(length):
-    if length < TILE:
-        raise ValueError("Tile larger than source")
-    return sorted(set(range(0, length - TILE + 1, STRIDE)) | {length - TILE})
-
-
-def windows():
-    return [(x,y) for y in starts(HEIGHT) for x in starts(WIDTH)]
-
-
-def clip_box(box, x, y):
-    a,b,c,d = box
-    clipped = [max(0,a-x), max(0,b-y), min(TILE,c-x), min(TILE,d-y)]
-    return clipped if clipped[0]<clipped[2] and clipped[1]<clipped[3] else None
-
-
-def intersection_over_union(a,b):
-    overlap=max(0,min(a[2],b[2])-max(a[0],b[0]))*max(0,min(a[3],b[3])-max(a[1],b[1]))
-    return overlap / ((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-overlap)
-
-
-def merge(rows):
-    # Deterministic confidence-ordered, same-kind NMS in source coordinates.
-    # Retain raw tile predictions in the evidence alongside merged predictions.
-    kept=[]
-    for row in sorted(rows,key=lambda r:(-r["confidence"],r["tile_index"],r["id"])):
-        if not any(row["kind"]==other["kind"] and intersection_over_union(row["box_xyxy"],other["box_xyxy"])>IOU for other in kept):
-            kept.append(row)
-    return kept
 
 
 def make_dataset(captures, work, evidence):
@@ -135,44 +101,6 @@ def make_dataset(captures, work, evidence):
     write_json(evidence/"tile-manifest.json",{"tile_size":TILE,"stride":STRIDE,"images":manifest,
         "stats":stats,"formal_holdout_used":False})
     return yaml
-
-
-def predict_view(content, ann, view, model, *, batch_size=8):
-    image=cv2.imdecode(np.frombuffer(content,np.uint8),cv2.IMREAD_COLOR)
-    windows_xy=windows()
-    crops=[image[y:y+TILE,x:x+TILE].copy() for x,y in windows_xy]
-    raw_tiles=[]
-    mapped=[]
-    unmapped=[]
-    # Bounded batches. Never publish crops or outputs to live inference.
-    if not isinstance(batch_size, int) or not 1 <= batch_size <= len(crops):
-        raise ValueError("Invalid offline tile batch size")
-    for offset in range(0,len(crops),batch_size):
-        batch=crops[offset:offset+batch_size]
-        results=model.predict(source=batch,imgsz=TILE_SETTINGS["imgsz"],conf=CONFIDENCE,
-                              device="cpu",verbose=False,save=False)
-        if len(results)!=len(batch):
-            raise ValueError("Tile prediction cardinality mismatch")
-        for j,result in enumerate(results):
-            index=offset+j
-            x,y=windows_xy[index]
-            frame=CameraFrame(content=b"",content_type="image/png",
-                source_id=f"offline_tile_{view}_{index}",width=TILE,height=TILE,
-                received_at_ms=0,frame_number=ann["tick"],origin=ann["provenance"],
-                coordinate_space="native_projection_v1",layout_id=ann["layout_id"])
-            converted=InferenceService._convert_results(frame,[result],model)["detections"]
-            raw_tiles.append({"tile_index":index,"origin_xy":[x,y],"local_predictions":converted})
-            for row in converted:
-                a,b,c,d=row["box_xyxy"]
-                name=row["class_name"].strip().lower()
-                kind=("pedestrian" if name in ("person","pedestrian") else
-                      "vehicle" if name in ("vehicle","car","suv","van","bus","truck","motorcycle","motorbike") else None)
-                full={**row,"tile_index":index,"box_xyxy":[a+x,b+y,c+x,d+y]}
-                if kind is None:
-                    unmapped.append(full)
-                else:
-                    mapped.append({**full,"kind":kind})
-    return merge(mapped),unmapped,raw_tiles
 
 
 def evaluate_tiles(captures,model,digest):

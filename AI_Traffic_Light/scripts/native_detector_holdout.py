@@ -28,11 +28,19 @@ def _unique_object(pairs):
     return obj
 
 
-def load_holdout(content, capture_names, model_digest, confidence, iou):
+def load_holdout(content, capture_names, model_digest, confidence, iou, *, method=None):
     """Check an operator-supplied plan; declarations are not authenticated facts."""
     plan = json.loads(content, object_pairs_hook=_unique_object)
-    if not isinstance(plan, dict) or type(plan.get("schema_version")) is not int or plan["schema_version"] != 1:
+    if not isinstance(plan, dict) or type(plan.get("schema_version")) is not int or plan["schema_version"] != (2 if method is not None else 1):
         raise ValueError("Unsupported holdout manifest")
+    if method is not None:
+        # Strict canonical comparison also rejects type changes such as true for 1.
+        if json.dumps(plan.get("method"), sort_keys=True) != json.dumps(method, sort_keys=True):
+            raise ValueError("Holdout predictor identity mismatch")
+        if not isinstance(plan.get("criteria_rationale"), str) or not plan["criteria_rationale"].strip():
+            raise ValueError("Missing independent criteria rationale")
+    elif "method" in plan:
+        raise ValueError("Method-bound plan requires method-specific admission")
     if _digest(plan.get("model_sha256")) != model_digest:
         raise ValueError("Holdout model digest mismatch")
     for key in ("model_provenance", "training_separation", "holdout_selection"):
@@ -50,6 +58,8 @@ def load_holdout(content, capture_names, model_digest, confidence, iou):
     training = plan.get("known_training_canonical_pixel_sha256")
     if not isinstance(training, list) or len(set(_digest(x) for x in training)) != len(training):
         raise ValueError("Invalid known training pixel digest list")
+    if method is not None and not training:
+        raise ValueError("Method-bound holdout requires known training image digests")
     criteria = plan.get("criteria")
     if not isinstance(criteria, dict) or set(criteria) != set(KINDS):
         raise ValueError("Both traffic kinds require predeclared criteria")

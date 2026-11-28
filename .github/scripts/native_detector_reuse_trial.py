@@ -17,31 +17,7 @@ from native_detector_batch import summarize, latency_summary
 from app.services.native_detector_validation import score_footprints
 
 
-class FrameDedupModel:
-    """One frame only; exact byte equality, not similarity or stale tracking."""
-    def __init__(self, model):
-        self.model = model
-        self.results = {}
-        self.requested = self.evaluated = self.model_calls = 0
-
-    def __getattr__(self, name):
-        return getattr(self.model, name)
-
-    def predict(self, *, source, **kwargs):
-        keys = [(crop.shape, crop.dtype.str, crop.tobytes()) for crop in source]
-        missing = {}
-        for key, crop in zip(keys, source):
-            if key not in self.results:
-                missing.setdefault(key, crop)
-        self.requested += len(keys)
-        if missing:
-            results = self.model.predict(source=list(missing.values()), **kwargs)
-            if len(results) != len(missing):
-                raise ValueError("Unique-tile prediction cardinality mismatch")
-            self.results.update(zip(missing, results))
-            self.evaluated += len(missing)
-            self.model_calls += 1
-        return [self.results[key] for key in keys]
+from native_detector_tiled import FrameDedupModel
 
 
 def self_test():
