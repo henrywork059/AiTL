@@ -1,0 +1,67 @@
+name: Update 28C inference-stage development profile
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-detector-profile.yml'
+      - '.github/scripts/native_detector_profile_trial.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      YOLO_AUTOINSTALL: 'false'
+      HF_HUB_OFFLINE: '1'
+      WANDB_MODE: disabled
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve pinned development inputs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/henrywork059/AiTL/actions/artifacts/15245454146/zip > "$RUNNER_TEMP/development.zip"
+          echo '86981ee46bfc982bcf064e59e7c64e7afabed2d203306160ec2a09a8f45a2a4e  '"$RUNNER_TEMP/development.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/development.zip" -d "$RUNNER_TEMP/development-captures"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15247571354/zip > "$RUNNER_TEMP/tiles.zip"
+          echo '3c9759f3b77dba00896bd92d6fe79646b1e1b42de7713e80a1ab24f614b6ac62  '"$RUNNER_TEMP/tiles.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/tiles.zip" tile-evidence/tile-development-last.pt > "$RUNNER_TEMP/tile-last.pt"
+          echo '9c888355e3228db090c98969672a4418eb207e1c0ffa926746091485da84ecba  '"$RUNNER_TEMP/tile-last.pt" | sha256sum -c -
+          gh api repos/henrywork059/AiTL/actions/artifacts/15249412930/zip > "$RUNNER_TEMP/reference.zip"
+          echo '0e663a5233ece7a572bd6f168f048bc16d9d60d95b3ea722bd777705bc207913  '"$RUNNER_TEMP/reference.zip" | sha256sum -c -
+          unzip -p "$RUNNER_TEMP/reference.zip" method-evidence/development-evaluation.json > "$RUNNER_TEMP/reference.json"
+      - name: Install isolated CPU inference environment
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220
+          python -m pip check
+          python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
+      - name: Verify timing proxy invariants
+        run: python .github/scripts/native_detector_profile_trial.py self-test
+      - name: Measure actual inference stages on development only
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: |
+          set -euo pipefail
+          lscpu > "$RUNNER_TEMP/cpu-info.txt"
+          python .github/scripts/native_detector_profile_trial.py run --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-inference-profile-development
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/profile-evidence/
+            ${{ runner.temp }}/python-packages.txt
+            ${{ runner.temp }}/cpu-info.txt
+          if-no-files-found: warn
