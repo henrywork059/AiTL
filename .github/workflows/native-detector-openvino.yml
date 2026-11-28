@@ -61,7 +61,7 @@ jobs:
           python AI_Traffic_Light/scripts/test_native_detector_batch.py
           python AI_Traffic_Light/scripts/test_native_detector_holdout.py
           python AI_Traffic_Light/scripts/test_native_detector_tiled_holdout.py
-          python AI_Traffic_Light/scripts/test_native_detector_openvino.py
+          MESH_OPENVINO_REAL_TEST=1 python AI_Traffic_Light/scripts/test_native_detector_openvino.py
       - name: Execute schema-2 development-only regression
         env:
           YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
@@ -69,7 +69,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mesh-28c-openvino-bound-development
+          name: mesh-28c-openvino-bound-explicit-fp32-development
           retention-days: 14
           path: |
             ${{ runner.temp }}/method-evidence/

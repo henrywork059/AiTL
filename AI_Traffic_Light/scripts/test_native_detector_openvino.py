@@ -1,4 +1,5 @@
 """Offline binding and fail-closed checks without loading a real model."""
+from contextlib import nullcontext
 import copy
 import hashlib
 import json
@@ -34,6 +35,8 @@ class OpenVINOBindingTest(unittest.TestCase):
                 method=ov.descriptor(root)
                 snap=ov.snapshot_export(root,Path(tmp)/"snapshot",method)
                 self.assertEqual(ov.descriptor(snap),method)
+                self.assertEqual(method["runtime"]["compilation_policy"],ov.COMPILATION_POLICY)
+                self.assertEqual(method["runtime"]["compiled_input"],ov.COMPILED_INPUT)
                 (directory/"model.bin").write_bytes(b"changed")
                 with self.assertRaises(ValueError):
                     ov.descriptor(root)
@@ -48,10 +51,15 @@ class OpenVINOBindingTest(unittest.TestCase):
         wrapper.model=SimpleNamespace(predict=lambda **kwargs:[object() for _ in kwargs["source"]])
         wrapper.calls=wrapper.evaluated=0
         wrapper.last_properties=None
+        wrapper.last_input=None
         kwargs={"source":[object()],"imgsz":640,"conf":.1,"device":"cpu","verbose":False,"save":False}
-        with patch.dict(os.environ,{"OMP_NUM_THREADS":"4"}):
+        with patch.dict(os.environ,{"OMP_NUM_THREADS":"4"}), patch.object(ov,"explicit_fp32_cpu_compile",side_effect=nullcontext), patch.object(ov,"observed_input",return_value=ov.COMPILED_INPUT.copy()):
             with patch.object(ov,"observed_properties",return_value=ov.PROPERTIES.copy()):
                 self.assertEqual(len(wrapper.predict(**kwargs)),1)
+                for key in ov.COMPILED_INPUT:
+                    with patch.object(ov,"observed_input",return_value={**ov.COMPILED_INPUT,key:"changed"}):
+                        with self.assertRaises(ValueError):
+                            wrapper.predict(**kwargs)
             for key in ov.PROPERTIES:
                 with patch.object(ov,"observed_properties",return_value={**ov.PROPERTIES,key:"changed"}):
                     with self.assertRaises(ValueError):
@@ -61,6 +69,38 @@ class OpenVINOBindingTest(unittest.TestCase):
                 wrapper.predict(**kwargs)
         self.assertEqual(wrapper.calls,1)
         self.assertEqual(wrapper.evaluated,1)
+
+    def test_compile_policy_scope_without_optional_runtime(self):
+        class Core:
+            def compile_model(self, model, device_name=None, config=None, **kwargs):
+                return model,device_name,config,kwargs
+        runtime=SimpleNamespace(Core=Core,Type=SimpleNamespace(f32="f32"))
+        original=Core.compile_model
+        with patch.dict(ov.sys.modules,{"openvino":runtime}):
+            with ov.explicit_fp32_cpu_compile():
+                result=Core().compile_model("graph","CPU",{"INFERENCE_PRECISION_HINT":"bf16","unrelated":1})
+                self.assertEqual(result,("graph","CPU",{"INFERENCE_PRECISION_HINT":"f32",
+                    "INFERENCE_NUM_THREADS":2,"NUM_STREAMS":1,"PERFORMANCE_HINT":"LATENCY","unrelated":1},{}))
+                with self.assertRaises(ValueError):
+                    Core().compile_model("graph","GPU")
+            self.assertIs(Core.compile_model,original)
+            with self.assertRaises(RuntimeError):
+                with ov.explicit_fp32_cpu_compile():
+                    raise RuntimeError("fixture")
+            self.assertIs(Core.compile_model,original)
+
+    @unittest.skipUnless(os.getenv("MESH_OPENVINO_REAL_TEST")=="1","optional isolated real runtime")
+    def test_real_compiled_runtime(self):
+        import openvino as runtime
+        param=runtime.opset13.parameter([-1,3,-1,-1],runtime.Type.f32)
+        graph=runtime.Model([runtime.opset13.relu(param)],[param])
+        original=runtime.Core.compile_model
+        with ov.explicit_fp32_cpu_compile():
+            compiled=runtime.Core().compile_model(graph,"CPU",{"INFERENCE_PRECISION_HINT":runtime.Type.bf16})
+            model=SimpleNamespace(predictor=SimpleNamespace(model=SimpleNamespace(ov_compiled_model=compiled)))
+            self.assertEqual(ov.observed_properties(model),ov.PROPERTIES)
+            self.assertEqual(ov.observed_input(model),ov.COMPILED_INPUT)
+        self.assertIs(runtime.Core.compile_model,original)
 
     def test_method_mismatch(self):
         method={"id":ov.METHOD,"runtime":{"compiled_properties":ov.PROPERTIES}}

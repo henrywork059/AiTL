@@ -112,7 +112,9 @@ def main():
         runtime = report["runtime_evidence"]
         if (runtime["all_calls_runtime_verified"] is not True or runtime["checked_calls"] != 256
                 or runtime["evaluated_tiles"] != 898
-                or runtime["compiled_properties"] != descriptor["runtime"]["compiled_properties"]):
+                or runtime["compiled_properties"] != descriptor["runtime"]["compiled_properties"]
+                or runtime["compiled_input"] != descriptor["runtime"]["compiled_input"]
+                or runtime["compilation_policy"] != descriptor["runtime"]["compilation_policy"]):
             raise ValueError("Bound OpenVINO runtime evidence mismatch")
     previous = {r["capture_name"].removeprefix("val/"):r for r in reference["records"]}
     rows = []

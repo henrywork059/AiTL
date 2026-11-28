@@ -2,6 +2,7 @@
 
 No live registration, model downloading, automatic backend selection or fallback.
 """
+from contextlib import contextmanager
 import hashlib
 from importlib.metadata import version
 import json
@@ -9,6 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+from unittest.mock import patch
 
 from native_detector_tiled import method_descriptor as base_descriptor
 
@@ -23,6 +25,8 @@ FILES = {
 PROPERTIES = {"EXECUTION_DEVICES": "['CPU']", "INFERENCE_NUM_THREADS": "2",
               "NUM_STREAMS": "1", "INFERENCE_PRECISION_HINT": "<Type: 'float32'>",
               "PERFORMANCE_HINT": "LATENCY"}
+COMPILED_INPUT = {"shape":"[?,3,?,?]","type":"f32"}
+COMPILATION_POLICY = "explicit-fp32-cpu-2-threads-1-stream-latency"
 VERSIONS = {"openvino": "2026.0.0", "ultralytics": "8.4.220",
             "torch": "2.11.0+cpu", "torchvision": "0.26.0+cpu",
             "numpy": "2.2.1", "opencv": "4.10.0"}
@@ -73,6 +77,7 @@ def descriptor(root):
                        "graph_inputs":manifest["inputs"],"graph_outputs":manifest["outputs"],
                        "omp_num_threads":"4","torch_intraop":2,"torch_interop":4,
                        "compiled_properties":PROPERTIES.copy(),
+                       "compiled_input":COMPILED_INPUT.copy(),"compilation_policy":COMPILATION_POLICY,
                        "startup":"no_prequalification_capture_warmup; first admitted view includes initialization"}}
 
 
@@ -91,14 +96,47 @@ def snapshot_export(root, destination, expected):
     return destination
 
 
-def observed_properties(model):
+@contextmanager
+def explicit_fp32_cpu_compile():
+    """Scope the verified shape-trial compile policy to offline model calls.
+
+    The evaluator is single-process, synchronous and isolated; never use this
+    library-class hook in a live or concurrent inference service.
+    """
+    import openvino as ov
+    original = ov.Core.compile_model
+
+    def compile_cpu(core, model, device_name=None, config=None, **kwargs):
+        if device_name not in (None, "CPU", "AUTO"):
+            raise ValueError("Unexpected OpenVINO compilation device: "+str(device_name))
+        settings = dict(config or {})
+        settings.update({"INFERENCE_PRECISION_HINT":ov.Type.f32,
+                         "INFERENCE_NUM_THREADS":2,"NUM_STREAMS":1,
+                         "PERFORMANCE_HINT":"LATENCY"})
+        return original(core, model, device_name="CPU", config=settings, **kwargs)
+
+    with patch.object(ov.Core,"compile_model",compile_cpu):
+        yield
+
+
+def compiled_model(model):
     backend = getattr(getattr(model,"predictor",None),"model",None)
     compiled = getattr(backend,"ov_compiled_model",None)
     if compiled is None:
         compiled = getattr(getattr(backend,"backend",None),"ov_compiled_model",None)
     if compiled is None:
         raise ValueError("OpenVINO compiled model unavailable")
+    return compiled
+
+
+def observed_properties(model):
+    compiled = compiled_model(model)
     return {key:str(compiled.get_property(key)) for key in PROPERTIES}
+
+
+def observed_input(model):
+    port = compiled_model(model).input(0)
+    return {"shape":str(port.partial_shape),"type":port.element_type.get_type_name()}
 
 
 class BoundOpenVINO:
@@ -113,13 +151,15 @@ class BoundOpenVINO:
         self.root = Path(snapshot)
         self.method = expected
         self.torch = torch
-        self.model = YOLO(str(self.root/"model_openvino_model"),task="detect")
+        with explicit_fp32_cpu_compile():
+            self.model = YOLO(str(self.root/"model_openvino_model"),task="detect")
         torch.set_num_threads(2)
         if torch.get_num_interop_threads()!=4:
             torch.set_num_interop_threads(4)
         self.calls = 0
         self.evaluated = 0
         self.last_properties = None
+        self.last_input = None
         self.check_threads()
 
     def __getattr__(self,name):
@@ -135,25 +175,31 @@ class BoundOpenVINO:
         if not 1 <= len(source) <= 8 or kwargs != {
                 "imgsz":640,"conf":.1,"device":"cpu","verbose":False,"save":False}:
             raise ValueError("Unexpected bound inference arguments")
-        results = self.model.predict(source=source,**kwargs)
+        with explicit_fp32_cpu_compile():
+            results = self.model.predict(source=source,**kwargs)
         self.check_threads()
         actual = observed_properties(self.model)
         if actual != PROPERTIES:
             raise ValueError("OpenVINO compiled CPU runtime mismatch: "+str(actual))
+        actual_input = observed_input(self.model)
+        if actual_input != COMPILED_INPUT:
+            raise ValueError("OpenVINO compiled input mismatch: "+str(actual_input))
         if len(results)!=len(source):
             raise ValueError("OpenVINO result cardinality mismatch")
         self.last_properties = actual
+        self.last_input = actual_input
         self.calls += 1
         self.evaluated += len(source)
         return results
 
     def runtime_evidence(self):
         self.check_threads()
-        if self.calls<1 or self.last_properties!=PROPERTIES:
+        if self.calls<1 or self.last_properties!=PROPERTIES or self.last_input!=COMPILED_INPUT:
             raise ValueError("No verified OpenVINO calls")
         if descriptor(self.root)!=self.method:
             raise ValueError("OpenVINO snapshot identity changed")
         return {"backend":"openvino","compiled_properties":self.last_properties.copy(),
+                "compiled_input":self.last_input.copy(),"compilation_policy":COMPILATION_POLICY,
                 "torch_intraop":self.torch.get_num_threads(),
                 "torch_interop":self.torch.get_num_interop_threads(),
                 "checked_calls":self.calls,"evaluated_tiles":self.evaluated,
