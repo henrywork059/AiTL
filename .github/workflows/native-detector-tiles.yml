@@ -1,0 +1,61 @@
+name: Update 28C tiny-object tiled development
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-detector-tiles.yml'
+      - '.github/scripts/native_detector_tile_trial.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  develop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      YOLO_AUTOINSTALL: 'false'
+      HF_HUB_OFFLINE: '1'
+      WANDB_MODE: disabled
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve only the pinned development cohort
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/henrywork059/AiTL/actions/artifacts/15245454146/zip > "$RUNNER_TEMP/development.zip"
+          echo '86981ee46bfc982bcf064e59e7c64e7afabed2d203306160ec2a09a8f45a2a4e  '"$RUNNER_TEMP/development.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/development.zip" -d "$RUNNER_TEMP/development-captures"
+      - name: Install isolated CPU training environment
+        run: |
+          set -euo pipefail
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220
+          python -m pip check
+          python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
+      - name: Test tile coverage, clipping and suppression
+        run: python .github/scripts/native_detector_tile_trial.py self-test
+      - name: Retrieve pinned initialization checkpoint
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-time 120 --max-filesize 5613764 -o "$RUNNER_TEMP/yolo11n.pt" https://huggingface.co/Ultralytics/YOLO11/resolve/5599de6f3b0ef95f98f37530ed0f3bf149c10b37/yolo11n.pt
+          echo '0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1  '"$RUNNER_TEMP/yolo11n.pt" | sha256sum -c -
+      - name: Execute six-epoch tiled development trial
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: python .github/scripts/native_detector_tile_trial.py train --captures "$RUNNER_TEMP/development-captures" --work "$RUNNER_TEMP/tile-work" --weights "$RUNNER_TEMP/yolo11n.pt" --evidence "$RUNNER_TEMP/tile-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-tiled-development
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/tile-evidence/
+            ${{ runner.temp }}/python-packages.txt
+          if-no-files-found: warn
