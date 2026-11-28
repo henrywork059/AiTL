@@ -281,7 +281,9 @@ export async function fetchCameraStatus(): Promise<CameraStatus> { return reques
 export async function fetchCameraStatusStrict(signal?: AbortSignal): Promise<CameraStatus> { return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/status`, { signal, cache: "no-store" }); }
 export async function setCameraSimulation(enabled: boolean): Promise<CameraStatus> {
   const action = enabled ? "start" : "stop";
-  return requestJson<CameraStatus>(`${API_BASE}/api/camera/simulation/${action}`, fallbackCameraStatus, { method: "POST" });
+  const status = await requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/${action}`, { method: "POST" });
+  if (status.simulation_enabled !== enabled) throw new Error("Simulation mode change was not confirmed by the backend.");
+  return status;
 }
 export async function setCameraSimulationSettings(input: { density?: SimulationDensity; paused?: boolean; engine?: "legacy" | "protected" }): Promise<CameraStatus> {
   return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/simulation/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });

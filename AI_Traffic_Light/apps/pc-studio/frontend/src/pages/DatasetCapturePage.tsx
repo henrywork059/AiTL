@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { API_BASE, captureLatestFrame, deleteDatasetCapture, fetchDatasetStatusStrict } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { SimulationCamera3D } from "../components/SimulationCamera3D";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import type { PollingContext } from "../lib/pollingScope";
+import { createPollingScope, type PollingContext } from "../lib/pollingScope";
+import { matchesSelectedCameraFrame } from "../lib/cameraPreviewState";
 import type { CameraStatus, CaptureQualityTag, CaptureRecord, DatasetStatus } from "../types";
 
 type Props = {
@@ -19,12 +20,21 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [lastCapture, setLastCapture] = useState<CaptureRecord | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const mutationRef = useRef(false);
+  const scopeRef = useRef(createPollingScope());
+  useLayoutEffect(() => {
+    const scope = createPollingScope();
+    scopeRef.current = scope;
+    return () => scope.retire();
+  }, []);
 
   async function refreshStatus(context?: PollingContext) {
     const nextStatus = await fetchDatasetStatusStrict(context?.signal);
     if (context && !context.isCurrent()) return;
     setDatasetStatus(nextStatus);
     setLastCapture(nextStatus.last_capture);
+    setStatusError(null);
   }
 
   const { runNow: refreshDatasetStatus, waitForIdle: waitForDatasetStatusIdle } = useSerialPolling(refreshStatus, 3000, {
@@ -32,52 +42,76 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
     onError: (error) => {
       setDatasetStatus(null);
       setLastCapture(null);
-      setMessage(error instanceof Error ? error.message : "Dataset status could not be refreshed.");
+      setStatusError(error instanceof Error ? error.message : "Dataset status could not be refreshed.");
     },
   });
 
-  const captureReady = Boolean(cameraStatus?.frame_available && !cameraStatus.stale && cameraStatus.active_source_id && cameraStatus.origin);
+  const captureReady = Boolean(cameraStatus?.active_source_id && matchesSelectedCameraFrame(
+    cameraStatus, cameraStatus.active_source_id, cameraStatus.simulation_enabled ? "simulation" : "esp32",
+  ));
 
   async function saveCurrentFrame() {
-    if (!captureReady || !cameraStatus?.active_source_id || !cameraStatus.origin) return;
+    if (mutationRef.current || !captureReady || !cameraStatus?.active_source_id || !cameraStatus.origin ||
+        !datasetStatus?.capture_enabled || !sessionId.trim()) return;
     const expectedSource = cameraStatus.active_source_id;
     const expectedOrigin = cameraStatus.origin;
+    const scope = scopeRef.current;
+    mutationRef.current = true;
     setSaving(true);
     setMessage(null);
     try {
       await waitForDatasetStatusIdle();
+      if (!scope.isCurrent()) return;
       const record = await captureLatestFrame({
         session_id: sessionId, quality_tag: qualityTag, note,
         expected_source_id: expectedSource, expected_origin: expectedOrigin,
       });
-      if (record.source_id !== expectedSource || record.origin !== expectedOrigin) {
+      if (!scope.isCurrent()) return;
+      if (record.source_id !== expectedSource || record.origin !== expectedOrigin || !record.capture_id) {
         throw new Error("Captured frame identity differs from the selected preview; inspect the saved capture.");
       }
       setLastCapture(record);
       setMessage(`Captured ${record.image_path}`);
+      // The poll has separate error state. An acknowledged write remains acknowledged.
       await refreshDatasetStatus();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Capture failed.");
+      if (!scope.isCurrent()) return;
+      setDatasetStatus(null);
+      setLastCapture(null);
+      setMessage(error instanceof Error ? error.message : "Capture failed; refresh dataset status before retrying.");
     } finally {
-      setSaving(false);
+      mutationRef.current = false;
+      if (scope.isCurrent()) setSaving(false);
     }
   }
 
   async function deleteLastCapture() {
-    if (!lastCapture) return;
-    if (!window.confirm(`Permanently delete capture ${lastCapture.capture_id}? Its metadata and saved manual labels will also be removed.`)) return;
+    if (mutationRef.current || !lastCapture || !datasetStatus) return;
+    const id = lastCapture.capture_id;
+    if (!window.confirm(`Permanently delete capture ${id}? Its metadata and saved manual labels will also be removed.`)) return;
+    const scope = scopeRef.current;
+    mutationRef.current = true;
     setDeleting(true);
     setMessage(null);
+    setLastCapture(null);
     try {
       await waitForDatasetStatusIdle();
-      const result = await deleteDatasetCapture(lastCapture.capture_id);
-      setLastCapture(null);
-      setMessage(`Deleted ${result.capture_id}.`);
+      if (!scope.isCurrent()) return;
+      const result = await deleteDatasetCapture(id);
+      if (!scope.isCurrent()) return;
+      if (result.capture_id !== id || result.deleted !== true) {
+        throw new Error("Deletion was not confirmed for the selected capture; refresh dataset status.");
+      }
+      setMessage(`Deleted ${result.capture_id}.${result.cleanup_pending ? " File cleanup pending." : ""}`);
       await refreshDatasetStatus();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Capture could not be deleted.");
+      if (!scope.isCurrent()) return;
+      setDatasetStatus(null);
+      setLastCapture(null);
+      setMessage(error instanceof Error ? error.message : "Capture deletion could not be confirmed.");
     } finally {
-      setDeleting(false);
+      mutationRef.current = false;
+      if (scope.isCurrent()) setDeleting(false);
     }
   }
 
@@ -129,25 +163,26 @@ export function DatasetCapturePage({ cameraStatus }: Props) {
               Note
               <textarea value={note} maxLength={500} rows={4} placeholder="Optional context for later review" onChange={(event) => setNote(event.target.value)} />
             </label>
-            <button className="primary" onClick={() => void saveCurrentFrame()} disabled={saving || deleting || !captureReady || !sessionId || !datasetStatus?.capture_enabled}>
+            <button className="primary" onClick={() => void saveCurrentFrame()} disabled={saving || deleting || !captureReady || !sessionId.trim() || !datasetStatus?.capture_enabled}>
               {saving ? "Saving..." : "Capture frame"}
             </button>
-            {message && <p className={message.startsWith("Captured") || message.startsWith("Deleted") ? "success-message" : "error-message"}>{message}</p>}
+            {message && <p role="status" className={message.startsWith("Captured") || message.startsWith("Deleted") ? "success-message" : "error-message"}>{message}</p>}
+            {statusError && <p role="alert" className="error-message">Dataset status: {statusError}</p>}
           </section>
 
           <section className="panel compact-panel">
             <div className="panel-header"><h2>Dataset storage</h2></div>
             <div className="camera-status-list">
-              <div><span>Images</span><strong>{datasetStatus?.frame_count ?? 0}</strong></div>
-              <div><span>Metadata files</span><strong>{datasetStatus?.metadata_count ?? 0}</strong></div>
-              <div><span>Sessions</span><strong>{datasetStatus?.session_count ?? 0}</strong></div>
+              <div><span>Images</span><strong>{datasetStatus?.frame_count ?? "—"}</strong></div>
+              <div><span>Metadata files</span><strong>{datasetStatus?.metadata_count ?? "—"}</strong></div>
+              <div><span>Sessions</span><strong>{datasetStatus?.session_count ?? "—"}</strong></div>
               <div><span>Location</span><strong>{datasetStatus?.dataset_path ?? "datasets/captures"}</strong></div>
             </div>
             {lastCapture && (
               <>
                 <p className="small-note">Most recent capture</p>
                 <code className="endpoint-code">{lastCapture.image_path}</code>
-                <button className="danger" type="button" onClick={() => void deleteLastCapture()} disabled={deleting || saving}>
+                <button className="danger" type="button" onClick={() => void deleteLastCapture()} disabled={deleting || saving || !datasetStatus}>
                   {deleting ? "Deleting..." : "Delete last capture"}
                 </button>
               </>

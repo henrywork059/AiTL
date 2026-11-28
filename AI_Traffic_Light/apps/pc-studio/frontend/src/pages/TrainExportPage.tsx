@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { fetchRuntimeSettings, fetchTrainingDatasetStatusStrict, fetchTrainingStatusStrict, startTraining } from "../api";
 import { FunctionChecklist } from "../components/FunctionChecklist";
 import { TrainingConvergenceChart } from "../components/TrainingConvergenceChart";
 import { useSerialPolling } from "../lib/useSerialPolling";
-import type { PollingContext } from "../lib/pollingScope";
+import { createPollingScope, type PollingContext } from "../lib/pollingScope";
 import type { TrainingConfig, TrainingDatasetStatus, TrainingStatus } from "../types";
 
 const DEFAULT_CONFIG: TrainingConfig = {
@@ -23,15 +23,26 @@ export function TrainExportPage() {
   const [config, setConfig] = useState<TrainingConfig>(DEFAULT_CONFIG);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const startRef = useRef(false);
+  const scopeRef = useRef(createPollingScope());
+  useLayoutEffect(() => {
+    const scope = createPollingScope();
+    scopeRef.current = scope;
+    return () => scope.retire();
+  }, []);
 
   async function refreshStatus({ signal, isCurrent }: PollingContext) {
-    const [nextStatus, nextDataset] = await Promise.all([
+    const [nextStatus, nextDataset] = await Promise.allSettled([
       fetchTrainingStatusStrict(signal),
       fetchTrainingDatasetStatusStrict(signal),
     ]);
     if (!isCurrent()) return;
-    setStatus(nextStatus);
-    setManagedDataset(nextDataset);
+    setStatus(nextStatus.status === "fulfilled" ? nextStatus.value : null);
+    setManagedDataset(nextDataset.status === "fulfilled" ? nextDataset.value : null);
+    const failures = [nextStatus, nextDataset].flatMap(result =>
+      result.status === "rejected" ? [result.reason instanceof Error ? result.reason.message : "Training status could not be refreshed."] : []);
+    setStatusError(failures.length ? failures.join(" · ") : null);
   }
 
   useEffect(() => {
@@ -53,39 +64,49 @@ export function TrainExportPage() {
     onError: (nextError) => {
       setStatus(null);
       setManagedDataset(null);
-      setError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed.");
+      setStatusError(nextError instanceof Error ? nextError.message : "Training status could not be refreshed.");
     },
   });
 
   async function launchTraining() {
+    if (startRef.current || !status?.training_available || status.status === "running" ||
+        (config.dataset_yaml.trim() === "yolo/data.yaml" && (!managedDataset?.ready || managedDataset.stale))) return;
+    const scope = scopeRef.current;
+    startRef.current = true;
     setStarting(true);
     setError(null);
     try {
       await waitForTrainingStatusIdle();
-      const [currentStatus, currentDataset] = await Promise.all([
+      if (!scope.isCurrent()) return;
+      const [currentStatus, currentDataset] = await Promise.allSettled([
         fetchTrainingStatusStrict(), fetchTrainingDatasetStatusStrict(),
       ]);
-      setStatus(currentStatus);
-      setManagedDataset(currentDataset);
-      if (!currentStatus.training_available || currentStatus.status === "running") {
+      if (!scope.isCurrent()) return;
+      const trainer = currentStatus.status === "fulfilled" ? currentStatus.value : null;
+      const dataset = currentDataset.status === "fulfilled" ? currentDataset.value : null;
+      setStatus(trainer);
+      setManagedDataset(dataset);
+      if (!trainer?.training_available || trainer.status === "running") {
         throw new Error("Training is unavailable or another run is active.");
       }
-      if (config.dataset_yaml.trim() === "yolo/data.yaml" && (!currentDataset.ready || currentDataset.stale)) {
-        throw new Error(currentDataset.message || "Rebuild the managed dataset before training.");
+      if (config.dataset_yaml.trim() === "yolo/data.yaml" && (!dataset?.ready || dataset.stale)) {
+        throw new Error(dataset?.message || "Managed dataset status unavailable; rebuild or refresh before training.");
       }
-      setStatus(await startTraining(config));
-    } catch (nextError) {
+      // Only the acknowledged start response may report a new run.
       setStatus(null);
-      setManagedDataset(null);
-      setError(nextError instanceof Error ? nextError.message : "Training could not start.");
+      const started = await startTraining(config);
+      if (scope.isCurrent()) setStatus(started);
+    } catch (nextError) {
+      if (scope.isCurrent()) setError(nextError instanceof Error ? nextError.message : "Training could not start.");
     } finally {
-      setStarting(false);
+      startRef.current = false;
+      if (scope.isCurrent()) setStarting(false);
     }
   }
 
   const running = status?.status === "running";
   const usesManagedDataset = config.dataset_yaml.trim() === "yolo/data.yaml";
-  const managedDatasetBlocked = usesManagedDataset && !managedDataset?.ready;
+  const managedDatasetBlocked = usesManagedDataset && (!managedDataset?.ready || managedDataset.stale);
   const early = status?.early_stopping ?? null;
 
   return (
@@ -98,7 +119,7 @@ export function TrainExportPage() {
               <p className="placeholder-copy">Run local Ultralytics YOLO training and stop automatically when validation fitness stops improving.</p>
             </div>
             <span className={`status-pill ${status?.training_available ? "status-implemented" : "status-planned"}`}>
-              {status?.training_available ? "training available" : "dependency required"}
+              {status?.training_available ? "training available" : status ? "dependency required" : "status unavailable"}
             </span>
           </div>
           <div className="form-grid">
@@ -127,9 +148,9 @@ export function TrainExportPage() {
           <p className="small-note">Patience is the number of validation epochs allowed without a new best fitness score before the run stops early.</p>
           {usesManagedDataset && (
             <div className="camera-status-list training-status-list">
-              <div><span>Eligible reviewed frames</span><strong>{managedDataset?.eligible_frame_count ?? 0}</strong></div>
-              <div><span>Train / validation split</span><strong>{managedDataset?.train_count ?? 0} / {managedDataset?.val_count ?? 0}</strong></div>
-              <div><span>Managed dataset</span><strong>{managedDataset?.ready ? "ready" : managedDataset?.stale ? "rebuild required" : "not built"}</strong></div>
+              <div><span>Eligible reviewed frames</span><strong>{managedDataset?.eligible_frame_count ?? "—"}</strong></div>
+              <div><span>Train / validation split</span><strong>{managedDataset?.train_count ?? "—"} / {managedDataset?.val_count ?? "—"}</strong></div>
+              <div><span>Managed dataset</span><strong>{!managedDataset ? "unavailable" : managedDataset.stale ? "rebuild required" : managedDataset.ready ? "ready" : "not built"}</strong></div>
             </div>
           )}
           <button
@@ -139,13 +160,14 @@ export function TrainExportPage() {
           >
             {running ? "Training in progress..." : starting ? "Starting..." : "Start training"}
           </button>
-          {!status?.training_available && (
+          {status && !status.training_available && (
             <code className="endpoint-code">cd apps\pc-studio\backend<br />pip install -r requirements-training.txt</code>
           )}
           {managedDatasetBlocked && (
             <p className="warning-box">{managedDataset?.message ?? "Build the managed dataset in Dataset Review before using yolo/data.yaml."}</p>
           )}
-          {error && <p className="error-message">{error}</p>}
+          {error && <p className="error-message" role="alert">{error}</p>}
+          {statusError && <p className="error-message" role="alert">{statusError}</p>}
         </section>
 
         <aside className="panel">
@@ -155,7 +177,7 @@ export function TrainExportPage() {
           </div>
           <div className="progress-track"><div style={{ width: `${status?.progress ?? 0}%` }} /></div>
           <div className="camera-status-list training-status-list">
-            <div><span>Progress</span><strong>{status?.progress ?? 0}%</strong></div>
+            <div><span>Progress</span><strong>{status ? `${status.progress}%` : "—"}</strong></div>
             <div><span>Epochs completed</span><strong>{status?.completed_epochs ?? 0} / {status?.config?.epochs ?? config.epochs}</strong></div>
             <div><span>Run ID</span><strong>{status?.active_run_id ?? "none"}</strong></div>
             {status?.dataset_integrity_sha256 && <div><span>Verified dataset</span><strong title={status.dataset_integrity_sha256}>{status.dataset_integrity_sha256.slice(0, 12)}</strong></div>}

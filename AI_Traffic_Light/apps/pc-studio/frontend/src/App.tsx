@@ -67,6 +67,8 @@ export default function App() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [changingCameraMode, setChangingCameraMode] = useState(false);
+  const [cameraModeError, setCameraModeError] = useState<string | null>(null);
+  const changingCameraModeRef = useRef(false);
   const runtimeInitialized = useRef(false);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const cameraModeGenerationRef = useRef(0);
@@ -167,14 +169,23 @@ export default function App() {
   );
 
   const changeCameraSimulation = useCallback(async (enabled: boolean) => {
+    if (changingCameraModeRef.current) return;
+    changingCameraModeRef.current = true;
     cameraModeGenerationRef.current += 1;
     setChangingCameraMode(true);
+    setCameraModeError(null);
+    setCameraStatus(null);
     try {
       await waitForCameraStatusIdle();
       setCameraStatus(await setCameraSimulation(enabled));
+    } catch (error) {
+      // The request might have reached the server. Never infer the resulting mode.
+      setCameraStatus(null);
+      setCameraModeError(error instanceof Error ? error.message : "Camera mode change could not be confirmed.");
     } finally {
       // Discard any bulk refresh that began before or during the transition.
       cameraModeGenerationRef.current += 1;
+      changingCameraModeRef.current = false;
       setChangingCameraMode(false);
     }
   }, [waitForCameraStatusIdle]);
@@ -290,7 +301,7 @@ export default function App() {
 
   return (
     <>
-      <AppShell apiState={apiState} cameraStatus={cameraStatus} activePage={activePage} onPageChange={setActivePage} showSimulationTools={showSimulationTools} onSimulationToolsToggle={toggleSimulationTools}>{renderPage()}</AppShell>
+      <AppShell apiState={apiState} cameraStatus={cameraStatus} activePage={activePage} onPageChange={setActivePage} showSimulationTools={showSimulationTools} onSimulationToolsToggle={toggleSimulationTools}>{cameraModeError && <p className="error-message" role="alert">Camera mode: {cameraModeError} <button type="button" onClick={() => setCameraModeError(null)}>Dismiss</button></p>}{renderPage()}</AppShell>
       <AppStatusBar apiState={apiState} detectionCount={statusBarDetectionCount} preview={activePage === "live_ai"} />
     </>
   );

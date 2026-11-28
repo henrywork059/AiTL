@@ -62,8 +62,8 @@ window.fetch = async (input,init) => {
       if(command==="pause"){evalPaused=body.paused;}
       if(command==="stop"){evalGeneration++;evalRunning=false;cameraOwner=null;}
     }
-    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",max_ticks:2500,native_only:true,engine:evalRunning?"native":null,camera_owned:cameraOwner!==null,physical_output_allowed:false,
-      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,legacy_preview_layout_id:legacyLayoutId,legacy_preview_crossing:[[520,179],[760,179],[760,625],[520,625]],lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
+    return new Response(JSON.stringify({ok:true,data:{status:evalRunning?"running":"idle",provenance:"synthetic_sumo_projection",epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,mode:"fixed",density:"normal",geometry:"standard",profile:"default",max_ticks:2500,native_only:true,engine:evalRunning?"native":null,camera_owned:cameraOwner!==null,physical_output_allowed:false,
+      snapshot:evalRunning?{schema_version:1,provenance:"synthetic_sumo_projection",generation:evalGeneration,seed:42,tick:evalTick,time_s:evalTick/5,width:1280,height:720,paused:evalPaused,pixels_per_m:3.2,coordinate_space:"native_projection_v1",layout_id:layoutId,legacy_editor_compatible:false,legacy_preview_layout_id:legacyLayoutId,legacy_preview_crossing:[[520,179],[760,179],[760,625],[520,625]],lanes:[{id:"eval-road",kind:"road",points:[[20,100],[1000,100]],width_px:12}],agents:[{id:"sumo:pedestrian:p0",kind:"pedestrian",x:100+evalTick,y:100,road_id:"WC",speed_m_s:.65}]}:null}}),{headers:{"Content-Type":"application/json"}});
   }
   if (url.pathname === "/api/camera/simulation/native-projection") {
     nativeCalls++;
@@ -179,6 +179,13 @@ async function run(){
     await wait(()=>Boolean(button("Start evaluation")),"Standalone controls not loaded");
     button("Start evaluation")!.click();
     await wait(()=>Boolean(button("Advance 5 s")&&!button("Advance 5 s")!.disabled),"Standalone start failed");
+    check(host.querySelector("[data-native-applied-config]")?.textContent?.includes("native / standard / normal / fixed")&&host.querySelector("[data-native-applied-config]")?.textContent?.includes("seed 42"),"Applied native scenario missing");
+    const draftSeed=host.querySelector<HTMLInputElement>('input[aria-label="Native seed"]')!;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(draftSeed,"");draftSeed.dispatchEvent(new Event("input",{bubbles:true}));
+    await wait(()=>button("Reset evaluation")?.disabled,"Empty native seed allowed reset");
+    check(host.querySelector("[data-native-applied-config]")?.textContent?.includes("seed 42"),"Draft seed changed applied configuration");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(draftSeed,"42");draftSeed.dispatchEvent(new Event("input",{bubbles:true}));
+    await wait(()=>Boolean(button("Reset evaluation")&&!button("Reset evaluation")!.disabled),"Valid seed did not restore reset");
     button("Advance 5 s")!.click();
     await wait(()=>Boolean(host.querySelector("[data-native-tick='25']")),"Standalone step failed");
     await wait(()=>Boolean(button("Play evaluation")&&!button("Play evaluation")!.disabled),"Standalone playback unavailable");

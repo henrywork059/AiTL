@@ -47,6 +47,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   const [playing,setPlaying]=useState(false);
   const play=useRef<{epoch:string;generation:number}|null>(null);
   const [comparisonUrl,setComparisonUrl]=useState<string|null>(null);
+  const [comparisonLabel,setComparisonLabel]=useState("");
   useEffect(()=>()=>{if(comparisonUrl)URL.revokeObjectURL(comparisonUrl);},[comparisonUrl]);
   const stopPlayback=()=>{play.current=null;setPlaying(false);};
   const [top,setTop]=useState(false);
@@ -146,11 +147,15 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   };
   const compare=async()=>{
     if(!state||scene||active.current)return;
-    const controller=new AbortController();active.current=controller;setPending(true);setComparisonUrl(null);
+    const controller=new AbortController();active.current=controller;setPending(true);setComparisonUrl(null);setComparisonLabel("");
     try{
       await polling.waitForIdle();if(controller.signal.aborted)return;
       const blob=await runNativeComparison(state,density,controller.signal,seed,duration,profile,geometry,engine);
-      if(!controller.signal.aborted)setComparisonUrl(URL.createObjectURL(blob));
+      if(!controller.signal.aborted){
+        if(!blob.size)throw new Error("Empty comparison archive");
+        setComparisonUrl(URL.createObjectURL(blob));
+        setComparisonLabel(`${engine} · ${geometry} · ${density} · seed ${seed} · ${duration}s · profile ${profile||"active at request"}`);
+      }
     }catch{if(!controller.signal.aborted)setStatus("Native comparison failed");}
     finally{active.current=null;if(!controller.signal.aborted)setPending(false);}
   };
@@ -181,14 +186,14 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
         {three&&<><button type="button" onClick={()=>setTop(!top)}>{top?"Native perspective":"Native top"}</button><button type="button" onClick={()=>setDetail(!detail)}>{detail?"Native overview":"Native detail"}</button></>}
         {standalone&&<button type="button" onClick={()=>{setRegion(false);setThree(false);setImage(!image);}}>{image?"Scene":"PNG"}</button>}</>}
       {standalone&&state&&state.status!=="disabled"&&<>
-        <select aria-label="Evaluation engine" value={engine} disabled={pending||state.status==="busy"} onChange={e=>{const next=e.target.value as "native"|"reference";setEngine(next);if(next==="reference"&&geometry.startsWith("midblock"))setGeometry("standard");}}><option value="native">SUMO</option><option value="reference">Finite reference</option></select>
+        <span className="status-pill muted">Next start/reset</span><select aria-label="Evaluation engine" value={engine} disabled={pending||state.status==="busy"} onChange={e=>{const next=e.target.value as "native"|"reference";setEngine(next);if(next==="reference"&&geometry.startsWith("midblock"))setGeometry("standard");}}><option value="native">SUMO</option><option value="reference">Finite reference</option></select>
         <select aria-label="Native geometry" value={geometry} disabled={pending} onChange={e=>setGeometry(e.target.value)}><option value="standard">Standard junction</option><option value="compact">Compact junction</option><option value="elongated">Elongated junction</option>{engine==="native"&&<><option value="midblock">Midblock · cyclic slots (trial)</option><option value="midblock_compact">Midblock · compact</option><option value="midblock_wide">Midblock · wider crossing</option></>}</select>
         <select aria-label="Native density" value={density} disabled={pending} onChange={e=>setDensity(e.target.value)}><option>light</option><option>normal</option><option>busy</option></select>
         <select aria-label="Native policy" value={mode} disabled={pending} onChange={e=>setMode(e.target.value)}><option>fixed</option><option>adaptive</option></select>
-        <label>Seed <input aria-label="Native seed" type="number" min={0} max={2147483647} value={seed} disabled={pending} onChange={e=>setSeed(Number(e.target.value))} style={{width:90}}/></label>
+        <label>Seed <input aria-label="Native seed" type="number" min={0} max={2147483647} value={Number.isNaN(seed)?"":seed} disabled={pending} onChange={e=>setSeed(e.target.valueAsNumber)} style={{width:90}}/></label>
         <button type="button" disabled={locked||pending||state.status==="busy"||!validSeed} onClick={()=>void command("start",{density,mode,seed,geometry,engine})}>{scene?(engine!==state.engine?"Switch engine (reset)":"Reset evaluation"):"Start evaluation"}</button>
         {!scene&&<><label>Duration <select value={duration} disabled={pending} onChange={e=>setDuration(Number(e.target.value))}>{[30,60,180,300,500].map(v=><option key={v} value={v}>{v}s</option>)}</select></label><button type="button" disabled={pending||state.status==="busy"||!validSeed} onClick={()=>void compare()}>Compare fixed/adaptive</button>
-          {comparisonUrl&&<a href={comparisonUrl} download="mesh-evaluation-comparison.zip">Comparison ZIP</a>}</>}
+          {comparisonUrl&&<a href={comparisonUrl} download="mesh-evaluation-comparison.zip" title={comparisonLabel}>Comparison ZIP · {comparisonLabel}</a>}</>}
         {scene&&<>
           <button type="button" disabled={locked||pending||region||scene.paused||scene.tick>=state.max_ticks} onClick={()=>{
             if(play.current){stopPlayback();return;}
@@ -203,7 +208,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
         </>}
       </>}
     </div>
-    <span role="status">{status}{locked?" · Another workspace owns playback":owned?" · Camera-owned session":""}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene?" · Separate evaluation coordinate plane":""}</span>
+    <span role="status">{status}{locked?" · Another workspace owns playback":owned?" · Camera-owned session":""}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene&&state?<span data-native-applied-config="true"> · Applied {state.engine??"unknown"} / {state.geometry??"unknown"} / {state.density??"unknown"} / {state.mode??"unknown"} · seed {Number.isSafeInteger(scene.seed)?scene.seed:"unknown"} · profile {state.profile??"unknown"} · Separate evaluation coordinate plane</span>:null}</span>
   </div>;
 }
 

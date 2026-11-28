@@ -1,5 +1,7 @@
 import {useEffect,useState} from "react";
-import type {CameraStatus} from "../src/types";
+import type {CameraStatus, CaptureRecord} from "../src/types";
+import {SimulationLabPage} from "../src/pages/SimulationLabPage";
+import type {SimulationExperiment, ExperimentModeResult} from "../src/types/experiments";
 import {createRoot} from "react-dom/client";
 import {flushSync} from "react-dom";
 import {AppShell} from "../src/layout/AppShell";
@@ -23,7 +25,7 @@ import type {CrosswalkConfig} from "../src/types/crosswalks";
 import "../src/styles.css";
 
 const page=new URLSearchParams(location.search).get("page")??"dashboard";
-const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",junctions:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review",capture:"dataset_capture",training:"train_export"};
+const routes:Record<string,AppPageId>={dashboard:"dashboard",cameras:"camera_settings",diagnostics:"camera_diagnostics",network:"junction_network",junctions:"junction_network",crosswalks:"crosswalks",models:"model_registry",review:"dataset_review",capture:"dataset_capture",training:"train_export",experiments:"simulation_lab"};
 const fixture:CrosswalkConfig={schema_version:1,crosswalks:["North crossing","South crossing"].map((label,i)=>({id:"crossing_"+i,label,location:"Synthetic fixture",camera_side_a_id:i===0?"fixture_a":null,camera_side_b_id:null,regions:[]}))};
 const model={model_id:"fixture_model",model_path:"outputs/training/fixture_model/weights/best.pt",modified_at_ms:0,size_bytes:1048576,is_active:false,is_default:true,is_latest:true};
 const classes=[{id:0,name:"vehicle"}];
@@ -33,6 +35,8 @@ let labelFailure=true, imageFailure=true, labelSaves=0, imageVariant:"valid"|"wr
 let captureBImageRequests=0, datasetBuilt=false, datasetStale=false, datasetBuilds=0, captureDeletes=0;
 let capturePostCount=0, captureSavedCount=0, receiverSource="camera_b", trainingStatusFailure=false, trainingStartCount=0, trainingPollCount=0;
 let trainerState="idle";
+let captureStatusFailure=false, datasetOnlyFailure=false;
+let savedCapture:CaptureRecord|null=null;
 if(page==="training"){datasetBuilt=true;datasetStale=true;captureList.forEach(c=>{c.labeled=true;c.label_count=1;});}
 const datasetStatus=()=>{const reviewed=captureList.filter(c=>c.labeled);return {ready:datasetBuilt&&!datasetStale,stale:datasetStale,eligible_frame_count:reviewed.length,labeled_frame_count:reviewed.length,label_box_count:reviewed.reduce((sum,c)=>sum+c.label_count,0),train_count:datasetBuilt?1:0,val_count:datasetBuilt?1:0,message:"Synthetic fixture",classes};};
 // Encode once synchronously: canvas.toBlob callbacks can be delayed by headless virtual time.
@@ -48,6 +52,21 @@ const junctionCameras:JunctionCameraView[]=profiles.map(p=>({source_id:p.source_
 const junctionOverview=():JunctionNetworkOverview=>{const nodes=junctionConfig.intersections.map(c=>{const node=fallbackJunctionNode(c,junctionConfig.active_intersection_id);if(c.id==="j_a"){node.live={...node.live,available:true,pipeline_source_active:true,source_id:"camera_a",source_mapping_matched:true,observation_provenance:"ai_detection",phase:"vehicle_green",vehicle:{total:9,waiting:4,load:"moderate"},pedestrian:{total:2,waiting:2,crossing:0,load:"light"}};}return node;});return {schema_version:1,generated_at_ms:Date.now(),network:junctionConfig,available_cameras:junctionCameras,active_source_id:"camera_a",current_frame_source_id:"camera_a",observation_intersection_id:"j_a",observation_provenance:"ai_detection",source_mapping_matched:true,simulation_enabled:false,junctions:nodes,links:[],warnings:[],summary:{junction_count:2,enabled_junction_count:2,link_count:0,saved_esp_camera_count:2,assigned_esp_camera_count:2,reachable_esp_camera_count:2,streaming_esp_camera_count:2,warning_junction_count:0,event_count:0,heavy_vehicle_junction_count:0,heavy_pedestrian_junction_count:0},multi_camera_assignment:true,simultaneous_multi_junction_inference:false,prototype_only:true,scope_note:"Synthetic fixture; no physical authority."};};
 if(page==="junctions")savedNetwork={...fixture,crosswalks:fixture.crosswalks.map((c,i)=>({...c,camera_side_a_id:i===0?"camera_a":null}))};
 const remoteState=()=>({cameras:profiles.map(p=>({...p,selected:p.source_id===selectedCamera})),active_source_id:selectedCamera,camera_count:2,max_saved_cameras:12,source_id:selectedCamera,host:profiles.find(p=>p.source_id===selectedCamera)?.host});
+const waitMetrics={count:1,average_seconds:4,median_seconds:4,p95_seconds:4,max_seconds:4,total_seconds:4};
+const queueMetrics={sample_count:1,average:1,p95:1,max:1,queue_seconds:1,occupied_seconds:1,occupied_share_percent:100};
+function experimentMode(mode:"fixed"|"adaptive"):ExperimentModeResult{return {mode,metrics:{
+  waiting:{vehicle:waitMetrics,pedestrian:waitMetrics},
+  queues:{vehicle:queueMetrics,pedestrian:queueMetrics,simultaneous_queue_seconds:1,simultaneous_queue_share_percent:100},
+  throughput:{vehicle_passages:2,pedestrian_crossings:1,vehicle_per_minute:2,pedestrian_per_minute:1,combined_services:3,combined_services_per_minute:3,vehicle_passages_per_green_minute:2},
+  signal:{phase_time_seconds:{vehicle_green:60},phase_share_percent:{vehicle_green:100},phase_transitions:0,cycles_completed:0,clearance_time_seconds:0,clearance_share_percent:0,rule_application_count:0,rule_applications:{},extension_seconds:0,reduction_seconds:0},
+  diagnostics:{protected_overlap_seconds:0,protected_overlap_detected:false,note:"Synthetic fixture"}},
+  final_signal:null,timeline:[]};}
+function experimentFixture(id:string,seed:number):SimulationExperiment{return {run_id:id,created_at_ms:123456,label:id,scenario:{density:"normal",duration_seconds:60,seed,sample_interval_seconds:1,profile:"fixture",comparison:["fixed","adaptive"]},
+  fixed:experimentMode("fixed"),adaptive:experimentMode("adaptive"),
+  comparison:Object.fromEntries(["vehicle_wait_average","pedestrian_wait_average","vehicle_throughput","pedestrian_throughput","combined_throughput","simultaneous_queue_time"].map(key=>[key,{fixed:4,adaptive:4,difference:0,percent_change:0,adaptive_direction:"same",lower_is_better:true}])),
+  prototype_only:true,scope_note:"Synthetic browser fixture, not measured results"};}
+let storedExperiments=[experimentFixture("run_a",11),experimentFixture("run_b",22)];
+let experimentDetailFailure=true,experimentProfileFailure=false,experimentListFailure=false,experimentDeletes=0,experimentCreates=0;
 const fixtureError=(message:string)=>new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message}}),{status:503,headers:{"Content-Type":"application/json"}});
 window.fetch=async (input,init)=>{
   const path=new URL(typeof input==="string"?input:input instanceof URL?input.href:input.url,location.href).pathname;
@@ -59,12 +78,27 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");p.stream_connected=p.streaming;data=remoteState();}
   else if(path==="/api/camera/frame")return new Response(validFixtureImage,{headers:{"Content-Type":"image/png"}});
   else if(path==="/api/camera/status")data={mode:"receiver",simulation_enabled:false,simulation_paused:false,frame_available:false,stale:true,streaming:profiles.find(p=>p.source_id===selectedCamera)?.streaming??false,active_source_id:selectedCamera,resolution:null,age_ms:null,frame_url:null};
-  else if(path==="/api/dataset/status")data={active_dataset_id:"captures",session_count:captureSavedCount>0?1:0,frame_count:captureSavedCount,metadata_count:captureSavedCount,capture_enabled:true,status:"ready",dataset_path:"datasets/captures",last_capture:null};
-  else if(path==="/api/dataset/captures"&&init?.method==="POST"){capturePostCount++;const body=JSON.parse(String(init.body));check(body.expected_source_id==="camera_a"&&body.expected_origin==="upload"&&body.session_id==="default","Capture identity preflight missing");if(body.expected_source_id!==receiverSource)return fixtureError("Camera source changed before capture");captureSavedCount++;data={capture_id:"saved_capture_1",source_id:receiverSource,origin:"upload",image_path:"captures/default/saved_capture_1.png"};}
+  else if(path==="/api/dataset/status"){if(captureStatusFailure)return fixtureError("Dataset storage status unavailable");data={active_dataset_id:"captures",session_count:captureSavedCount>0?1:0,frame_count:captureSavedCount,metadata_count:captureSavedCount,capture_enabled:true,status:"ready",dataset_path:"datasets/captures",last_capture:savedCapture};}
+  else if(path==="/api/dataset/captures"&&init?.method==="POST"){capturePostCount++;const body=JSON.parse(String(init.body));check(body.expected_source_id==="camera_a"&&body.expected_origin==="upload"&&body.session_id==="default","Capture identity preflight missing");if(body.expected_source_id!==receiverSource)return fixtureError("Camera source changed before capture");captureSavedCount++;savedCapture={capture_id:"saved_capture_1",session_id:"default",source_id:receiverSource,origin:"upload",image_path:"captures/default/saved_capture_1.png",metadata_path:"captures/default/saved_capture_1.json",content_type:"image/png",width:1280,height:720,source_frame_number:7,source_received_at_ms:123456,captured_at_ms:123457,size_bytes:500,quality_tag:"unreviewed",note:""};data=savedCapture;captureStatusFailure=true;}
+  else if(path==="/api/dataset/captures/saved_capture_1"&&init?.method==="DELETE"){check(savedCapture!==null,"Wrong capture deletion target");savedCapture=null;captureSavedCount=0;captureStatusFailure=true;data={capture_id:"saved_capture_1",session_id:"default",deleted:true,cleanup_pending:false,deleted_paths:[],training_dataset:datasetStatus()};}
   else if(path==="/api/dataset/captures")data={captures:captureList,total:captureList.length,classes};
   else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/image")){const id=path.split("/")[4];if(id==="cap_b"){captureBImageRequests++;if(imageFailure)return fixtureError("Fixture image unavailable");}const blob=id!=="cap_b"||imageVariant==="valid"?validFixtureImage:imageVariant==="wrong-size"?wrongSizeFixtureImage:invalidFixtureImage;return new Response(blob,{headers:{"Content-Type":"image/png"}});}
-  else if(path==="/api/dataset/training-dataset/status"){if(trainingStatusFailure)return fixtureError("Managed dataset status unavailable");data=datasetStatus();}
+  else if(path==="/api/dataset/training-dataset/status"){if(trainingStatusFailure||datasetOnlyFailure)return fixtureError("Managed dataset status unavailable");data=datasetStatus();}
   else if(path==="/api/settings/runtime")data=fallbackRuntimeSettings;
+  else if(path==="/api/traffic/signal-rules"&&page==="experiments"){if(experimentProfileFailure)return fixtureError("Signal profile unavailable");data={profiles:{fixture:{}},active_profile:"fixture"};}
+  else if(path==="/api/traffic/experiments"&&init?.method==="POST"&&page==="experiments"){
+    const body=JSON.parse(String(init.body));check(body.profile==="fixture","Wrong experiment profile");experimentCreates++;
+    const created=experimentFixture("run_c",body.seed);storedExperiments=[created,...storedExperiments];experimentListFailure=true;data=created;
+  }
+  else if(path==="/api/traffic/experiments"&&page==="experiments"){
+    if(experimentListFailure)return fixtureError("Stored experiment list unavailable");
+    data={experiments:storedExperiments.map(run=>({run_id:run.run_id,created_at_ms:run.created_at_ms,label:run.label,scenario:run.scenario,headline:run.comparison})),total:storedExperiments.length,storage_path:"fixture",prototype_only:true};
+  }
+  else if(path.startsWith("/api/traffic/experiments/")&&page==="experiments"){
+    const id=decodeURIComponent(path.split("/").pop()!);
+    if(init?.method==="DELETE"){check(id==="run_c"&&storedExperiments.some(run=>run.run_id===id),"Wrong stored experiment deletion");experimentDeletes++;storedExperiments=storedExperiments.filter(run=>run.run_id!==id);data={deleted:true,run_id:id};}
+    else {if(id==="run_b"){await new Promise(resolve=>setTimeout(resolve,350));if(experimentDetailFailure)return fixtureError("Stored experiment unavailable");}const found=storedExperiments.find(run=>run.run_id===id);if(!found)return fixtureError("Unknown experiment");data=found;}
+  }
   else if(path==="/api/training/status"){trainingPollCount++;if(trainingStatusFailure)return fixtureError("Training status unavailable");data={training_available:true,status:trainerState,progress:trainerState==="running"?2:0,completed_epochs:0,active_run_id:trainerState==="running"?"fixture_run":null,dataset_integrity_sha256:trainerState==="running"?"a".repeat(64):null,message:"Synthetic training fixture",config:null,output_path:null,best_model_path:null,error:null,history:[],early_stopping:null};}
   else if(path==="/api/training/start"){const body=JSON.parse(String(init?.body));check(body.dataset_yaml==="yolo/data.yaml"&&datasetStatus().ready&&!datasetStatus().stale,"Training started with stale managed dataset");trainingStartCount++;trainerState="running";data={training_available:true,status:"running",progress:0,completed_epochs:0,active_run_id:"fixture_run",dataset_integrity_sha256:"a".repeat(64),message:"Synthetic run initiated",config:body,output_path:null,best_model_path:null,error:null,history:[],early_stopping:null};}
   else if(path==="/api/dataset/training-dataset"&&init?.method==="POST"){check(JSON.parse(String(init.body)).validation_fraction===0.2&&datasetStatus().eligible_frame_count>=2,"Invalid dataset build");datasetBuilds++;datasetBuilt=true;datasetStale=false;data=datasetStatus();}
@@ -94,7 +128,7 @@ function CameraFixture(){
   const [status,setStatus]=useState<CameraStatus|null>(null);
   return <CameraSettingsPage status={status} showSimulationTools={false} onSimulationChange={()=>{}} onStatusChange={setStatus} changingMode={false}/>;
 }
-const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions","capture","training","cameras"].includes(page)?120:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
+const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions","capture","training","cameras","experiments"].includes(page)?120:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 let dragSerial=0;
 async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};const id=++dragSerial;result.dataset.drag=JSON.stringify({id,from:toScreen(start),to:toScreen(end),target:selector===".crosswalk-region-overlay"?".crosswalk-region-vertex":".label-canvas",svgSelector:selector,logicalFrom:start,logicalTo:end});await waitFor(()=>result.dataset.dragDone===String(id)&&done(),"Real pointer drag not committed: "+selector+"; released="+result.dataset.dragDone+"; vertices="+[...svg.querySelectorAll("circle")].map(c=>c.getAttribute("cx")+","+c.getAttribute("cy")).join(";"));delete result.dataset.drag;}
@@ -102,8 +136,8 @@ const vertexNear=(x:number,y:number)=>{const c=document.querySelector(".crosswal
 function CaptureFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:true,streaming:true,active_source_id:"camera_a",resolution:{width:1280,height:720},content_type:"image/png",received_at_ms:123456,age_ms:50,frame_number:7,size_bytes:500,origin:"upload",stale:false,frame_url:null,upload_endpoint:""});useEffect(()=>{const image=document.querySelector<HTMLImageElement>(".camera-preview-panel img");if(image)image.src=location.origin+"/api/camera/frame";},[status.stale]);return <><button id="fixture-source-stale" type="button" onClick={()=>setStatus(current=>({...current,stale:!current.stale}))}>Toggle fixture stale</button><DatasetCapturePage cameraStatus={status}/></>;}
 function CrosswalkFixture(){const [status,setStatus]=useState<CameraStatus>({mode:"receiver",simulation_enabled:false,simulation_paused:false,simulation_density:"normal",frame_available:false,streaming:true,active_source_id:"camera_a",resolution:null,content_type:null,received_at_ms:null,age_ms:null,frame_number:0,size_bytes:0,origin:null,stale:false,frame_url:null,upload_endpoint:""});return <CrosswalksPage cameraStatus={status} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}} onCameraStatusChange={setStatus}/>;}
 async function main(){
-  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="capture"?<CaptureFixture/>:page==="training"?<TrainExportPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
-  flushSync(()=>root.render(<AppShell activePage={routes[page]} apiState={apiState} cameraStatus={null} onPageChange={id=>{selected=id;}} showSimulationTools={false} onSimulationToolsToggle={()=>{}}>{content}</AppShell>));
+  const content=page==="cameras"?<CameraFixture/>:page==="diagnostics"?<CameraDiagnosticsPage/>:page==="network"?<NetworkFixture/>:page==="junctions"?<JunctionNetworkPage cameraStatus={null} showSimulationTools={false} changingMode={false} onSimulationChange={async()=>{}}/>:page==="crosswalks"?<CrosswalkFixture/>:page==="review"?<DatasetReviewPage/>:page==="capture"?<CaptureFixture/>:page==="training"?<TrainExportPage/>:page==="experiments"?<SimulationLabPage/>:page==="models"?<ModelRegistryPage runtimeSettings={fallbackRuntimeSettings} onSettingsChange={()=>{}}/>:<DashboardPage health={null} smokeStatus={null} cameraStatus={null} apiState={apiState} onRefresh={()=>{}} refreshing={false} onNavigate={id=>{selected=id;}}/>;
+  flushSync(()=>root.render(<AppShell activePage={routes[page]} apiState={apiState} cameraStatus={null} onPageChange={id=>{selected=id;}} showSimulationTools={page==="experiments"} onSimulationToolsToggle={()=>{}}>{content}</AppShell>));
   for(let i=0;i<20;i++){if((page!=="models"||document.body.textContent?.includes("fixture_model"))&&(page!=="cameras"||document.body.textContent?.includes("camera_b")))break;await pause();}
   await pause();
   const mobile=innerWidth<=760;
@@ -258,7 +292,16 @@ async function main(){
     receiverSource="camera_a";
     await waitFor(()=>!findButton("Capture frame")!.disabled,"Capture recovery unavailable");
     findButton("Capture frame")!.click();
-    await waitFor(()=>capturePostCount===2&&captureSavedCount===1&&document.body.textContent?.includes("Captured captures/default/saved_capture_1.png"),"Qualified source capture did not succeed");
+    await waitFor(()=>capturePostCount===2&&captureSavedCount===1&&document.body.textContent?.includes("Captured captures/default/saved_capture_1.png")&&document.body.textContent?.includes("Dataset storage status unavailable"),"Capture acknowledgement was lost on refresh failure");
+    check(!findButton("Delete last capture"),"Unverified capture status allowed deletion");
+    captureStatusFailure=false;
+    await waitFor(()=>findButton("Delete last capture")&&!findButton("Delete last capture")!.disabled,"Capture storage did not recover");
+    window.confirm=()=>true;
+    findButton("Delete last capture")!.click();
+    await waitFor(()=>captureSavedCount===0&&document.body.textContent?.includes("Deleted saved_capture_1.")&&document.body.textContent?.includes("Dataset storage status unavailable"),"Confirmed deletion was lost on refresh failure");
+    check(!findButton("Delete last capture"),"Deleted capture stayed actionable");
+    captureStatusFailure=false;
+    await waitFor(()=>findButton("Capture frame")&&!findButton("Capture frame")!.disabled,"Capture status did not recover after deletion");
   }
   if(page==="training"){
     await waitFor(()=>trainingPollCount>0&&findButton("Start training")?.disabled&&document.body.textContent?.includes("rebuild required"),"Stale dataset did not block training");
@@ -274,6 +317,32 @@ async function main(){
     await waitFor(()=>trainingStartCount===1&&document.body.textContent?.includes("Training in progress"),"Training fresh readiness preflight or launch failed");
     check(document.body.textContent?.includes("fixture_run"),"Training run identity not displayed");
     check(document.body.textContent?.includes("aaaaaaaaaaaa")&&document.body.textContent?.includes("Verified dataset"),"Training dataset digest not displayed");
+    datasetOnlyFailure=true;
+    await waitFor(()=>document.body.textContent?.includes("Managed dataset status unavailable"),"Dataset-only failure not displayed");
+    check(document.body.textContent?.includes("fixture_run")&&findButton("Training in progress...")?.disabled,"Dataset-only failure withdrew verified running trainer");
+    datasetOnlyFailure=false;
+    await waitFor(()=>!document.body.textContent?.includes("Managed dataset status unavailable"),"Dataset status recovery failed");
+  }
+  if(page==="experiments"){
+    const select=()=>document.querySelector<HTMLSelectElement>(".experiment-saved-row select")!;
+    const enabled=(label:string)=>Boolean(findButton(label)&&!findButton(label)!.disabled);
+    await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_a","Initial stored experiment not verified");
+    select().value="run_b";select().dispatchEvent(new Event("change",{bubbles:true}));
+    await waitFor(()=>select().value==="run_b"&&findButton("Export samples CSV")?.disabled&&findButton("Delete run")?.disabled,"Stale result remained actionable during selection");
+    await waitFor(()=>document.body.textContent?.includes("Stored experiment unavailable")&&enabled("Refresh stored runs"),"Selection failure not displayed");
+    check(findButton("Export samples CSV")?.disabled&&findButton("Delete run")?.disabled,"Failed selection restored stale actions");
+    experimentDetailFailure=false;experimentProfileFailure=true;findButton("Refresh stored runs")!.click();
+    await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_b"&&document.body.textContent?.includes("Signal profile unavailable"),"Stored result recovery blocked by missing profile");
+    check(findButton("Run comparison")?.disabled,"Unverified profile allowed a new comparison");
+    experimentProfileFailure=false;findButton("Refresh stored runs")!.click();
+    await waitFor(()=>enabled("Run comparison"),"Profile recovery unavailable");
+    findButton("Run comparison")!.click();
+    await waitFor(()=>experimentCreates===1&&select().value==="run_c"&&enabled("Export samples CSV")&&document.body.textContent?.includes("Experiment saved; the stored-run list could not be refreshed."),"Acknowledged experiment creation lost after list failure");
+    window.confirm=()=>true;findButton("Delete run")!.click();
+    await waitFor(()=>experimentDeletes===1&&select().value===""&&document.body.textContent?.includes("Experiment deleted; the stored-run list could not be refreshed."),"Acknowledged experiment deletion lost");
+    check(findButton("Delete run")?.disabled&&findButton("Export samples CSV")?.disabled,"Deleted experiment remained actionable");
+    experimentListFailure=false;findButton("Refresh stored runs")!.click();
+    await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_a","Stored experiment list recovery failed");
   }
   if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;load.click();for(let i=0;i<20&&!load.disabled;i++)await pause();await pause();check(activeModel&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model activation");modelFailure=true;const refresh=[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")!;refresh.click();for(let i=0;i<20&&!document.body.textContent?.includes("Model registry unavailable or loading.");i++)await pause();check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;[...document.querySelectorAll("button")].find(b=>b.textContent==="Refresh")?.click();for(let i=0;i<20&&!document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model");i++)await pause();check(document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Model recovery");}
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";

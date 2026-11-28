@@ -134,10 +134,10 @@ try {
   const png=resolve(process.env.RUNNER_TEMP||'.','mesh-renderer.png');
   const shot=spawnSync(edge,[...args,'--user-data-dir='+profile+'-shot','--screenshot='+png,url],{encoding:'utf8',timeout:45000,windowsHide:true});
   if(shot.status!==0||!existsSync(png)||readFileSync(png).length<1000)throw new Error('Screenshot missing');
-  for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['capture',1440,1000],['training',1440,1000],['diagnostics',600,900],['network',1440,1000],['junctions',1440,1000],['crosswalks',1440,1000],['models',600,900],['review',1440,1000]]){
+  for(const [page,width,height] of [['dashboard',1440,1000],['cameras',1440,1000],['capture',1440,1000],['training',1440,1000],['experiments',1440,1000],['diagnostics',600,900],['network',1440,1000],['junctions',1440,1000],['crosswalks',1440,1000],['models',600,900],['review',1440,1000]]){
     const workspaceUrl='http://127.0.0.1:4179/workspace.html?page='+page;
     const workspaceArgs=[...args.filter(x=>!x.startsWith('--window-size=')&&!x.startsWith('--virtual-time-budget=')),'--window-size='+width+','+height,'--virtual-time-budget=7000'];
-    if(page==='review'||page==='crosswalks'||page==='junctions'||page==='capture'||page==='training'||page==='cameras'){await reviewWithRealTime(workspaceUrl,workspaceArgs,page);continue;}
+    if(page==='review'||page==='crosswalks'||page==='junctions'||page==='capture'||page==='training'||page==='cameras'||page==='experiments'){await reviewWithRealTime(workspaceUrl,workspaceArgs,page);continue;}
     const dom=spawnSync(edge,[...workspaceArgs,'--user-data-dir='+profile+'-workspace-'+page,'--dump-dom',workspaceUrl],{encoding:'utf8',timeout:45000,windowsHide:true});
     if(dom.status!==0||!dom.stdout.includes('MESH_WORKSPACE_PASS · synthetic API fixture'))throw Error('Workspace '+page+' failed: '+dom.stdout.slice(-2500)+' '+dom.stderr.slice(-1000));
     const target=resolve(process.env.RUNNER_TEMP||'.','mesh-workspace-'+page+'.png');

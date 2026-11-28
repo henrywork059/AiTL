@@ -328,7 +328,7 @@ export function fetchNativeProjection(signal: AbortSignal): Promise<NativeProjec
   );
 }
 
-export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|"midblock_compact"|"midblock_wide"|null;native_only:boolean;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
+export type NativeEvaluationState = NativeProjectionResponse & {epoch:string;generation:number;mode:"fixed"|"adaptive"|null;density:"light"|"normal"|"busy"|null;max_ticks:number;geometry?:"standard"|"compact"|"elongated"|"midblock"|"midblock_compact"|"midblock_wide"|null;native_only:boolean;profile?:string|null;engine?:"native"|"reference"|null;evaluation_only?:true;camera_owned?:boolean;available_engines?:Array<"native"|"reference">;physical_output_allowed:false};
 const nativeEvaluationBase = `${API_BASE}/api/camera/simulation/native-evaluation`;
 export function fetchNativeEvaluation(signal:AbortSignal):Promise<NativeEvaluationState>{
   return requestJsonStrict<NativeEvaluationState>(nativeEvaluationBase,{signal,cache:"no-store"});
