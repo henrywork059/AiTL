@@ -30,8 +30,10 @@ def main() -> None:
     assert 'role="listitem"' in saved
     assert 'type="button"' in saved
     assert 'onClick={() => void chooseSavedCamera(camera.source_id)}' in saved
-    assert 'aria-pressed={camera.selected}' in saved
-    assert 'disabled={busy}' in saved
+    assert 'aria-pressed={registryCurrent && camera.selected}' in saved
+    assert 'disabled={busy || changingMode}' in saved
+    assert 'registryCurrent && camera.selected ? " is-selected"' in saved
+    assert 'registryCurrent && camera.selected && <small>Active preview</small>' in saved
     assert 'className={`camera-status-entry' in saved
     assert "const next = await selectRemoteCamera(nextSourceId)" in cameras
     assert "loadSelectedProfile(next)" in cameras
