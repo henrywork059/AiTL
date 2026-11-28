@@ -1,6 +1,6 @@
 """Deterministic checks of every-tick reference and bracket ambiguity."""
 import unittest
-from native_detector_tick_truth import bracket_review,collisions,series,analyze
+from native_detector_tick_truth import bracket_review,collisions,series,analyze,freeze_scene
 
 
 def event(ident,start,stop,direction="positive"):
@@ -8,6 +8,15 @@ def event(ident,start,stop,direction="positive"):
 
 
 class TickTruthTest(unittest.TestCase):
+    def test_wire_geometry_normalization(self):
+        original={"bounds_m":(0,1,2,3),"lanes":[{"points":[(1,2),(3,4)]}]}
+        frozen=freeze_scene(original)
+        self.assertEqual(frozen,{"bounds_m":[0,1,2,3],"lanes":[{"points":[[1,2],[3,4]]}]})
+        frozen["lanes"][0]["points"][0][0]=99
+        self.assertEqual(original["lanes"][0]["points"][0],(1,2))
+        with self.assertRaises(ValueError):
+            freeze_scene({"x":float("nan")})
+
     def test_brackets_not_tuned(self):
         native=[event("a",0,200),event("b",200,400),event("c",200,400),
                 event("d",0,200),event("r",0,200),event("r",400,600)]

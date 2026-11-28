@@ -12,7 +12,7 @@ from zipfile import ZipFile
 
 ROOT=Path(__file__).resolve().parents[2]/"AI_Traffic_Light"
 sys.path[:0]=[str(ROOT/"scripts"),str(ROOT/"apps/pc-studio/backend")]
-from native_detector_tick_truth import analyze,STEP_MS,SAMPLE_TICKS
+from native_detector_tick_truth import analyze,STEP_MS,SAMPLE_TICKS,freeze_scene
 from native_detector_temporal_metrics import zone_from_scene
 from native_detector_temporal_trial import read_capture,VIEW,RESERVED,known_hashes
 from native_detector_temporal_trial import ARMS as PREVIOUS_ARMS
@@ -57,7 +57,9 @@ def generate(out):
                     state=service.scene()
                     if state["physical_output_allowed"] is not False or state["evaluation_only"] is not True:
                         raise ValueError("Unexpected evaluation authority")
-                    scene=state["snapshot"]
+                    if state["mode"]!=mode:
+                        raise ValueError("Unexpected protected policy mode")
+                    scene=freeze_scene(state["snapshot"])
                     if scene["tick"]!=tick or any(scene[k]!=v for k,v in identity.items()):
                         raise ValueError("Every-tick identity mismatch")
                     scenes.append(scene)
@@ -94,9 +96,12 @@ def verify(captures,prior,old_temporal,output):
         or set(manifest["sequences"])!={str(a[0]) for a in ARMS}):
         raise ValueError("Unexpected new cohort")
     previous=known_hashes(prior)
+    prior_manifest=json.loads(prior.read_bytes())
     old=json.loads(old_temporal.read_bytes())
     if old["formal_holdout_used"] is not False or len(old["records"])!=452:
         raise ValueError("Unexpected old temporal manifest")
+    if {a[0] for a in ARMS} & ({a[1] for a in prior_manifest["arms"]}|{a[0] for a in old["arms"]}):
+        raise ValueError("Prior development scenario seed reused")
     old_pixels={h for rec in old["records"].values() for h in rec["pixels"].values()}
     all_names=set();all_pixels=set();results=[];prior_overlaps=[];repeated=[]
     for seed,density,geometry,mode in ARMS:

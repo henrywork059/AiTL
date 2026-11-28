@@ -4,12 +4,18 @@ Every native tick is observed; an event is still a bracket, not an exact
 continuous-time crossing. No controller authority or acceptance threshold.
 """
 from collections import defaultdict
+import json
 import math
 from native_detector_temporal_metrics import KINDS, center, inside, line_events, episodes, zone_from_scene
 from native_detector_temporal_review import native_centers
 
 STEP_MS = 200
 SAMPLE_TICKS = 2
+
+
+def freeze_scene(scene):
+    """Detach exact JSON wire representation, including tuple-to-list geometry."""
+    return json.loads(json.dumps(scene,allow_nan=False))
 
 
 def event_groups(events):
