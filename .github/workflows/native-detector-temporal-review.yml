@@ -1,0 +1,42 @@
+name: Update 28C frozen temporal evidence review
+on:
+  push:
+    branches: [feature/interactive-3d-simulation]
+    paths:
+      - '.github/workflows/native-detector-temporal-review.yml'
+      - 'AI_Traffic_Light/scripts/native_detector_temporal_review.py'
+      - 'AI_Traffic_Light/scripts/test_native_detector_temporal_review.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test supplementary reference and availability metrics
+        run: python AI_Traffic_Light/scripts/test_native_detector_temporal_review.py
+      - name: Retrieve exact audited development archives only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/henrywork059/AiTL/actions/artifacts/15260061226/zip > "$RUNNER_TEMP/captures.zip"
+          gh api repos/henrywork059/AiTL/actions/artifacts/15259739443/zip > "$RUNNER_TEMP/evidence.zip"
+          echo 'e9b9b079e13c3067351c34bf33df74d3e312904c3af7d7aa77922718be7dced3  '"$RUNNER_TEMP/captures.zip" | sha256sum -c -
+          echo '4747d9bf0b5ba708d0167cf0824399c0e590cea9cdea1a4d5ed6da96cb78fe45  '"$RUNNER_TEMP/evidence.zip" | sha256sum -c -
+      - name: Reconstruct frozen metrics and supplementary diagnostics
+        run: python AI_Traffic_Light/scripts/native_detector_temporal_review.py --captures "$RUNNER_TEMP/captures.zip" --evidence "$RUNNER_TEMP/evidence.zip" --output "$RUNNER_TEMP/temporal-review.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mesh-28c-frozen-temporal-supplementary-review
+          retention-days: 14
+          path: ${{ runner.temp }}/temporal-review.json
+          if-no-files-found: warn
