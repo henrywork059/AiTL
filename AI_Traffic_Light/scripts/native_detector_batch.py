@@ -64,7 +64,7 @@ def capture_input(path, capture_root, holdout, seen_pixels):
     canonical = cv2.imdecode(np.frombuffer(images[next(iter(VIEW_FLIPS))], np.uint8), cv2.IMREAD_COLOR)
     pixel_digest = sha256(canonical.tobytes())
     known = set(holdout["known_training_canonical_pixel_sha256"])
-    if holdout["schema_version"] == 2:
+    if holdout.get("schema_version", 1) == 2:
         # Check every orientation against known training and prior capture orientations.
         digests = {sha256(cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR).tobytes())
                    for image in images.values()}
@@ -82,13 +82,28 @@ def evaluate(paths, model=None, confidence=.1, iou=.5, capture_root=None, holdou
         raise ValueError("Invalid batch input")
     if holdout is not None and (model is None or capture_root is None):
         raise ValueError("Holdout requires an explicit offline model and capture root")
+    # Legacy in-process callers supplied already-admitted schema-1 dictionaries
+    # without a schema field. CLI manifests still require an explicit schema.
+    if holdout is not None:
+        schema = holdout.get("schema_version", 1)
+        if (type(schema) is not int or schema != (2 if method is not None else 1)
+                or (method is None and "method" in holdout)
+                or (method is not None and holdout.get("method") != method)):
+            raise ValueError("Holdout method mismatch")
     if method is not None:
-        from native_detector_tiled import METHOD, CONFIDENCE, IOU, tiled_predict
-        if method.get("id") != METHOD or model is None or (confidence, iou) != (CONFIDENCE, IOU):
+        from native_detector_tiled import METHOD, CONFIDENCE, IOU, method_descriptor, tiled_predict
+        if (method.get("id") != METHOD or model is None or (confidence, iou) != (CONFIDENCE, IOU)
+                or json.dumps(method, sort_keys=True) != json.dumps(method_descriptor(), sort_keys=True)):
             raise ValueError("Invalid tiled evaluation method")
-    if holdout is not None and (holdout.get("schema_version") != (2 if method is not None else 1)
-                                or (method is not None and holdout.get("method") != method)):
-        raise ValueError("Holdout method mismatch")
+        if holdout is not None:
+            # Direct callers also preflight all admitted captures before scoring.
+            admitted, identities = set(), set()
+            for path in paths:
+                ann, _, _, _ = capture_input(path, capture_root, holdout, admitted)
+                identity = (ann["epoch"], ann["generation"], ann["tick"], ann["layout_id"])
+                if identity in identities:
+                    raise ValueError("Duplicate qualified capture identity")
+                identities.add(identity)
     records, seen, seen_pixels = [], set(), set()
     for path in paths:
         annotations, images, integrity, archive_digest = capture_input(path, capture_root, holdout, seen_pixels)

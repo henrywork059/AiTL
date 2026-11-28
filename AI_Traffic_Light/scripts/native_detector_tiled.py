@@ -53,6 +53,8 @@ def merge(rows):
 
 def predict_view(content, ann, view, model, *, batch_size=8):
     image=cv2.imdecode(np.frombuffer(content,np.uint8),cv2.IMREAD_COLOR)
+    if image is None or image.shape != (HEIGHT, WIDTH, 3):
+        raise ValueError("Invalid offline tiled evaluation image")
     windows_xy=windows()
     crops=[image[y:y+TILE,x:x+TILE].copy() for x,y in windows_xy]
     raw_tiles=[]
