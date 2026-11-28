@@ -43,6 +43,7 @@ const datasetStatus=()=>{const reviewed=captureList.filter(c=>c.labeled);return 
 const fixtureImage=(width=1280,height=720)=>{const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d")!;ctx.fillStyle="#dae4e8";ctx.fillRect(0,0,width,height);ctx.fillStyle="#59636c";ctx.fillRect(0,250,width,220);ctx.fillStyle="#ffffff";ctx.font="32px sans-serif";ctx.fillText("Synthetic empty road fixture",40,100);const bytes=Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]),char=>char.charCodeAt(0));return new Blob([bytes],{type:"image/png"});};
 const validFixtureImage=fixtureImage(), wrongSizeFixtureImage=fixtureImage(640,360), invalidFixtureImage=new Blob(["not an image"],{type:"image/png"});
 let activeModel=false, modelFailure=false, failModelRefreshAfterLoad=false, savedNetwork=fixture;
+let modelRegistryReads=0;
 let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true, failRegionSave=false, failCameraStatus=false;
 const profiles=["camera_a","camera_b"].map((source_id,i)=>({source_id,host:"192.168.1."+(80+i),kind:"esp32",selected:i===0,connected:false,streaming:false,device_reachable:false,target_fps:15,settings:DEFAULT_REMOTE_CAMERA_SETTINGS,last_error:null as string|null,stream_connected:false,measured_fps:0,paused_for_simulation:false}));
 if(page==="crosswalks")Object.assign(profiles[0],{connected:true,streaming:true,device_reachable:true,stream_connected:true});
@@ -114,7 +115,7 @@ window.fetch=async (input,init)=>{
   else if(path==="/api/dataset/training-dataset"&&init?.method==="POST"){check(JSON.parse(String(init.body)).validation_fraction===0.2&&datasetStatus().eligible_frame_count>=2,"Invalid dataset build");datasetBuilds++;datasetBuilt=true;datasetStale=false;data=datasetStatus();}
   else if(path.startsWith("/api/dataset/captures/")&&init?.method==="DELETE"){const id=path.split("/")[4];check(id==="cap_b"&&captureList.some(c=>c.capture_id===id),"Wrong delete capture");captureList.splice(captureList.findIndex(c=>c.capture_id===id),1);delete labelDocs[id];captureDeletes++;datasetStale=datasetBuilt;data={capture_id:id,session_id:id,deleted:true,cleanup_pending:false,deleted_paths:[],training_dataset:datasetStatus()};}
   else if(path.startsWith("/api/dataset/captures/")&&path.endsWith("/labels")){const id=path.split("/")[4];if(init?.method==="PUT"){check(id===(labelSaves===0?"cap_b":"cap_a"),"Wrong capture label save");const body=JSON.parse(String(init.body));check(Array.isArray(body.labels),"Invalid labels");if(id==="cap_b")check(body.labels.length===0,"Old capture labels leaked");else{check(body.labels.length===2,"New annotation not saved");const box=body.labels[1].box_xyxy;check([160,200,400,360].every((value,i)=>Math.abs(box[i]-value)<3),"Annotation coordinates mismatch: "+box);}labelSaves++;if(datasetBuilt)datasetStale=true;labelDocs[id]={...labelDocs[id],reviewed:true,labels:body.labels};const cap=captureList.find(x=>x.capture_id===id)!;cap.labeled=true;cap.label_count=body.labels.length;}else if(id==="cap_b"&&labelFailure){await new Promise(r=>setTimeout(r,150));return fixtureError("Fixture labels unavailable");}data=labelDocs[id];}
-  else if(path==="/api/models"){if(modelFailure)return new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message:"Model registry unavailable"}}),{status:503,headers:{"Content-Type":"application/json"}});data={total:1,models:[{...model,is_active:activeModel}],default_model_id:model.model_id,active_model_id:activeModel?model.model_id:null};}
+  else if(path==="/api/models"){modelRegistryReads++;if(modelFailure)return new Response(JSON.stringify({ok:false,error:{code:"FIXTURE",message:"Model registry unavailable"}}),{status:503,headers:{"Content-Type":"application/json"}});data={total:1,models:[{...model,is_active:activeModel}],default_model_id:model.model_id,active_model_id:activeModel?model.model_id:null};}
   else if(path==="/api/inference/load"){check(JSON.parse(String(init?.body)).model_id===model.model_id,"Wrong load model");activeModel=true;if(failModelRefreshAfterLoad)modelFailure=true;data={model_loaded:true,backend_available:true,active_model_id:model.model_id};}
   else if(path==="/api/crosswalks"){if(init?.method==="PUT"){const next=JSON.parse(String(init.body)).config;if(page==="crosswalks"&&next.crosswalks[0]?.regions.length){await new Promise(r=>setTimeout(r,350));if(failRegionSave)return fixtureError("Fixture region save rejected");}savedNetwork=next;savedCount++;}else{readCount++;}data=savedNetwork;}
   else if(path==="/api/inference/status")data={model_loaded:activeModel,backend_available:true,active_model_id:activeModel?model.model_id:null};
@@ -376,7 +377,32 @@ async function main(){
     findButton("Back to legacy experiments")!.click();
     await waitFor(()=>enabled("Export samples CSV")&&select().value==="run_a","Demo changed stored experiment state");
   }
-  if(page==="models"){check(document.body.textContent?.includes("fixture_model"),"Fixture model missing");const search=document.querySelector<HTMLInputElement>("input[type=search]")!;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("No matching models."),"Model filtering");setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));await pause();check(document.body.textContent?.includes("fixture_model"),"Filter restoration");const load=[...document.querySelectorAll("button")].find(b=>b.textContent==="Load model")!;failModelRefreshAfterLoad=true;load.click();await waitFor(()=>activeModel&&document.body.textContent?.includes("Loaded model fixture_model.")&&document.body.textContent?.includes("Model registry unavailable or loading."),"Model activation acknowledgment lost during registry failure");check(document.querySelector(".inference-status-list")?.textContent?.includes("fixture_model"),"Independent active inference status withdrawn");modelFailure=true;await waitFor(()=>findButton("Refresh")&&!findButton("Refresh")!.disabled,"Model activation refresh did not finish");findButton("Refresh")!.click();await waitFor(()=>findButton("Refresh")&&!findButton("Refresh")!.disabled&&document.body.textContent?.includes("Model registry unavailable"),"Failed registry refresh did not finish");check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");modelFailure=false;findButton("Refresh")!.click();await waitFor(()=>findButton("Refresh")&&!findButton("Refresh")!.disabled&&document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model")&&document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model recovery");}
+  if(page==="models"){
+    const ready=()=>{const button=findButton("Refresh");return Boolean(button&&!button.disabled);};
+    await waitFor(()=>ready()&&document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Initial registry not ready");
+    const search=document.querySelector<HTMLInputElement>("input[type=search]")!;
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!;
+    setter.call(search,"not_present");search.dispatchEvent(new Event("input",{bubbles:true}));
+    await waitFor(()=>document.body.textContent?.includes("No matching models."),"Model filtering");
+    setter.call(search,"");search.dispatchEvent(new Event("input",{bubbles:true}));
+    await waitFor(()=>document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model"),"Filter restoration");
+    const beforeLoad=modelRegistryReads;
+    failModelRefreshAfterLoad=true;
+    findButton("Load model")!.click();
+    await waitFor(()=>modelRegistryReads>beforeLoad&&ready()&&activeModel&&document.body.textContent?.includes("Loaded model fixture_model.")&&
+      document.body.textContent?.includes("Model registry unavailable or loading."),"Model activation acknowledgment lost during registry failure");
+    check(document.querySelector(".inference-status-list")?.textContent?.includes("fixture_model"),"Independent active inference status withdrawn");
+    const beforeFailedRefresh=modelRegistryReads;
+    modelFailure=true;
+    findButton("Refresh")!.click();
+    await waitFor(()=>modelRegistryReads>beforeFailedRefresh&&ready()&&document.body.textContent?.includes("Model registry unavailable"),"New failed registry refresh did not finish");
+    check(document.body.textContent?.includes("Model registry unavailable or loading.")&&!document.body.textContent?.includes("No trained models were found"),"Registry error rendered as empty");
+    const beforeRecovery=modelRegistryReads;
+    modelFailure=false;
+    findButton("Refresh")!.click();
+    await waitFor(()=>modelRegistryReads>beforeRecovery&&ready()&&document.querySelector(".model-list-grid")?.textContent?.includes("fixture_model")&&
+      document.querySelector(".model-list-grid")?.textContent?.includes("active"),"Model recovery");
+  }
   result.textContent="MESH_WORKSPACE_PASS · synthetic API fixture";
 }
 void main().catch(error=>{result.textContent="MESH_WORKSPACE_FAIL: "+String(error);});
