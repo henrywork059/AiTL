@@ -20,7 +20,8 @@ let nativeTick = 1;
 let nativeStatus = "running";
 let nativeCalls = 0;
 let evalGeneration=0,evalTick=0,evalRunning=false,evalPaused=false,evalCalls=0;
-let wrongFrameHeader=false;
+let wrongFrameHeader=false, wrongControlIdentity=false;
+let controlCalls=0;
 let cameraOwner:string|null=null,releaseCalls=0;
 const layoutId="b".repeat(64);
 const legacyLayoutId="c".repeat(64);
@@ -38,6 +39,19 @@ window.fetch = async (input,init) => {
   if(url.pathname.startsWith("/api/camera/simulation/native-evaluation")){
     evalCalls++;
     const command=url.pathname.split("/").pop();
+    if(command==="detector-control"){
+      check(evalRunning&&evalPaused&&!cameraOwner&&url.searchParams.get("epoch")==="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"&&
+        Number(url.searchParams.get("generation"))===evalGeneration&&Number(url.searchParams.get("tick"))===evalTick,"Control request lost snapshot identity");
+      controlCalls++;
+      const views=Object.fromEntries(["simulation_camera","simulation_camera_b","simulation_camera_c","simulation_camera_d"].map(id=>[id,{
+        score:{by_kind:{vehicle:{truth_count:0,prediction_count:0,matched:0,precision:null,recall:null},
+          pedestrian:{truth_count:1,prediction_count:1,matched:1,precision:1,recall:1}}},palette_prediction_ms:2}]));
+      return new Response(JSON.stringify({ok:true,data:{schema_version:1,method:"exact_palette_components_not_trained_model",
+        epoch:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",generation:evalGeneration,tick:evalTick+(wrongControlIdentity?1:0),layout_id:layoutId,
+        provenance:"synthetic_sumo_projection",physical_output_allowed:false,formal_holdout_used:false,
+        production_detector_validated:false,migration_authorized:false,iou_threshold:.5,evaluation_ms:10,views,limitations:"Synthetic fixture only"}}),
+        {headers:{"Content-Type":"application/json"}});
+    }
     if(init?.method==="POST"){
       const body=JSON.parse(String(init.body));
       if(command==="camera-release"){
@@ -200,6 +214,12 @@ async function run(){
     await wait(()=>Boolean(button("Pause evaluation")&&!button("Pause evaluation")!.disabled),"Standalone pause unavailable");
     button("Pause evaluation")!.click();
     await wait(()=>Boolean(button("Resume evaluation")&&button("Advance 5 s")!.disabled),"Standalone pause failed");
+    await wait(()=>Boolean(button("Evaluate palette control")&&!button("Evaluate palette control")!.disabled),"Synthetic control unavailable");
+    wrongControlIdentity=true;button("Evaluate palette control")!.click();
+    await wait(()=>Boolean(controlCalls===1&&host.textContent?.includes("Synthetic control report identity or metrics mismatch.")&&button("Evaluate palette control")),"Mismatched detector control response not rejected");
+    check(!host.querySelector('a[download^="mesh-palette-"]'),"Mismatched control exported");
+    wrongControlIdentity=false;button("Evaluate palette control")!.click();
+    await wait(()=>Boolean(controlCalls===2&&host.textContent?.includes("Palette control (not trained AI)")&&host.textContent?.includes("vehicle: 0/0 matched, precision N/A, recall N/A")&&host.querySelector('a[download^="mesh-palette-"]')),"Qualified control results or undefined-denominator display missing");
     await wait(()=>Boolean(button("Draft region")&&!button("Draft region")!.disabled),"Native draft unavailable");
     button("Draft region")!.click();
     await wait(()=>Boolean(host.querySelector("[data-native-region-editor]")),"Native draft did not open");
@@ -225,6 +245,7 @@ async function run(){
     await wait(()=>Boolean(button("Stop evaluation")&&!button("Stop evaluation")!.disabled),"Standalone stop unavailable");
     button("Stop evaluation")!.click();
     await wait(()=>!agent()&&Boolean(button("Start evaluation")),"Standalone stop failed");
+    check(!host.querySelector('a[download^="mesh-palette-"]')&&!host.textContent?.includes("Palette control (not trained AI)"),"Retired detector control remained visible");
     button("Shadow preview")!.click();
     await wait(()=>Boolean(agent()),"Shadow rollback failed");
     const evalRetired=evalCalls;

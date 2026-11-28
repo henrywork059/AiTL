@@ -458,8 +458,8 @@ export async function evaluateNativeControl(state: NativeEvaluationState, signal
             const score=view.score?.by_kind?.[kind];
             if(!score || ![score.truth_count,score.prediction_count,score.matched].every(n=>Number.isSafeInteger(n)&&n>=0) ||
               score.matched>Math.min(score.truth_count,score.prediction_count))return true;
-            return (score.prediction_count ? typeof score.precision!=="number" || Math.abs(score.precision-score.matched/score.prediction_count)>1e-6 : score.precision!==null) ||
-              (score.truth_count ? typeof score.recall!=="number" || Math.abs(score.recall-score.matched/score.truth_count)>1e-6 : score.recall!==null);
+            return (score.prediction_count ? typeof score.precision!=="number" || !Number.isFinite(score.precision) || Math.abs(score.precision-score.matched/score.prediction_count)>1e-6 : score.precision!==null) ||
+              (score.truth_count ? typeof score.recall!=="number" || !Number.isFinite(score.recall) || Math.abs(score.recall-score.matched/score.truth_count)>1e-6 : score.recall!==null);
           });
       })) throw new Error("Synthetic control report identity or metrics mismatch.");
   return report;

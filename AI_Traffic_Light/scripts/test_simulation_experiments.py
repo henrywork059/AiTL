@@ -224,6 +224,26 @@ def main() -> int:
             pass
         else:
             raise AssertionError("Mismatched evidence identity accepted")
+        from unittest.mock import patch
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from app.routes import experiments as experiment_routes
+        from app.core.middleware import RequestContextMiddleware
+        from app.core.exceptions import AppError, app_error_handler
+        app = FastAPI()
+        app.add_middleware(RequestContextMiddleware)
+        app.add_exception_handler(AppError, app_error_handler)
+        app.include_router(experiment_routes.router, prefix="/api/traffic")
+        with patch.object(experiment_routes, "simulation_experiment_service", service):
+            client = TestClient(app)
+            response = client.get("/api/traffic/experiments/"+first["run_id"]+"/evidence.zip",
+                                  headers={"X-Request-ID":"req_evidence_zip"})
+            assert response.status_code==200 and response.headers["x-request-id"]=="req_evidence_zip"
+            assert response.headers["content-type"]=="application/zip"
+            with ZipFile(BytesIO(response.content)) as archive:
+                assert json.loads(archive.read("experiment.json"))==loaded
+                assert archive.read("samples.csv").decode("utf-8")==csv_text
+            assert client.get("/api/traffic/experiments/missing_run/evidence.zip").status_code==404
         deleted = service.delete(first["run_id"])
         assert deleted["deleted"] is True
         assert service.list()["total"] == 1

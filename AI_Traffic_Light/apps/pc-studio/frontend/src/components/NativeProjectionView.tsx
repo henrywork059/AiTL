@@ -50,6 +50,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   const [comparisonLabel,setComparisonLabel]=useState("");
   const [controlReport,setControlReport]=useState<NativeControlReport|null>(null);
   const [controlUrl,setControlUrl]=useState<string|null>(null);
+  const [controlError,setControlError]=useState<string|null>(null);
   useEffect(()=>()=>{if(controlUrl)URL.revokeObjectURL(controlUrl);},[controlUrl]);
   const currentControl=controlReport&&state&&scene&&controlReport.epoch===state.epoch&&controlReport.generation===state.generation&&controlReport.tick===scene.tick&&controlReport.layout_id===scene.layout_id?controlReport:null;
   useEffect(()=>()=>{if(comparisonUrl)URL.revokeObjectURL(comparisonUrl);},[comparisonUrl]);
@@ -131,7 +132,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   },playing?200:500,{restartKey:sourceId,onError:()=>{if(!active.current){stopPlayback();setRegion(false);setScene(null);setState(null);setStatus("Native preview unavailable");}}});
   const command=async(action:"start"|"step"|"pause"|"stop",extra:Record<string,unknown>={})=>{
     if(!state||active.current||locked)return;
-    stopPlayback();setRegion(false);
+    stopPlayback();setRegion(false);setControlError(null);
     const controller=new AbortController();active.current=controller;setPending(true);
     try{
       await polling.waitForIdle();
@@ -151,14 +152,14 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   };
   const evaluateControl=async()=>{
     if(!state||!scene||playing||active.current||locked||cameraWorkspace)return;
-    const controller=new AbortController();active.current=controller;setPending(true);setControlReport(null);setControlUrl(null);
+    const controller=new AbortController();active.current=controller;setPending(true);setControlReport(null);setControlUrl(null);setControlError(null);
     try{
       await polling.waitForIdle();if(controller.signal.aborted)return;
       const report=await evaluateNativeControl(state,controller.signal);
       if(!controller.signal.aborted){
         setControlReport(report);setControlUrl(URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"})));
       }
-    }catch(error){if(!controller.signal.aborted)setStatus(error instanceof Error?error.message:"Synthetic detector control failed");}
+    }catch(error){if(!controller.signal.aborted)setControlError(error instanceof Error?error.message:"Synthetic detector control failed");}
     finally{active.current=null;if(!controller.signal.aborted)setPending(false);}
   };
   const compare=async()=>{
@@ -226,6 +227,7 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
         </>}
       </>}
     </div>
+    {controlError&&scene&&<p role="alert" className="error-message" style={{position:"absolute",bottom:34,left:8,right:8,zIndex:5}}>{controlError}</p>}
     {currentControl&&!pending&&!playing&&<div className="status-pill muted" style={{position:"absolute",bottom:34,left:8,right:8,zIndex:5,whiteSpace:"normal"}} role="status">
       Palette control (not trained AI) · tick {currentControl.tick} · {sourceId} · {(["vehicle","pedestrian"] as const).map(kind=>{
         const score=currentControl.views[sourceId]?.score.by_kind[kind];
