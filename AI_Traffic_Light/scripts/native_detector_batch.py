@@ -90,10 +90,23 @@ def evaluate(paths, model=None, confidence=.1, iou=.5, capture_root=None, holdou
                 or (method is None and "method" in holdout)
                 or (method is not None and holdout.get("method") != method)):
             raise ValueError("Holdout method mismatch")
+    bound = getattr(model,"qualification_method",None) == "tiled-stream-reuse-openvino-v1"
+    if bound and (method is None or method.get("id") != "tiled-stream-reuse-openvino-v1"):
+        raise ValueError("Bound OpenVINO model requires its explicit method")
     if method is not None:
         from native_detector_tiled import METHOD, CONFIDENCE, IOU, method_descriptor, tiled_predict
-        if (method.get("id") != METHOD or model is None or (confidence, iou) != (CONFIDENCE, IOU)
-                or json.dumps(method, sort_keys=True) != json.dumps(method_descriptor(), sort_keys=True)):
+        if method.get("id") == "tiled-stream-reuse-openvino-v1":
+            from native_detector_openvino import BoundOpenVINO, CHECKPOINT, descriptor
+            if (not isinstance(model, BoundOpenVINO) or holdout is None
+                    or holdout.get("model_sha256") != CHECKPOINT):
+                raise ValueError("Bound OpenVINO requires explicit schema-2 checkpoint admission")
+            actual_method = descriptor(model.root)
+        elif method.get("id") == METHOD and not bound:
+            actual_method = method_descriptor()
+        else:
+            raise ValueError("Invalid tiled evaluation method")
+        if (model is None or (confidence, iou) != (CONFIDENCE, IOU)
+                or json.dumps(method, sort_keys=True) != json.dumps(actual_method, sort_keys=True)):
             raise ValueError("Invalid tiled evaluation method")
         if holdout is not None:
             # Direct callers also preflight all admitted captures before scoring.
@@ -128,6 +141,7 @@ def evaluate(paths, model=None, confidence=.1, iou=.5, capture_root=None, holdou
     return {"schema_version": 1, "evidence_class": "executed_synthetic_capture_evaluation",
             "method": method["id"] if method is not None else ("exact_palette_components_not_trained_model" if model is None else "offline_local_yolo"),
             **({"inference_method": method} if method is not None else {}),
+            **({"runtime_evidence": model.runtime_evidence()} if bound else {}),
             "confidence": confidence if model is not None else None, "iou_threshold": iou,
             "capture_count": len(records), "canonical_view": next(iter(VIEW_FLIPS)),
             "views": {sid: {"micro": summarize(r["views"][sid]["score"] for r in records),
@@ -141,17 +155,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--capture-root", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--method", choices=("full-frame", "tiled-stream-reuse-v1"), default="full-frame")
-    parser.add_argument("--describe-method", action="store_true", help="Print tiled method identity without accessing captures or weights")
+    parser.add_argument("--method", choices=("full-frame", "tiled-stream-reuse-v1", "tiled-stream-reuse-openvino-v1"), default="full-frame")
+    parser.add_argument("--describe-method", action="store_true", help="Print tiled method identity without accessing captures or .pt weights")
+    parser.add_argument("--openvino-export", type=Path, help="Explicit audited export root; only with the OpenVINO method")
     parser.add_argument("--model", type=Path, help="Explicit trusted local .pt weights; never download")
     parser.add_argument("--holdout-manifest", type=Path, help="Predeclared synthetic holdout plan; requires trusted local weights")
     parser.add_argument("--confidence", type=float, default=.1)
     parser.add_argument("--iou", type=float, default=.5)
     args = parser.parse_args()
     method = None
-    if args.method == "tiled-stream-reuse-v1":
+    use_openvino = args.method == "tiled-stream-reuse-openvino-v1"
+    if use_openvino != (args.openvino_export is not None):
+        parser.error("OpenVINO method requires its explicit audited export root")
+    if args.method != "full-frame":
         from native_detector_tiled import method_descriptor, CONFIDENCE, IOU
-        method = method_descriptor()
+        if use_openvino:
+            from native_detector_openvino import descriptor, CHECKPOINT
+            method = descriptor(args.openvino_export)
+        else:
+            method = method_descriptor()
         if (args.confidence, args.iou) != (CONFIDENCE, IOU):
             parser.error("Tiled reference requires frozen confidence and IoU")
     if args.describe_method:
@@ -170,6 +192,10 @@ def main():
     if model_path is not None and (not model_path.is_file() or model_path.suffix.lower() != ".pt"):
         parser.error("Provide trusted existing .pt weights")
     digest = file_sha256(model_path) if model_path is not None else None
+    if use_openvino and (digest != CHECKPOINT or args.holdout_manifest is None):
+        parser.error("OpenVINO requires original trusted checkpoint and explicit schema-2 plan")
+    if use_openvino and args.output.resolve().is_relative_to(args.openvino_export.resolve()):
+        parser.error("Output must not overwrite audited export")
     plan, plan_digest = None, None
     if args.holdout_manifest is not None:
         if model_path is None:
@@ -200,7 +226,12 @@ def main():
             shutil.copyfile(model_path, snapshot)
             if file_sha256(snapshot) != digest:
                 raise ValueError("Model changed during qualification")
-            model = YOLO(str(snapshot))
+            if use_openvino:
+                from native_detector_openvino import BoundOpenVINO, snapshot_export
+                export = snapshot_export(args.openvino_export, Path(temp)/"audited_export", method)
+                model = BoundOpenVINO(export, method)
+            else:
+                model = YOLO(str(snapshot))
             if (plan is not None or method is not None) and getattr(model, "task", None) != "detect":
                 raise ValueError("Holdout requires an object detection model")
         result = evaluate(paths, model, args.confidence, args.iou, args.capture_root, plan, method=method)

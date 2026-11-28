@@ -29,6 +29,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     for name in ("captures", "weights", "source-manifest", "reference", "evidence"):
         p.add_argument("--"+name, required=True, type=Path)
+    p.add_argument("--openvino-export", type=Path)
     a = p.parse_args()
     a.evidence.mkdir(parents=True, exist_ok=False)
     if file_sha256(a.weights) != CHECKPOINT:
@@ -52,9 +53,15 @@ def main():
             raise ValueError("Development capture digest mismatch")
     if set(training) != {h for n,row in records.items() if n.startswith("train/") for h in row["pixels"].values()}:
         raise ValueError("Training digest list mismatch")
-    command = [sys.executable, str(ROOT/"scripts/native_detector_batch.py"), "--method", "tiled-stream-reuse-v1"]
+    command = [sys.executable, str(ROOT/"scripts/native_detector_batch.py"), "--method",
+               "tiled-stream-reuse-openvino-v1" if a.openvino_export else "tiled-stream-reuse-v1"]
+    expected_method = method_descriptor()
+    if a.openvino_export:
+        from native_detector_openvino import descriptor as ov_descriptor
+        command += ["--openvino-export", str(a.openvino_export)]
+        expected_method = ov_descriptor(a.openvino_export)
     descriptor = json.loads(subprocess.check_output(command+["--describe-method"], text=True))
-    if descriptor != method_descriptor():
+    if descriptor != expected_method:
         raise ValueError("CLI method identity differs")
     for name,digest in descriptor["source_sha256"].items():
         if hashlib.sha256((ROOT/name).read_bytes()).hexdigest() != digest:
@@ -101,6 +108,12 @@ def main():
             or report["holdout"]["plan"] != plan or report["production_detector_validated"] is not False
             or report["physical_output_allowed"] is not False):
         raise ValueError("Evaluation report identity mismatch")
+    if a.openvino_export:
+        runtime = report["runtime_evidence"]
+        if (runtime["all_calls_runtime_verified"] is not True or runtime["checked_calls"] != 256
+                or runtime["evaluated_tiles"] != 898
+                or runtime["compiled_properties"] != descriptor["runtime"]["compiled_properties"]):
+            raise ValueError("Bound OpenVINO runtime evidence mismatch")
     previous = {r["capture_name"].removeprefix("val/"):r for r in reference["records"]}
     rows = []
     for record in report["records"]:
