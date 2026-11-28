@@ -17,7 +17,7 @@ const DEFAULT_CONFIG: TrainingConfig = {
   patience: 5,
 };
 
-export function TrainExportPage() {
+export function TrainExportPage({ onOpenModels, onOpenReview }: { onOpenModels?: () => void; onOpenReview?: () => void } = {}) {
   const [status, setStatus] = useState<TrainingStatus | null>(null);
   const [managedDataset, setManagedDataset] = useState<TrainingDatasetStatus | null>(null);
   const [config, setConfig] = useState<TrainingConfig>(DEFAULT_CONFIG);
@@ -163,6 +163,7 @@ export function TrainExportPage() {
           {status && !status.training_available && (
             <code className="endpoint-code">cd apps\pc-studio\backend<br />pip install -r requirements-training.txt</code>
           )}
+          {managedDatasetBlocked && onOpenReview && <button type="button" onClick={onOpenReview}>Open Dataset Review</button>}
           {managedDatasetBlocked && (
             <p className="warning-box">{managedDataset?.message ?? "Build the managed dataset in Dataset Review before using yolo/data.yaml."}</p>
           )}
@@ -188,6 +189,7 @@ export function TrainExportPage() {
           </div>
           <p className="small-note">Early stopping keeps the best checkpoint produced by the run. Model runtime export is not implemented yet.</p>
           {status?.error && <p className="error-message">{status.error}</p>}
+          {onOpenModels && status?.best_model_path && (status.status === "completed" || status.status === "early_stopped") && <button type="button" onClick={onOpenModels}>Review checkpoint in Models</button>}
         </aside>
       </div>
 

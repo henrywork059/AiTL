@@ -282,7 +282,7 @@ export default function App() {
       case "dataset_review":
         return <DatasetReviewPage />;
       case "train_export":
-        return <TrainExportPage />;
+        return <TrainExportPage onOpenModels={() => setActivePage("model_registry")} onOpenReview={() => setActivePage("dataset_review")} />;
       case "model_registry":
         return <ModelRegistryPage runtimeSettings={runtimeSettings} onSettingsChange={applyRuntimeSettings} />;
       case "logs":

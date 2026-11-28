@@ -23,6 +23,7 @@ export function FakeJunctionDemoPage() {
     const controller = new AbortController();
     active.current = controller;
     setBusy(true); setError(null); setReport(null); setDownload(null);
+    setAuthorized(false); // Each request consumes its explicit fake authorization.
     try {
       const result = await runFakeJunctionDemo(scenario, authorized, controller.signal);
       if (controller.signal.aborted) return;
