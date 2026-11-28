@@ -23,13 +23,14 @@ import {
   type RemoteFrameSize,
 } from "../lib/remoteCameraApi";
 import { useSerialPolling } from "../lib/useSerialPolling";
+import { matchesSelectedCameraFrame } from "../lib/cameraPreviewState";
 import type { CameraStatus } from "../types";
 
 type Props = {
   status: CameraStatus | null;
   showSimulationTools: boolean;
   onSimulationChange: (enabled: boolean) => void;
-  onStatusChange: (status: CameraStatus) => void;
+  onStatusChange: (status: CameraStatus | null) => void;
   changingMode: boolean;
   view?: "sources" | "settings";
 };
@@ -167,12 +168,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   }
 
   useSerialPolling(
-    async () => {
-      if (busyRef.current) return;
+    async (context) => {
+      if (busyRef.current || changingMode) return;
       const epoch = actionEpochRef.current;
       try {
         const next = await fetchRemoteCameraStatus();
-        if (busyRef.current || epoch !== actionEpochRef.current) return;
+        if (!context.isCurrent() || busyRef.current || epoch !== actionEpochRef.current) return;
         setPollError(null);
         if (!initializedRef.current) {
           loadSelectedProfile(next);
@@ -181,13 +182,13 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
           setRemote(next);
         }
       } catch (error) {
-        if (!busyRef.current && epoch === actionEpochRef.current) {
+        if (context.isCurrent() && !busyRef.current && epoch === actionEpochRef.current) {
           setPollError(error instanceof Error ? error.message : "Camera status unavailable.");
         }
       }
     },
     1000,
-    { onError: () => undefined },
+    { enabled: !busy && !changingMode, onError: () => undefined },
   );
 
   const selectedSaved = selectedId !== NEW_CAMERA;
@@ -201,7 +202,9 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   const secondSimulationPairSaved = remote?.cameras.some((camera) => camera.source_id === "simulation_camera_d") ?? false;
   const nextSimulationPair: 1 | 2 = firstSimulationPairSaved ? 2 : 1;
   const selectedStreaming = Boolean(selectedProfile?.streaming);
-  const selectedActive = Boolean(!pollError && selectedProfile && remote?.active_source_id === selectedId);
+  const registryCurrent = Boolean(remote && !pollError && !busy && !changingMode);
+  const selectedActive = Boolean(registryCurrent && selectedProfile && remote?.active_source_id === selectedId);
+  const statusMatchesSelected = matchesSelectedCameraFrame(status, selectedId, selectedSimulation ? "simulation" : "esp32");
   const setupError = effectiveCameraType === "esp32" && !selectedSimulation
     ? validateSetup(host, sourceId, targetFps, settings, remote?.cameras ?? [], selectedSaved ? selectedId : null)
     : null;
@@ -225,7 +228,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             : addressChanged ? "Save or connect the changed IP before starting a stream."
             : health?.state === "connected" ? "Control connected. Start Stream to receive images."
             : health?.state === "not_connected" ? "Connect to the saved ESP first." : null;
-  const backgroundStreams = remote?.cameras.filter((camera) => camera.streaming && camera.source_id !== remote.active_source_id).length ?? 0;
+  const backgroundStreams = registryCurrent ? remote?.cameras.filter((camera) => camera.kind === "esp32" && camera.streaming && !camera.paused_for_simulation && camera.source_id !== remote.active_source_id).length ?? 0 : 0;
   const deviceEffectiveQuality = typeof remote?.device?.effective_jpeg_quality === "number" ? remote.device.effective_jpeg_quality : null;
   const deviceConfiguredQuality = typeof remote?.device?.configured_jpeg_quality === "number" ? remote.device.configured_jpeg_quality : null;
   const deviceSendEwma = typeof remote?.device?.send_ewma_ms === "number" ? remote.device.send_ewma_ms : null;
@@ -239,14 +242,14 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
   const deviceWifiReconnects = typeof remote?.device?.wifi_reconnects === "number" ? remote.device.wifi_reconnects : null;
   const deviceTransportSlowFrames = typeof remote?.device?.transport_slow_frames === "number" ? remote.device.transport_slow_frames : null;
   const selectedFrameAvailable = Boolean(
-    status?.frame_available
-      && (status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
+    status?.frame_available && !status.stale && !status.simulation_fault && !busy && !changingMode
+      && (cameraSettingsView ? selectedActive && statusMatchesSelected : status.simulation_enabled || !remote?.active_source_id || status.active_source_id === remote.active_source_id),
   );
   // The Settings preview must never display a simulation or stale frame as the selected ESP.
-  const imageUrl = selectedSimulation && !showSimulationTools ? null : cameraSettingsView
-    ? selectedSimulation && status?.simulation_enabled && selectedActive
+  const imageUrl = busy || changingMode || status?.simulation_fault || (selectedSimulation && !showSimulationTools) ? null : cameraSettingsView
+    ? selectedSimulation && status?.simulation_enabled && selectedActive && statusMatchesSelected
       ? liveCameraMjpegUrl()
-      : selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled && selectedActive
+      : selectedSaved && !selectedSimulation && selectedStreaming && !status?.simulation_enabled && selectedActive && statusMatchesSelected
         && !selectedProfile?.paused_for_simulation && selectedProfile?.device_contract?.health.frame_fresh === true
         ? liveCameraMjpegUrl()
         : null
@@ -256,18 +259,18 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         ? `${API_BASE}/api/camera/frame?v=${status?.frame_number ?? 0}`
         : null;
 
-  const use3dPreview = Boolean(showSimulationTools && status?.simulation_enabled && (cameraSettingsView ? selectedSimulation && selectedActive : true));
+  const use3dPreview = Boolean(showSimulationTools && status?.simulation_enabled && !status.simulation_fault && !busy && !changingMode && (cameraSettingsView ? selectedSimulation && selectedActive && statusMatchesSelected : true));
   const sceneSourceId = cameraSettingsView ? selectedId : status?.active_source_id ?? "simulation_camera";
 
   const statusLabel = cameraSettingsView
-    ? pollError ? "status unavailable" : !selectedSaved ? "new camera draft" : !selectedActive ? "select saved camera" : selectedIndicator?.label ?? "checking"
+    ? busy || changingMode ? "changing source" : pollError ? "status unavailable" : !selectedSaved ? "new camera draft" : !selectedActive ? "select saved camera" : selectedIndicator?.label ?? "checking"
     : !status
     ? "checking"
     : status.simulation_enabled
       ? status.simulation_paused ? "simulation paused" : "simulation running"
       : !selectedSaved
         ? "new camera draft"
-        : remote?.streaming
+        : pollError ? "status unavailable" : remote?.streaming
           ? remote.paused_for_simulation
             ? "ESP paused for simulation"
             : remote.stream_connected
@@ -280,7 +283,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
               : "waiting for device";
 
   function beginAction(): boolean {
-    if (busyRef.current) return false;
+    if (busyRef.current || changingMode) return false;
     busyRef.current = true;
     actionEpochRef.current += 1;
     setBusy(true);
@@ -298,6 +301,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
     try {
       onStatusChange(await refreshCameraAfterRemoteChange());
     } catch (error) {
+      onStatusChange(null);
       setRemoteError(`Camera action completed, but preview status refresh failed: ${error instanceof Error ? error.message : "backend unavailable"}`);
     }
   }
@@ -473,23 +477,23 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
         <section className="panel compact-panel camera-status-strip" aria-label="Saved camera connection status">
           <div className="camera-status-strip-header">
             <strong>Saved cameras</strong>
-            <span>{remote ? visibleCameras.length : "—"} shown · {pollError ? "status unavailable" : `${visibleCameras.filter((camera) => camera.device_contract?.health.frame_fresh === true).length} live`}</span>
+            <span>{remote ? visibleCameras.length : "—"} shown · {!registryCurrent ? pollError ? "status unavailable" : "checking" : `${visibleCameras.filter((camera) => camera.device_contract?.health.frame_fresh === true).length} live`}</span>
           </div>
           <div className="camera-status-strip-items" role="list">
             {visibleCameras.map((camera) => {
-              const indicator = cameraIndicator(camera);
+              const indicator = registryCurrent ? cameraIndicator(camera) : { label: pollError ? "Unavailable" : "Checking", tone: "muted" };
               return (
                 <div role="listitem" key={camera.source_id}>
                   <button
                     type="button"
-                    className={`camera-status-entry${camera.selected ? " is-selected" : ""}`}
-                    aria-pressed={camera.selected}
-                    disabled={busy}
+                    className={`camera-status-entry${registryCurrent && camera.selected ? " is-selected" : ""}`}
+                    aria-pressed={registryCurrent && camera.selected}
+                    disabled={busy || changingMode}
                     onClick={() => void chooseSavedCamera(camera.source_id)}
                   >
                     <span className="camera-status-entry-name">
                       <strong title={camera.source_id}>{camera.source_id}</strong>
-                      {camera.selected && <small>Active preview</small>}
+                      {registryCurrent && camera.selected && <small>Active preview</small>}
                     </span>
                     <small title={camera.host || "PC simulation"}>{camera.kind === "simulation" ? "PC simulation" : camera.host}</small>
                     <span className={`status-pill ${indicator.tone}`}>{indicator.label}</span>
@@ -592,12 +596,12 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             <div className="form-grid">
               <label>
                 Saved camera
-                <select value={selectedId} onChange={(event) => void chooseSavedCamera(event.target.value)} disabled={busy}>
+                <select value={selectedId} onChange={(event) => void chooseSavedCamera(event.target.value)} disabled={busy || changingMode}>
                   <option value={NEW_CAMERA}>+ New camera</option>
                   {selectedSimulation && !showSimulationTools && <option value={selectedId}>Active simulated source</option>}
                   {visibleCameras.map((camera) => (
                     <option key={camera.source_id} value={camera.source_id}>
-                      {camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}{camera.streaming ? " • streaming" : camera.connected ? " • connected" : ""}
+                      {camera.source_id} — {camera.kind === "simulation" ? "PC simulation" : camera.host}{registryCurrent ? camera.streaming ? " • streaming" : camera.connected ? " • connected" : "" : ""}
                     </option>
                   ))}
                 </select>
@@ -631,14 +635,14 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
 
             <div className="button-row">
               <button type="button" onClick={() => resetNewCamera()} disabled={busy}>New camera</button>
-              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>Save</button>
-              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>
+              <button type="button" onClick={() => void saveEspProfile()} disabled={busy || changingMode || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>Save</button>
+              <button className="primary" type="button" onClick={() => void connectEsp()} disabled={busy || changingMode || !host.trim() || !sourceId.trim() || selectedStreaming || Boolean(setupError)}>
                 {busy ? "Working..." : health?.state === "error" || health?.state === "unreachable" || remoteError ? "Retry connection" : selectedProfile?.connected ? "Reconnect" : "Connect"}
               </button>
               <button type="button" onClick={() => void disconnectEsp()} disabled={busy || !selectedActive || !selectedProfile?.connected}>
                 Disconnect
               </button>
-              <button type="button" onClick={() => void deleteEspProfile()} disabled={busy || !selectedSaved}>
+              <button type="button" onClick={() => void deleteEspProfile()} disabled={busy || changingMode || !selectedSaved}>
                 Remove saved
               </button>
             </div>
@@ -654,7 +658,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             </div>}
             {showSimulationTools && selectedSimulation && <div className="button-row">
               <button className="primary" type="button" onClick={() => onSimulationChange(!status?.simulation_enabled)} disabled={busy || changingMode || !status}>{status?.simulation_enabled ? "Stop Simulation" : "Start Simulation"}</button>
-              <button type="button" onClick={() => void deleteEspProfile()} disabled={busy}>Remove saved</button>
+              <button type="button" onClick={() => void deleteEspProfile()} disabled={busy || changingMode}>Remove saved</button>
             </div>}
             {showSimulationTools && selectedSimulation && <SimulationControls status={status} onStatusChange={onStatusChange} />}
 
@@ -666,7 +670,7 @@ export function CameraSourcesPage({ status, showSimulationTools, onSimulationCha
             {selectedProfile?.last_error && <p className="small-note">Last selected-ESP error: {selectedProfile.last_error}</p>}
 
             {backgroundStreams > 0 && (
-              <p className="small-note">{backgroundStreams} other ESP stream{backgroundStreams === 1 ? " is" : "s are"} still running in the background for faster switching.</p>
+              <p className="small-note">{backgroundStreams} other ESP stream{backgroundStreams === 1 ? " is" : "s are"} active or reconnecting in the background.</p>
             )}
             {remote?.registry_warning && <p className="error-message">{remote.registry_warning}</p>}
           </section>

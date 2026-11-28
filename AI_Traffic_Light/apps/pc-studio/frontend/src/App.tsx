@@ -4,6 +4,7 @@ import {
   fetchActiveZones,
   fetchHealth,
   fetchCameraStatus,
+  fetchCameraStatusStrict,
   fetchMockFrame,
   fetchRecentLogs,
   fetchRuntimeSettings,
@@ -14,6 +15,7 @@ import {
 import { AppStatusBar } from "./components/AppStatusBar";
 import { AppShell } from "./layout/AppShell";
 import { useSerialPolling } from "./lib/useSerialPolling";
+import type { PollingContext } from "./lib/pollingScope";
 import { CameraDiagnosticsPage } from "./pages/CameraDiagnosticsPage";
 import { CameraSettingsPage, CameraSourcesPage } from "./pages/CameraSourcesPage";
 import { CrosswalksPage } from "./pages/CrosswalksPage";
@@ -44,7 +46,7 @@ import type {
   Zone,
 } from "./types";
 
-const CAMERA_POLL_PAGES: AppPageId[] = ["camera_sources", "camera_settings", "crosswalks", "junction_network", "dataset_capture", "zone_editor", "live_ai"];
+const CAMERA_POLL_PAGES: AppPageId[] = ["dashboard", "camera_sources", "camera_settings", "crosswalks", "junction_network", "dataset_capture", "zone_editor", "live_ai"];
 
 export default function App() {
   const [frame, setFrame] = useState<DetectionFrame | null>(null);
@@ -82,7 +84,7 @@ export default function App() {
         fetchActiveZones(),
         fetchTrafficState(),
         fetchRecentLogs(),
-        fetchCameraStatus(),
+        fetchCameraStatusStrict().catch(() => null),
         fetchRuntimeSettings(),
       ]);
 
@@ -134,11 +136,17 @@ export default function App() {
     void refreshAll();
   }, [refreshAll]);
 
-  const pollCameraStatus = useCallback(async () => {
+  const strictDevicePoll = activePage === "dashboard" || activePage === "camera_settings";
+  const pollCameraStatus = useCallback(async (context: PollingContext) => {
     const generation = cameraModeGenerationRef.current;
-    const status = await fetchCameraStatus();
-    if (generation === cameraModeGenerationRef.current) setCameraStatus(status);
-  }, []);
+    let status: CameraStatus | null;
+    try {
+      status = strictDevicePoll ? await fetchCameraStatusStrict(context.signal) : await fetchCameraStatus();
+    } catch {
+      status = null;
+    }
+    if (context.isCurrent() && generation === cameraModeGenerationRef.current) setCameraStatus(status);
+  }, [strictDevicePoll]);
 
   const pollLiveContext = useCallback(async () => {
     const [nextTraffic, nextZones] = await Promise.all([fetchTrafficState(), fetchActiveZones()]);
@@ -149,7 +157,7 @@ export default function App() {
   const { waitForIdle: waitForCameraStatusIdle } = useSerialPolling(
     pollCameraStatus,
     activePage === "live_ai" ? runtimeSettings.live_poll_interval_ms : 1000,
-    { enabled: CAMERA_POLL_PAGES.includes(activePage) && !changingCameraMode, immediate: true },
+    { enabled: CAMERA_POLL_PAGES.includes(activePage) && !changingCameraMode && !(strictDevicePoll && refreshing), immediate: true, restartKey: strictDevicePoll },
   );
 
   useSerialPolling(

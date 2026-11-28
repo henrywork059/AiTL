@@ -32,8 +32,8 @@ export function DashboardPage({ health, smokeStatus, apiState, onRefresh, refres
   return (
     <div className="page-stack">
       <section className="panel workspace-device-summary" aria-label="Device overview">
-        <div className="panel-header"><div><h2>Camera input</h2><p className="small-note">Last reported source status. Open Devices for live preview and controls.</p></div><span className="status-pill muted">{sourceState}</span></div>
-        <div className="workspace-device-facts"><div><span>Source</span><strong>{source?.active_source_id ?? "Not available"}</strong></div><div><span>Mode</span><strong>{!source ? "Unknown" : source.simulation_enabled ? "Synthetic" : "Receiver"}</strong></div><div><span>Frame size</span><strong>{source?.frame_available && source.resolution ? `${source.resolution.width} × ${source.resolution.height}` : "—"}</strong></div></div>
+        <div className="panel-header"><div><h2>Camera input</h2><p className="small-note">Polled source status. Open Devices for live preview and controls.</p></div><span className="status-pill muted">{sourceState}</span></div>
+        <div className="workspace-device-facts"><div><span>Source</span><strong>{source?.active_source_id ?? "Not available"}</strong></div><div><span>Mode</span><strong>{!source ? "Unknown" : source.simulation_enabled ? "Synthetic" : "Receiver"}</strong></div><div><span>Frame size</span><strong>{source?.frame_available && !source.stale && !source.simulation_fault && source.resolution ? `${source.resolution.width} × ${source.resolution.height}` : "—"}</strong></div></div>
         <div className="button-row wrap-row"><button type="button" className="primary" onClick={() => onNavigate("camera_settings")}>Open cameras</button><button type="button" onClick={() => onNavigate("camera_diagnostics")}>Diagnostics</button><button type="button" onClick={() => onNavigate("junction_network")}>Network</button><button type="button" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Refreshing..." : "Refresh"}</button></div>
       </section>
       <MetricStrip

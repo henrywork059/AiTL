@@ -81,6 +81,10 @@ def main() -> int:
     assert "generation === cameraModeGenerationRef.current" in app
     assert "const refreshAll = useCallback((): Promise<void>" in app
     assert "cameraModeGeneration === cameraModeGenerationRef.current" in app
+    assert '["dashboard", "camera_sources"' in app
+    assert "fetchCameraStatusStrict(context.signal)" in app
+    assert "restartKey: strictDevicePoll" in app
+    assert "context.isCurrent() && generation === cameraModeGenerationRef.current" in app
 
     review = read("apps/pc-studio/frontend/src/pages/DatasetReviewPage.tsx")
     assert "async function refreshCaptureList()" in review

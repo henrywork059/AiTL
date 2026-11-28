@@ -1,4 +1,4 @@
-import { API_BASE, fetchCameraStatus } from "../api";
+import { API_BASE, fetchCameraStatusStrict } from "../api";
 import { requestJsonStrict } from "./apiClient";
 import type { CameraStatus } from "../types";
 
@@ -291,7 +291,7 @@ export async function disconnectRemoteCamera(): Promise<RemoteCameraStatus> {
 }
 
 export async function refreshCameraAfterRemoteChange(): Promise<CameraStatus> {
-  return fetchCameraStatus();
+  return fetchCameraStatusStrict();
 }
 
 export type NativeProjectionScene = {

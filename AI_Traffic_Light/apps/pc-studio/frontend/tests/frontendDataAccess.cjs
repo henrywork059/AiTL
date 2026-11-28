@@ -12,7 +12,7 @@ function loadModules() {
   try {
     const source = path.join(temporary, 'src');
     fs.mkdirSync(source);
-    const files = ['pollingScope.ts', 'apiClient.ts', 'errorCodes.ts', 'logger.ts'];
+    const files = ['pollingScope.ts', 'apiClient.ts', 'errorCodes.ts', 'logger.ts', 'cameraPreviewState.ts'];
     for (const file of files) {
       fs.copyFileSync(path.join(frontend, 'src', 'lib', file), path.join(source, file));
     }
@@ -31,15 +31,27 @@ function loadModules() {
     return {
       ...require(path.join(temporary, 'dist', 'pollingScope.js')),
       ...require(path.join(temporary, 'dist', 'apiClient.js')),
+      ...require(path.join(temporary, 'dist', 'cameraPreviewState.js')),
     };
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
 }
 
-const { createPollingScope, runScopedSerialTask, requestJson, requestJsonStrict, ApiRequestError } = loadModules();
+const { createPollingScope, runScopedSerialTask, requestJson, requestJsonStrict, ApiRequestError, matchesSelectedCameraFrame } = loadModules();
 
 async function main() {
+  const physical = {active_source_id:'camera_a',simulation_enabled:false,frame_available:true,stale:false,origin:'upload'};
+  const synthetic = {...physical,active_source_id:'simulation_camera_b',simulation_enabled:true,origin:'simulation'};
+  assert.equal(matchesSelectedCameraFrame(physical,'camera_a','esp32'),true);
+  assert.equal(matchesSelectedCameraFrame(synthetic,'simulation_camera_b','simulation'),true);
+  assert.equal(matchesSelectedCameraFrame(null,'camera_a','esp32'),false);
+  for (const patch of [{active_source_id:'camera_b'},{active_source_id:null},{frame_available:false},{stale:true},{simulation_enabled:true},{origin:null},{origin:'simulation'},{simulation_fault:'fault'}]) assert.equal(matchesSelectedCameraFrame({...physical,...patch},'camera_a','esp32'),false);
+  assert.equal(matchesSelectedCameraFrame(synthetic,'simulation_camera','simulation'),false);
+  assert.equal(matchesSelectedCameraFrame({...synthetic,origin:'upload'},'simulation_camera_b','simulation'),false);
+  assert.equal(matchesSelectedCameraFrame({...synthetic,simulation_fault:'fault'},'simulation_camera_b','simulation'),false);
+  assert.equal(matchesSelectedCameraFrame(synthetic,'simulation_camera_b','esp32'),false);
+  console.log('[PASS] 15 selected camera source/frame admission cases');
   const inFlight = { current: null };
   const old = createPollingScope();
   const latest = createPollingScope();

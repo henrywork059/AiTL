@@ -278,6 +278,7 @@ export async function saveRuntimeSettings(settings: RuntimeSettings): Promise<Ru
   return requestJsonStrict<RuntimeSettings>(`${API_BASE}/api/settings/runtime`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
 }
 export async function fetchCameraStatus(): Promise<CameraStatus> { return requestJson<CameraStatus>(`${API_BASE}/api/camera/status`, fallbackCameraStatus); }
+export async function fetchCameraStatusStrict(signal?: AbortSignal): Promise<CameraStatus> { return requestJsonStrict<CameraStatus>(`${API_BASE}/api/camera/status`, { signal, cache: "no-store" }); }
 export async function setCameraSimulation(enabled: boolean): Promise<CameraStatus> {
   const action = enabled ? "start" : "stop";
   return requestJson<CameraStatus>(`${API_BASE}/api/camera/simulation/${action}`, fallbackCameraStatus, { method: "POST" });

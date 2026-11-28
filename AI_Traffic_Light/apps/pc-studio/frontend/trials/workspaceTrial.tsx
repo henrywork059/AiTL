@@ -39,7 +39,7 @@ const datasetStatus=()=>{const reviewed=captureList.filter(c=>c.labeled);return 
 const fixtureImage=(width=1280,height=720)=>{const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d")!;ctx.fillStyle="#dae4e8";ctx.fillRect(0,0,width,height);ctx.fillStyle="#59636c";ctx.fillRect(0,250,width,220);ctx.fillStyle="#ffffff";ctx.font="32px sans-serif";ctx.fillText("Synthetic empty road fixture",40,100);const bytes=Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]),char=>char.charCodeAt(0));return new Blob([bytes],{type:"image/png"});};
 const validFixtureImage=fixtureImage(), wrongSizeFixtureImage=fixtureImage(640,360), invalidFixtureImage=new Blob(["not an image"],{type:"image/png"});
 let activeModel=false, modelFailure=false, savedNetwork=fixture;
-let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true, failRegionSave=false;
+let savedCount=0, readCount=0, selectedCamera="camera_a", failProbe=true, failRegionSave=false, failCameraStatus=false;
 const profiles=["camera_a","camera_b"].map((source_id,i)=>({source_id,host:"192.168.1."+(80+i),kind:"esp32",selected:i===0,connected:false,streaming:false,device_reachable:false,target_fps:15,settings:DEFAULT_REMOTE_CAMERA_SETTINGS,last_error:null as string|null,stream_connected:false,measured_fps:0,paused_for_simulation:false}));
 if(page==="crosswalks")Object.assign(profiles[0],{connected:true,streaming:true,device_reachable:true,stream_connected:true});
 let junctionFailure=false, junctionSaves=0;
@@ -52,11 +52,11 @@ const fixtureError=(message:string)=>new Response(JSON.stringify({ok:false,error
 window.fetch=async (input,init)=>{
   const path=new URL(typeof input==="string"?input:input instanceof URL?input.href:input.url,location.href).pathname;
   let data:unknown;
-  if(path==="/api/camera/remote/status")data=page==="cameras"||page==="crosswalks"?remoteState(): {cameras:[],active_source_id:null};
+  if(path==="/api/camera/remote/status"){if(failCameraStatus)return fixtureError("Fixture camera status unavailable");data=page==="cameras"||page==="crosswalks"?remoteState(): {cameras:[],active_source_id:null};}
   else if(path==="/api/camera/remote/select"){selectedCamera=JSON.parse(String(init?.body)).source_id;check(profiles.some(p=>p.source_id===selectedCamera),"Wrong camera identity");data=remoteState();}
   else if(path==="/api/camera/remote/cameras"){const body=JSON.parse(String(init?.body));check(body.source_id===selectedCamera&&body.host===profiles.find(p=>p.source_id===selectedCamera)?.host,"Camera profile mismatch");data=remoteState();}
   else if(path==="/api/camera/remote/connect"){const body=JSON.parse(String(init?.body));check(body.source_id===selectedCamera,"Wrong connection target");const p=profiles.find(p=>p.source_id===selectedCamera)!;if(failProbe){p.last_error="Fixture ESP unreachable";return fixtureError(p.last_error);}p.last_error=null;p.connected=true;p.device_reachable=true;data=remoteState();}
-  else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");data=remoteState();}
+  else if(path==="/api/camera/remote/start"||path==="/api/camera/remote/stop"){const p=profiles.find(p=>p.source_id===selectedCamera)!;check(p.connected,"Stream requested without connection");p.streaming=path.endsWith("/start");p.stream_connected=p.streaming;data=remoteState();}
   else if(path==="/api/camera/frame")return new Response(validFixtureImage,{headers:{"Content-Type":"image/png"}});
   else if(path==="/api/camera/status")data={mode:"receiver",simulation_enabled:false,simulation_paused:false,frame_available:false,stale:true,streaming:profiles.find(p=>p.source_id===selectedCamera)?.streaming??false,active_source_id:selectedCamera,resolution:null,age_ms:null,frame_url:null};
   else if(path==="/api/dataset/status")data={active_dataset_id:"captures",session_count:captureSavedCount>0?1:0,frame_count:captureSavedCount,metadata_count:captureSavedCount,capture_enabled:true,status:"ready",dataset_path:"datasets/captures",last_capture:null};
@@ -94,7 +94,7 @@ function CameraFixture(){
   const [status,setStatus]=useState<CameraStatus|null>(null);
   return <CameraSettingsPage status={status} showSimulationTools={false} onSimulationChange={()=>{}} onStatusChange={setStatus} changingMode={false}/>;
 }
-const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions","capture","training"].includes(page)?120:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
+const waitFor=async (predicate:()=>unknown,reason:string)=>{for(let i=0;i<(["review","crosswalks","junctions","capture","training","cameras"].includes(page)?120:30);i++){if(predicate())return;await pause();}throw Error(reason+(page==="review"?"; image requests="+captureBImageRequests+"; state="+document.querySelector(".label-empty-state")?.textContent:""));};
 const findButton=(label:string)=>[...document.querySelectorAll("button")].find(b=>b.textContent===label);
 let dragSerial=0;
 async function dragImagePoint(selector:string,start:[number,number],end:[number,number],done:()=>unknown){const svg=document.querySelector<SVGSVGElement>(selector)!;svg.scrollIntoView({block:"center"});await pause();const matrix=svg.getScreenCTM()!;const toScreen=(point:[number,number])=>{const p=new DOMPoint(...point).matrixTransform(matrix);return [p.x,p.y];};const id=++dragSerial;result.dataset.drag=JSON.stringify({id,from:toScreen(start),to:toScreen(end),target:selector===".crosswalk-region-overlay"?".crosswalk-region-vertex":".label-canvas",svgSelector:selector,logicalFrom:start,logicalTo:end});await waitFor(()=>result.dataset.dragDone===String(id)&&done(),"Real pointer drag not committed: "+selector+"; released="+result.dataset.dragDone+"; vertices="+[...svg.querySelectorAll("circle")].map(c=>c.getAttribute("cx")+","+c.getAttribute("cy")).join(";"));delete result.dataset.drag;}
@@ -127,6 +127,13 @@ async function main(){
     findButton("Start Stream")!.click();
     await waitFor(()=>Boolean(findButton("Stop Stream")&&!findButton("Stop Stream")!.disabled),"Start did not enable stop");
     check(!document.querySelector("img.camera-frame"),"Unverified stream shown as fresh");
+    check(document.querySelector(".camera-status-entry.is-selected")?.textContent?.includes("Streaming"),"Fixture streaming status missing");
+    failCameraStatus=true;
+    await waitFor(()=>document.querySelector(".camera-status-strip")?.textContent?.includes("status unavailable"),"Failed camera poll not shown");
+    check(document.querySelectorAll(".camera-status-entry").length===2&&!document.querySelector(".camera-status-entry.is-selected")&&[...document.querySelectorAll(".camera-status-entry .status-pill")].every(el=>el.textContent==="Unavailable"),"Cached profiles or stale status after failed poll");
+    check(findButton("Stop Stream")?.disabled&&!document.querySelector("img.camera-frame"),"Unverified selected command or frame remained available");
+    failCameraStatus=false;
+    await waitFor(()=>document.querySelector(".camera-status-entry.is-selected")?.textContent?.includes("camera_b")&&!findButton("Stop Stream")?.disabled,"Camera poll recovery did not restore active state");
     findButton("Stop Stream")!.click();
     await waitFor(()=>Boolean(findButton("Start Stream")&&!findButton("Start Stream")!.disabled),"Stop did not restore start");
     check(!profiles[0].connected&&!profiles[0].streaming&&profiles[1].connected&&!profiles[1].streaming,"Other camera state changed");
