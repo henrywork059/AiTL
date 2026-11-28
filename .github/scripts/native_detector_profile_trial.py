@@ -35,7 +35,7 @@ def export_hashes(directory):
     return {p.relative_to(directory).as_posix():file_sha256(p) for p in files}
 
 
-def read_export(root):
+def read_export(root, *, shape_profile=None, parent=None):
     manifest = json.loads((root/"manifest.json").read_text(encoding="utf-8"))
     directory = root/"model_openvino_model"
     if (manifest["checkpoint_sha256"] != CHECKPOINT or manifest["settings"] != EXPORT_SETTINGS
@@ -43,7 +43,76 @@ def read_export(root):
             or manifest["ultralytics_version"] != version("ultralytics")
             or manifest["files"] != export_hashes(directory)):
         raise ValueError("Export identity mismatch")
+    if shape_profile is not None:
+        from native_detector_openvino import validate_export, EXPORT_MANIFEST, FILES
+        if shape_profile == "dynamic":
+            validate_export(root)
+            if parent is not None:
+                raise ValueError("Unexpected parent for audited dynamic graph")
+        elif shape_profile == "static-spatial":
+            if parent is None:
+                raise ValueError("Missing audited parent")
+            validate_export(parent)
+            if (manifest.get("specialization") != {"parent_manifest_sha256":EXPORT_MANIFEST,
+                    "parent_files":FILES,"operation":"reshape_spatial_only",
+                    "input_shape":[-1,3,640,640],"compress_to_fp16":False}
+                    or file_sha256(directory/"metadata.yaml") != FILES["metadata.yaml"]):
+                raise ValueError("Specialized graph parent identity mismatch")
+        else:
+            raise ValueError("Unknown graph shape profile")
+        import openvino as ov
+        graph = ov.Core().read_model(str(next(directory.glob("*.xml"))))
+        inputs, outputs = graph_interface(graph)
+        expected = "[?,3,640,640]" if shape_profile=="static-spatial" else "[?,3,?,?]"
+        if inputs != [{"shape":expected,"type":"f32"}] or inputs != manifest["inputs"] or outputs != manifest["outputs"]:
+            raise ValueError("Graph shape/interface mismatch")
+        if len(outputs)!=1 or outputs[0]["type"]!="f32" or any(
+                op.get_type_name() in ("NonMaxSuppression","MulticlassNms","MatrixNms") for op in graph.get_ops()):
+            raise ValueError("Unexpected output interface or embedded suppression")
     return directory, manifest
+
+
+def graph_interface(graph):
+    return ([{"shape":str(x.partial_shape),"type":x.element_type.get_type_name()} for x in graph.inputs],
+            [{"shape":str(x.partial_shape),"type":x.element_type.get_type_name()} for x in graph.outputs])
+
+
+def specialize_spatial_graph(graph):
+    before, _ = graph_interface(graph)
+    if before != [{"shape":"[?,3,?,?]","type":"f32"}]:
+        raise ValueError("Unexpected dynamic FP32 source graph")
+    graph.reshape([-1,3,640,640])
+    after, _ = graph_interface(graph)
+    if after != [{"shape":"[?,3,640,640]","type":"f32"}]:
+        raise ValueError("Spatial-only reshape failed")
+
+
+def specialize_export(parent, root):
+    from native_detector_openvino import validate_export, EXPORT_MANIFEST, FILES
+    manifest = validate_export(parent)
+    directory, verified = read_export(parent,shape_profile="dynamic")
+    if manifest != verified:
+        raise ValueError("Inconsistent parent export")
+    import openvino as ov
+    root.mkdir(parents=True,exist_ok=False)
+    destination=root/"model_openvino_model"
+    destination.mkdir()
+    start=perf_counter()
+    graph=ov.Core().read_model(str(directory/"model.xml"))
+    specialize_spatial_graph(graph)
+    # No quantization, no FP16 compression, no re-export from .pt.
+    ov.save_model(graph,str(destination/"model.xml"),compress_to_fp16=False)
+    shutil.copyfile(directory/"metadata.yaml",destination/"metadata.yaml")
+    saved=ov.Core().read_model(str(destination/"model.xml"))
+    inputs,outputs=graph_interface(saved)
+    write(root/"manifest.json",{**manifest,"inputs":inputs,"outputs":outputs,
+          "files":export_hashes(destination),
+          "specialization":{"parent_manifest_sha256":EXPORT_MANIFEST,"parent_files":FILES,
+                            "operation":"reshape_spatial_only","input_shape":[-1,3,640,640],
+                            "compress_to_fp16":False},
+          "specialization_wall_ms":(perf_counter()-start)*1000})
+    read_export(root,shape_profile="static-spatial",parent=parent)
+    validate_export(parent)
 
 
 def export_openvino(weights, root):
@@ -81,6 +150,12 @@ def openvino_properties(model):
     if compiled is None:
         return {"available":False}
     result = {"available":True}
+    try:
+        result["compiled_input_shape"] = str(compiled.input(0).partial_shape)
+        result["compiled_input_type"] = compiled.input(0).element_type.get_type_name()
+    except (AttributeError,RuntimeError,TypeError,ValueError):
+        result["compiled_input_shape"] = None
+        result["compiled_input_type"] = None
     for key in OV_PROPERTIES:
         try:
             result[key] = str(compiled.get_property(key))
@@ -184,7 +259,19 @@ def self_test():
         original = export_hashes(d)
         (d/"model.bin").write_bytes(b"changed")
         assert export_hashes(d)!=original
-    print("Timing proxy, stage aggregation, thread recording, backend identity and invalid timing rejection passed")
+    # Exercise the actual runtime reshape API without a trained model.
+    import openvino as ov
+    parameter=ov.opset13.parameter([-1,3,-1,-1],ov.Type.f32)
+    graph=ov.Model([ov.opset13.relu(parameter)],[parameter])
+    specialize_spatial_graph(graph)
+    assert graph_interface(graph)[0] == [{"shape":"[?,3,640,640]","type":"f32"}]
+    try:
+        specialize_spatial_graph(graph)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Non-dynamic source admitted")
+    print("Timing proxy, stage aggregation, thread recording, backend identity, spatial reshape and invalid timing rejection passed")
 
 
 def boxes(rows):
@@ -195,11 +282,13 @@ def write(path, data):
     path.write_text(json.dumps(data,indent=2,allow_nan=False),encoding="utf-8")
 
 
-def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None, backend="pytorch", export_dir=None):
+def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None, backend="pytorch", export_dir=None, shape_profile=None, parent_export=None):
     if platform.system() != "Linux" or file_sha256(weights) != CHECKPOINT:
         raise ValueError("Expected isolated Linux and frozen checkpoint")
     ref = json.loads(reference.read_text(encoding="utf-8"))
-    if (ref["model_sha256"] != CHECKPOINT or ref["method"] != METHOD or ref["capture_count"] != 16
+    reference_artifact = 15253776453 if shape_profile is not None else 15249412930
+    reference_method = "tiled-stream-reuse-openvino-v1" if shape_profile is not None else METHOD
+    if (ref["model_sha256"] != CHECKPOINT or ref["method"] != reference_method or ref["capture_count"] != 16
             or ref["production_detector_validated"] is not False
             or "DEVELOPMENT REGRESSION ONLY" not in ref["holdout"]["plan"]["holdout_selection"]):
         raise ValueError("Unexpected development reference")
@@ -211,25 +300,30 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         if file_sha256(captures/name) != expected[name]["archive_sha256"]:
             raise ValueError("Unexpected capture digest")
     evidence.mkdir(parents=True,exist_ok=False)
+    if shape_profile is not None and (backend!="openvino" or thread_profile!="2"):
+        raise ValueError("Shape trial requires OpenVINO with two surrounding threads")
     descriptor = method_descriptor()
     export = None
     model_path = weights
     if backend == "openvino":
         if export_dir is None or thread_profile != "2":
             raise ValueError("OpenVINO trial requires local export and fixed PyTorch surrounding threads")
-        model_path, export = read_export(export_dir)
+        model_path, export = read_export(export_dir,shape_profile=shape_profile,parent=parent_export)
     elif export_dir is not None:
         raise ValueError("Unexpected export for native backend")
     runtime = {"backend":backend,"requested_torch_intraop":thread_profile,"omp_num_threads":os.getenv("OMP_NUM_THREADS"),
                "profile_source_sha256":file_sha256(Path(__file__)), "export":export,
+               "shape_profile":shape_profile,
                "qualification_scope":"development-only; not a formal schema-2 method"}
     write(evidence/"plan.json", {"method":descriptor,"model_sha256":CHECKPOINT,
-        "reference_artifact":15249412930,"capture_artifact":15245454146,
+        "reference_artifact":reference_artifact,"capture_artifact":15245454146,
         "formal_holdout_used":False,"migration_authorized":False,
         "thread_profile":thread_profile,"run_label":run_label,"runtime":runtime,
         "timing_scope":"Single frame wall includes decode, crop, reuse, conversion and merge; excludes scoring and capture admission. Model call wall includes preprocessing/inference/postprocessing and startup. Results.speed is library-reported, not independently instrumented kernels."})
     import torch
     from ultralytics import YOLO
+    if shape_profile is not None and torch.get_num_interop_threads()!=4:
+        torch.set_num_interop_threads(4)
     model = YOLO(str(model_path), task="detect")
     # Warm up once on a fixed, already-evaluated development view. Explicit
     # intra-op settings are applied before and re-applied after lazy model
@@ -308,15 +402,23 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         thread_consistent = thread_consistent and expected_threads == requested
     observed = [c["openvino_properties"] for v in rows for c in v["calls"]] if backend=="openvino" else []
     backend_observed = backend=="pytorch" or (bool(observed) and all(cpu_backend_observed(p) for p in observed))
+    if shape_profile is not None:
+        from native_detector_openvino import PROPERTIES
+        expected_shape = "[?,3,640,640]" if shape_profile=="static-spatial" else "[?,3,?,?]"
+        backend_observed = backend_observed and all(
+            {k:p[k] for k in PROPERTIES} == PROPERTIES
+            and p["compiled_input_shape"] == expected_shape
+            and p["compiled_input_type"] == "f32" for p in observed)
+        thread_consistent = thread_consistent and all(v["torch_num_interop_threads"]==4 for v in rows)
     runtime["actual_torch_intraop"] = expected_threads
     runtime["actual_torch_interop"] = sorted({v["torch_num_interop_threads"] for v in rows})
     runtime["observed_openvino_properties"] = list({json.dumps(p,sort_keys=True):p for p in observed}.values())
     runtime["cpu_backend_identity_verified"] = backend_observed
     if backend == "openvino":
-        _, after = read_export(export_dir)
+        _, after = read_export(export_dir,shape_profile=shape_profile,parent=parent_export)
         if after != export:
             raise ValueError("Export changed during evaluation")
-    report={"model_sha256":CHECKPOINT,"method":descriptor,"reference_artifact":15249412930,"runtime":runtime,
+    report={"model_sha256":CHECKPOINT,"method":descriptor,"reference_artifact":reference_artifact,"runtime":runtime,
             "formal_holdout_used":False,"migration_authorized":False,"physical_output_allowed":False,
             "production_detector_validated":False,"view_count":len(rows),"stage_summaries":summaries,
             "thread_profile":thread_profile,"run_label":run_label,"warmup":warmup,
@@ -342,7 +444,9 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
 
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("mode",choices=("self-test","run","export"))
+    p.add_argument("mode",choices=("self-test","run","export","specialize"))
+    p.add_argument("--shape-profile",choices=("dynamic","static-spatial"))
+    p.add_argument("--parent-export",type=Path)
     p.add_argument("--backend",choices=("pytorch","openvino"),default="pytorch")
     p.add_argument("--export-dir",type=Path)
     p.add_argument("--thread-profile",choices=("default","1","2","4"))
@@ -356,7 +460,11 @@ if __name__=="__main__":
         if not all((a.weights,a.export_dir)):
             p.error("export requires weights and export-dir")
         export_openvino(a.weights,a.export_dir)
+    elif a.mode=="specialize":
+        if not all((a.parent_export,a.export_dir)):
+            p.error("specialize requires parent-export and export-dir")
+        specialize_export(a.parent_export,a.export_dir)
     else:
         if not all((a.captures,a.weights,a.reference,a.evidence)):
             p.error("run requires all inputs")
-        run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir)
+        run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir,shape_profile=a.shape_profile,parent_export=a.parent_export)
