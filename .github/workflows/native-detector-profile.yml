@@ -1,4 +1,4 @@
-name: Update 28C CPU thread allocation development trial
+name: Update 28C CPU backend development comparison
 on:
   push:
     branches: [feature/interactive-3d-simulation]
@@ -43,12 +43,16 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision==0.26.0
-          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220
+          python -m pip install -r AI_Traffic_Light/apps/pc-studio/backend/requirements.txt ultralytics==8.4.220 openvino==2026.0.0
           python -m pip check
           python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
       - name: Verify timing proxy invariants
         run: python .github/scripts/native_detector_profile_trial.py self-test
-      - name: Execute counterbalanced fresh-process CPU thread profiles
+      - name: Export original checkpoint to local OpenVINO graph
+        env:
+          YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
+        run: python .github/scripts/native_detector_profile_trial.py export --weights "$RUNNER_TEMP/tile-last.pt" --export-dir "$RUNNER_TEMP/backend-model"
+      - name: Execute counterbalanced fresh-process CPU backend profiles
         env:
           YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
         run: |
@@ -59,14 +63,16 @@ jobs:
           status=0
           for round in 1 2; do
             if [ "$round" = 1 ]; then
-              order="default 2 1 4"
+              order="pytorch openvino"
             else
-              order="4 1 2 default"
+              order="openvino pytorch"
             fi
-            for profile in $order; do
-              label="r${round}-${profile}"
+            for backend in $order; do
+              label="r${round}-${backend}"
               rc=0
-              python .github/scripts/native_detector_profile_trial.py run --thread-profile "$profile" --run-label "$label" --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence/$label" || rc=$?
+              extra=()
+              if [ "$backend" = openvino ]; then extra=(--export-dir "$RUNNER_TEMP/backend-model"); fi
+              python .github/scripts/native_detector_profile_trial.py run --backend "$backend" --thread-profile 2 --run-label "$label" --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence/$label" "${extra[@]}" || rc=$?
               printf '%s,%s\n' "$label" "$rc" >> "$RUNNER_TEMP/profile-evidence/exit-codes.csv"
               if [ "$rc" != 0 ]; then status=1; fi
             done
@@ -75,10 +81,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mesh-28c-thread-allocation-development
+          name: mesh-28c-backend-development
           retention-days: 14
           path: |
             ${{ runner.temp }}/profile-evidence/
+            ${{ runner.temp }}/backend-model/
             ${{ runner.temp }}/python-packages.txt
             ${{ runner.temp }}/cpu-info.txt
           if-no-files-found: warn

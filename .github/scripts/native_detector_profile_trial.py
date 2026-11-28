@@ -7,7 +7,10 @@ import os
 from pathlib import Path
 import platform
 import resource
+import shutil
 import sys
+from tempfile import TemporaryDirectory
+from importlib.metadata import version
 from time import perf_counter, process_time
 
 ROOT = Path(__file__).resolve().parents[2] / "AI_Traffic_Light"
@@ -19,13 +22,83 @@ from app.services.sumo_projection import VIEW_FLIPS
 
 CHECKPOINT = "9c888355e3228db090c98969672a4418eb207e1c0ffa926746091485da84ecba"
 STAGES = ("preprocess", "inference", "postprocess")
+EXPORT_SETTINGS = {"format":"openvino","imgsz":640,"batch":8,"dynamic":True,"nms":False,"device":"cpu","quantize":None}
+OV_PROPERTIES = ("EXECUTION_DEVICES","INFERENCE_NUM_THREADS","NUM_STREAMS","INFERENCE_PRECISION_HINT","PERFORMANCE_HINT")
+
+
+def export_hashes(directory):
+    files = sorted(p for p in directory.rglob("*") if p.is_file())
+    if (not files or any(p.is_symlink() for p in files)
+            or len(list(directory.glob("*.xml"))) != 1 or len(list(directory.glob("*.bin"))) != 1
+            or not (directory/"metadata.yaml").is_file()):
+        raise ValueError("Unexpected OpenVINO export files")
+    return {p.relative_to(directory).as_posix():file_sha256(p) for p in files}
+
+
+def read_export(root):
+    manifest = json.loads((root/"manifest.json").read_text(encoding="utf-8"))
+    directory = root/"model_openvino_model"
+    if (manifest["checkpoint_sha256"] != CHECKPOINT or manifest["settings"] != EXPORT_SETTINGS
+            or manifest["openvino_version"] != version("openvino")
+            or manifest["ultralytics_version"] != version("ultralytics")
+            or manifest["files"] != export_hashes(directory)):
+        raise ValueError("Export identity mismatch")
+    return directory, manifest
+
+
+def export_openvino(weights, root):
+    if file_sha256(weights) != CHECKPOINT:
+        raise ValueError("Unexpected reference checkpoint")
+    import openvino as ov
+    from ultralytics import YOLO
+    root.mkdir(parents=True, exist_ok=False)
+    t = perf_counter()
+    with TemporaryDirectory(prefix="mesh-ov-export-") as temp:
+        snapshot = Path(temp)/"model.pt"
+        shutil.copyfile(weights,snapshot)
+        if file_sha256(snapshot) != CHECKPOINT:
+            raise ValueError("Checkpoint changed during export")
+        exported = Path(YOLO(str(snapshot),task="detect").export(**EXPORT_SETTINGS))
+        directory = root/"model_openvino_model"
+        shutil.copytree(exported,directory)
+    graph = ov.Core().read_model(str(next(directory.glob("*.xml"))))
+    inputs = [{"shape":str(x.partial_shape),"type":x.element_type.get_type_name()} for x in graph.inputs]
+    outputs = [{"shape":str(x.partial_shape),"type":x.element_type.get_type_name()} for x in graph.outputs]
+    if len(inputs)!=1 or inputs[0]["type"]!="f32" or any(x["type"]!="f32" for x in outputs):
+        raise ValueError("Expected FP32 graph interface")
+    write(root/"manifest.json",{"checkpoint_sha256":CHECKPOINT,"settings":EXPORT_SETTINGS,
+          "openvino_version":version("openvino"),"ultralytics_version":version("ultralytics"),
+          "files":export_hashes(directory),"inputs":inputs,"outputs":outputs,
+          "export_wall_ms":(perf_counter()-t)*1000})
+
+
+def openvino_properties(model):
+    # Record actual library-managed CPU configuration, not assumed defaults.
+    backend = getattr(getattr(model,"predictor",None),"model",None)
+    compiled = getattr(backend,"ov_compiled_model",None)
+    if compiled is None:
+        compiled = getattr(getattr(backend,"backend",None),"ov_compiled_model",None)
+    if compiled is None:
+        return {"available":False}
+    result = {"available":True}
+    for key in OV_PROPERTIES:
+        try:
+            result[key] = str(compiled.get_property(key))
+        except (RuntimeError,TypeError,ValueError):
+            result[key] = None
+    return result
+
+
+def cpu_backend_observed(properties):
+    return properties.get("available") is True and all(properties.get(k) is not None for k in OV_PROPERTIES) and "CPU" in properties["EXECUTION_DEVICES"] and not any(x in properties["EXECUTION_DEVICES"] for x in ("GPU","NPU"))
 
 
 class TimedModel:
     """Proxy only: return the original result objects without modification."""
-    def __init__(self, model, torch_module=None):
+    def __init__(self, model, torch_module=None, backend="pytorch"):
         self.model = model
         self.torch = torch_module
+        self.backend = backend
         self.calls = []
 
     def __getattr__(self, name):
@@ -54,7 +127,8 @@ class TimedModel:
         self.calls.append({"unique_images": len(source), "wall_ms": elapsed,
                            "cpu_ms": cpu_ms, "per_image_reported_ms": speeds,
                            "threads_before": before_threads,
-                           "threads_after": self.torch.get_num_threads() if self.torch is not None else None})
+                           "threads_after": self.torch.get_num_threads() if self.torch is not None else None,
+                           **({"openvino_properties":openvino_properties(self.model)} if self.backend=="openvino" else {})})
         return results
 
 
@@ -96,7 +170,21 @@ def self_test():
     threaded = TimedModel(Fake(), ThreadDouble())
     threaded.predict(source=[0])
     assert threaded.calls[0]["threads_before"] == threaded.calls[0]["threads_after"] == 2
-    print("Timing proxy, stage aggregation, thread recording, and invalid timing rejection passed")
+    class CompiledDouble:
+        def get_property(self, key):
+            return ["CPU"] if key=="EXECUTION_DEVICES" else "fixture"
+    backend = SimpleNamespace(predictor=SimpleNamespace(model=SimpleNamespace(ov_compiled_model=CompiledDouble())))
+    assert cpu_backend_observed(openvino_properties(backend))
+    assert not cpu_backend_observed(openvino_properties(SimpleNamespace()))
+    assert not cpu_backend_observed({**openvino_properties(backend),"EXECUTION_DEVICES":"GPU"})
+    with TemporaryDirectory() as temp:
+        d = Path(temp)
+        for n in ("model.xml","model.bin","metadata.yaml"):
+            (d/n).write_bytes(n.encode())
+        original = export_hashes(d)
+        (d/"model.bin").write_bytes(b"changed")
+        assert export_hashes(d)!=original
+    print("Timing proxy, stage aggregation, thread recording, backend identity and invalid timing rejection passed")
 
 
 def boxes(rows):
@@ -107,7 +195,7 @@ def write(path, data):
     path.write_text(json.dumps(data,indent=2,allow_nan=False),encoding="utf-8")
 
 
-def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None):
+def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None, backend="pytorch", export_dir=None):
     if platform.system() != "Linux" or file_sha256(weights) != CHECKPOINT:
         raise ValueError("Expected isolated Linux and frozen checkpoint")
     ref = json.loads(reference.read_text(encoding="utf-8"))
@@ -124,14 +212,25 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
             raise ValueError("Unexpected capture digest")
     evidence.mkdir(parents=True,exist_ok=False)
     descriptor = method_descriptor()
+    export = None
+    model_path = weights
+    if backend == "openvino":
+        if export_dir is None or thread_profile != "2":
+            raise ValueError("OpenVINO trial requires local export and fixed PyTorch surrounding threads")
+        model_path, export = read_export(export_dir)
+    elif export_dir is not None:
+        raise ValueError("Unexpected export for native backend")
+    runtime = {"backend":backend,"requested_torch_intraop":thread_profile,"omp_num_threads":os.getenv("OMP_NUM_THREADS"),
+               "profile_source_sha256":file_sha256(Path(__file__)), "export":export,
+               "qualification_scope":"development-only; not a formal schema-2 method"}
     write(evidence/"plan.json", {"method":descriptor,"model_sha256":CHECKPOINT,
         "reference_artifact":15249412930,"capture_artifact":15245454146,
         "formal_holdout_used":False,"migration_authorized":False,
-        "thread_profile":thread_profile,"run_label":run_label,
+        "thread_profile":thread_profile,"run_label":run_label,"runtime":runtime,
         "timing_scope":"Single frame wall includes decode, crop, reuse, conversion and merge; excludes scoring and capture admission. Model call wall includes preprocessing/inference/postprocessing and startup. Results.speed is library-reported, not independently instrumented kernels."})
     import torch
     from ultralytics import YOLO
-    model = YOLO(str(weights))
+    model = YOLO(str(model_path), task="detect")
     # Warm up once on a fixed, already-evaluated development view. Explicit
     # intra-op settings are applied before and re-applied after lazy model
     # initialization, since the library may change the process thread count.
@@ -146,7 +245,7 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         if requested is not None:
             torch.set_num_threads(requested)
         first_view = next(iter(VIEW_FLIPS))
-        proxy = TimedModel(model, torch)
+        proxy = TimedModel(model, torch, backend)
         t = perf_counter()
         cpu = process_time()
         predictions, unmapped, details = tiled_predict(images[first_view],ann,first_view,proxy)
@@ -171,7 +270,7 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
             raise ValueError("Unqualified development archive")
         views = {}
         for view in VIEW_FLIPS:
-            proxy = TimedModel(model, torch)
+            proxy = TimedModel(model, torch, backend)
             t = perf_counter()
             cpu = process_time()
             predictions, unmapped, details = tiled_predict(images[view],ann,view,proxy)
@@ -207,7 +306,17 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         c["threads_before"] == c["threads_after"] == expected_threads for c in v["calls"]) for v in rows)
     if requested is not None:
         thread_consistent = thread_consistent and expected_threads == requested
-    report={"model_sha256":CHECKPOINT,"method":descriptor,"reference_artifact":15249412930,
+    observed = [c["openvino_properties"] for v in rows for c in v["calls"]] if backend=="openvino" else []
+    backend_observed = backend=="pytorch" or (bool(observed) and all(cpu_backend_observed(p) for p in observed))
+    runtime["actual_torch_intraop"] = expected_threads
+    runtime["actual_torch_interop"] = sorted({v["torch_num_interop_threads"] for v in rows})
+    runtime["observed_openvino_properties"] = list({json.dumps(p,sort_keys=True):p for p in observed}.values())
+    runtime["cpu_backend_identity_verified"] = backend_observed
+    if backend == "openvino":
+        _, after = read_export(export_dir)
+        if after != export:
+            raise ValueError("Export changed during evaluation")
+    report={"model_sha256":CHECKPOINT,"method":descriptor,"reference_artifact":15249412930,"runtime":runtime,
             "formal_holdout_used":False,"migration_authorized":False,"physical_output_allowed":False,
             "production_detector_validated":False,"view_count":len(rows),"stage_summaries":summaries,
             "thread_profile":thread_profile,"run_label":run_label,"warmup":warmup,
@@ -227,11 +336,15 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         raise SystemExit("Profile did not preserve detection parity; retain negative evidence")
     if thread_profile is not None and not thread_consistent:
         raise SystemExit("Runtime thread configuration changed; retain negative evidence")
+    if not backend_observed:
+        raise SystemExit("OpenVINO CPU runtime properties not verified; retain negative evidence")
 
 
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("mode",choices=("self-test","run"))
+    p.add_argument("mode",choices=("self-test","run","export"))
+    p.add_argument("--backend",choices=("pytorch","openvino"),default="pytorch")
+    p.add_argument("--export-dir",type=Path)
     p.add_argument("--thread-profile",choices=("default","1","2","4"))
     p.add_argument("--run-label")
     for name in ("captures","weights","reference","evidence"):
@@ -239,7 +352,11 @@ if __name__=="__main__":
     a=p.parse_args()
     if a.mode=="self-test":
         self_test()
+    elif a.mode=="export":
+        if not all((a.weights,a.export_dir)):
+            p.error("export requires weights and export-dir")
+        export_openvino(a.weights,a.export_dir)
     else:
         if not all((a.captures,a.weights,a.reference,a.evidence)):
             p.error("run requires all inputs")
-        run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label)
+        run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir)
