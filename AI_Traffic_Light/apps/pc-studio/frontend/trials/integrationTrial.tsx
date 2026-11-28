@@ -182,7 +182,7 @@ async function run(){
     check(host.querySelector("[data-native-applied-config]")?.textContent?.includes("native / standard / normal / fixed")&&host.querySelector("[data-native-applied-config]")?.textContent?.includes("seed 42"),"Applied native scenario missing");
     const draftSeed=host.querySelector<HTMLInputElement>('input[aria-label="Native seed"]')!;
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(draftSeed,"");draftSeed.dispatchEvent(new Event("input",{bubbles:true}));
-    await wait(()=>button("Reset evaluation")?.disabled,"Empty native seed allowed reset");
+    await wait(()=>Boolean(button("Reset evaluation")?.disabled),"Empty native seed allowed reset");
     check(host.querySelector("[data-native-applied-config]")?.textContent?.includes("seed 42"),"Draft seed changed applied configuration");
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(draftSeed,"42");draftSeed.dispatchEvent(new Event("input",{bubbles:true}));
     await wait(()=>Boolean(button("Reset evaluation")&&!button("Reset evaluation")!.disabled),"Valid seed did not restore reset");
