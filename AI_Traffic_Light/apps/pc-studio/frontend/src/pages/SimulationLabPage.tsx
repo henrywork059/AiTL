@@ -191,12 +191,25 @@ export function SimulationLabPage() {
     if (busy) return;
     await performOperation(async (isCurrent) => {
       setResult(null);
-      const config = await fetchSignalRules();
+      const [config, listing] = await Promise.allSettled([fetchSignalRules(), fetchSimulationExperiments(50)]);
       if (!isCurrent()) return;
-      const available = Object.keys(config.profiles);
-      setProfiles(available);
-      setProfile(current => available.includes(current) ? current : config.active_profile);
-      await refreshRunList(isCurrent, selectedRunId || undefined);
+      if (config.status === "fulfilled") {
+        const { profiles: nextProfiles, active_profile: activeProfile } = config.value;
+        const available = Object.keys(nextProfiles);
+        setProfiles(available);
+        setProfile(current => available.includes(current) ? current : activeProfile);
+      } else {
+        // Do not offer a new comparison with an unverified signal profile.
+        setProfiles([]);
+        setProfile("");
+      }
+      if (listing.status === "fulfilled") {
+        setRuns(listing.value.experiments);
+        await loadSelectedRun(chooseStoredRunId(listing.value.experiments, selectedRunId || undefined), isCurrent);
+      } else {
+        throw listing.reason;
+      }
+      if (config.status === "rejected") throw config.reason;
     }, "Stored runs could not be refreshed.");
   }
 

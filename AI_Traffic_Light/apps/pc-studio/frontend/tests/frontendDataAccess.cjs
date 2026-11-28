@@ -65,7 +65,7 @@ async function main() {
   assert.equal(verifiedExperimentResult('',storedRuns[0]), null);
   assert.equal(verifiedExperimentResult('a',null), null);
   assert.equal(verifiedExperimentResult('a',storedRuns[0]), storedRuns[0]);
-  console.log('[PASS] 17 experiment operation/selection assertions');
+  console.log('[PASS] 16 experiment operation/selection assertions');
 
   const physical = {active_source_id:'camera_a',simulation_enabled:false,frame_available:true,stale:false,origin:'upload'};
   const synthetic = {...physical,active_source_id:'simulation_camera_b',simulation_enabled:true,origin:'simulation'};
