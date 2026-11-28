@@ -7,6 +7,7 @@ import {
   fetchSimulationExperiments,
   runSimulationExperiment,
   simulationExperimentExportUrl,
+  simulationExperimentEvidenceUrl,
 } from "../experimentApi";
 import type { ExperimentDelta, ExperimentModeResult, SimulationExperiment, SimulationExperimentSummary } from "../types/experiments";
 import { createExperimentOperationGate, chooseStoredRunId, verifiedExperimentResult } from "../lib/experimentRunState";
@@ -303,6 +304,7 @@ export function SimulationLabPage() {
           <div className="button-row">
             <button type="button" disabled={busy} onClick={() => void refreshStoredRuns()}>Refresh stored runs</button>
             <button type="button" disabled={busy || !result} onClick={() => !busy && result && window.location.assign(simulationExperimentExportUrl(result.run_id))}>Export samples CSV</button>
+            <button type="button" disabled={busy || !result} onClick={() => !busy && result && window.location.assign(simulationExperimentEvidenceUrl(result.run_id))}>Export evidence ZIP</button>
             <button className="danger" type="button" disabled={!result || busy} onClick={() => void deleteRun()}>Delete run</button>
           </div>
           {result && <div className="experiment-scenario-strip"><strong>{result.scenario.profile}</strong><span>{result.scenario.density}</span><span>{result.scenario.duration_seconds}s</span><span>seed {result.scenario.seed}</span>{result.scenario.demand_model==="live_slots"&&<span>Live camera slots · 50 ms</span>}{result.scenario.demand_model==="protected_slots"&&<span>Protected crosswalk · 50 ms</span>}<span>{new Date(result.created_at_ms).toLocaleString()}</span></div>}

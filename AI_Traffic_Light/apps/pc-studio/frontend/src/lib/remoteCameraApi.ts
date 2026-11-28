@@ -431,3 +431,36 @@ export function previewLegacyCrossing(state:NativeEvaluationState,sourceId:strin
       body:JSON.stringify({epoch:state.epoch,generation:state.generation,tick:snapshot.tick,source_id:sourceId,
         legacy_layout_id:snapshot.legacy_preview_layout_id,layout_id:snapshot.layout_id,polygon}),signal});
 }
+
+export type NativeControlScore = { truth_count: number; prediction_count: number; matched: number; precision: number | null; recall: number | null };
+export type NativeControlReport = {
+  schema_version: 1; method: "exact_palette_components_not_trained_model";
+  epoch: string; generation: number; tick: number; layout_id: string; provenance: string;
+  physical_output_allowed: false; formal_holdout_used: false; production_detector_validated: false;
+  migration_authorized: false; iou_threshold: number; evaluation_ms: number;
+  views: Record<string, {score: {by_kind: Record<"vehicle"|"pedestrian", NativeControlScore>}; palette_prediction_ms: number}>;
+  limitations: string;
+};
+export async function evaluateNativeControl(state: NativeEvaluationState, signal: AbortSignal): Promise<NativeControlReport> {
+  const snapshot=state.snapshot;
+  if (!snapshot || state.status!=="running" || !snapshot.layout_id || snapshot.coordinate_space!=="native_projection_v1") throw new Error("Exact synthetic snapshot unavailable.");
+  const report=await requestJsonStrict<NativeControlReport>(`${nativeEvaluationBase}/detector-control?${evaluationQuery(state)}`,{signal,cache:"no-store"});
+  if (!report || report.schema_version!==1 || report.method!=="exact_palette_components_not_trained_model" ||
+      report.epoch!==state.epoch || report.generation!==state.generation || report.tick!==snapshot.tick || report.layout_id!==snapshot.layout_id ||
+      report.provenance!==snapshot.provenance || report.physical_output_allowed!==false || report.formal_holdout_used!==false ||
+      report.production_detector_validated!==false || report.migration_authorized!==false || report.iou_threshold!==.5 ||
+      !Number.isFinite(report.evaluation_ms) || report.evaluation_ms<0 ||
+      Object.keys(report.views??{}).length!==4 ||
+      ["simulation_camera","simulation_camera_b","simulation_camera_c","simulation_camera_d"].some(id=>{
+        const view=report.views?.[id];
+        return !view || !Number.isFinite(view.palette_prediction_ms) || view.palette_prediction_ms<0 ||
+          (["vehicle","pedestrian"] as const).some(kind=>{
+            const score=view.score?.by_kind?.[kind];
+            if(!score || ![score.truth_count,score.prediction_count,score.matched].every(n=>Number.isSafeInteger(n)&&n>=0) ||
+              score.matched>Math.min(score.truth_count,score.prediction_count))return true;
+            return (score.prediction_count ? typeof score.precision!=="number" || Math.abs(score.precision-score.matched/score.prediction_count)>1e-6 : score.precision!==null) ||
+              (score.truth_count ? typeof score.recall!=="number" || Math.abs(score.recall-score.matched/score.truth_count)>1e-6 : score.recall!==null);
+          });
+      })) throw new Error("Synthetic control report identity or metrics mismatch.");
+  return report;
+}

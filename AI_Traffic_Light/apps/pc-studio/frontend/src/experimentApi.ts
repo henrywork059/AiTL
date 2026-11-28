@@ -35,3 +35,7 @@ export async function deleteSimulationExperiment(runId: string): Promise<{ delet
 export function simulationExperimentExportUrl(runId: string): string {
   return `${API_BASE}/api/traffic/experiments/${encodeURIComponent(runId)}/export.csv`;
 }
+
+export function simulationExperimentEvidenceUrl(runId: string): string {
+  return `${API_BASE}/api/traffic/experiments/${encodeURIComponent(runId)}/evidence.zip`;
+}

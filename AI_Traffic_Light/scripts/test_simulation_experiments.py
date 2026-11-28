@@ -200,6 +200,30 @@ def main() -> int:
         assert loaded["run_id"] == first["run_id"]
         csv_text = service.export_csv(first["run_id"])
         assert "fixed_vehicle_queue" in csv_text and "adaptive_vehicle_queue" in csv_text
+        from app.services.experiment_evidence_export import experiment_evidence_zip
+        from zipfile import ZipFile
+        from io import BytesIO
+        import hashlib, json
+        for stored in (first, protected_first):
+            with ZipFile(BytesIO(experiment_evidence_zip(stored,stored["run_id"]))) as archive:
+                manifest=json.loads(archive.read("manifest.json"))
+                assert set(archive.namelist())=={"manifest.json","experiment.json","samples.csv"}
+                assert json.loads(archive.read("experiment.json"))==stored
+                assert manifest["run_id"]==stored["run_id"]
+                assert manifest["scenario"]==stored["scenario"]
+                assert manifest["execution_version"] is None
+                assert not manifest["physical_output_allowed"]
+                assert manifest["sample_counts"]=={m:len(stored[m]["timeline"]) for m in ("fixed","adaptive")}
+                for name,digest in manifest["sha256"].items():
+                    assert hashlib.sha256(archive.read(name)).hexdigest()==digest
+                owner=service if stored is first else live_service
+                assert archive.read("samples.csv").decode("utf-8")==owner.export_csv(stored["run_id"])
+        try:
+            experiment_evidence_zip(first,"wrong_run")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Mismatched evidence identity accepted")
         deleted = service.delete(first["run_id"])
         assert deleted["deleted"] is True
         assert service.list()["total"] == 1

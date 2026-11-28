@@ -3,6 +3,9 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 from app.core.api_response import ok
+from app.core.error_codes import ErrorCode
+from app.core.exceptions import AppError
+from app.services.experiment_evidence_export import experiment_evidence_zip
 from app.core.logging_config import get_logger
 from app.models import NetworkSimulationExperimentRunRequest, SimulationExperimentRunRequest
 from app.services.network_simulation_experiments import network_simulation_experiment_service
@@ -45,6 +48,19 @@ def export_simulation_experiment(run_id: str, request: Request) -> Response:
             "X-Request-ID": request.state.request_id,
         },
     )
+
+
+@router.get("/experiments/{run_id}/evidence.zip")
+def export_simulation_experiment_evidence(run_id: str, request: Request) -> Response:
+    result = simulation_experiment_service.get(run_id)
+    try:
+        archive = experiment_evidence_zip(result, run_id)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise AppError(ErrorCode.TRAFFIC_EXPERIMENT_READ_FAILED,
+                       "Stored experiment evidence is invalid.", status_code=500) from exc
+    return Response(content=archive, media_type="application/zip", headers={
+        "Cache-Control": "no-store", "X-Request-ID": request.state.request_id,
+        "Content-Disposition": f'attachment; filename="mesh_{run_id}_evidence.zip"' })
 
 
 @router.get("/experiments/{run_id}")

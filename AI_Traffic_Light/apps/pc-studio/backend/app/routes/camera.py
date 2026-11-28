@@ -463,6 +463,15 @@ def native_evaluation_capture(request: Request, epoch: str,
         "Content-Disposition":f'attachment; filename="mesh-native-g{generation}-t{tick}.zip"'})
 
 
+@router.get("/simulation/native-evaluation/detector-control")
+def native_detector_control(request: Request, epoch: str,
+                            generation: int = Query(ge=0), tick: int = Query(ge=0)) -> dict:
+    # Only current exact session-generated data; never open retained holdout files.
+    from app.services.native_snapshot_evaluation import evaluate_native_snapshot
+    archive = native_evaluation_service.capture(epoch=epoch, generation=generation, tick=tick)
+    return ok(evaluate_native_snapshot(archive), request_id=request.state.request_id)
+
+
 @router.get("/simulation/native-evaluation/export")
 def native_evaluation_export(request: Request, epoch: str,
                              generation: int = Query(ge=0), tick: int = Query(ge=0)) -> dict:

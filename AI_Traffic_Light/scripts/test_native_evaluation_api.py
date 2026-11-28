@@ -471,6 +471,25 @@ class Tests(unittest.TestCase):
                         self.assertEqual(meta["source_frame_number"],5)
                         self.assertEqual(meta["origin"],"synthetic_sumo_projection")
                         self.assertEqual(frame.headers["x-received-at-ms"],str(meta["source_received_at_ms"]))
+                control=assert_envelope(client.get(BASE+"/detector-control",params=params))["data"]
+                self.assertEqual(control["method"],"exact_palette_components_not_trained_model")
+                self.assertEqual(control["tick"],5)
+                self.assertEqual(control["epoch"],identity["epoch"])
+                self.assertEqual(set(control["views"]),set(VIEW_FLIPS))
+                self.assertTrue(control["capture_integrity"]["hash_manifest_verified"])
+                self.assertFalse(control["formal_holdout_used"])
+                self.assertFalse(control["production_detector_validated"])
+                self.assertFalse(control["physical_output_allowed"])
+                self.assertFalse(control["migration_authorized"])
+                for view in control["views"].values():
+                    self.assertGreaterEqual(view["palette_prediction_ms"],0)
+                    for kind in ("vehicle","pedestrian"):
+                        metric=view["score"]["by_kind"][kind]
+                        self.assertEqual(metric["truth_count"],sum(row["kind"]==kind for row in view["truth"]))
+                        self.assertEqual(metric["prediction_count"],sum(row["kind"]==kind for row in view["predictions"]))
+                        self.assertEqual(metric["recall"],round(metric["matched"]/metric["truth_count"],6) if metric["truth_count"] else None)
+                assert_envelope(client.get(BASE+"/detector-control",params={**params,"tick":4}),expected_status=409)
+                self.assertEqual(service.scene()["snapshot"]["tick"],5)
                 from app.services.inference import InferenceService
                 from app.core.exceptions import AppError
                 detector=InferenceService()

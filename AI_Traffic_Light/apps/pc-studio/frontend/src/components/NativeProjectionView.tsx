@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from "react";
-import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,fetchExactNativeFrame,nativeEvaluationExportUrl,runNativeComparison,renewNativeCamera,releaseNativeCamera,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
+import {fetchNativeProjection,fetchNativeEvaluation,nativeEvaluationCommand,nativeEvaluationCaptureUrl,fetchExactNativeFrame,nativeEvaluationExportUrl,runNativeComparison,evaluateNativeControl,type NativeControlReport,renewNativeCamera,releaseNativeCamera,type NativeProjectionScene,type NativeProjectionResponse,type NativeEvaluationState} from "../lib/remoteCameraApi";
 import {useSerialPolling} from "../lib/useSerialPolling";
 import {NativeRoad3D} from "./NativeRoad3D";
 import {NativeRegionDraft} from "./NativeRegionDraft";
@@ -48,6 +48,10 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
   const play=useRef<{epoch:string;generation:number}|null>(null);
   const [comparisonUrl,setComparisonUrl]=useState<string|null>(null);
   const [comparisonLabel,setComparisonLabel]=useState("");
+  const [controlReport,setControlReport]=useState<NativeControlReport|null>(null);
+  const [controlUrl,setControlUrl]=useState<string|null>(null);
+  useEffect(()=>()=>{if(controlUrl)URL.revokeObjectURL(controlUrl);},[controlUrl]);
+  const currentControl=controlReport&&state&&scene&&controlReport.epoch===state.epoch&&controlReport.generation===state.generation&&controlReport.tick===scene.tick&&controlReport.layout_id===scene.layout_id?controlReport:null;
   useEffect(()=>()=>{if(comparisonUrl)URL.revokeObjectURL(comparisonUrl);},[comparisonUrl]);
   const stopPlayback=()=>{play.current=null;setPlaying(false);};
   const [top,setTop]=useState(false);
@@ -145,6 +149,18 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
     }catch{if(!controller.signal.aborted)setStatus("Native evaluation command rejected; refreshing");}
     finally{active.current=null;if(!controller.signal.aborted){setPending(false);void polling.runNow();}}
   };
+  const evaluateControl=async()=>{
+    if(!state||!scene||playing||active.current||locked||cameraWorkspace)return;
+    const controller=new AbortController();active.current=controller;setPending(true);setControlReport(null);setControlUrl(null);
+    try{
+      await polling.waitForIdle();if(controller.signal.aborted)return;
+      const report=await evaluateNativeControl(state,controller.signal);
+      if(!controller.signal.aborted){
+        setControlReport(report);setControlUrl(URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"})));
+      }
+    }catch(error){if(!controller.signal.aborted)setStatus(error instanceof Error?error.message:"Synthetic detector control failed");}
+    finally{active.current=null;if(!controller.signal.aborted)setPending(false);}
+  };
   const compare=async()=>{
     if(!state||scene||active.current)return;
     const controller=new AbortController();active.current=controller;setPending(true);setComparisonUrl(null);setComparisonLabel("");
@@ -204,10 +220,19 @@ function NativeContent({sourceId,standalone,profile,initialGeometry,cameraWorksp
           <button type="button" disabled={locked||pending} onClick={()=>void command("pause",{tick:scene.tick,paused:!scene.paused})}>{scene.paused?"Resume evaluation":"Pause evaluation"}</button>
           <button type="button" disabled={locked||pending} onClick={()=>void command("stop")}>Stop evaluation</button>
           {!pending&&!playing&&<><a href={nativeEvaluationCaptureUrl(state)} aria-label="Download evaluation four-view capture">Capture ZIP</a>
-            <a href={nativeEvaluationExportUrl(state)} target="_blank" rel="noreferrer">Export JSON</a></>}
+            <a href={nativeEvaluationExportUrl(state)} target="_blank" rel="noreferrer">Export JSON</a>
+            {!cameraWorkspace&&!locked&&<button type="button" onClick={()=>void evaluateControl()}>Evaluate palette control</button>}
+            {currentControl&&controlUrl&&<a href={controlUrl} download={`mesh-palette-g${currentControl.generation}-t${currentControl.tick}.json`}>Control report JSON</a>}</>}
         </>}
       </>}
     </div>
+    {currentControl&&!pending&&!playing&&<div className="status-pill muted" style={{position:"absolute",bottom:34,left:8,right:8,zIndex:5,whiteSpace:"normal"}} role="status">
+      Palette control (not trained AI) · tick {currentControl.tick} · {sourceId} · {(["vehicle","pedestrian"] as const).map(kind=>{
+        const score=currentControl.views[sourceId]?.score.by_kind[kind];
+        const pct=(value:number|null)=>value===null?"N/A":(value*100).toFixed(1)+"%";
+        return score?`${kind}: ${score.matched}/${score.truth_count} matched, precision ${pct(score.precision)}, recall ${pct(score.recall)}`:"unavailable";
+      }).join(" · ")} · {currentControl.views[sourceId]?.palette_prediction_ms.toFixed(1)} ms palette only
+    </div>}
     <span role="status">{status}{locked?" · Another workspace owns playback":owned?" · Camera-owned session":""}{scene?` · ${scene.time_s.toFixed(1)} s · ${scene.agents.length} agents${state?.geometry?` · ${state.geometry}`:""}${scene.paused?" · paused":""}`:""}{scene?.signal?` · Requested ${scene.signal.phase.replaceAll("_"," ")} · Applied ${scene.signal.applied_vehicle_go?"vehicle":scene.signal.applied_pedestrian_walk?"pedestrian":"no new entry"}`:""}{failed?" · WebGL unavailable, 2D fallback":""}{standalone&&scene&&state?<span data-native-applied-config="true"> · Applied {state.engine??"unknown"} / {state.geometry??"unknown"} / {state.density??"unknown"} / {state.mode??"unknown"} · seed {Number.isSafeInteger(scene.seed)?scene.seed:"unknown"} · profile {state.profile??"unknown"} · Separate evaluation coordinate plane</span>:null}</span>
   </div>;
 }
