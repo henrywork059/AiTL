@@ -144,8 +144,10 @@ def export_openvino(weights, root):
 
 
 @contextmanager
-def explicit_fp32_cpu_compile():
-    """Only in isolated shape trials: prevent hardware-dependent auto BF16."""
+def explicit_fp32_cpu_compile(inference_threads=2):
+    """Only in isolated trials: prevent hardware-dependent auto BF16."""
+    if inference_threads not in (2,4):
+        raise ValueError("Unsupported experimental inference thread count")
     import openvino as ov
     original = ov.Core.compile_model
 
@@ -154,7 +156,7 @@ def explicit_fp32_cpu_compile():
             raise ValueError("Unexpected OpenVINO compilation device: "+str(device_name))
         settings = dict(config or {})
         settings.update({"INFERENCE_PRECISION_HINT":ov.Type.f32,
-                         "INFERENCE_NUM_THREADS":2,"NUM_STREAMS":1,
+                         "INFERENCE_NUM_THREADS":inference_threads,"NUM_STREAMS":1,
                          "PERFORMANCE_HINT":"LATENCY"})
         return original(core, model, device_name="CPU", config=settings, **kwargs)
 
@@ -162,11 +164,12 @@ def explicit_fp32_cpu_compile():
         yield
 
 
-def shape_runtime_verified(properties, shape_profile):
+def shape_runtime_verified(properties, shape_profile, inference_threads=2):
     from native_detector_openvino import PROPERTIES
     expected_shape = "[?,3,640,640]" if shape_profile=="static-spatial" else "[?,3,?,?]"
-    return (cpu_backend_observed(properties)
-            and all(properties.get(k)==v for k,v in PROPERTIES.items())
+    expected = {**PROPERTIES,"INFERENCE_NUM_THREADS":str(inference_threads)}
+    return (inference_threads in (2,4) and cpu_backend_observed(properties)
+            and all(properties.get(k)==v for k,v in expected.items())
             and properties.get("compiled_input_shape")==expected_shape
             and properties.get("compiled_input_type")=="f32")
 
@@ -302,6 +305,9 @@ def self_test():
                   "compiled_input_type":dynamic.input(0).element_type.get_type_name(),
                   **{k:str(dynamic.get_property(k)) for k in PROPERTIES}}
         assert shape_runtime_verified(actual,"dynamic")
+        assert not shape_runtime_verified(actual,"dynamic",4)
+        assert shape_runtime_verified({**actual,"INFERENCE_NUM_THREADS":"4"},"dynamic",4)
+        assert not shape_runtime_verified({**actual,"INFERENCE_NUM_THREADS":"4"},"dynamic",2)
         assert not shape_runtime_verified({**actual,"INFERENCE_PRECISION_HINT":"<Type: 'bfloat16'>"},"dynamic")
         assert not shape_runtime_verified(actual,"static-spatial")
         try:
@@ -317,6 +323,13 @@ def self_test():
                   **{k:str(static.get_property(k)) for k in PROPERTIES}}
         assert shape_runtime_verified(actual,"static-spatial")
     assert ov.Core.compile_model is original_compile
+    try:
+        with explicit_fp32_cpu_compile(3):
+            pass
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Unsupported thread count admitted")
     assert graph_interface(graph)[0] == [{"shape":"[?,3,640,640]","type":"f32"}]
     try:
         specialize_spatial_graph(graph)
@@ -335,11 +348,11 @@ def write(path, data):
     path.write_text(json.dumps(data,indent=2,allow_nan=False),encoding="utf-8")
 
 
-def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None, backend="pytorch", export_dir=None, shape_profile=None, parent_export=None):
+def run(captures, weights, reference, evidence, *, thread_profile=None, run_label=None, backend="pytorch", export_dir=None, shape_profile=None, parent_export=None, ov_inference_threads=2):
     if platform.system() != "Linux" or file_sha256(weights) != CHECKPOINT:
         raise ValueError("Expected isolated Linux and frozen checkpoint")
     ref = json.loads(reference.read_text(encoding="utf-8"))
-    reference_artifact = 15253776453 if shape_profile is not None else 15249412930
+    reference_artifact = 15254202779 if shape_profile is not None else 15249412930
     reference_method = "tiled-stream-reuse-openvino-v1" if shape_profile is not None else METHOD
     if (ref["model_sha256"] != CHECKPOINT or ref["method"] != reference_method or ref["capture_count"] != 16
             or ref["production_detector_validated"] is not False
@@ -353,6 +366,8 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
         if file_sha256(captures/name) != expected[name]["archive_sha256"]:
             raise ValueError("Unexpected capture digest")
     evidence.mkdir(parents=True,exist_ok=False)
+    if ov_inference_threads not in (2,4) or (ov_inference_threads!=2 and shape_profile!="dynamic"):
+        raise ValueError("Experimental thread change requires audited dynamic graph")
     if shape_profile is not None and (backend!="openvino" or thread_profile!="2"):
         raise ValueError("Shape trial requires OpenVINO with two surrounding threads")
     descriptor = method_descriptor()
@@ -367,7 +382,8 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
     runtime = {"backend":backend,"requested_torch_intraop":thread_profile,"omp_num_threads":os.getenv("OMP_NUM_THREADS"),
                "profile_source_sha256":file_sha256(Path(__file__)), "export":export,
                "shape_profile":shape_profile,
-               "compilation_policy":"explicit-fp32-cpu-2-threads-1-stream-latency" if shape_profile is not None else "library-default",
+               "compilation_policy":f"explicit-fp32-cpu-{ov_inference_threads}-threads-1-stream-latency" if shape_profile is not None else "library-default",
+               "requested_ov_inference_threads":ov_inference_threads if shape_profile is not None else None,
                "qualification_scope":"development-only; not a formal schema-2 method"}
     write(evidence/"plan.json", {"method":descriptor,"model_sha256":CHECKPOINT,
         "reference_artifact":reference_artifact,"capture_artifact":15245454146,
@@ -459,10 +475,10 @@ def run(captures, weights, reference, evidence, *, thread_profile=None, run_labe
     if shape_profile is not None:
         warmup_observed = [c["openvino_properties"] for c in warmup["calls"]]
         backend_observed = (backend_observed and bool(warmup_observed)
-                            and all(shape_runtime_verified(p,shape_profile)
+                            and all(shape_runtime_verified(p,shape_profile,ov_inference_threads)
                                     for p in observed+warmup_observed))
         runtime["warmup_openvino_properties_verified"] = bool(warmup_observed) and all(
-            shape_runtime_verified(p,shape_profile) for p in warmup_observed)
+            shape_runtime_verified(p,shape_profile,ov_inference_threads) for p in warmup_observed)
         thread_consistent = thread_consistent and all(v["torch_num_interop_threads"]==4 for v in rows)
     runtime["actual_torch_intraop"] = expected_threads
     runtime["actual_torch_interop"] = sorted({v["torch_num_interop_threads"] for v in rows})
@@ -501,6 +517,7 @@ if __name__=="__main__":
     p.add_argument("mode",choices=("self-test","run","export","specialize"))
     p.add_argument("--shape-profile",choices=("dynamic","static-spatial"))
     p.add_argument("--parent-export",type=Path)
+    p.add_argument("--ov-inference-threads",type=int,choices=(2,4),default=2)
     p.add_argument("--backend",choices=("pytorch","openvino"),default="pytorch")
     p.add_argument("--export-dir",type=Path)
     p.add_argument("--thread-profile",choices=("default","1","2","4"))
@@ -521,5 +538,5 @@ if __name__=="__main__":
     else:
         if not all((a.captures,a.weights,a.reference,a.evidence)):
             p.error("run requires all inputs")
-        with explicit_fp32_cpu_compile() if a.shape_profile is not None else nullcontext():
-            run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir,shape_profile=a.shape_profile,parent_export=a.parent_export)
+        with explicit_fp32_cpu_compile(a.ov_inference_threads) if a.shape_profile is not None else nullcontext():
+            run(a.captures,a.weights,a.reference,a.evidence,thread_profile=a.thread_profile,run_label=a.run_label,backend=a.backend,export_dir=a.export_dir,shape_profile=a.shape_profile,parent_export=a.parent_export,ov_inference_threads=a.ov_inference_threads)

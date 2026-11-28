@@ -1,4 +1,4 @@
-name: Update 28C OpenVINO spatial shape specialization trial
+name: Update 28C OpenVINO FP32 inference thread trial
 on:
   push:
     branches: [feature/interactive-3d-simulation]
@@ -36,8 +36,8 @@ jobs:
           echo '3c9759f3b77dba00896bd92d6fe79646b1e1b42de7713e80a1ab24f614b6ac62  '"$RUNNER_TEMP/tiles.zip" | sha256sum -c -
           unzip -p "$RUNNER_TEMP/tiles.zip" tile-evidence/tile-development-last.pt > "$RUNNER_TEMP/tile-last.pt"
           echo '9c888355e3228db090c98969672a4418eb207e1c0ffa926746091485da84ecba  '"$RUNNER_TEMP/tile-last.pt" | sha256sum -c -
-          gh api repos/henrywork059/AiTL/actions/artifacts/15253776453/zip > "$RUNNER_TEMP/reference.zip"
-          echo 'f1dd09497b0265e3b23ea4c4d20172aecfdcdc10e0917e18b7316bb4b3cab719  '"$RUNNER_TEMP/reference.zip" | sha256sum -c -
+          gh api repos/henrywork059/AiTL/actions/artifacts/15254202779/zip > "$RUNNER_TEMP/reference.zip"
+          echo '7565741655484d2901b4c26fbece790e52f58cf7aca600462f22233bd353b2ce  '"$RUNNER_TEMP/reference.zip" | sha256sum -c -
           unzip -p "$RUNNER_TEMP/reference.zip" method-evidence/development-evaluation.json > "$RUNNER_TEMP/reference.json"
           gh api repos/henrywork059/AiTL/actions/artifacts/15253197259/zip > "$RUNNER_TEMP/backend.zip"
           echo '03b475ee1ba95b3602f6de7ec5afd262a1c98d6db4a560dfb5a418976286f1ed  '"$RUNNER_TEMP/backend.zip" | sha256sum -c -
@@ -51,9 +51,7 @@ jobs:
           python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
       - name: Verify timing proxy invariants
         run: python .github/scripts/native_detector_profile_trial.py self-test
-      - name: Specialize audited OpenVINO graph spatial dimensions only
-        run: python .github/scripts/native_detector_profile_trial.py specialize --parent-export "$RUNNER_TEMP/backend-model" --export-dir "$RUNNER_TEMP/specialized-model"
-      - name: Execute counterbalanced fresh-process graph shape profiles
+      - name: Execute counterbalanced fresh-process dynamic graph thread profiles
         env:
           YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
         run: |
@@ -64,18 +62,15 @@ jobs:
           status=0
           for round in 1 2; do
             if [ "$round" = 1 ]; then
-              order="dynamic static-spatial"
+              order="2 4"
             else
-              order="static-spatial dynamic"
+              order="4 2"
             fi
-            for shape in $order; do
-              label="r${round}-${shape}"
+            for threads in $order; do
+              label="r${round}-ov${threads}"
               rc=0
               extra=(--export-dir "$RUNNER_TEMP/backend-model")
-              if [ "$shape" = static-spatial ]; then
-                extra=(--export-dir "$RUNNER_TEMP/specialized-model" --parent-export "$RUNNER_TEMP/backend-model")
-              fi
-              python .github/scripts/native_detector_profile_trial.py run --backend openvino --shape-profile "$shape" --thread-profile 2 --run-label "$label" --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence/$label" "${extra[@]}" || rc=$?
+              python .github/scripts/native_detector_profile_trial.py run --backend openvino --shape-profile dynamic --ov-inference-threads "$threads" --thread-profile 2 --run-label "$label" --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence/$label" "${extra[@]}" || rc=$?
               printf '%s,%s\n' "$label" "$rc" >> "$RUNNER_TEMP/profile-evidence/exit-codes.csv"
               if [ "$rc" != 0 ]; then status=1; fi
             done
@@ -84,12 +79,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mesh-28c-openvino-spatial-explicit-fp32-development
+          name: mesh-28c-openvino-fp32-thread-development
           retention-days: 14
           path: |
             ${{ runner.temp }}/profile-evidence/
             ${{ runner.temp }}/backend-model/
-            ${{ runner.temp }}/specialized-model/
             ${{ runner.temp }}/python-packages.txt
             ${{ runner.temp }}/cpu-info.txt
           if-no-files-found: warn
