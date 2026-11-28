@@ -137,7 +137,7 @@ def make_dataset(captures, work, evidence):
     return yaml
 
 
-def predict_view(content, ann, view, model):
+def predict_view(content, ann, view, model, *, batch_size=8):
     image=cv2.imdecode(np.frombuffer(content,np.uint8),cv2.IMREAD_COLOR)
     windows_xy=windows()
     crops=[image[y:y+TILE,x:x+TILE].copy() for x,y in windows_xy]
@@ -145,8 +145,10 @@ def predict_view(content, ann, view, model):
     mapped=[]
     unmapped=[]
     # Bounded batches. Never publish crops or outputs to live inference.
-    for offset in range(0,len(crops),8):
-        batch=crops[offset:offset+8]
+    if not isinstance(batch_size, int) or not 1 <= batch_size <= len(crops):
+        raise ValueError("Invalid offline tile batch size")
+    for offset in range(0,len(crops),batch_size):
+        batch=crops[offset:offset+batch_size]
         results=model.predict(source=batch,imgsz=TILE_SETTINGS["imgsz"],conf=CONFIDENCE,
                               device="cpu",verbose=False,save=False)
         if len(results)!=len(batch):
