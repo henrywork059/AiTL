@@ -1,4 +1,4 @@
-name: Update 28C inference-stage development profile
+name: Update 28C CPU thread allocation development trial
 on:
   push:
     branches: [feature/interactive-3d-simulation]
@@ -48,17 +48,34 @@ jobs:
           python -m pip freeze > "$RUNNER_TEMP/python-packages.txt"
       - name: Verify timing proxy invariants
         run: python .github/scripts/native_detector_profile_trial.py self-test
-      - name: Measure actual inference stages on development only
+      - name: Execute counterbalanced fresh-process CPU thread profiles
         env:
           YOLO_CONFIG_DIR: ${{ runner.temp }}/mesh-yolo-config
         run: |
           set -euo pipefail
           lscpu > "$RUNNER_TEMP/cpu-info.txt"
-          python .github/scripts/native_detector_profile_trial.py run --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence"
+          # Same runner, fresh process per repetition. Preserve failed profiles.
+          mkdir -p "$RUNNER_TEMP/profile-evidence"
+          status=0
+          for round in 1 2; do
+            if [ "$round" = 1 ]; then
+              order="default 2 1 4"
+            else
+              order="4 1 2 default"
+            fi
+            for profile in $order; do
+              label="r${round}-${profile}"
+              rc=0
+              python .github/scripts/native_detector_profile_trial.py run --thread-profile "$profile" --run-label "$label" --captures "$RUNNER_TEMP/development-captures/val" --weights "$RUNNER_TEMP/tile-last.pt" --reference "$RUNNER_TEMP/reference.json" --evidence "$RUNNER_TEMP/profile-evidence/$label" || rc=$?
+              printf '%s,%s\n' "$label" "$rc" >> "$RUNNER_TEMP/profile-evidence/exit-codes.csv"
+              if [ "$rc" != 0 ]; then status=1; fi
+            done
+          done
+          exit "$status"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mesh-28c-inference-profile-development
+          name: mesh-28c-thread-allocation-development
           retention-days: 14
           path: |
             ${{ runner.temp }}/profile-evidence/
